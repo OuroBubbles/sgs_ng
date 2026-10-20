@@ -6,7 +6,7 @@
 
 ## 本地运行
 
-需要 Node.js 24 和 pnpm 11.25.0。
+需要 Node.js 24 和 pnpm 11.25.0。工作区内先激活环境，再用 `sgs-ng install` / `sgs-ng dev`；`sgs-ng check` 转发下面的完整检查，`sgs-ng typecheck` 只做类型检查，`sgs-ng ui` 包含内容包准备。
 
 ```sh
 pnpm install --frozen-lockfile
