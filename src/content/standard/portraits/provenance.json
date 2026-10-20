@@ -1,0 +1,180 @@
+{
+  "usage": "Private project reference assets supplied by the user; original bytes copied unchanged, no redistribution permission asserted.",
+  "images": [
+    {
+      "id": "standard:guanyu",
+      "source": "noname/resources/app/image/character/guanyu.jpg",
+      "file": "guanyu.jpg",
+      "bytes": 273401,
+      "sha256": "2fd8ffecf64070f5eb11fee2e6485b06cea90f0163d6a56a346df3e363a4c352"
+    },
+    {
+      "id": "standard:huanggai",
+      "source": "noname/resources/app/image/character/huanggai.jpg",
+      "file": "huanggai.jpg",
+      "bytes": 262147,
+      "sha256": "037591d57ff96a1dcf234e2b3ae6a62197e6c18573bc856714c0d87e85ff4233"
+    },
+    {
+      "id": "standard:sunshangxiang",
+      "source": "noname/resources/app/image/character/sunshangxiang.jpg",
+      "file": "sunshangxiang.jpg",
+      "bytes": 250689,
+      "sha256": "d6e99b100574b79336111a4dd970c68f7fba3e65a6ae099d0d49675327c0471a"
+    },
+    {
+      "id": "standard:zhaoyun",
+      "source": "noname/resources/app/image/character/zhaoyun.jpg",
+      "file": "zhaoyun.jpg",
+      "bytes": 292613,
+      "sha256": "391ceaca9de745410b5ce40fd3e91f9b045f7fcdb27d30a29fd5a947083bdf99"
+    },
+    {
+      "id": "standard:zhangfei",
+      "source": "noname/resources/app/image/character/zhangfei.jpg",
+      "file": "zhangfei.jpg",
+      "bytes": 208526,
+      "sha256": "c0649bd0b7e01edc53c30bc6b06330e5d9612b143d0504aa6b0ff4aed921a035"
+    },
+    {
+      "id": "standard:ganning",
+      "source": "noname/resources/app/image/character/ganning.jpg",
+      "file": "ganning.jpg",
+      "bytes": 287158,
+      "sha256": "9bfb5af00b30ea9049bbe4b4f3845ffb9289ac3fb6d400764736b8ed23354fbe"
+    },
+    {
+      "id": "standard:xiahoudun",
+      "source": "noname/resources/app/image/character/xiahoudun.jpg",
+      "file": "xiahoudun.jpg",
+      "bytes": 296929,
+      "sha256": "b1140dcec5e327e0c2ea7077818c0513b49e5b71da6e27148f0f05f9b0d10161"
+    },
+    {
+      "id": "standard:xuchu",
+      "source": "noname/resources/app/image/character/xuzhu.jpg",
+      "file": "xuchu.jpg",
+      "bytes": 255701,
+      "sha256": "8be4a3cc0360c9a3375fdfeb0050cd508cb66207963c3e4178a8b201a26322a4"
+    },
+    {
+      "id": "standard:zhenji",
+      "source": "noname/resources/app/image/character/zhenji.jpg",
+      "file": "zhenji.jpg",
+      "bytes": 279268,
+      "sha256": "7b50da395225cc05dce9d499a7e89089920583aa090b27fdd29dbe16294237f0"
+    },
+    {
+      "id": "standard:simayi",
+      "source": "noname/resources/app/image/character/simayi.jpg",
+      "file": "simayi.jpg",
+      "bytes": 243318,
+      "sha256": "ac1534eaa0e7096765a49d4cebb49da101e0cb8c20127a53a79232dc678c581b"
+    },
+    {
+      "id": "standard:guojia",
+      "source": "noname/resources/app/image/character/guojia.jpg",
+      "file": "guojia.jpg",
+      "bytes": 252387,
+      "sha256": "90bb11e2e3331e624112a23783637905380112f3b5b5bd51c41934c4b7268e18"
+    },
+    {
+      "id": "standard:caocao",
+      "source": "noname/resources/app/image/character/caocao.jpg",
+      "file": "caocao.jpg",
+      "bytes": 284096,
+      "sha256": "f197f695a0daf4a90f36d3b8ad25ffe7e58d1353b03b74018568ef9f730f8316"
+    },
+    {
+      "id": "standard:zhangliao",
+      "source": "noname/resources/app/image/character/zhangliao.jpg",
+      "file": "zhangliao.jpg",
+      "bytes": 245194,
+      "sha256": "2ee33e46842a3efd14cd11de094af10b214cf72446926090c026155f0539567d"
+    },
+    {
+      "id": "standard:liubei",
+      "source": "noname/resources/app/image/character/liubei.jpg",
+      "file": "liubei.jpg",
+      "bytes": 265533,
+      "sha256": "624d9fedd5d83858d1d62819317eab34bd9a245a5a539b48d51de61f75d00186"
+    },
+    {
+      "id": "standard:huatuo",
+      "source": "noname/resources/app/image/character/huatuo.jpg",
+      "file": "huatuo.jpg",
+      "bytes": 230616,
+      "sha256": "0b544c57e829c076d0bc540f71eb3698c9426fcafe07b99decfe8d67db5ec883"
+    },
+    {
+      "id": "standard:sunquan",
+      "source": "noname/resources/app/image/character/sunquan.jpg",
+      "file": "sunquan.jpg",
+      "bytes": 263598,
+      "sha256": "f52a7e92f5a9b3f134b353637046071b8bf9e24751691128ff86379c83ca4dd1"
+    },
+    {
+      "id": "standard:lvmeng",
+      "source": "noname/resources/app/image/character/lvmeng.jpg",
+      "file": "lvmeng.jpg",
+      "bytes": 197507,
+      "sha256": "5a4de880787e8325aefa1f25804d0ff3cf99b68889893200786483c255b5260e"
+    },
+    {
+      "id": "standard:luxun",
+      "source": "noname/resources/app/image/character/luxun.jpg",
+      "file": "luxun.jpg",
+      "bytes": 265907,
+      "sha256": "e44f50b310ab7c40f625bd04b51327fbec1d44f48e7b7dab55de5c7c14446ac1"
+    },
+    {
+      "id": "standard:huangyueying",
+      "source": "noname/resources/app/image/character/huangyueying.jpg",
+      "file": "huangyueying.jpg",
+      "bytes": 200263,
+      "sha256": "90a6b80e13fa3a37cba82b6682ba6b838e822bfc4e870a76e22a2f35104c3ef1"
+    },
+    {
+      "id": "standard:lvbu",
+      "source": "noname/resources/app/image/character/lvbu.jpg",
+      "file": "lvbu.jpg",
+      "bytes": 262586,
+      "sha256": "53b84c31aac54d77ed0a091855cc8dd1880b51a3e4d7640f5347472b0a110ded"
+    },
+    {
+      "id": "standard:daqiao",
+      "source": "noname/resources/app/image/character/daqiao.jpg",
+      "file": "daqiao.jpg",
+      "bytes": 246836,
+      "sha256": "85f08254854aeffa6425959902f2fb5646fac002882ec37833ab4c5c16f1e390"
+    },
+    {
+      "id": "standard:machao",
+      "source": "noname/resources/app/image/character/machao.jpg",
+      "file": "machao.jpg",
+      "bytes": 244790,
+      "sha256": "3fb90413880158b18864d77c6086d5cdb8be5e74e7c65f7ea2926a0c9e321eed"
+    },
+    {
+      "id": "standard:zhouyu",
+      "source": "noname/resources/app/image/character/zhouyu.jpg",
+      "file": "zhouyu.jpg",
+      "bytes": 247039,
+      "sha256": "590213bd0cf547b50a491170a68de11b3178f2701de1e8adce982a1ab58368fc"
+    },
+    {
+      "id": "standard:diaochan",
+      "source": "noname/resources/app/image/character/diaochan.jpg",
+      "file": "diaochan.jpg",
+      "bytes": 276064,
+      "sha256": "d0ed3ec281faf0738e370e0d8a0a96d825ccdbb4f729cf773ed3b4228421e8b4"
+    },
+    {
+      "id": "standard:zhugeliang",
+      "source": "noname/resources/app/image/character/zhugeliang.jpg",
+      "file": "zhugeliang.jpg",
+      "bytes": 280047,
+      "sha256": "d988db58433c0aec4743a884629895148d4a6feecf62b7fe10c5996a0d28ba17"
+    }
+  ]
+}

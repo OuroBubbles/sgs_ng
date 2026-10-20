@@ -1,0 +1,12 @@
+freekill/
+noname/
+node_modules/
+.tools/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.artifacts/
+test-results/
+playwright-report/
+pnpm-lock.yaml
+public/spine/

@@ -1,0 +1,869 @@
+import { DecisionHub } from '../decisions/hub';
+import type { DecisionResult, Decision } from '../decisions/hub';
+import { Journal } from '../history/journal';
+import type { Cause, Fact, HistoryReader } from '../history/journal';
+import type { Change, WorldReader, WorldSeed } from '../model/state';
+import { World } from '../state/world';
+import { Random } from './random';
+import { RuleAbort, Scope } from './scope';
+import type {
+  Trigger,
+  TriggerSource,
+  WindowOptions,
+  WindowType,
+  TriggerOccurrence,
+  ActionAnchor,
+  WindowRef,
+  WindowAdmission,
+} from './window';
+
+export type FlowBody<T> = (ctx: Context) => T | Promise<T>;
+
+export type FlowResult<T> =
+  | { readonly kind: 'resolved'; readonly value: T }
+  | { readonly kind: 'aborted'; readonly reason: string };
+
+interface Operations {
+  readonly assertWriting: () => void;
+  readonly query: <T>(body: () => T) => T;
+  readonly flow: <T>(kind: string, body: FlowBody<T>, reason: string) => Promise<FlowResult<T>>;
+  readonly window: <T>(
+    type: WindowType<T>,
+    payload: T,
+    options: WindowOptions,
+  ) => Promise<FlowResult<void>>;
+  readonly ask: <T>(spec: Decision<T>) => Promise<DecisionResult<T>>;
+  readonly commit: <T>(kind: string, changes: readonly Change[], detail: T) => Fact<T>;
+  readonly random: (bound: number) => number;
+  readonly actionOrder: (subject?: string) => readonly string[];
+  readonly listen: <T>(type: WindowType<T>, trigger: Trigger<T>) => () => void;
+  readonly windowOf: <T>(type: WindowType<T>) => WindowRef<T> | null;
+  readonly include: <T>(
+    window: WindowRef<T>,
+    source: TriggerSource,
+    select?: (trigger: Trigger<T>) => boolean,
+  ) => WindowAdmission;
+}
+
+/** 显式因果上下文；一个上下文同一时刻只能等待一个子操作。 */
+export class Context {
+  #busy: string | null = null;
+
+  constructor(
+    readonly cause: Cause,
+    private readonly lifetime: Scope,
+    readonly world: WorldReader,
+    readonly history: HistoryReader,
+    private readonly operations: Operations,
+  ) {}
+
+  get scope(): Pick<Scope, 'id' | 'active'> {
+    return this.lifetime;
+  }
+
+  /** 领域草案使用这个守卫；开放子窗口时草案仍可改，纯查询和关闭后不能改。 */
+  assertActive(): void {
+    this.operations.assertWriting();
+    this.lifetime.assertActive();
+  }
+
+  flow<T>(kind: string, body: FlowBody<T>, reason = kind): Promise<FlowResult<T>> {
+    return this.#wait(kind, () => this.operations.flow(kind, body, reason));
+  }
+
+  /**
+   * 显式取出已经 await 完成的子流程结果；中止沿当前调用者的作用域继续传播。
+   * 不把业务上的 declined/unavailable 变成中止，不回滚已提交事实，也不捕获异常。
+   */
+  unwrap<T>(result: FlowResult<T>): T {
+    this.#assertIdle();
+    if (result.kind === 'aborted') return this.abort(result.reason);
+    return result.value;
+  }
+
+  window<T>(
+    type: WindowType<T>,
+    payload: T,
+    options: WindowOptions = {},
+  ): Promise<FlowResult<void>> {
+    const selection = Object.freeze({ ...options });
+    return this.#wait(type.id, () => this.operations.window(type, payload, selection));
+  }
+
+  /** 最近的同类型祖先窗口；可在进入同名嵌套窗口前捕获明确的外层引用。 */
+  windowOf<T>(type: WindowType<T>): WindowRef<T> | null {
+    return this.query(() => this.operations.windowOf(type));
+  }
+
+  /** 显式收集一个已挂接来源的新候选；不复活已处理身份、不倒退窗口游标。 */
+  include<T>(
+    window: WindowRef<T>,
+    source: TriggerSource,
+    select?: (trigger: Trigger<T>) => boolean,
+  ): WindowAdmission {
+    this.#assertIdle();
+    return this.operations.include(window, source, select);
+  }
+
+  /** 按本局模式取得当前完整座次序，包含死亡席位；调用者再按实时资格筛选。 */
+  actionOrder(subject?: string): readonly string[] {
+    return this.query(() => this.operations.actionOrder(subject));
+  }
+
+  ask<T>(spec: Decision<T>): Promise<DecisionResult<T>> {
+    return this.#wait('decision', () => this.operations.ask(spec));
+  }
+
+  commit<T>(kind: string, changes: readonly Change[], detail: T): Fact<T> {
+    this.#assertIdle();
+    return this.operations.commit(kind, changes, detail);
+  }
+
+  randomInt(bound: number): number {
+    this.#assertIdle();
+    return this.operations.random(bound);
+  }
+
+  /** 纯查询也可直接读 world；这个入口为组合查询添加运行时写入守卫。 */
+  query<T>(body: () => T): T {
+    this.lifetime.assertActive();
+    return this.operations.query(body);
+  }
+
+  listen<T>(type: WindowType<T>, trigger: Trigger<T>): void {
+    this.#assertIdle();
+    const unregister = this.operations.listen(type, trigger);
+    this.lifetime.onClose(unregister);
+  }
+
+  defer(cleanup: () => void): void {
+    this.#assertIdle();
+    this.lifetime.onClose(cleanup);
+  }
+
+  abort(reason: string): never {
+    this.#assertIdle();
+    this.lifetime.close(reason);
+    throw new RuleAbort(reason);
+  }
+
+  /** 运行时出口检查，避免遗漏 await 的子操作逃出父流程。 */
+  assertSettled(): void {
+    if (this.#busy) throw new Error(`Unawaited child operation: ${this.#busy}`);
+    this.lifetime.assertActive();
+  }
+
+  #assertIdle(): void {
+    this.operations.assertWriting();
+    this.lifetime.assertActive();
+    if (this.#busy) throw new Error(`Concurrent rule operation while waiting for ${this.#busy}.`);
+  }
+
+  #wait<T>(kind: string, work: () => Promise<T>): Promise<T> {
+    this.#assertIdle();
+    this.#busy = kind;
+    let pending: Promise<T>;
+    try {
+      pending = work();
+    } catch (error) {
+      this.#busy = null;
+      throw error;
+    }
+    const result = pending.then(
+      (value) => {
+        this.#busy = null;
+        this.operations.assertWriting();
+        this.lifetime.assertActive();
+        return value;
+      },
+      (error: unknown) => {
+        this.#busy = null;
+        throw error;
+      },
+    );
+    // 即使作者漏 await，错误也由父出口/Room 故障诊断接住，不产生游离拒绝。
+    result.catch(() => undefined);
+    return result;
+  }
+}
+
+interface Registration {
+  readonly label: string;
+  readonly token: object;
+  readonly id: string;
+  readonly owner: string | null;
+  readonly group: string;
+  readonly order: 'automatic' | 'choose';
+  active: boolean;
+  readonly times?: (ctx: Context, payload: unknown) => number;
+  readonly eligible: (ctx: Context, payload: unknown, occurrence: TriggerOccurrence) => boolean;
+  readonly run: (
+    ctx: Context,
+    payload: unknown,
+    occurrence: TriggerOccurrence,
+  ) => void | Promise<void>;
+}
+interface WindowCandidate {
+  readonly registration: Registration;
+  readonly id: string;
+  readonly label: string;
+  readonly occurrence: TriggerOccurrence;
+}
+
+interface ActiveWindow {
+  readonly ref: WindowRef<unknown>;
+  readonly scopeId: string;
+  include(
+    caller: Context,
+    source: TriggerSource,
+    select?: (trigger: unknown) => boolean,
+  ): WindowAdmission;
+}
+
+export interface RoomOptions {
+  readonly id: string;
+  readonly seed: number;
+  readonly world: WorldSeed;
+  /** 本局模式的默认起点；未安装时按主体回退。特殊窗口可显式覆盖。 */
+  readonly actionAnchor?: ActionAnchor;
+}
+
+/** 每局独立的执行者。没有全局 currentRoom/currentEvent，也没有 UI 或计时器依赖。 */
+export class Room {
+  readonly history = new Journal();
+  readonly decisions: DecisionHub;
+  readonly world: WorldReader;
+  #state: World;
+  #random: Random;
+  #lifetime: Scope;
+  #status: 'ready' | 'running' | 'faulted' | 'ended' = 'ready';
+  #failure: unknown;
+  #nextFlow = 0;
+  #queryDepth = 0;
+  #id: string;
+  #windows = new Map<string, object>();
+  #triggers = new Map<string, Registration>();
+  #sources = new Map<TriggerSource, object>();
+  #openWindows = new Map<object, ActiveWindow>();
+  #finishReason: string | null = null;
+  #actionAnchor: ActionAnchor | null;
+
+  constructor(options: RoomOptions) {
+    if (!options.id) throw new Error('Room requires a stable ID.');
+    this.#id = options.id;
+    this.#actionAnchor = options.actionAnchor ?? null;
+    this.#state = new World(options.world);
+    this.world = this.#state.reader;
+    this.#random = new Random(options.seed);
+    this.#lifetime = new Scope(`${options.id}:match`, null);
+    this.decisions = new DecisionHub(
+      options.id,
+      () => this.world.snapshot.revision,
+      this.history,
+      (body) => this.#query(body),
+      (error, cause) => this.#freeze(error, cause),
+    );
+  }
+
+  get status(): 'ready' | 'running' | 'faulted' | 'ended' {
+    return this.#status;
+  }
+
+  /** 同步只读投影；不启动流程、不消费随机源或因果编号，返回后上下文立即关闭。 */
+  inspect<T>(body: (ctx: Context) => T): T {
+    const scope = new Scope(`${this.#id}:inspection`, null);
+    const deny = (): never => {
+      throw new Error('Inspection is read-only.');
+    };
+    const cause: Cause = Object.freeze({
+      flowId: `${this.#id}:inspection`,
+      parentFlowId: null,
+      scopeId: scope.id,
+      scopePath: scope.path,
+      reason: 'inspection',
+    });
+    const ctx: Context = new Context(cause, scope, this.world, this.history, {
+      assertWriting: deny,
+      query: (read) => this.#query(read),
+      actionOrder: (subject) => this.#actionOrder(ctx, subject),
+      flow: deny,
+      window: deny,
+      ask: deny,
+      commit: deny,
+      random: deny,
+      listen: deny,
+      windowOf: () => null,
+      include: deny,
+    });
+    try {
+      return this.#query(() => body(ctx));
+    } finally {
+      scope.close('Inspection finished.');
+    }
+  }
+
+  run<T>(kind: string, body: FlowBody<T>): Promise<FlowResult<T>> {
+    if (this.#status !== 'ready') throw new Error(`Room cannot start a flow: ${this.#status}`);
+    this.#assertWriting();
+    this.#status = 'running';
+    const result = this.#execute(this.#lifetime, null, kind, body, kind).finally(() => {
+      if (this.#status === 'running') {
+        if (this.#finishReason !== null) this.#finish();
+        else this.#status = 'ready';
+      }
+    });
+    result.catch(() => undefined);
+    return result;
+  }
+
+  /** 停止新决策，当前根流程完成善后后再关闭；与立即 abort 分开。 */
+  finish(reason: string): void {
+    if (this.#status === 'ended' || this.#status === 'faulted' || this.#finishReason !== null)
+      return;
+    this.#assertWriting();
+    if (!reason) throw new Error('Finishing a room requires a reason.');
+    this.#finishReason = reason;
+    this.decisions.stop(reason);
+    if (this.#status === 'ready') this.#finish();
+  }
+
+  #finish(): void {
+    this.#status = 'ended';
+    try {
+      this.#lifetime.close(this.#finishReason ?? 'Room finished.');
+    } catch (error) {
+      this.#freeze(error, {
+        flowId: `${this.#id}:control`,
+        parentFlowId: null,
+        scopeId: this.#lifetime.id,
+        scopePath: this.#lifetime.path,
+        reason: 'finish',
+      });
+      throw error;
+    }
+  }
+
+  /** 终止整局，关闭全部等待；结束后的 Room 不允许再次进入。 */
+  abort(reason: string): void {
+    if (this.#status === 'ended' || this.#status === 'faulted') return;
+    this.#assertWriting();
+    this.#status = 'ended';
+    try {
+      this.#lifetime.close(reason);
+    } catch (error) {
+      this.#freeze(error, {
+        flowId: `${this.#id}:control`,
+        parentFlowId: null,
+        scopeId: this.#lifetime.id,
+        scopePath: this.#lifetime.path,
+        reason,
+      });
+      throw error;
+    }
+  }
+
+  on<T>(type: WindowType<T>, trigger: Trigger<T>): () => void {
+    this.#assertWriting();
+    this.#checkWindow(type);
+    if (!trigger.id || this.#triggers.has(trigger.id))
+      throw new Error(`Duplicate trigger: ${trigger.id}`);
+    const group = trigger.group ?? 'main';
+    if (!type.groups.includes(group)) throw new Error(`Unknown window group: ${group}`);
+    if (trigger.owner !== null) this.world.player(trigger.owner);
+    if (trigger.owner === null && trigger.order === 'choose')
+      throw new Error('Ordered choice requires an owner.');
+    const entry: Registration = {
+      token: type,
+      id: trigger.id,
+      label: trigger.label ?? trigger.id,
+      owner: trigger.owner,
+      group,
+      order: trigger.order ?? 'automatic',
+      active: true,
+      ...(trigger.times === undefined
+        ? {}
+        : { times: (ctx: Context, payload: unknown) => trigger.times!(ctx, payload as T) }),
+      // token 的对象身份保证这里只会接收声明的 T。
+      eligible: (ctx, payload, occurrence) => trigger.eligible(ctx, payload as T, occurrence),
+      run: (ctx, payload, occurrence) => trigger.run(ctx, payload as T, occurrence),
+    };
+    this.#triggers.set(entry.id, entry);
+    return () => {
+      if (this.#queryDepth) throw new Error('Pure queries cannot unregister triggers.');
+      entry.active = false;
+      if (this.#triggers.get(entry.id) === entry) this.#triggers.delete(entry.id);
+    };
+  }
+
+  addTriggerSource(source: TriggerSource): () => void {
+    this.#assertWriting();
+    if (this.#sources.has(source)) throw new Error('Trigger source is already installed.');
+    const registration = {};
+    this.#sources.set(source, registration);
+    return () => {
+      if (this.#queryDepth) throw new Error('Pure queries cannot unregister trigger sources.');
+      if (this.#sources.get(source) === registration) this.#sources.delete(source);
+    };
+  }
+
+  /** 执行侧资源随整局结束清理；与会生成规则事实的异步善后分开。 */
+  onClose(cleanup: () => void): () => void {
+    this.#assertWriting();
+    const remove = this.#lifetime.onClose(cleanup);
+    return () => {
+      if (this.#queryDepth) throw new Error('Pure queries cannot unregister Room cleanup.');
+      remove();
+    };
+  }
+
+  #assertWriting(): void {
+    if (this.#status === 'faulted') throw this.#failure;
+    this.#lifetime.assertActive();
+    if (this.#queryDepth) throw new Error('Pure queries cannot perform rule operations.');
+  }
+
+  #query<T>(body: () => T): T {
+    this.#queryDepth++;
+    try {
+      const value = body();
+      if (value !== null && typeof value === 'object' && 'then' in value)
+        throw new Error('Queries cannot await.');
+      return value;
+    } finally {
+      this.#queryDepth--;
+    }
+  }
+
+  #freeze(error: unknown, cause: Cause): void {
+    if (this.#status === 'faulted') return;
+    this.#failure = error;
+    this.#status = 'faulted';
+    this.history.trace(cause, 'fault', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    try {
+      this.#lifetime.close('Room faulted.');
+    } catch {
+      /* 保留最初故障，资源清理已逐项尝试。 */
+    }
+  }
+
+  async #execute<T>(
+    parent: Scope,
+    parentCause: Cause | null,
+    kind: string,
+    body: FlowBody<T>,
+    reason: string,
+  ): Promise<FlowResult<T>> {
+    this.#assertWriting();
+    parent.assertActive();
+    const id = ++this.#nextFlow;
+    const scope = new Scope(`${this.#id}:scope:${id}`, parent);
+    const cause: Cause = Object.freeze({
+      flowId: `${this.#id}:flow:${id}`,
+      parentFlowId: parentCause?.flowId ?? null,
+      scopeId: scope.id,
+      scopePath: scope.path,
+      reason,
+    });
+    this.history.trace(cause, 'flow.open', { kind });
+    const ctx: Context = new Context(cause, scope, this.world, this.history, {
+      assertWriting: () => this.#assertWriting(),
+      query: (query) => this.#query(query),
+      actionOrder: (subject) => this.#actionOrder(ctx, subject),
+      flow: (childKind, childBody, childReason) =>
+        this.#execute(scope, cause, childKind, childBody, childReason),
+      window: (type, payload, options) =>
+        this.#execute(
+          scope,
+          cause,
+          `window:${type.id}`,
+          (child) => this.#openWindow(child, type, payload, options),
+          type.id,
+        ),
+      ask: (spec) => {
+        this.world.player(spec.player);
+        return this.decisions.open(spec, scope, cause);
+      },
+      commit: (factKind, changes, detail) => {
+        const prepared = this.#state.prepare(changes);
+        // 事实数据的校验/复制也必须在权威状态替换之前完成。
+        const fact = this.history.commit(cause, prepared.revision, factKind, changes, detail);
+        this.#state.apply(prepared);
+        return fact;
+      },
+      random: (bound) => {
+        const value = this.#random.integer(bound);
+        this.history.trace(cause, 'random', { bound, value });
+        return value;
+      },
+      listen: (type, trigger) => this.on(type, trigger),
+      windowOf: (type) => this.#windowOf(ctx, type),
+      include: (window, source, select) => this.#include(ctx, window, source, select),
+    });
+    let outcome = 'faulted';
+    let result: FlowResult<T> | null = null;
+    let failure: { readonly error: unknown } | null = null;
+    try {
+      const value = await body(ctx);
+      ctx.assertSettled();
+      this.#assertWriting();
+      outcome = 'resolved';
+      result = { kind: 'resolved', value };
+    } catch (error) {
+      if (error instanceof RuleAbort && this.#status !== 'faulted') {
+        outcome = 'aborted';
+        result = { kind: 'aborted', reason: error.reason };
+      } else {
+        this.#freeze(error, cause);
+        failure = { error };
+      }
+    }
+
+    // 释放失败也要冻结，但不覆盖已经捕获的原始内容错误。
+    try {
+      scope.close();
+    } catch (error) {
+      if (!failure) {
+        this.#freeze(error, cause);
+        failure = { error };
+      }
+      outcome = 'faulted';
+    }
+    this.history.trace(cause, 'flow.close', {
+      kind,
+      outcome,
+      ...(result?.kind === 'aborted' ? { reason: result.reason } : {}),
+    });
+    if (failure) throw failure.error;
+    if (!result) throw new Error('Flow exited without an outcome.');
+    return result;
+  }
+
+  #checkWindow<T>(type: WindowType<T>): void {
+    const known = this.#windows.get(type.id);
+    if (known && known !== type) throw new Error(`Two window definitions share ID: ${type.id}`);
+    this.#windows.set(type.id, type);
+  }
+
+  #windowOf<T>(ctx: Context, type: WindowType<T>): WindowRef<T> | null {
+    for (const active of [...this.#openWindows.values()].reverse()) {
+      if (active.ref.type === type && ctx.cause.scopePath.includes(active.scopeId))
+        return active.ref as WindowRef<T>;
+    }
+    return null;
+  }
+
+  #include<T>(
+    ctx: Context,
+    ref: WindowRef<T>,
+    source: TriggerSource,
+    select?: (trigger: Trigger<T>) => boolean,
+  ): WindowAdmission {
+    const active = this.#openWindows.get(ref);
+    if (!active || ctx.world !== this.world || !ctx.cause.scopePath.includes(active.scopeId))
+      throw new Error('Window is closed or is not an ancestor of this Context.');
+    if (!this.#sources.has(source)) throw new Error('Window source is not attached to this Room.');
+    return active.include(
+      ctx,
+      source,
+      select ? (candidate) => select(candidate as Trigger<T>) : undefined,
+    );
+  }
+
+  #collectSource<T>(
+    ctx: Context,
+    type: WindowType<T>,
+    payload: T,
+    source: TriggerSource,
+    select?: (trigger: unknown) => boolean,
+  ): Registration[] {
+    const registration = this.#sources.get(source);
+    if (!registration) throw new Error('Window source is not attached to this Room.');
+    const candidates = ctx.query(() => source.collect(type, this.world, payload));
+    return candidates
+      .filter((candidate) => {
+        if (!select) return true;
+        const chosen = ctx.query(() => select(candidate));
+        if (typeof chosen !== 'boolean') throw new Error('Window selection must return a boolean.');
+        return chosen;
+      })
+      .map((candidate) => {
+        if (!candidate.id || (candidate.owner === null && candidate.order === 'choose'))
+          throw new Error('Invalid sourced trigger identity or owner.');
+        if (candidate.owner !== null) this.world.player(candidate.owner);
+        const group = candidate.group ?? 'main';
+        if (!type.groups.includes(group)) throw new Error(`Unknown window group: ${group}`);
+        return {
+          token: type,
+          id: candidate.id,
+          label: candidate.label ?? candidate.id,
+          owner: candidate.owner,
+          group,
+          order: candidate.order ?? 'automatic',
+          active: true,
+          ...(candidate.times === undefined
+            ? {}
+            : {
+                times: (child: Context, data: unknown) => candidate.times!(child, data as T),
+              }),
+          eligible: (child, data, occurrence) =>
+            this.#sources.get(source) === registration &&
+            candidate.eligible(child, data as T, occurrence),
+          run: (child, data, occurrence) => candidate.run(child, data as T, occurrence),
+        };
+      });
+  }
+
+  #actionOrder(ctx: Context, subject?: string, override?: string): readonly string[] {
+    const seats = this.world.snapshot.players.map((player) => player.id);
+    if (subject !== undefined && !seats.includes(subject))
+      throw new Error(`Unknown action-order subject: ${subject}`);
+    const preferred =
+      override !== undefined
+        ? override
+        : this.#actionAnchor
+          ? this.#actionAnchor(ctx, subject ?? null)
+          : null;
+    if (preferred !== null && !seats.includes(preferred))
+      throw new Error(`Unknown action-order anchor: ${preferred}`);
+    const anchor = preferred ?? subject ?? seats[0];
+    const index = anchor === undefined ? 0 : seats.indexOf(anchor);
+    return Object.freeze([...seats.slice(index), ...seats.slice(0, index)]);
+  }
+
+  async #openWindow<T>(
+    ctx: Context,
+    type: WindowType<T>,
+    payload: T,
+    options: WindowOptions,
+  ): Promise<void> {
+    this.#checkWindow(type);
+    const ref: WindowRef<T> = Object.freeze({ id: ctx.cause.flowId, type, payload });
+    let admission: ActiveWindow['include'] | null = null;
+    this.#openWindows.set(ref, {
+      ref,
+      scopeId: ctx.scope.id,
+      include: (...args) => {
+        if (!admission) throw new Error('Window is still collecting initial candidates.');
+        return admission(...args);
+      },
+    });
+    ctx.defer(() => this.#openWindows.delete(ref));
+    try {
+      const isOpen = () => {
+        if (!options.active) return true;
+        const active = ctx.query(() => options.active!(ctx));
+        if (typeof active !== 'boolean') throw new Error('Window active must return a boolean.');
+        return active;
+      };
+      const stopped = () => {
+        if (!options.active || isOpen()) return false;
+        this.history.trace(ctx.cause, 'window.stopped', { window: type.id });
+        return true;
+      };
+      if (stopped()) return;
+      // 入窗即固定本次行动序；嵌套回合或回调改变模式的后续结果都不倒排本窗口。
+      const order = ctx.query(() => this.#actionOrder(ctx, options.subject, options.anchor));
+      this.history.trace(ctx.cause, 'window.order', {
+        window: type.id,
+        subject: options.subject ?? null,
+        anchor: order[0] ?? null,
+        override: options.anchor !== undefined,
+      });
+      const registrations = [...this.#triggers.values()].filter((entry) => entry.token === type);
+      const known = new Map<string, TriggerSource | null>(
+        registrations.map((entry) => [entry.id, null]),
+      );
+      for (const source of this.#sources.keys()) {
+        const collected = this.#collectSource(ctx, type, payload, source);
+        for (const candidate of collected) {
+          if (known.has(candidate.id)) throw new Error('Duplicate window candidate ID.');
+          known.set(candidate.id, source);
+          registrations.push(candidate);
+        }
+      }
+      if (new Set(registrations.map((candidate) => candidate.id)).size !== registrations.length)
+        throw new Error('Duplicate window candidate ID.');
+      // 每个候选入队时只读一次，成为有限快照；普通后效不自动发现或增加次数。
+      const occurrences = (registration: Registration): WindowCandidate[] => {
+        const total = ctx.query(() =>
+          registration.times === undefined ? 1 : registration.times(ctx, payload),
+        );
+        if (!Number.isSafeInteger(total) || total < 0)
+          throw new Error('Trigger times must be a nonnegative safe integer.');
+        return Array.from({ length: total }, (_, offset) => {
+          const index = offset + 1;
+          return {
+            registration,
+            id: registration.times ? JSON.stringify([registration.id, index]) : registration.id,
+            label: total > 1 ? `${registration.label} · ${index}/${total}` : registration.label,
+            occurrence: Object.freeze({
+              id: JSON.stringify([ctx.cause.flowId, registration.id, index]),
+              index,
+              total,
+            }),
+          };
+        });
+      };
+      const snapshot = registrations.flatMap(occurrences);
+      if (new Set(snapshot.map((candidate) => candidate.id)).size !== snapshot.length)
+        throw new Error('Duplicate window occurrence ID.');
+      const owners = [null, ...order];
+      const queues: WindowCandidate[][] = type.groups.flatMap((group) =>
+        owners.map((owner) =>
+          snapshot.filter(
+            (entry) => entry.registration.group === group && entry.registration.owner === owner,
+          ),
+        ),
+      );
+      const slot = (entry: Registration) =>
+        type.groups.indexOf(entry.group) * owners.length + owners.indexOf(entry.owner);
+      const occurrenceIds = new Set(snapshot.map((entry) => entry.id));
+      let cursor = 0;
+      const include: ActiveWindow['include'] = (caller, source, select) => {
+        if (options.active && !isOpen())
+          return Object.freeze({
+            state: 'stopped',
+            added: Object.freeze([]),
+            skipped: Object.freeze([]),
+          });
+        const candidates = this.#collectSource(ctx, type, payload, source, select);
+        if (new Set(candidates.map((entry) => entry.id)).size !== candidates.length)
+          throw new Error('Duplicate window candidate ID.');
+        const added: Registration[] = [];
+        const skipped: { id: string; reason: 'known' | 'past' }[] = [];
+        for (const candidate of candidates) {
+          if (known.has(candidate.id)) {
+            if (known.get(candidate.id) !== source)
+              throw new Error('Window candidate ID belongs to another source.');
+            skipped.push({ id: candidate.id, reason: 'known' });
+          } else if (slot(candidate) < cursor) skipped.push({ id: candidate.id, reason: 'past' });
+          else added.push(candidate);
+        }
+        // 整批先校验和固定次数，任何作者错误都不能留下半批队列。
+        const prepared = added.flatMap(occurrences);
+        const ids = new Set(occurrenceIds);
+        for (const entry of prepared) {
+          if (ids.has(entry.id)) throw new Error('Duplicate window occurrence ID.');
+          ids.add(entry.id);
+        }
+        for (const entry of added) known.set(entry.id, source);
+        for (const entry of prepared) {
+          occurrenceIds.add(entry.id);
+          queues[slot(entry.registration)]!.push(entry);
+        }
+        const result: WindowAdmission = Object.freeze({
+          state: 'open',
+          added: Object.freeze(added.map((entry) => entry.id)),
+          skipped: Object.freeze(skipped.map((entry) => Object.freeze(entry))),
+        });
+        this.history.trace(caller.cause, 'window.included', {
+          window: type.id,
+          id: ref.id,
+          ...result,
+        });
+        return result;
+      };
+      admission = include;
+      const eligible = (entry: WindowCandidate) =>
+        entry.registration.active &&
+        ctx.query(() => entry.registration.eligible(ctx, payload, entry.occurrence));
+      const trace = (entry: WindowCandidate, outcome: 'ineligible' | 'running') =>
+        this.history.trace(ctx.cause, 'window.candidate', {
+          window: type.id,
+          effect: entry.id,
+          source: entry.registration.id,
+          occurrence: entry.occurrence,
+          outcome,
+        });
+
+      for (cursor = 0; cursor < queues.length; cursor++) {
+        const owner = owners[cursor % owners.length]!;
+        const pending = queues[cursor]!;
+        while (pending.length) {
+          pending.sort((a, b) =>
+            a.registration.id < b.registration.id
+              ? -1
+              : a.registration.id > b.registration.id
+                ? 1
+                : a.occurrence.index - b.occurrence.index,
+          );
+          if (stopped()) return;
+          // 每个效果只开放最早合资格的一次。预览不消费其前面的失效次数；
+          // 其他效果可能先改变条件，只有选定本效果时才正式跳过该前缀。
+          const offered = new Set<Registration>();
+          const prefixes = new Map<Registration, WindowCandidate[]>();
+          const frontier: WindowCandidate[] = [];
+          for (const entry of pending) {
+            if (offered.has(entry.registration)) continue;
+            if (eligible(entry)) {
+              frontier.push(entry);
+              offered.add(entry.registration);
+            } else {
+              const prefix = prefixes.get(entry.registration) ?? [];
+              prefix.push(entry);
+              prefixes.set(entry.registration, prefix);
+            }
+          }
+          // 当前组/席位没有可执行者便收束，过去的组与席位不回头。
+          if (!frontier.length) {
+            for (const entry of pending) trace(entry, 'ineligible');
+            break;
+          }
+          let selected =
+            frontier.find((entry) => entry.registration.order === 'automatic') ?? frontier[0];
+          if (!selected) break;
+          if (selected.registration.order === 'choose' && frontier.length > 1 && owner !== null) {
+            const ids = frontier.map((entry) => entry.id);
+            const reply = await ctx.ask({
+              player: owner,
+              kind: 'trigger-order',
+              prompt: '选择先结算的效果',
+              data: {
+                window: type.id,
+                options: ids,
+                labels: Object.fromEntries(frontier.map((trigger) => [trigger.id, trigger.label])),
+                occurrences: Object.fromEntries(
+                  frontier.map((entry) => [
+                    entry.id,
+                    { source: entry.registration.id, ...entry.occurrence },
+                  ]),
+                ),
+              },
+              optional: false,
+              validate: (input) =>
+                typeof input === 'string' && ids.includes(input)
+                  ? { ok: true, value: input }
+                  : { ok: false, reason: 'Choose a pending effect.' },
+            });
+            if (reply.kind !== 'chosen') return;
+            selected = frontier.find((entry) => entry.id === reply.value);
+            if (!selected) throw new Error('Invalid trigger ordering reply.');
+          }
+          if (stopped()) return;
+          const candidate = selected;
+          const skipped = prefixes.get(candidate.registration) ?? [];
+          const consumed = new Set([candidate, ...skipped]);
+          // 保持数组身份：同席位的显式加入会追加到这份尚未完成的队列。
+          for (let index = pending.length - 1; index >= 0; index--)
+            if (consumed.has(pending[index]!)) pending.splice(index, 1);
+          for (const entry of skipped) trace(entry, 'ineligible');
+          if (!eligible(candidate)) {
+            trace(candidate, 'ineligible');
+            continue;
+          }
+          trace(candidate, 'running');
+          await ctx.flow(
+            `trigger:${candidate.id}`,
+            (child) => candidate.registration.run(child, payload, candidate.occurrence),
+            candidate.registration.id,
+          );
+          if (stopped()) return;
+        }
+      }
+    } finally {
+      this.#openWindows.delete(ref);
+    }
+  }
+}

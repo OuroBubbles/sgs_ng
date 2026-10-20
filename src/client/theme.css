@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --ink: #111d19;
+  --text: #d7d2be;
+  --gold: #bfa16a;
+  --gold-light: #d1b780;
+  --muted: #7d8b76;
+  --line: #7f8b692b;
+  --serif: 'KaiTi', 'STKaiti', 'SimSun', serif;
+  --sans: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}

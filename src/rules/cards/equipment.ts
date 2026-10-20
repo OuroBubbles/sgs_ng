@@ -1,0 +1,244 @@
+import type { WorldReader, Zone } from '../../core/model/state';
+import { immutable } from '../../core/model/value';
+import type { Context, FlowResult } from '../../core/runtime/room';
+import { defineSkill, isSkillBlocked } from '../skills/skills';
+import type { SkillBinding, SkillDefinition, SkillHandle, SkillProvider } from '../skills/skills';
+import { modify } from '../skills/query';
+import { attackRange } from './queries';
+import { cardsMoved, moveCards } from './move';
+import type { MoveResult } from './move';
+import type { CardBook } from './book';
+import type { CardDefinition, EffectRef } from './types';
+import { isGameOver } from '../game/end';
+
+/** 标准槽位为 weapon/armor/offensive-horse/defensive-horse；扩展可直接命名新槽位。 */
+export type EquipmentSlot = string;
+export interface EquipmentDefinition {
+  readonly slot: EquipmentSlot;
+  readonly range?: number;
+  readonly skill?: SkillDefinition | ((book: CardBook) => SkillDefinition);
+}
+
+/** 忽略只属于指定目标的这个效果；嵌套效果、代答者及普通技能来源各自判断。 */
+export function equipmentEffectiveFor(
+  world: WorldReader,
+  self: SkillHandle,
+  effect: EffectRef,
+  slot: EquipmentSlot,
+): boolean {
+  return (
+    self.effective(world) &&
+    !(
+      self.origin?.kind === 'equipment' &&
+      self.owner === effect.target &&
+      effect.ignoredEquipment?.some((entry) => entry.slot === slot)
+    )
+  );
+}
+
+export function equippedCards(world: WorldReader, owner: string): readonly string[] {
+  // 区域身份由 World 管理；牌的槽位由目录解释，见 equipmentInSlot。
+  return world.snapshot.zones
+    .filter((zone) => zone.kind === 'equipment' && zone.owner === owner)
+    .flatMap((zone) => zone.cards);
+}
+
+export function equipmentInSlot(
+  world: WorldReader,
+  book: CardBook,
+  owner: string,
+  slot: EquipmentSlot,
+): readonly string[] {
+  return equippedCards(world, owner).filter(
+    (id) => book.definition(world.card(id).name).equipment?.slot === slot,
+  );
+}
+
+export type EquipResult =
+  | {
+      readonly kind: 'equipped';
+      readonly card: string;
+      readonly owner: string;
+      readonly replaced: readonly string[];
+    }
+  | { readonly kind: 'unavailable' | 'unchanged' };
+
+/** 替换在同一次移动中提交。后效看见新装备与旧装备离场，不存在两把同槽武器的中间态。 */
+export function equip(
+  ctx: Context,
+  book: CardBook,
+  input: {
+    readonly card: string;
+    readonly owner: string;
+    readonly from: string;
+  },
+): Promise<FlowResult<EquipResult>> {
+  const request = immutable(input);
+  return ctx.flow('equipment.equip', async (child) => {
+    const definition = book.definition(child.world.card(request.card).name).equipment;
+    if (!definition) throw new Error('Card has no equipment definition.');
+    if (
+      !child.world.player(request.owner).alive ||
+      isGameOver(child.world) ||
+      child.world.position(request.card) !== request.from
+    )
+      return { kind: 'unavailable' };
+    const zones = child.world.snapshot.zones.filter(
+      (zone) => zone.kind === 'equipment' && zone.owner === request.owner,
+    );
+    if (zones.length !== 1) throw new Error('Equipment requires one owned equipment zone.');
+    const destination = zones[0]!;
+    if (request.from === destination.id) return { kind: 'unchanged' };
+    const replaced = equipmentInSlot(child.world, book, request.owner, definition.slot);
+    const result = immutable({
+      kind: 'equipped' as const,
+      card: request.card,
+      owner: request.owner,
+      replaced,
+    });
+    const moved = await moveCards(
+      child,
+      [
+        ...replaced.map((card) => ({
+          cards: [card],
+          from: child.world.position(card),
+          to: 'discard',
+          place: 'bottom' as const,
+        })),
+        { cards: [request.card], from: request.from, to: destination.id, place: 'bottom' },
+      ],
+      'equipment',
+      { kind: 'equipment.equipped', data: result },
+    );
+    if (moved.kind === 'aborted') return child.abort(moved.reason);
+    return result;
+  });
+}
+
+/** 当前标准装备安装一个同名实体；转换装备与零/多材料装备尚无持久绑定协议。 */
+export function equipmentCard(
+  input: {
+    readonly id: string;
+    readonly label: string;
+  } & EquipmentDefinition,
+): CardDefinition {
+  if (
+    !input.slot ||
+    (input.range !== undefined && (!Number.isSafeInteger(input.range) || input.range < 1))
+  )
+    throw new Error('Invalid equipment range.');
+  const { id, label, ...equipment } = input;
+  const definition: CardDefinition = {
+    id,
+    type: 'equipment',
+    label,
+    equipment: Object.freeze(equipment),
+    use: {
+      count: { min: 0, max: 0 },
+      fixedTargets: (_ctx, actor) => [actor],
+      target: (_ctx, request, target) => target === request.actor,
+      canUse: (ctx, request) =>
+        request.targets.length === 1 &&
+        request.card.materials.length === 1 &&
+        ctx.world.card(request.card.materials[0]!).name === id
+          ? null
+          : 'Equipment requires one matching physical card.',
+      async resolve(ctx, effect, book) {
+        const card = effect.card.materials[0]!;
+        const result = await equip(ctx, book, {
+          card,
+          owner: effect.target,
+          from: effect.processing,
+        });
+        if (result.kind === 'aborted') return ctx.abort(result.reason);
+      },
+    },
+  };
+  return Object.freeze(definition);
+}
+
+/** 离场能力必须明确引用本次移动前后快照，不把已离场装备重新伪装成当前装备。 */
+export function equipmentLost(world: WorldReader, moved: MoveResult, self: SkillHandle): boolean {
+  const card = self.origin?.kind === 'equipment' ? self.origin.id : null;
+  return (
+    card !== null &&
+    !isSkillBlocked(world, self.owner, self.id) &&
+    moved.before.some(
+      (zone) => zone.kind === 'equipment' && zone.owner === self.owner && zone.cards.includes(card),
+    ) &&
+    !moved.after.some(
+      (zone) => zone.kind === 'equipment' && zone.owner === self.owner && zone.cards.includes(card),
+    )
+  );
+}
+
+/** 装备实例以实体牌与持有者为身份。移动、支付、埋葬后查询立即反映权威位置。 */
+export function equipmentAbilities(
+  definitions: readonly CardDefinition[],
+  book: CardBook,
+): SkillProvider {
+  const abilities = new Map(
+    definitions
+      .filter((card) => card.equipment)
+      .map((card) => {
+        const equipment = card.equipment!;
+        const base =
+          typeof equipment.skill === 'function' ? equipment.skill(book) : equipment.skill;
+        return [
+          card.id,
+          defineSkill({
+            id: base?.id ?? `${card.id}:ability`,
+            name: base?.name ?? card.label,
+            ...(base?.description === undefined ? {} : { description: base.description }),
+            effects: base?.effects ?? [],
+            ...(base?.active === undefined ? {} : { active: base.active }),
+            ...(base?.viewAs === undefined ? {} : { viewAs: base.viewAs }),
+            modifiers: [
+              ...(base?.modifiers ?? []),
+              ...(equipment.range === undefined
+                ? []
+                : [
+                    modify(attackRange, (_ctx, input, self) =>
+                      input.actor === self.owner && !input.card.materials.includes(self.origin!.id)
+                        ? equipment.range
+                        : undefined,
+                    ),
+                  ]),
+            ],
+          }),
+        ] as const;
+      }),
+  );
+  const collectFrom = (world: WorldReader, zones: readonly Zone[]): SkillBinding[] =>
+    zones.flatMap((zone) => {
+      if (zone.kind !== 'equipment' || zone.owner === null) return [];
+      return zone.cards.flatMap((card) => {
+        const definition = abilities.get(world.card(card).name);
+        if (!definition) return [];
+        const owner = zone.owner!;
+        const id = JSON.stringify(['equipment', owner, card]);
+        const self: SkillHandle = Object.freeze({
+          id,
+          owner,
+          skill: definition.id,
+          name: definition.name,
+          origin: Object.freeze({ kind: 'equipment', id: card }),
+          effective: (current: WorldReader) =>
+            equippedCards(current, owner).includes(card) && !isSkillBlocked(current, owner, id),
+        });
+        return [{ self, definition }];
+      });
+    });
+  return Object.freeze({
+    collect(world: WorldReader, window?: { readonly type: object; readonly payload: unknown }) {
+      const current = collectFrom(world, world.snapshot.zones);
+      const before =
+        window?.type === cardsMoved
+          ? collectFrom(world, (window.payload as MoveResult).before)
+          : [];
+      return [
+        ...new Map([...current, ...before].map((binding) => [binding.self.id, binding])).values(),
+      ];
+    },
+  });
+}

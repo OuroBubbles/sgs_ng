@@ -1,0 +1,31 @@
+{
+  "purpose": "P0 runtime evaluation fixture, not final game artwork",
+  "editorVersion": "4.2",
+  "commit": "e7dc1435fa4a0083ab431f1b28e083c14a1f5c68",
+  "files": [
+    {
+      "filename": "spineboy-pro.skel",
+      "source": "https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/e7dc1435fa4a0083ab431f1b28e083c14a1f5c68/examples/spineboy/export/spineboy-pro.skel",
+      "bytes": 64463,
+      "sha256": "1345de0e8e4729559f39060ed614429b21ab39bfc09ed2e1f58fcf054a8b5925"
+    },
+    {
+      "filename": "spineboy.atlas",
+      "source": "https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/e7dc1435fa4a0083ab431f1b28e083c14a1f5c68/examples/spineboy/export/spineboy.atlas",
+      "bytes": 1680,
+      "sha256": "fc90c2a604c14bb3ae1a81f9c950660863a41654cb29c869423a86e127fa75ae"
+    },
+    {
+      "filename": "spineboy.png",
+      "source": "https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/e7dc1435fa4a0083ab431f1b28e083c14a1f5c68/examples/spineboy/export/spineboy.png",
+      "bytes": 245321,
+      "sha256": "071a6adec73378eebd802a047d274deefe11abee3ce689a1e71acb4cb41e331e"
+    },
+    {
+      "filename": "LICENSE",
+      "source": "https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/e7dc1435fa4a0083ab431f1b28e083c14a1f5c68/LICENSE",
+      "bytes": 1469,
+      "sha256": "b9d50158f6c23a704d123fd0200cc00633a693ccf9b0aacb15e5d5b9cf6c0d58"
+    }
+  ]
+}

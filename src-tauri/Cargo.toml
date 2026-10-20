@@ -1,0 +1,15 @@
+[package]
+name = "sgs-ng"
+version = "0.1.0"
+description = "sgs_ng P0 client"
+edition = "2021"
+
+[lib]
+name = "sgs_ng_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

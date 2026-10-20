@@ -1,0 +1,152 @@
+import { immutable } from '../../core/model/value';
+import type { Context, FlowResult } from '../../core/runtime/room';
+import { pay } from '../costs/pay';
+import { isGameOver } from '../game/end';
+import { parseCardChoice } from './book';
+import type { CardBook } from './book';
+import { withProcessing } from './processing';
+import { responseFinished } from './played';
+import type { CardChoice, SemanticCard } from './types';
+
+export interface CardSupplyInput {
+  readonly actor: string;
+  readonly beneficiary: string;
+  readonly names: readonly string[];
+  readonly reason: string;
+  readonly available?: (ctx: Context) => boolean;
+}
+export interface SuppliedCard {
+  readonly id: string;
+  readonly actor: string;
+  readonly card: SemanticCard;
+  readonly processing: string;
+  /** 已打出材料仍完整归属于本次供牌，且原请求仍可继续。零材料供牌也受生存期约束。 */
+  available(ctx: Context): boolean;
+}
+export type SupplyResult<T> =
+  | { readonly kind: 'supplied'; readonly value: T }
+  | { readonly kind: 'declined' | 'unavailable' | 'invalidated' };
+
+/** 实际供牌者打出一次，材料暂存到回调结束；未被后续流程接走的余牌统一善后。 */
+export function withCardSupply<T>(
+  ctx: Context,
+  book: CardBook,
+  input: CardSupplyInput,
+  body: (ctx: Context, supply: SuppliedCard) => T | Promise<T>,
+): Promise<FlowResult<SupplyResult<T>>> {
+  const isAvailable = input.available;
+  const { actor, beneficiary, names, reason } = immutable({
+    actor: input.actor,
+    beneficiary: input.beneficiary,
+    names: input.names,
+    reason: input.reason,
+  });
+  if (!names.length || new Set(names).size !== names.length || !reason)
+    throw new Error('Supply requires distinct names and a reason.');
+  return ctx.flow('card.supply', async (child) => {
+    const live = (at: Context) =>
+      at.world === child.world &&
+      child.scope.active &&
+      at.cause.scopePath.includes(child.scope.id) &&
+      at.world.player(actor).alive &&
+      at.world.player(beneficiary).alive &&
+      !isGameOver(at.world) &&
+      (isAvailable?.(at) ?? true);
+    const valid = (at: Context, choice: CardChoice) =>
+      at.query(() => {
+        if (!live(at)) return false;
+        const built = book.build(at, actor, choice, 'response');
+        return built.ok && names.includes(built.value.name);
+      });
+    const answer = await child.ask<CardChoice>({
+      player: actor,
+      kind: 'card-response',
+      prompt: `请为 ${beneficiary} 打出${names.map((name) => book.definition(name).label).join('/')}（${reason}）`,
+      data: null,
+      optional: true,
+      describe: () => ({
+        names,
+        beneficiary,
+        reason,
+        offers: book.offers(child, actor, 'response', names),
+      }),
+      available: () => live(child) && book.offers(child, actor, 'response', names).length > 0,
+      validate: (value) => {
+        const parsed = parseCardChoice(value);
+        return !parsed.ok
+          ? parsed
+          : valid(child, parsed.value)
+            ? parsed
+            : { ok: false, reason: 'Card does not satisfy this supply.' };
+      },
+    });
+    if (answer.kind !== 'chosen')
+      return { kind: answer.kind === 'unavailable' ? 'unavailable' : 'declined' };
+    const built = book.build(child, actor, answer.value, 'response');
+    if (!built.ok || !valid(child, answer.value)) return { kind: 'unavailable' };
+    const card = built.value;
+    const origins = new Map(card.materials.map((id) => [id, child.world.position(id)]));
+    const result = await withProcessing<SupplyResult<T>>(
+      child,
+      [],
+      'discard',
+      async (at, processing) => {
+        const responseId = at.cause.flowId;
+        const paid = await pay(at, {
+          actor,
+          cards: card.materials,
+          to: processing.zone,
+          reason,
+          ...(card.source?.kind === 'viewAs'
+            ? { skill: book.skills.binding(at.world, card.source.instance)!.self }
+            : {}),
+          materialAllowed: (_ctx, id, zone) => origins.get(id) === zone.id,
+          legal: (latest) => {
+            const current = book.build(latest, actor, answer.value, 'response');
+            return (
+              live(latest) &&
+              current.ok &&
+              names.includes(current.value.name) &&
+              JSON.stringify(current.value) === JSON.stringify(card)
+            );
+          },
+          factKind: 'card.responded',
+          declaration: {
+            id: responseId,
+            card,
+            beneficiary,
+            subject: { kind: 'supply', reason },
+            processing: processing.zone,
+          },
+        });
+        if (paid.kind === 'aborted') return at.abort(paid.reason);
+        if (paid.value.kind !== 'paid') return { kind: 'unavailable' };
+        await at.window(
+          responseFinished,
+          {
+            id: responseId,
+            actor,
+            card,
+            subject: { kind: 'supply', id: child.cause.flowId, beneficiary, reason },
+          },
+          { subject: actor },
+        );
+        const available = (current: Context) =>
+          live(current) &&
+          at.scope.active &&
+          current.cause.scopePath.includes(at.scope.id) &&
+          card.materials.every((id) => current.world.position(id) === processing.zone);
+        if (!available(at)) return { kind: 'invalidated' };
+        return {
+          kind: 'supplied',
+          value: await body(
+            at,
+            Object.freeze({ id: responseId, actor, card, processing: processing.zone, available }),
+          ),
+        };
+      },
+    );
+    if (result.kind === 'aborted') return child.abort(result.reason);
+    return result.value;
+  });
+}

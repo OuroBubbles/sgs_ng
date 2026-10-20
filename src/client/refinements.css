@@ -1,0 +1,254 @@
+/* 交互状态只表现选择会话的结果，不自行推导游戏合法性。 */
+.playing-card {
+  text-align: center;
+}
+.target-hitbox.available:hover {
+  box-shadow: inset 0 0 22px #d4bc7818;
+}
+.target-hitbox.unavailable {
+  cursor: not-allowed;
+}
+.inspect-link {
+  margin-left: 13px;
+  color: #bfa16a;
+}
+
+/* 桌面牌来自已提交记录；这里不拥有处理区或牌的位置状态。 */
+.table-cards {
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translate(-50%, -12%);
+  pointer-events: none;
+}
+.table-cards-label {
+  position: absolute;
+  top: -19px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  color: #8a9a7c;
+  font-size: 9px;
+  letter-spacing: 4px;
+}
+.played-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.played-entry > span {
+  font-size: 9px;
+  color: #b9bd9c;
+}
+.table-card {
+  width: 68px;
+  height: 98px;
+  opacity: 0.88;
+  box-shadow: 0 4px 12px #0002;
+}
+.table-card .card-rank {
+  top: 7px;
+  left: 8px;
+  font-size: 12px;
+}
+.table-card .card-rank small {
+  font-size: 12px;
+}
+.table-card .card-type {
+  font-size: 7px;
+  right: 7px;
+  top: 8px;
+}
+.table-card .card-art {
+  left: 12px;
+  top: 25px;
+  width: 42px;
+  height: 42px;
+}
+.table-card .card-art b {
+  font-size: 35px;
+}
+.table-card .card-name {
+  font-size: 23px;
+  bottom: 19px;
+}
+.table-card .card-bottom {
+  font-size: 6px;
+  letter-spacing: 1px;
+  bottom: 10px;
+}
+
+.card-inspector {
+  position: fixed;
+  width: min(520px, calc(100vw - 32px));
+  padding: 34px;
+  color: #d7d2be;
+  background: #182a22;
+  border: 1px solid #a28c5766;
+  border-radius: 7px;
+  box-shadow: 0 25px 90px #0007;
+}
+.card-inspector[open] {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 28px;
+  align-items: center;
+}
+.card-inspector::backdrop {
+  background: #07100ed9;
+  backdrop-filter: blur(7px);
+}
+.inspector-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+.inspected-card {
+  cursor: default;
+}
+.inspected-card:hover {
+  transform: none;
+}
+.card-rule h2 {
+  font: 25px var(--serif);
+  margin: 13px 0;
+  color: #dbc696;
+}
+.card-rule p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #c4cbb2;
+}
+.card-rule > small {
+  display: block;
+  font-size: 9px;
+  color: #86957b;
+  line-height: 1.7;
+  margin: 12px 0 19px;
+}
+
+/* 骨骼验证器按需下载和初始化；横屏优先让操作保持在同一屏。 */
+.app-shell {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@container battlefield (height < 310px) {
+  .table-cards {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .inspect-link {
+    display: inline-block;
+    margin-left: 7px;
+    font-size: 8px;
+  }
+  .table-cards {
+    top: 56%;
+    gap: 5px;
+    transform: translate(-50%, 0);
+  }
+  .table-card {
+    width: 42px;
+    height: 64px;
+    border-radius: 3px;
+  }
+  .table-card .card-rank {
+    font-size: 9px;
+    top: 5px;
+    left: 5px;
+  }
+  .table-card .card-rank small {
+    font-size: 8px;
+  }
+  .table-card .card-type,
+  .table-card .card-art,
+  .table-card .card-bottom {
+    display: none;
+  }
+  .table-card .card-name {
+    font-size: 23px;
+    bottom: 11px;
+  }
+  .table-cards-label {
+    font-size: 8px;
+    top: -15px;
+  }
+  .played-entry > span {
+    font-size: 8px;
+  }
+  .card-inspector {
+    padding: 32px 20px 24px;
+  }
+  .card-inspector[open] {
+    grid-template-columns: 85px 1fr;
+    gap: 18px;
+  }
+  .inspected-card {
+    width: 85px;
+    height: 135px;
+  }
+  .card-rule h2 {
+    font-size: 23px;
+  }
+}
+@media (max-height: 600px) and (min-width: 650px) {
+  .app-shell {
+    height: 100dvh;
+    min-height: 0;
+  }
+  .app-header {
+    height: 48px;
+    flex: 0 0 48px;
+  }
+  .game-layout {
+    min-height: 0;
+    padding: 5px 24px;
+    display: block;
+  }
+  .table-column {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .table-topline {
+    height: 23px;
+    flex: 0 0 23px;
+  }
+  .battlefield {
+    height: auto;
+    min-height: 125px;
+    flex: 1;
+  }
+  .hand-meta {
+    display: none;
+  }
+  .hand-zone {
+    padding-top: 10px;
+    flex: 0 0 102px;
+  }
+  .hand-cards {
+    height: 92px;
+    min-height: 92px;
+  }
+  .decision-bar {
+    flex: 0 0 47px;
+    margin-top: 9px;
+    padding: 6px 15px;
+  }
+  .app-footer {
+    height: 28px;
+    flex: 0 0 28px;
+  }
+  .table-coordinate,
+  .board-status {
+    display: none;
+  }
+  .journal.open {
+    top: 58px;
+    bottom: 38px;
+  }
+}
