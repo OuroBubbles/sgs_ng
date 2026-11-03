@@ -43,7 +43,7 @@ modify(cardQueries.prohibitDiscard, (_ctx, { input, self }) =>
 | 张飞 / 蜀 / 男 | 4        | 咆哮：取消杀的次数上限，保留累计记录；失去技能后恢复已累计的正常上限  |
 | 甘宁 / 吴 / 男 | 4        | 奇袭：一张黑色手牌或装备当过河拆桥使用；材料离场仍触发正常装备后效    |
 
-实现为 [martial.ts](../src/content/standard/martial.ts) 中的普通转换和查询修正，未复制杀、闪或拆桥逻辑。文本依据本地[龙胆](../../freekill/packages/standard/pkg/skills/longdan.lua)、[咆哮](../../freekill/packages/standard/pkg/skills/paoxiao.lua)、[奇袭](../../freekill/packages/standard/pkg/skills/qixi.lua)。此前三名武将见 [27](27-generals-active-skills.md)。
+实现为 [generals/](../src/content/standard/generals/) 中的普通转换和查询修正，未复制杀、闪或拆桥逻辑。文本依据本地[龙胆](../../freekill/packages/standard/pkg/skills/longdan.lua)、[咆哮](../../freekill/packages/standard/pkg/skills/paoxiao.lua)、[奇袭](../../freekill/packages/standard/pkg/skills/qixi.lua)。此前三名武将见 [27](27-generals-active-skills.md)。
 
 基础 AI 自动消费这些合法转换和次数，不增加角色专用搜索。六名真实武将已通过六席全 AI 对局至身份胜负，不能据此宣称完整标准包或高级 AI 完成。
 

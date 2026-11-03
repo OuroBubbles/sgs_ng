@@ -14,7 +14,7 @@
 
 `equipmentCard({ id, label, slot, range?, skill? })` 生成普通牌定义。装备自动以自己为目标，不要求玩家再次点击自己；被禁止的目标不能通过过滤成零目标来支付掉装备。
 
-`skill` 可直接提供定义，也可用 `(book) => SkillDefinition` 工厂显式取得当前目录与用牌服务；方天等能力共用 `extraTargets` 查询。防御结果和青龙/斧/戟/弓的后续实现见 [22](22-weapons-defense.md)。
+`skill` 是静态 SkillDefinition，回调需要当前目录与用牌服务时调用 `rulesOf(ctx)`；方天等能力共用 `extraTargets` 查询。防御结果和青龙/斧/戟/弓的后续实现见 [22](22-weapons-defense.md)。
 
 `equip(ctx, book, { card, owner, from })` 要求明确原区域。它将同槽旧装备移至弃牌区，新装备移入持有者装备区，在一次提交中完成。标准槽位是 weapon、armor、offensive-horse、defensive-horse；扩展可直接命名新槽位。
 

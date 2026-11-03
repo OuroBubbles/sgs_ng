@@ -22,7 +22,7 @@
 
 ## 委托响应与护驾
 
-[护驾](../src/content/standard/commanders.ts) 复用已有 `ResponseOpportunity.delegate`，没有额外的角色供牌通道。只在拥有者自己的根闪请求中发动；委托请求的 actor 与 beneficiary 不同，不会再递归发动护驾。
+[护驾](../src/content/standard/generals/) 复用已有 `ResponseOpportunity.delegate`，没有额外的角色供牌通道。只在拥有者自己的根闪请求中发动；委托请求的 actor 与 beneficiary 不同，不会再递归发动护驾。
 
 候选是其他存活魏角色，不预先读取其手牌或转换能力。顺序从当前回合角色起算；独立规则流程以技能拥有者为锚点。每次委托前重新读取当前势力与存活状态，失败后继续询问下一人；全部失败则本人仍可正常响应。
 

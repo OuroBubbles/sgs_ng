@@ -12,7 +12,7 @@ pnpm audit:standard
 
 工具不执行参考代码，不自动导入它们的架构，也不判断文本等价或技能分支已经通过。报告明确标记 static-reference-inventory 与 behaviorVerified=false；常规构建、测试不读取参考项目。坐骑只解析本目录明确的 horse 工厂调用，不尝试解释任意作者函数。
 
-规则依据优先读取项目实际定义与说明；参考分别记录，不能把不同项目、不同模式的文本拼成一套规则。当前目录见 [武将/技能装配](../src/content/standard/generals.ts)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts)。本地参考入口为 [FreeKill 标准文本](../../freekill/packages/standard/i18n/zh_CN.lua)、[牌文本](../../freekill/packages/standard_cards/i18n/zh_CN.lua)、[noname 标准文本](../../noname/resources/app/character/standard/translate.js) 与 [牌包](../../noname/resources/app/card/standard.js)。它们不代表上游最新版本。
+规则依据优先读取项目实际定义与说明；参考分别记录，不能把不同项目、不同模式的文本拼成一套规则。当前目录见 [武将/技能装配](../src/content/standard/generals/sunshangxiang.ts)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts)。本地参考入口为 [FreeKill 标准文本](../../freekill/packages/standard/i18n/zh_CN.lua)、[牌文本](../../freekill/packages/standard_cards/i18n/zh_CN.lua)、[noname 标准文本](../../noname/resources/app/character/standard/translate.js) 与 [牌包](../../noname/resources/app/card/standard.js)。它们不代表上游最新版本。
 
 ## 行为清单与检查
 
@@ -110,7 +110,7 @@ pnpm audit:standard:behavior --complete
 
 ## 项目采用的规则语义
 
-- 仁德以出牌阶段累计。FreeKill 使用 `_rende_cards-phase`，noname 说明使用“回合”措辞；本项目按 [仁德实现](../src/content/standard/benevolence.ts) 的明确阶段生存期与原子交牌累计处理，不从文本相似推断嵌套行为相同。
+- 仁德以出牌阶段累计。FreeKill 使用 `_rende_cards-phase`，noname 说明使用“回合”措辞；本项目按 [仁德实现](../src/content/standard/generals/liubei.ts) 的明确阶段生存期与原子交牌累计处理，不从文本相似推断嵌套行为相同。
 - 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的独立效果处理，详见 [42](42-skill-identity-audit.md)。
 - 方天选择“材料包含全部非空手牌”，和 FreeKill 当前代码一致；不能仅按 noname“最后手牌”短句推断多材料或零材料分支。
 - 天妒的公共判定结束机会先于洛神的本次判定后续；最终牌若已被取得，后者不抢回，详见 [29](29-wei-judgment-effects.md) 与谋士专项。判定最终快照与当前牌面分开，见 [50](50-card-faces.md)。

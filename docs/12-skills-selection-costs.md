@@ -12,7 +12,7 @@
 
 defineSkill / viewAs 可重复调用；本入口已固定的声明原样复用，不在内容组合和每局登记时重复复制、绑定。外部浅冻结对象仍按当前输入校验与复制，原始对象不会成为缓存键；本局工厂每局执行，运行中的候选、来源与合法性仍实时查询。
 
-装配期 `register` 可原子追加定义，第一次挂接后封口。需要牌规则的触发技能可通过显式工厂闭包取得 CardBook；转换与主动回调则直接取得本局目录。独立回合效果使用 [56](56-independent-effects.md) 的普通数据实例与闭包，裸衣不再手写专用 Provider。普通源码组合与未来接口见 [39](39-source-packages.md)。
+装配期 `register` 可原子追加定义，第一次挂接后封口。需要牌规则的触发技能在回调中用 `rulesOf(ctx)` 取得本局 CardBook；转换与主动回调则直接取得本局目录。独立回合效果使用 [56](56-independent-effects.md) 的普通数据实例与闭包，裸衣不再手写专用 Provider。普通源码组合与未来接口见 [39](39-source-packages.md)。
 
 技能入口支持普通方法：on 的 times / retain / when / run、主动的 available / selection / run、转换的 available / materials / 动态 count / names / make / use，以及底层 bind / contribution。静态装配固定声明与方法入口，保留原接收者，原型方法与私有字段不因对象复制失效；原对象不会被冻结。对象字面量、闭包与类方法使用同一套调用形式。方法内部继续读取原接收者，其可变数据与方法间调用仍由作者管理，局内状态不能存入跨局共享的定义对象。
 
@@ -86,9 +86,9 @@ CardBook.hasOffers 与 offers 共用候选迭代，activeAvailable 与 activeOff
 
 ## 可运行例子与证据
 
-[作者入口](05-authoring.md) 的完整示例与 [渡口](../examples/content/harbor/index.ts) 使用相同的 SDK：普通 TypeScript 工厂取得本局 CardBook，通过 invoke 宣告、draw 摸牌。文档原样代码由 [模块场景](../tests/scenarios/content-examples.test.ts) 构建并真实结算，覆盖拒绝、正式摸牌时点、宣告后来源失去与事实重建。
+[作者入口](05-authoring.md) 的完整示例与 [渡口](../examples/content/harbor/index.ts) 使用相同的 SDK：普通 TypeScript 静态技能，经 trigger 询问并宣告、draw 摸牌。文档原样代码由 [模块场景](../tests/scenarios/content-examples.test.ts) 构建并真实结算，覆盖拒绝、正式摸牌时点、宣告后来源失去与事实重建。
 
-受伤后私取与分批交牌可读 [标准遗计](../src/content/standard/strategists.ts)；私有牌池与真实摸牌各有自己的规则入口和时点。取消后保留已获得牌、逐批移牌、死亡善后与已宣告后失去技能的继续条件，由 [实际技能场景](../tests/scenarios/strategists.test.ts) 保护。通用边界分别见 [技能](../tests/scenarios/skills.test.ts)、[选择](../tests/scenarios/selection.test.ts) 与 [支付](../tests/scenarios/payment.test.ts)；当前验证只记录在 STATUS。
+受伤后私取与分批交牌可读 [标准遗计](../src/content/standard/generals/)；私有牌池与真实摸牌各有自己的规则入口和时点。取消后保留已获得牌、逐批移牌、死亡善后与已宣告后失去技能的继续条件，由 [实际技能场景](../tests/scenarios/strategists.test.ts) 保护。通用边界分别见 [技能](../tests/scenarios/skills.test.ts)、[选择](../tests/scenarios/selection.test.ts) 与 [支付](../tests/scenarios/payment.test.ts)；当前验证只记录在 STATUS。
 
 本地 FreeKill 参考：`packages/standard/pkg/skills/wusheng.lua` 将转换与牌执行分开；`standard_cards/pkg/skills/slash.lua` 独立检查次数/目标；`ltk/server/events/skill.lua:206`、`ltk/core/player.lua:996` 提供来源/失效/存活参考；`standard/pkg/skills/yiji.lua` 展示循环和联合选择需求。没有复制代码或兼容接口。
 

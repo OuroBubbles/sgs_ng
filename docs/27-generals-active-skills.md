@@ -23,7 +23,7 @@ RoleMatch 玩家可指定 `{ id, general }`，不能同时用 maxHp/gender/skill
 
 主持侧使用同一 play-action 请求；主动值包含技能实例、动作、材料和目标。actor 与 phase 由主持侧固定。界面在同一草稿中选择技能、材料和目标，最后一次提交；得到新信息后的选择仍由 run 按规则时点询问。客户端与 AI 接收数据描述，执行侧模型与函数不进入协议或 World。
 
-实际写法见 [制衡](../src/content/standard/wu.ts)、[结姻](../src/content/standard/generals.ts)、[仁德与青囊](../src/content/standard/benevolence.ts)、[反间与离间](../src/content/standard/intrigue.ts)。
+实际写法见 [制衡](../src/content/standard/generals/)、[结姻](../src/content/standard/generals/sunshangxiang.ts)、[仁德与青囊](../src/content/standard/generals/liubei.ts)、[反间与离间](../src/content/standard/generals/)。
 
 ## 三个流程约束
 

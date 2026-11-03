@@ -4,7 +4,7 @@
 
 ## 两名标准武将
 
-实现位于 [strategists.ts](../src/content/standard/strategists.ts)，只依赖 SDK。依据本地 FreeKill 的[鬼才](../../freekill/packages/standard/pkg/skills/guicai.lua)、[反馈](../../freekill/packages/standard/pkg/skills/fankui.lua)、[天妒](../../freekill/packages/standard/pkg/skills/tiandu.lua)、[遗计](../../freekill/packages/standard/pkg/skills/yiji.lua)及[改判操作](../../freekill/ltk/server/events/judge.lua)；沿用标准版本，没有混入界限突破。
+实现位于 [generals/](../src/content/standard/generals/)，只依赖 SDK。依据本地 FreeKill 的[鬼才](../../freekill/packages/standard/pkg/skills/guicai.lua)、[反馈](../../freekill/packages/standard/pkg/skills/fankui.lua)、[天妒](../../freekill/packages/standard/pkg/skills/tiandu.lua)、[遗计](../../freekill/packages/standard/pkg/skills/yiji.lua)及[改判操作](../../freekill/ltk/server/events/judge.lua)；沿用标准版本，没有混入界限突破。
 
 | 武将   | 基础体力 / 性别 | 技能                                                               |
 | ------ | --------------- | ------------------------------------------------------------------ |

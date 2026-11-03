@@ -1,46 +1,65 @@
 # 05 · 内容开发入口
 
-本文使用当前 [SDK](../src/sdk/index.ts)，不再保留不能直接执行的早期示意接口。系统能力与未验收边界以 [STATUS](STATUS.md) 为准；流程、时点和故障的完整契约见 [04](04-resolution.md)。
+本文使用当前 [SDK](../src/sdk/index.ts)。系统能力与未验收边界以 [STATUS](STATUS.md) 为准；流程、时点和故障的完整契约见 [04](04-resolution.md)。
 
-## 日常开发：直接组合普通定义
+## 一将一文件
 
-当前以个人开发、AI 辅助为主。直接修改 [标准内容](../src/content/standard/index.ts) 或 [机制演武](../src/content/workshop/index.ts)，导出普通 `ContentDefinition` 对象。卡牌、技能、武将、牌堆与展示声明可以来自任意普通 import；没有包清单、内容版本、依赖登记或 ID 前缀要求。
+标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general({...})`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件，不再改任何登记列表。`general({ id, name, kingdom, hp, gender?, skills })` 直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
-用 [createContent](../src/content/catalog.ts) 将一份或多份定义组合为本局目录，例如 `createContent(standard, practice)`。`skills` 始终是列表，静态对象和普通工厂可并列，例如 `skills: [wusheng, guicai]`；工厂接收本局 CardBook，可返回一个或一组技能，分支、循环与普通函数组合保持可用。条目按组合后的列表顺序逐项登记，工厂可读取前面静态声明或工厂返回的技能；有依赖时将被依赖项放在前面，合并或拆分 ContentDefinition 不改变这个顺序。组合时固定卡牌和静态技能的声明快照，之后修改原对象不影响对局；工厂拿到该局实际使用的 CardBook，Window、Query 和普通闭包保留对象身份。默认对局直接装配标准源码；`RoleMatch` 统一通过 content 传入普通定义或已有目录，例如 `content: { cards, skills, generals }`，二者共用同一装配实现。标准内容现有 `standard:` ID 是内容命名习惯，普通装配不强制该格式。
+```ts
+import { draw, general, skill, trigger, useDeclared, cardDef } from '../../../sdk';
 
-持续生效的独立效果放在同一 `ContentDefinition.effects` 列表，由装配入口每局登记；技能工厂只需返回技能。[裸衣](../src/content/standard/wei.ts) 的技能与独立效果在 [标准入口](../src/content/standard/index.ts) 分别声明，不再依赖调用技能工厂的登记副作用。局内创建效果仍用普通 `book.effects.prepare/add`，来源技能失去后是否保留由规则决定。
+export const study = skill({
+  id: 'study',
+  name: '研习',
+  description: '当你使用锦囊牌时，你可以摸一张牌。',
+  triggers: [
+    trigger(useDeclared, {
+      who: (use) => use.actor, // 只在事件主体是技能拥有者时触发
+      when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
+      ask: '是否发动【研习】摸一张牌？', // 询问 + 宣告由引擎完成
+      effect: (ctx, _use, self) => draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
+    }),
+  ],
+});
 
-用 [createOfflineMatch](../src/app/offline/practice.ts) 运行普通场景时，直接提供 `{ seed, preset, lineup, content }`；阵容长度决定人数。无固定阵容的练习局使用 `{ count, seed, preset }`，count 与 lineup 在类型上互斥；无参数仍是四席标准局。源码按常规相对路径导入 SDK，不再保留仅类型检查可见的特殊别名。
+export default general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, skills: [study] });
+```
 
-content 可直接传普通 ContentDefinition 或已有目录；preset 交给 [RoleMatch](../src/app/offline/role-match.ts) 从同一内容装配中生成牌表和取得名称。直接建局时，deck 可写目录牌组 ID，例如 `deck: 'play'`，也可提供自行生成的实体牌数组。实体牌先固定快照，再用同一份数据验证定义与建立初始状态，不冻结调用者的原对象；deckName 仍可显式覆盖显示名称。
+技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。
 
-技能直接写普通对象，用 `satisfies SkillDefinition` 获得类型提示，只声明实际能力，空的 `triggers` 列表不是必填。标准内容、机制演武与示例均采用此写法，转换配方也直接写在 `viewAs` 列表中。`triggers: [on(window, …)]` 与独立效果的触发列表同名；`ContentDefinition.effects` 只登记独立持续效果。createContent / SkillBook 与装备装配负责原有校验、声明快照及方法绑定；defineSkill / viewAs 仍可用于主动提前规范化，无需逐项包装内容声明。
+## 触发技：两段式 trigger
 
-独立效果同样直接写普通对象，用 `satisfies EffectDefinition<Data>` 保留数据和句柄的类型提示。createContent / EffectBook 固定声明并绑定原接收者；defineEffect 用于主动提前规范化，内置裸衣与[守约示例](../examples/effects/covenant.ts)均由装配入口完成这一职责。
+`trigger(window, spec)` 是 `on` 之上的分段写法：
 
-active 与 viewAs 的 label 可省略，菜单使用当前技能实例的 name；需要区分同一技能的多个能力时再声明，例如龙胆的杀与闪。发布给 UI / AI 的菜单仍始终包含完整名称。
+- `who(event)`：事件主体，不等于拥有者时不触发；`when` / `times` 同 `on`，参数为 `(ctx, event, self)`。
+- 非锁定技默认 `order: 'choose'`；`locked: true` 表示锁定技，不询问、不宣告。
+- `ask`：询问是否发动并宣告（skill.invoke）；可为字符串或 `(ctx, event, self, occurrence) => string`，多次触发用 `nth(occurrence)` 追加「第 i/n 次」。
+- `cost`：先由玩家完成选择（返回 null/false 视为不发动），再宣告；`declare` 返回随宣告同次提交的附加数据、状态变更或代价。
+- `keep`：宣告时的合法条件，与「未终局」一起由引擎检查。
+- `effect`：宣告即生效，之后失去技能或条件改变不撤销；只有终局会截断 effect。效果内若文本要求再查（如奸雄要求材料仍在处理区），在 effect 里普通地判断。
 
-卡牌、技能、转换配方、独立效果与武将按声明字段各读取一次，校验与保存使用同一份快照；目录再用该快照检查重复并建立 ID 索引。时点组与技能能力列表也先固定再校验，普通对象与原型 getter 使用相同路径。方法入口固定并绑定原接收者，作者对象仍可供其方法读取，不会被冻结。演武与示例的武将直接使用外层 `satisfies ContentDefinition` 提供的类型提示；单独声明列表时可用 `as const satisfies readonly GeneralDefinition[]`。defineGeneral 仍可用于主动提前规范化单项声明。
+## 主动技：action
 
-on 与 effectOn 可省略局部 id，默认使用时点的 id；同一技能或独立效果内默认名冲突时，再显式区分处理器。底层自定义 bind 声明仍提供明确 ID。
+`action({ id, limit, cards, targets, pay, selection, declare, effect })` 生成 `active` 能力：`limit` 为每阶段次数（键为技能 ID 末段），`cards: { count, areas, filter }` 与 `targets: { count, filter }` 生成联合选择，`pay: 'discard'` 弃置所选牌作为费用；复杂配对等约束可用 `selection` 自写 JointSelection 模型。effect 取得 `{ self, phase, cards, targets }`。
 
-局部 ID 冲突时，报错指出技能 ID、能力种类与重复的 ID；缺失局部 ID 由对应声明入口拒绝。触发、转换与主动能力各自检查局部 ID，跨种类可以同名。批量登记失败时整批不生效，修正后可重新登记。
+## 规则动词自带存活与终局处理
 
-主动技能的 `available` / `selection` 使用 `(ctx, { self, phase, book })`；执行使用 `(ctx, { self, phase, book, choice, selection })`，按需解构字段，不再填充位置占位参数。`available` 可省略，只表达次数等额外条件；引擎通过 selection 检查材料、目标与复杂约束是否存在完成路径，不用再手写同一遍候选检查。苦肉可只声明 run，仁德可只声明 selection 与 run；阶段和来源资格仍由引擎检查。selection 是本次执行重查使用的模型，可在支付的 legal 中调用 selection.validate(choice)，无需再建一次相同模型；候选仍实时读取。触发回调继续使用下文的窗口载荷接口。
+`damage`、`draw`、`recover`、`judge`、`chooseOwnedCard` 以及作者动词 `obtain` / `takeCard` / `give` / `askDiscard` / `select` / `obtainJudgment` 都会在目标阵亡或已终局时 no-op 或返回 unavailable，技能无需在每个 await 后手写 `isGameOver` / `alive` 检查。牌的获得统一写成移牌事实的 `declaration` 形式（如 `card.taken` 的 `{ moves, before, declaration }`）。
 
-零材料转换可整组省略 materials / count，由执行侧补齐空候选与零张数；需要材料时两者必须同时声明，类型检查与运行入口均拒绝半组配置。固定转换直接声明 `make: { name: 'standard:slash' }`，可能牌名从牌面取得，无需再写 `names` 或常量返回函数；装配时固定牌面快照。动态转换仍显式提供 `names` 与 `make` 函数，后者可按参数返回不同牌面或 null。`names` / `materials` / `count` / `available` 的函数使用 `(ctx, { self, book, purpose })`；`make` 函数还可取 `materials` 和 `parameters`，如 `make: (_ctx, { parameters }) => ...`。`purpose` 明确区分使用与打出，预览和最终构牌共用同一用途。可选的 `use` 使用 `(ctx, { self, book, purpose, intent })`，直接返回 `UseResult` 或其 Promise，purpose 固定为 use；管线等待完整结果，[激将](../src/content/standard/benevolence.ts) 继续用普通异步供牌完成真实用牌，不增加询问层级。
+## AI 提示与技能同处
 
-查询修正使用 `modify(query, (ctx, { input, self }) => value)`，按需读取查询数据与技能来源；共享函数可标注 `ModifyInput<T>`。贡献的组合与底层自定义协议见 [装备与查询](18-equipment-queries.md#小而可组合的纯查询)。
+技能可声明 `ai: { value?: (view) => number, targets?: 'ally' | 'enemy' }`。基础 AI 只通过 `observation.skills(id)` 读取提示：`value` 给出主动技能的发动意愿（不大于 0 不发动），`targets: 'ally'` 让选目标偏向友方。view 只含观察者视角的 `self / players / hand / cards / hostility / cost`，提示必须是纯函数。基础 AI 本身不再按技能 ID 分支。
 
-卡牌 use 的回调沿用相同约定，例如 `target(ctx, { request, target, book })` 与 `resolve(ctx, { effect, book })`；整牌 execute 取得 use / book / resolveTargets，可继续用普通控制流编排目标与共享资源。具体输入及查询 / 后效区别见 [语义牌与用牌](13-card-use.md#一次用牌)。
+## 组合与运行
 
-## 一个完整技能
+用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。组合时固定卡牌与技能的声明快照，之后修改原对象不影响对局；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果放在 `ContentDefinition.effects`（裸衣的 `luoyiAftereffect` 在[标准入口](../src/content/standard/index.ts)声明）。
 
-[研习示例](../examples/content/study.ts) 是可直接 import 的完整普通源码：使用锦囊时可询问摸牌。它通过工厂取得本局 CardBook，不使用清单、版本或名称前缀。可以修改该文件，或在自己的普通文件中定义技能。
+用 [createOfflineMatch](../src/app/offline/practice.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 
-在 [本地装配](../src/app/offline/practice.ts) 中显式组合定义，例如 `createContent(standard, study)`，再执行 `pnpm typecheck` 与 `pnpm check`。不扫描目录、不自动安装，也不要求自建牌堆、模式或 UI。[真实场景](../tests/scenarios/content-examples.test.ts) 直接 import 示例，验证取消、宣告、来源失效后的后效与事实重建。
+[研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留[内容组合接口](39-source-packages.md)。
 
-未来扩展只保留 [内容组合接口](39-source-packages.md)，没有独立包格式或专用构建命令。普通跨文件合作使用常规 import，见渡口与画阁示例。
+底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 与 effectOn 可省略局部 id；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，见 [装备与查询](18-equipment-queries.md#小而可组合的纯查询)；卡牌 use 回调见 [语义牌与用牌](13-card-use.md#一次用牌)。
 
 ## ctx、self 与普通函数
 
@@ -56,16 +75,16 @@ on 与 effectOn 可省略局部 id，默认使用时点的 id；同一技能或�
 
 ## 选哪种能力入口
 
-| 需求                         | 当前入口                                                    | 可运行源码                                                                             |
-| ---------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 在时点参与结算               | `on`；`when` 为纯查询，`run` 可等待                         | [集智等](../src/content/standard/tacticians.ts)                                        |
-| 出牌阶段主动发动             | `active` 中的 `available` / `selection` / `run`             | [制衡](../src/content/standard/wu.ts)                                                  |
-| 将材料解释为另一张牌         | `viewAs`；用牌与响应规则继续由 CardBook 处理                | [武圣](../src/content/standard/wusheng.ts)、[龙胆](../src/content/standard/martial.ts) |
-| 修正牌面、距离或限制         | `modify` + 具名 `cardQueries`；自定义组合可用 `defineQuery` | [谦逊](../src/content/standard/wu.ts)                                                  |
-| 创建失去技能后仍可存在的效果 | `EffectDefinition` / `EffectBook`，实例数据存 World         | [裸衣](../src/content/standard/wei.ts)                                                 |
-| 定义新的规则时点             | `defineWindow<T>` + `ctx.window`，跨包直接共享对象          | [渡口](../examples/content/harbor/index.ts)                                            |
+| 需求                         | 作者层入口（优先）                                       | 底层入口（作者层不够时）                                    | 可运行源码                                                |
+| ---------------------------- | -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| 在时点参与结算               | `trigger(window, { who, when, ask/cost, keep, effect })` | `on`；`when` 为纯查询，`run` 可等待                         | [刚烈](../src/content/standard/generals/xiahoudun.ts)     |
+| 出牌阶段主动发动             | `action({ limit, cards, targets, pay, effect })`         | `active` 中的 `available` / `selection` / `run`             | [结姻](../src/content/standard/generals/sunshangxiang.ts) |
+| 将材料解释为另一张牌         | `convert(id, { as, match, areas })`                      | `viewAs`；用牌与响应规则继续由 CardBook 处理                | [武圣](../src/content/standard/generals/guanyu.ts)        |
+| 修正牌面、距离或限制         | —                                                        | `modify` + 具名 `cardQueries`；自定义组合可用 `defineQuery` | [谦逊](../src/content/standard/generals/luxun.ts)         |
+| 创建失去技能后仍可存在的效果 | —                                                        | `EffectDefinition` / `EffectBook`，实例数据存 World         | [裸衣](../src/content/standard/generals/xuchu.ts)         |
+| 定义新的规则时点             | —                                                        | `defineWindow<T>` + `ctx.window`，跨文件直接共享对象        | [渡口](../examples/content/harbor/index.ts)               |
 
-一个技能可以组合这些入口，也可直接编排公开规则函数；没有要求复杂技能翻译成配置 DSL。新 helper 应来自真实重复的语义，而不是为隐藏一个循环建立通用框架。
+一个技能可以混用两层，也可直接编排公开规则函数。作者层只是同一套 `on` / `active` / `viewAs` 声明的写法，不是第二套机制；新 helper 应来自真实重复的语义，而不是为隐藏一个循环建立通用框架。
 
 ## 选择、费用与继续条件
 

@@ -8,7 +8,7 @@
 - [CardBook](../src/rules/cards/book.ts)：固定牌目录、候选、构造、统一验证、宣告、目标效果与响应。
 - [UsePlan](../src/rules/cards/plan.ts)：增删/转移/显式重复目标、阶段封口与原因记录。
 - [标准牌子集](../src/content/standard/cards.ts)：杀、闪、桃、决斗、无中生有，以及无懈、群体锦囊、借刀与延时牌。
-- [武圣](../src/content/standard/wusheng.ts)：红色手牌/装备作为杀，复用同一管线。
+- [武圣](../src/content/standard/generals/guanyu.ts)：红色手牌/装备作为杀，复用同一管线。
 
 ## 语义牌与材料
 

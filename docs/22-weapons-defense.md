@@ -40,7 +40,7 @@ flowchart LR
 
 ## 内容作者取得服务
 
-需要牌目录或完整用牌服务的装备能力可以使用同步工厂：
+装备能力是静态 SkillDefinition；需要牌目录或完整用牌服务时，在回调里用 `rulesOf(ctx)`：
 
 ```ts
 equipmentCard({
@@ -48,17 +48,17 @@ equipmentCard({
   label: '示例武器',
   slot: 'weapon',
   range: 3,
-  skill: (book) => ({
+  skill: {
     id: 'my:weapon-ability',
     name: '示例武器',
     triggers: [
-      /* 普通闭包可调用 book.askUse / book.definition */
+      /* 回调中 rulesOf(ctx).askUse / cardDef(ctx, name) */
     ],
-  }),
+  },
 });
 ```
 
-简单能力仍可直接提供 SkillDefinition。工厂在本 CardBook 的完整目录建立后求值，再从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。工厂只声明能力，运行时操作留在效果回调内。
+CardBook 从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。
 
 `SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；联合选择可通过 `decision(player, prompt, { optional: true, cancelLabel })` 指定取消文字，借刀复用它显示“取消用牌”。
 

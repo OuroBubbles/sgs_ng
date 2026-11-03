@@ -6,7 +6,7 @@
 
 ## 装配与配置所有权
 
-[createContent](../src/content/catalog.ts) 直接组合普通定义，无命名空间要求。skills 列表可并列静态对象与接收本局 CardBook 的工厂；按列表顺序登记，每个工厂返回的一组技能原子登记。独立效果显式装配。目录先规范化，再用同一份快照检查重复和建立索引；Window / Query 对象身份保留，方法入口固定并保留原接收者，作者对象不被冻结。
+[createContent](../src/content/catalog.ts) 直接组合普通定义，无命名空间要求。技能为静态声明：武将经 `general({ skills })` 携带技能对象，createContent 自动登记（同一对象只登记一次），`skills` 列表只放不属于武将的技能；回调经 `rulesOf(ctx)` 取本局目录。标准武将一将一文件，由 glob 自动收集。独立效果显式装配。目录先规范化，再用同一份快照检查重复和建立索引；Window / Query 对象身份保留，方法入口固定并保留原接收者，作者对象不被冻结。
 
 [RoleMatch](../src/app/offline/role-match.ts) 接受普通内容定义或目录，牌组可用 ID 或直接实体牌表；同一份固定牌表用于验证和初始化。[离线入口](../src/app/offline/practice.ts) 的人数与阵容配置互斥，正常界面使用明确阵容，人数入口保留手动演练预设。准备页与开局共用 App 草稿。CardBook 基础策略按需提供，默认策略、技能查询和最终验证仍使用同一规则实现。
 
