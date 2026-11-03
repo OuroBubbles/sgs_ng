@@ -23,6 +23,8 @@ import {
 import type { Context, PhaseBody, PhaseKind, TurnOrigin, TurnView } from '../../src/sdk';
 import { cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Game } from '../../src/sdk';
 
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const stop = (ctx: Context) => finishGame(ctx, { winners: ['a'], reason: 'probe-completed' });
@@ -50,7 +52,7 @@ it('额外回合具有独立身份，next/last 明确排序并冻结输入，取
     const later = scheduleExtraTurn(ctx, { owner: 'a', reason: 'later' })!;
     expect([a.id, b.id, c.id]).not.toContain(later.id);
   });
-  expect(game.room.history.facts('turn.extra-taken')).toHaveLength(3);
+  expect(game.room.history.facts(Turn.extraTaken)).toHaveLength(3);
   rebuilt(game);
 });
 
@@ -66,7 +68,7 @@ it('取消只按请求身份移除一次，不误取消同角色的另一额外�
     expect(cancelExtraTurn(ctx, b.id, 'already-taken')).toBe(false);
     expect(() => cancelExtraTurn(ctx, 'unknown', '')).toThrow('reason');
   });
-  expect(game.room.history.facts('turn.extra-cancelled')).toHaveLength(1);
+  expect(game.room.history.facts(Turn.extraCancelled)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -77,7 +79,7 @@ it('死亡请求显式跳过，空队列读取不写无意义事实', async () =
     scheduleExtraTurn(ctx, { owner: 'c', reason: 'dead' });
     await kill(ctx, { player: 'c', killer: null, cause, reason: 'rule' });
     expect(takeExtraTurn(ctx)).toEqual(living);
-    expect(game.room.history.facts('turn.extra-skipped')[0]?.data.detail).toMatchObject({
+    expect(game.room.history.facts(Turn.extraSkipped)[0]?.data.detail).toMatchObject({
       turn: { owner: 'c' },
       reason: 'owner-dead',
     });
@@ -120,7 +122,7 @@ it('终局不新增或消费额外回合，已授予但未执行的请求保留�
     expect(takeExtraTurn(ctx)).toBeNull();
     expect(pendingExtraTurns(ctx.world)).toEqual([granted]);
   });
-  expect(game.room.history.facts('game.finished')).toHaveLength(1);
+  expect(game.room.history.facts(Game.finished)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -235,7 +237,7 @@ it('重复的真实出牌阶段各自计算杀次数，第一阶段已用杀不�
   await running;
   expect(game.room.world.player('b').hp).toBe(2);
   const uses = game.room.history
-    .facts('card.used')
+    .facts(CardEvent.used)
     .map((fact) => fact.data.detail as { declaration: { context: { phase: string } } });
   expect(uses).toHaveLength(2);
   expect(uses[0]!.declaration.context.phase).not.toBe(uses[1]!.declaration.context.phase);
@@ -282,8 +284,8 @@ it('阶段计划在进入等待前复制，空回合仍有开始/结束与独立
       runTurn(ctx, game.book, 'a', { origin: { kind: 'extra', id: '', reason: 'bad' } }),
     ).toThrow('Invalid');
   });
-  expect(game.room.history.facts('turn.started')).toHaveLength(2);
-  expect(game.room.history.facts('turn.finished')).toHaveLength(2);
+  expect(game.room.history.facts(Turn.started)).toHaveLength(2);
+  expect(game.room.history.facts(Turn.finished)).toHaveLength(2);
   rebuilt(game);
 });
 
@@ -395,8 +397,8 @@ it('结束窗口排入额外回合，旧回合状态到期后才进入新回合'
     ['b', true],
   ]);
   await running;
-  const finished = game.room.history.facts('turn.finished')[0]!;
-  const starts = game.room.history.facts('turn.started');
+  const finished = game.room.history.facts(Turn.finished)[0]!;
+  const starts = game.room.history.facts(Turn.started);
   expect(finished.seq).toBeLessThan(starts[1]!.seq);
   rebuilt(game);
 });
@@ -419,8 +421,8 @@ it('队列接收者死亡则跳过，仍执行下一项存活请求', async () =
     ['b', true],
   ]);
   await running;
-  expect(game.room.history.facts('turn.extra-skipped')).toHaveLength(1);
-  expect(game.room.history.facts('turn.extra-taken')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Turn.extraSkipped)).toHaveLength(1);
+  expect(game.room.history.facts(Turn.extraTaken)[0]?.data.detail).toMatchObject({
     turn: { owner: 'b' },
   });
   rebuilt(game);
@@ -448,7 +450,7 @@ it('授予来源在本回合死亡，不抹掉其他角色已获得的额外回�
   ]);
   await running;
   expect(game.room.world.player('c').alive).toBe(false);
-  expect(game.room.history.facts('turn.extra-taken')).toHaveLength(1);
+  expect(game.room.history.facts(Turn.extraTaken)).toHaveLength(1);
   rebuilt(game);
 });
 

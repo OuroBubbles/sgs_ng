@@ -5,6 +5,9 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { ownedCards, runPhase, useDeclarations } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'trigger-baseline' } as const;
@@ -83,8 +86,8 @@ it('无双不会把万箭齐发的一次打出闪扩张为连续两次', async (
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.player('d').hp).toBe(3);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   replay(game);
 });
 
@@ -123,7 +126,7 @@ it.each(['qianxun', 'kongcheng'] as const)(
       }
       expect(ctx.world.snapshot).toEqual(before);
     });
-    expect(game.room.history.facts('card.used')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toEqual([]);
     replay(game);
   },
 );
@@ -147,7 +150,7 @@ it('集智不响应他人使用的实体普通锦囊', async () => {
   ).toBe(0);
   expect(ownedCards(game.room.world, 'a')).toEqual([]);
   expect(ownedCards(game.room.world, 'b')).toEqual(['one', 'two']);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   replay(game);
 });
 
@@ -175,8 +178,8 @@ it('集智不响应奇袭转换的有材料普通锦囊，实际拆牌仍完成'
   expect(game.room.world.position('material')).toBe('discard');
   expect(game.room.world.position('victim')).toBe('discard');
   expect(game.room.world.zone('draw').cards).toEqual(['untouched']);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
-  expect(game.room.history.facts('draw.completed')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
+  expect(game.room.history.facts(Draw.completed)).toEqual([]);
   replay(game);
 });
 
@@ -192,7 +195,7 @@ it.each(['yingzi', 'biyue'] as const)(
     expect(await acceptInvocations(game, running)).toBe(0);
     expect(ownedCards(game.room.world, 'a')).toHaveLength(skill === 'yingzi' ? 0 : 2);
     expect(ownedCards(game.room.world, 'b')).toHaveLength(skill === 'yingzi' ? 2 : 0);
-    expect(game.room.history.facts('skill.invoked')).toEqual([]);
+    expect(game.room.history.facts(Skill.invoked)).toEqual([]);
     replay(game);
   },
 );

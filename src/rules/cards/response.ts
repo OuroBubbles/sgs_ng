@@ -100,6 +100,8 @@ export interface ResponseRequest {
 export const Response = defineEvent('response', {
   finished: timing<CardResponse>(),
   requested: timing<ResponseOpportunity, ResponseRequest>(),
+  delegated: timing<unknown>(),
+  requestFinished: timing<unknown>(),
 });
 
 /** 响应机会只拥有待决请求；使用、打出、材料交接由 CardBook 原有领域管线执行。 */
@@ -267,7 +269,7 @@ export function requestResponse(
 
             if (isResponseSatisfied(result)) {
               supplied = immutable(result);
-              delegation.commit('response.delegated', [], {
+              delegation.commit(Response.delegated, [], {
                 request: lifetime.id,
                 actor,
                 beneficiary,
@@ -334,7 +336,7 @@ export function requestResponse(
         result = provided;
       }
     }
-    child.commit('response.request.finished', [], { ...snapshot, result });
+    child.commit(Response.requestFinished, [], { ...snapshot, result });
     return immutable(result);
   });
 }

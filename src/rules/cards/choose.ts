@@ -5,6 +5,7 @@ import type { Context } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
 import { delayedCards } from './delayed';
 import type { SemanticCard } from './types';
+import { CardEvent } from './move';
 
 export interface OwnedCardChoice {
   readonly actor: string;
@@ -132,7 +133,7 @@ export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise
     if (answer.kind !== 'chosen') return { kind: 'unavailable' };
     const chosen = available().find((item) => item.id === answer.value.cards[0]);
     if (!chosen) return { kind: 'unavailable' };
-    child.commit('card.chosen', [], { ...input, card: chosen.card, from: chosen.from });
+    child.commit(CardEvent.chosen, [], { ...input, card: chosen.card, from: chosen.from });
     if (chosen.delayed)
       return immutable({
         kind: 'delayed',

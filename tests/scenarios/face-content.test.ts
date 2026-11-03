@@ -8,6 +8,7 @@ import { projectMatch } from '../../src/app/offline/projection';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
 import { playMatch } from '../fixtures/match';
+import { CardEvent } from '../../src/sdk';
 
 const content = practiceContent;
 
@@ -72,7 +73,7 @@ it('自然种子 2 的牌面演练：本人牌面红桃、他人印刷黑桃，�
   expect(match.room.decisions.cancel(response.id, response.token)).toEqual({ kind: 'accepted' });
   await running;
   expect(match.room.world.position(material!)).toBe('discard');
-  expect(match.room.history.facts('card.used')[0]?.data.detail).toMatchObject({
+  expect(match.room.history.facts(CardEvent.used)[0]?.data.detail).toMatchObject({
     declaration: { card: { suit: 'heart', color: 'red' } },
   });
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(

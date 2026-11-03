@@ -16,6 +16,13 @@ import type {
 } from './life-events';
 import { Cards } from '../cards/move';
 import { Dying, Death } from './life-events';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const PlayerEvent = defineEvent('player', {
+  died: timing<unknown>(),
+  buried: timing<unknown>(),
+});
 
 export type {
   BurialEvent,
@@ -84,7 +91,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
     if (!child.world.player(input.player).alive || isGameOver(child.world))
       return { kind: 'unavailable', event: null, reason: null };
     if (draft.prevention) {
-      child.commit('death.prevented', [], { input, reason: draft.prevention });
+      child.commit(Death.prevented, [], { input, reason: draft.prevention });
       return { kind: 'prevented', event: null, reason: draft.prevention };
     }
     if (input.reason === 'dying' && child.world.player(input.player).hp > 0)
@@ -97,7 +104,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
       skillsBefore: child.world.snapshot.skills.filter((skill) => skill.owner === input.player),
     });
     child.commit(
-      'player.died',
+      PlayerEvent.died,
       [{ kind: 'vitality', player: input.player, hp: event.before.hp, alive: false }],
       event,
     );
@@ -120,7 +127,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
       burial: { zonesBefore: before, skillsBefore: skills },
     });
     changes.push(...skills.map((skill): Change => ({ kind: 'removeSkill', instance: skill.id })));
-    child.commit('player.buried', changes, {
+    child.commit(PlayerEvent.buried, changes, {
       event,
       moves,
       removedSkills: skills.map((skill) => skill.id),

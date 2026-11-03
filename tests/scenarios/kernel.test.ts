@@ -53,7 +53,9 @@ describe('串行结算、作用域和故障现场', () => {
       await ctx.flow('phase', async (phase) => {
         order.push('phase');
         await phase.flow('skill', (skill) => {
-          skill.commit('skill.hp', [{ kind: 'vitality', player: 'b', hp: 3 }], { player: 'b' });
+          skill.commit(testTiming('skill.hp'), [{ kind: 'vitality', player: 'b', hp: 3 }], {
+            player: 'b',
+          });
           order.push('skill');
         });
         order.push('phase resumes');
@@ -73,16 +75,15 @@ describe('串行结算、作用域和故障现场', () => {
       expect(entry.scopePath).toBe(fact?.scopePath);
     expect(game.world.player('b').hp).toBe(3);
     const snapshot = game.history.facts();
-    await game.run('later', (ctx) => ctx.commit('later.note', [], null));
+    await game.run('later', (ctx) => ctx.commit(testTiming('later.note'), [], null));
     expect(snapshot).toEqual([fact]);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(game.history.facts()).toEqual(
       game.history.entries.filter((entry) => entry.type === 'commit'),
     );
-    expect(game.history.facts('skill.hp', phase!.scopeId)).toEqual([fact]);
-    expect(game.history.facts(undefined, phase!.scopeId)).toEqual([fact]);
-    expect(game.history.facts('later.note', phase!.scopeId)).toEqual([]);
-    expect(game.history.facts('missing')).toEqual([]);
+    expect(game.history.facts(testTiming('skill.hp'), phase!.scopeId)).toEqual([fact]);
+    expect(game.history.facts(testTiming('later.note'), phase!.scopeId)).toEqual([]);
+    expect(game.history.facts(testTiming('missing'))).toEqual([]);
   });
 
   it('两个 Room 独立等待与执行；同局不能重入根流程', async () => {
@@ -91,7 +92,9 @@ describe('串行结算、作用域和故障现场', () => {
     const waiting = a.run('waiting', (ctx) => ctx.ask(choose()));
     const request = await nextRequest(a);
     expect(() => a.run('overlap', () => undefined)).toThrow('running');
-    await b.run('work', (ctx) => ctx.commit('hp', [{ kind: 'vitality', player: 'b', hp: 2 }], {}));
+    await b.run('work', (ctx) =>
+      ctx.commit(testTiming('hp'), [{ kind: 'vitality', player: 'b', hp: 2 }], {}),
+    );
     expect(a.world.player('b').hp).toBe(4);
     expect(b.world.player('b').hp).toBe(2);
     expect(a.decisions.submit(request.id, request.token, 'yes').kind).toBe('accepted');
@@ -103,7 +106,7 @@ describe('串行结算、作用域和故障现场', () => {
     await expect(
       game.run('bad', (ctx) => {
         const child = ctx.flow('child', (nested) => nested.ask(choose()));
-        ctx.commit('illegal', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
+        ctx.commit(testTiming('illegal'), [{ kind: 'vitality', player: 'b', hp: 1 }], {});
         return child;
       }),
     ).rejects.toThrow('Concurrent rule operation');
@@ -139,10 +142,10 @@ describe('串行结算、作用域和故障现场', () => {
         phase.abort('skip remaining phase');
       });
       expect(result).toEqual({ kind: 'aborted', reason: 'skip remaining phase' });
-      ctx.commit('phase.cleaned', [], {});
+      ctx.commit(testTiming('phase.cleaned'), [], {});
     });
     expect(cleanup).toEqual(['second', 'first']);
-    expect(game.history.facts('phase.cleaned')).toHaveLength(1);
+    expect(game.history.facts(testTiming('phase.cleaned'))).toHaveLength(1);
     expect(game.status).toBe('ready');
   });
 
@@ -166,13 +169,13 @@ describe('串行结算、作用域和故障现场', () => {
     await expect(
       game.run('broken', (ctx) => {
         captured.ctx = ctx;
-        ctx.commit('paid', [{ kind: 'vitality', player: 'b', hp: 3 }], {});
+        ctx.commit(testTiming('paid'), [{ kind: 'vitality', player: 'b', hp: 3 }], {});
         throw new Error('content bug');
       }),
     ).rejects.toThrow('content bug');
     expect(game.world.player('b').hp).toBe(3);
     expect(game.history.facts()).toHaveLength(1);
-    expect(() => captured.ctx?.commit('late', [], {})).toThrow('content bug');
+    expect(() => captured.ctx?.commit(testTiming('late'), [], {})).toThrow('content bug');
     expect(() => game.run('continue', () => undefined)).toThrow('faulted');
   });
 
@@ -180,7 +183,7 @@ describe('串行结算、作用域和故障现场', () => {
     const game = room();
     const result = await game.run('capture', (ctx) => ctx);
     if (result.kind !== 'resolved') throw new Error('Expected context.');
-    expect(() => result.value.commit('late', [], {})).toThrow('Scope closed');
+    expect(() => result.value.commit(testTiming('late'), [], {})).toThrow('Scope closed');
     expect(game.history.facts()).toEqual([]);
   });
 
@@ -203,7 +206,7 @@ describe('串行结算、作用域和故障现场', () => {
               }
             : async () => {
                 await Promise.resolve();
-                ctx.commit('late cleanup', [], {});
+                ctx.commit(testTiming('late cleanup'), [], {});
               };
         // 模拟没有经过项目 lint 的内容回调，运行时仍须守住同步释放边界。
         ctx.defer(cleanup as () => void);
@@ -308,7 +311,7 @@ describe('选择会话与最终验证', () => {
     const game = room();
     const running = game.run('choice', async (ctx) => {
       const result = await ctx.ask(choose());
-      if (result.kind === 'chosen') ctx.commit('chosen', [], { option: result.value });
+      if (result.kind === 'chosen') ctx.commit(testTiming('chosen'), [], { option: result.value });
       return result;
     });
     const request = await nextRequest(game);
@@ -323,7 +326,7 @@ describe('选择会话与最终验证', () => {
       reason: 'closed',
     });
     expect(await running).toEqual({ kind: 'resolved', value: { kind: 'chosen', value: 'yes' } });
-    expect(game.history.facts('chosen')).toHaveLength(1);
+    expect(game.history.facts(testTiming('chosen'))).toHaveLength(1);
   });
 
   it('草案失效 token 与 World revision 分开，提交时重新验证', async () => {
@@ -451,7 +454,7 @@ describe('同步提交与批量移牌', () => {
         { id: 'b:hand', cards: ['b1'] },
       ],
     });
-    expect(game.history.facts('cards.moved')).toHaveLength(1);
+    expect(game.history.facts(Cards.moved)).toHaveLength(1);
     expect(game.world.snapshot.revision).toBe(1);
     expect(game.world.snapshot.players).toBe(before.players);
     expect(game.world.zone('draw')).toBe(before.zones.find((zone) => zone.id === 'draw'));
@@ -497,7 +500,7 @@ describe('同步提交与批量移牌', () => {
       const game = room();
       await expect(
         game.run('bad-data', (ctx) =>
-          ctx.commit('bad', [{ kind: 'vitality', player: 'a', hp: 1 }], detail),
+          ctx.commit(testTiming('bad'), [{ kind: 'vitality', player: 'a', hp: 1 }], detail),
         ),
       ).rejects.toThrow(/plain finite data|Cyclic game data|plain objects/);
       expect(game.world.player('a').hp).toBe(4);
@@ -531,7 +534,11 @@ describe('同步提交与批量移牌', () => {
       marker,
     ];
     const result = await game.run('snapshot', (ctx) =>
-      ctx.commit('snapshot', changes, { shared, marker }),
+      ctx.commit(
+        testTiming<unknown, { shared: typeof shared; marker: typeof marker }>('snapshot'),
+        changes,
+        { shared, marker },
+      ),
     );
     if (result.kind !== 'resolved') throw new Error('Expected a committed snapshot.');
     const fact = result.value;
@@ -553,11 +560,11 @@ describe('同步提交与批量移牌', () => {
       await expect(
         game.run('reentry', (ctx) => {
           const enter = () => {
-            ctx.commit('inner', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
+            ctx.commit(testTiming('inner'), [{ kind: 'vitality', player: 'b', hp: 1 }], {});
             return 3;
           };
           ctx.commit(
-            'outer',
+            testTiming('outer'),
             [
               {
                 kind: 'vitality',
@@ -586,7 +593,7 @@ describe('同步提交与批量移牌', () => {
     const game = room();
     const before = game.world.snapshot;
     const detail = { cards: ['a1'] };
-    await game.run('first', (ctx) => ctx.commit('mark', [], detail));
+    await game.run('first', (ctx) => ctx.commit(testTiming('mark'), [], detail));
     const marked = game.world.snapshot;
     expect(marked).not.toBe(before);
     expect(marked.revision).toBe(before.revision + 1);
@@ -594,16 +601,16 @@ describe('同步提交与批量移牌', () => {
       expect(marked[key]).toBe(before[key]);
     detail.cards.push('a2');
     await game.run('second', (ctx) =>
-      ctx.commit('hp', [{ kind: 'vitality', player: 'a', hp: 3 }], {}),
+      ctx.commit(testTiming('hp'), [{ kind: 'vitality', player: 'a', hp: 3 }], {}),
     );
     expect(before.players[0]?.hp).toBe(4);
     expect(game.world.snapshot.players).not.toBe(before.players);
     expect(game.world.snapshot.players[1]).toBe(before.players[1]);
     for (const key of ['cards', 'zones', 'skills', 'states'] as const)
       expect(game.world.snapshot[key]).toBe(before[key]);
-    expect(game.history.facts('mark')[0]?.data.detail).toEqual({ cards: ['a1'] });
+    expect(game.history.facts(testTiming('mark'))[0]?.data.detail).toEqual({ cards: ['a1'] });
     expect(Object.isFrozen(game.world.snapshot.players[0])).toBe(true);
-    expect(Object.isFrozen(game.history.facts('mark')[0]?.data.detail)).toBe(true);
+    expect(Object.isFrozen(game.history.facts(testTiming('mark'))[0]?.data.detail)).toBe(true);
 
     const shared = { value: 2 };
     const mutable = { cards: ['a1'] };
@@ -619,15 +626,16 @@ describe('同步提交与批量移牌', () => {
       },
     });
     const named = Object.fromEntries([['__proto__', { value: 1 }]]);
+    const graphDetail = {
+      left: shared,
+      right: shared,
+      shell: Object.freeze({ mutable }),
+      sparse,
+      shifting,
+      named,
+    };
     const graph = await game.run('graph', (ctx) =>
-      ctx.commit('graph', [], {
-        left: shared,
-        right: shared,
-        shell: Object.freeze({ mutable }),
-        sparse,
-        shifting,
-        named,
-      }),
+      ctx.commit(testTiming<unknown, typeof graphDetail>('graph'), [], graphDetail),
     );
     if (graph.kind !== 'resolved') throw new Error('Expected immutable graph.');
     const snapshot = graph.value.data.detail;
@@ -742,7 +750,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
         remove();
         if (!ctx.world.snapshot.skills.some((skill) => skill.skill === 'new')) {
           ctx.commit(
-            'skill.gained',
+            testTiming('skill.gained'),
             [
               {
                 kind: 'setSkill',
@@ -864,7 +872,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
         });
         const writeLater = async () => {
           await Promise.resolve();
-          ctx.commit('illegal.query', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
+          ctx.commit(testTiming('illegal.query'), [{ kind: 'vitality', player: 'b', hp: 1 }], {});
           return {};
         };
         if (path === 'query') {
@@ -873,7 +881,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
           } catch (error) {
             expect(error).toBeInstanceOf(Error);
           }
-          ctx.commit('after.catch', [], {});
+          ctx.commit(testTiming('after.catch'), [], {});
           return;
         }
         await ctx.ask({
@@ -901,7 +909,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
       id: 'bad-query',
       owner: 'a',
       eligible: (ctx) => {
-        ctx.commit('illegal', [], {});
+        ctx.commit(testTiming('illegal'), [], {});
         return true;
       },
       run: () => undefined,

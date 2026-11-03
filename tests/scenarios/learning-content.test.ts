@@ -7,6 +7,7 @@ import { practiceContent } from '../../src/app/offline/practice';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Skill } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'probe' } as const;
 const content = practiceContent;
@@ -42,7 +43,7 @@ it.each([true, false])(
     expect(game.room.decisions.submit(request.id, request.token, accept).kind).toBe('accepted');
     await running;
     expect(game.room.world.zone('b:hand').cards).toEqual(accept ? ['reward'] : []);
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(accept ? 2 : 1);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(accept ? 2 : 1);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   },
 );
@@ -71,7 +72,7 @@ it('后续伤害自然收集已有余响，不重复学习或复制同一时点�
   expect(game.room.world.zone('b:hand').cards).toEqual(['reward', 'next']);
   expect(
     game.room.history
-      .facts('skill.invoked')
+      .facts(Skill.invoked)
       .map((fact) => (fact.data.detail as { skill: string }).skill),
   ).toEqual(['workshop:insight', echo.id, echo.id]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -89,7 +90,7 @@ it.each([4, 17])(
     await playMatch(match, { steps: 20000, decisions: 2400 });
     expect(
       match.room.history
-        .facts('skill.invoked')
+        .facts(Skill.invoked)
         .some((fact) => (fact.data.detail as { skill: string }).skill === echo.id),
     ).toBe(true);
     expect(match.initial.cards).toHaveLength(48);

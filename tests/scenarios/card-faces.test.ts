@@ -32,6 +32,11 @@ import { standardCards } from '../../src/content/standard/cards';
 import { cardView, projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
+import { CardEvent } from '../../src/sdk';
+import { Damage } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { testTiming } from '../fixtures/timing';
+import { Cards } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'probe' } as const;
@@ -215,7 +220,7 @@ it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从�
     timing: { kind: 'effect' },
   });
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('card.used')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[0]?.data.detail).toMatchObject({
     declaration: { card: { suit: 'heart', color: 'red' } },
   });
   clean(game);
@@ -376,7 +381,7 @@ it('查询贡献不能借助捕获的运行上下文提交、随机或注册后�
     triggers: [],
     modifiers: [
       modify(cardQueries.cardFace, () => {
-        captured.commit('bad', [], {});
+        captured.commit(testTiming('bad'), [], {});
         return {};
       }),
     ],
@@ -387,7 +392,7 @@ it('查询贡献不能借助捕获的运行上下文提交、随机或注册后�
     captured = ctx;
     expect(() => game.book.face(ctx, 'slash1')).toThrow('Pure queries');
   });
-  expect(game.room.history.facts('bad')).toHaveLength(0);
+  expect(game.room.history.facts(testTiming('bad'))).toHaveLength(0);
   clean(game);
 });
 
@@ -469,7 +474,7 @@ it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色�
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('gift')).toBe('b:hand');
   expect(game.room.world.card('gift').suit).toBe('spade');
-  expect(game.room.history.facts('damage.dealt')).toHaveLength(0);
+  expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
   clean(game);
 });
 
@@ -654,13 +659,13 @@ it('日志窗口之外的公开牌池仍存活，同次公开多张牌保留展�
           [{ cards: gifts, from: 'a:hand', to: 'b:hand', place: 'bottom' }],
           'public gift',
           {
-            kind: 'cards.given',
+            kind: Cards.given,
             data: { actor: 'a', target: 'b', cards: gifts, count: gifts.length, visible: true },
           },
         );
         // 后续公开叙事足够长，但不能使仍在处理中的旧公开牌池消失。
         for (let i = 0; i < 110; i++)
-          at.commit('draw.completed', [], { input: { player: 'a' }, cards: [] });
+          at.commit(Draw.completed, [], { input: { player: 'a' }, cards: [] });
         const shown = projectMatch(match, null, null);
         expect(shown.log).toHaveLength(100);
         expect(shown.log.every((entry) => entry.text === 'a摸了 0 张牌')).toBe(true);

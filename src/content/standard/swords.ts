@@ -18,6 +18,8 @@ import {
 } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { Skill } from '../../sdk';
+import { Weapon } from './weapons';
 
 const doubleSwords = equipmentCard({
   id: 'standard:double_swords',
@@ -85,7 +87,7 @@ const doubleSwords = equipmentCard({
               });
 
               if (moved.kind === 'discarded') {
-                ctx.commit('weapon.card-discarded', [], {
+                ctx.commit(Weapon.cardDiscarded, [], {
                   actor: self.owner,
                   name: self.name,
                   target: effect.target,
@@ -144,7 +146,7 @@ const iceSword = equipmentCard({
           const paid = await pay(ctx, {
             skill: self,
             reason: self.skill,
-            factKind: 'skill.invoked',
+            factKind: Skill.invoked,
             declaration: { label: self.name },
             legal: (at) =>
               !draft.prevented &&
@@ -167,7 +169,7 @@ const iceSword = equipmentCard({
           )
             return;
           draft.prevent(self.skill);
-          ctx.commit('weapon.damage-replaced', [], {
+          ctx.commit(Weapon.damageReplaced, [], {
             actor: self.owner,
             name: self.name,
             target,
@@ -205,7 +207,7 @@ const iceSword = equipmentCard({
             });
 
             if (moved.kind !== 'discarded') break;
-            ctx.commit('weapon.card-discarded', [], {
+            ctx.commit(Weapon.cardDiscarded, [], {
               actor: self.owner,
               name: self.name,
               target,

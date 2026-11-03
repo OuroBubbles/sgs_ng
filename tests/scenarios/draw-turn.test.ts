@@ -22,6 +22,7 @@ import type { TurnView } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { testTiming } from '../fixtures/timing';
 
 it('摸牌数可在提交前修改，洗牌只补牌堆并保持已有牌堆顶顺序', async () => {
   const game = cardGame({
@@ -180,7 +181,7 @@ it('跳过阶段不执行阶段本体或开始/结束窗口，其他阶段继续
   expect(stages).not.toContain('end:draw');
   expect(stages).toContain('end:finish');
   expect(game.room.world.zone('draw').cards).toEqual(['d1', 'd2']);
-  expect(game.room.history.facts('phase.skipped')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Phase.skipped)[0]?.data.detail).toMatchObject({
     kind: 'draw',
     skipped: true,
     reason: 'skip draw',
@@ -191,14 +192,14 @@ it('弃牌阶段结束时按显式阶段身份查询本阶段弃牌', async () =
   const game = cardGame();
   const counts: number[] = [];
   await game.room.run('wound', (ctx) =>
-    ctx.commit('hp', [{ kind: 'vitality', player: 'a', hp: 2 }], {}),
+    ctx.commit(testTiming('hp'), [{ kind: 'vitality', player: 'a', hp: 2 }], {}),
   );
   game.room.on(Phase.ending, {
     id: 'query',
     owner: 'b',
     eligible: (_ctx, current) => current.kind === 'discard',
     run: (ctx, current) => {
-      counts.push(ctx.history.facts('cards.discarded', current.id).length);
+      counts.push(ctx.history.facts(Cards.discarded, current.id).length);
     },
   });
   const running = game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
@@ -263,7 +264,7 @@ it('支付后死亡会停止后续阶段，正常结束会恢复对局阶段状�
     owner: 'b',
     eligible: (_ctx, receipt) => receipt.cards.includes('slash1'),
     run: (ctx) => {
-      ctx.commit('death', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(testTiming('death'), [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
     },
   });
   const running = game.room.run('turn', (ctx) => runTurn(ctx, game.book, 'a'));
@@ -274,7 +275,7 @@ it('支付后死亡会停止后续阶段，正常结束会恢复对局阶段状�
   });
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('phase.started')).toHaveLength(4);
+  expect(game.room.history.facts(Phase.started)).toHaveLength(4);
   expect(readState(game.room.world, activePhase, activeTarget)).toBe(null);
   expect(readState(game.room.world, activeTurn, activeTarget)).toBe(null);
 });
@@ -327,7 +328,7 @@ it('用牌费用后效结束回合，已宣告牌仍完整结算，再停止后�
     value: { ended: true, reason: 'stop after current use' },
   });
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('phase.started')).toHaveLength(4);
+  expect(game.room.history.facts(Phase.started)).toHaveLength(4);
   expect(game.room.decisions.pending).toEqual([]);
 });
 
@@ -354,11 +355,11 @@ it('阶段 body 中止仍清理并恢复阶段状态，记录明确原因', asyn
 it('手牌上限通过具名纯查询修正，不必复制弃牌阶段实现', async () => {
   const game = cardGame({ policy: { handLimit: (_ctx, _actor, base) => base + 2 } });
   await game.room.run('wound', (ctx) =>
-    ctx.commit('hp', [{ kind: 'vitality', player: 'a', hp: 2 }], {}),
+    ctx.commit(testTiming('hp'), [{ kind: 'vitality', player: 'a', hp: 2 }], {}),
   );
   await game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
   expect(game.room.world.zone('a:hand').cards).toHaveLength(4);
-  expect(game.room.history.facts('cards.discarded')).toEqual([]);
+  expect(game.room.history.facts(Cards.discarded)).toEqual([]);
   expect(game.room.decisions.pending).toEqual([]);
 });
 
@@ -400,7 +401,7 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
   await game.room.run('phase', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
   expect(observations).toEqual([true]);
   expect(game.room.world.zone('draw').cards).toEqual(['d1']);
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 
 it('费用失效时不提交跳过意图，阶段照常执行', async () => {
@@ -423,7 +424,7 @@ it('费用失效时不提交跳过意图，阶段照常执行', async () => {
     },
   });
   await game.room.run('phase', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
-  expect(game.room.history.facts('phase.skipped')).toEqual([]);
+  expect(game.room.history.facts(Phase.skipped)).toEqual([]);
   expect(game.room.world.zone('a:hand').cards).toContain('d1');
   expect(game.room.world.zone('b:hand').cards).toEqual(['other']);
 });

@@ -25,6 +25,10 @@ import {
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Phase } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 const death = {
@@ -53,7 +57,7 @@ async function cancel(game: Game) {
 }
 async function wound(game: Game, hp = 1, player = 'a') {
   await game.room.run('wound', (ctx) =>
-    ctx.commit('test.hp', [{ kind: 'vitality', player, hp }], null),
+    ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
   );
 }
 function replay(game: Game) {
@@ -79,7 +83,7 @@ const startKeji = (
       phases: ['play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'play') await body(at, phase);
-        else at.commit('test.discard-body', [], null);
+        else at.commit(testTiming('test.discard-body'), [], null);
       },
     }),
   );
@@ -98,7 +102,7 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
       expect(() => draft.adjust(0.5, 'fraction')).toThrow();
       expect(() => draft.setAmount(-1, 'negative')).toThrow();
       draft.adjust(2, 'bonus');
-      ctx.commit('test.hp', [{ kind: 'vitality', player: 'a', hp: 3 }], null);
+      ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player: 'a', hp: 3 }], null);
     },
   });
   game.room.on(Hp.recovered, {
@@ -148,7 +152,7 @@ it.each(['zero', 'dead', 'already-dead'] as const)(
       value: { kind: kind === 'zero' ? 'unchanged' : 'unavailable', amount: 0 },
     });
     expect(opened).toBe(kind === 'already-dead' ? 0 : 1);
-    expect(game.room.history.facts('hp.recovered')).toEqual([]);
+    expect(game.room.history.facts(Hp.recovered)).toEqual([]);
   },
 );
 it.each(['wu', 'shu', 'self', 'changed'] as const)(
@@ -168,7 +172,7 @@ it.each(['wu', 'shu', 'self', 'changed'] as const)(
     await running;
     const hp = kind === 'wu' ? 2 : 1;
     expect(game.room.world.player('a').hp).toBe(hp);
-    expect(game.room.history.facts('hp.recovered')[0]!.data.detail).toMatchObject({
+    expect(game.room.history.facts(Hp.recovered)[0]!.data.detail).toMatchObject({
       attemptedAmount: hp,
       amount: hp,
     });
@@ -203,7 +207,7 @@ it('制衡手牌/装备同批弃置，后效后按实际费用数量摸牌，一
   await answer(game, { cards: ['one', 'two', 'gear'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['d1', 'd2', 'd3']);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.zone('discard').cards).toEqual(['one', 'two', 'gear']);
   replay(game);
 });
@@ -276,8 +280,8 @@ it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () =
   const running = startKeji(game);
   await answer(game, true);
   await running;
-  expect(game.room.history.facts('test.discard-body')).toEqual([]);
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.discard-body'))).toEqual([]);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
   expect(game.room.world.zone('a:hand').cards).toHaveLength(6);
   replay(game);
 });
@@ -287,11 +291,11 @@ it('克己可以拒绝；独立弃牌阶段无本回合出牌记录也可发动'
   const first = startKeji(game);
   await answer(game, false);
   await first;
-  expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
   const second = game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
   await answer(game, true);
   await second;
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 it.each(['physical', 'converted', 'before-grant'] as const)(
   '出牌阶段真实使用杀后不能克己，包括获得技能前的活动：%s',
@@ -317,8 +321,8 @@ it.each(['physical', 'converted', 'before-grant'] as const)(
       if (kind === 'before-grant')
         await game.skills.grant(ctx, { owner: 'a', skill: 'standard:keji', source });
     });
-    expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
-    expect(game.room.history.facts('phase.skipped')).toEqual([]);
+    expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
+    expect(game.room.history.facts(Phase.skipped)).toEqual([]);
     replay(game);
   },
 );
@@ -331,11 +335,11 @@ it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动�
   );
   await answer(game, { cards: ['retrial'], targets: [] }, 'cards-targets');
   await running;
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   expect(
     cardActivities(game.room.history.facts()).filter((a) => a.kind === 'response'),
   ).toMatchObject([{ actor: 'a', card: { name: 'standard:slash' } }]);
-  expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
 });
 it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克己', async () => {
   const game = scenario({
@@ -357,14 +361,14 @@ it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克�
             targets: ['c'],
             timing: { kind: 'effect' },
           });
-        else at.commit('test.discard-body', [], null);
+        else at.commit(testTiming('test.discard-body'), [], null);
       },
     }),
   );
   await answer(game, { cards: ['retrial'], targets: [] }, 'cards-targets');
   await answer(game, true);
   await running;
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 it('重复出牌阶段的使用记录都属于本回合，不能只查看最后一段', async () => {
   const game = scenario({ hands: { a: [card('hit', 'slash')] } });
@@ -381,12 +385,12 @@ it('重复出牌阶段的使用记录都属于本回合，不能只查看最后�
             targets: ['b'],
             timing: phase.playTiming(),
           });
-        else if (phase.kind === 'discard') at.commit('test.discard-body', [], null);
+        else if (phase.kind === 'discard') at.commit(testTiming('test.discard-body'), [], null);
       },
     }),
   );
-  expect(game.room.history.facts('phase.skipped')).toEqual([]);
-  expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toEqual([]);
+  expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
 });
 it.each(['snatch', 'indulgence'] as const)(
   '谦逊禁止%s成为目标，失去技能后恢复合法性',
@@ -425,7 +429,7 @@ it('连营一次失去多张最后手牌只询问一次，并且记录发生于�
   );
   await answer(game, true);
   await running;
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.zone('a:hand').cards).toEqual(['new']);
   replay(game);
 });
@@ -446,7 +450,7 @@ it('连营不会因部分手牌或仅装备离场发动，拒绝发动不产生�
       'test',
     ),
   );
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   const running = game.room.run('last', (ctx) =>
     moveCards(ctx, [{ cards: ['two'], from: 'a:hand', to: 'discard', place: 'bottom' }], 'test'),
   );
@@ -515,8 +519,8 @@ it('连营嵌在最后手牌用牌费用中，摸牌不会追回或重建原用�
   expect(game.room.world.position('hit')).toBe('discard');
   expect(game.room.world.position('new')).toBe('a:hand');
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('skill.invoked')[0]!.seq).toBeLessThan(
-    game.room.history.facts('card.effect')[0]!.seq,
+  expect(game.room.history.facts(Skill.invoked)[0]!.seq).toBeLessThan(
+    game.room.history.facts(CardEvent.effect)[0]!.seq,
   );
   replay(game);
 });
@@ -541,7 +545,7 @@ it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
       (a) => a.actor === 'a' && a.kind === 'response',
     ),
   ).toHaveLength(1);
-  expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
 });
 it('普通移走杀不算使用或打出，前一回合的杀也不阻止本回合克己', async () => {
   const game = scenario({ hands: { a: [card('old', 'slash'), card('discarded', 'slash')] } });
@@ -563,7 +567,7 @@ it('普通移走杀不算使用或打出，前一回合的杀也不阻止本回�
   });
   await answer(game, true);
   await next;
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 it('连营重新得到手牌再失去，会得到新的独立发动机会', async () => {
   const game = scenario({
@@ -579,7 +583,7 @@ it('连营重新得到手牌再失去，会得到新的独立发动机会', asyn
     await running;
   }
   expect(game.room.world.zone('a:hand').cards).toEqual(['second']);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(2);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
   replay(game);
 });
 it('救援同样识别急救转换的桃，并保留真实使用者', async () => {
@@ -597,7 +601,7 @@ it('救援同样识别急救转换的桃，并保留真实使用者', async () =
   ).offers.find((o) => o.kind === 'viewAs')!;
   await answer(game, { kind: 'viewAs', ...offer.choice, materials: ['red'] }, 'use-card');
   await running;
-  expect(game.room.history.facts('hp.recovered')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Hp.recovered)[0]!.data.detail).toMatchObject({
     input: { from: 'b', card: { card: { name: 'standard:peach', source: { kind: 'viewAs' } } } },
     attemptedAmount: 2,
     amount: 2,
@@ -627,7 +631,7 @@ it('三名新吴将八人局由基础 AI 经正式决策走到胜负', async () 
 
   expect(
     match.room.history
-      .facts('skill.invoked')
+      .facts(Skill.invoked)
       .some((f) => (f.data.detail as { skill: string }).skill === 'standard:zhiheng'),
   ).toBe(true);
 }, 60000);

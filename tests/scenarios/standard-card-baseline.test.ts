@@ -14,6 +14,10 @@ import {
 import type { SemanticCard, UseIntent } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Damage } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { Judgment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const slash: SemanticCard = {
@@ -163,8 +167,8 @@ it.each(['use', 'response'] as const)(
       expect(build(['one', 'two']).ok).toBe(false);
       expect(build(['one', 'three']).ok).toBe(true);
     });
-    expect(game.room.history.facts('card.used')).toEqual([]);
-    expect(game.room.history.facts('card.responded')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toEqual([]);
+    expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
     replay(game);
   },
 );
@@ -203,7 +207,7 @@ it.each(['heart', 'diamond', 'club'] as const)(
     const original = delayedCards(game.room.world, 'a')[0]!.source;
     await game.room.run('judge', (ctx) => runPhase(ctx, game.book, 'a', 'judge'));
     expect(game.room.world.player('a').hp).toBe(4);
-    expect(game.room.history.facts('damage.dealt')).toEqual([]);
+    expect(game.room.history.facts(Damage.dealt)).toEqual([]);
     expect(delayedCards(game.room.world, 'a')).toEqual([]);
     expect(delayedCards(game.room.world, 'b')).toMatchObject([
       {
@@ -212,7 +216,7 @@ it.each(['heart', 'diamond', 'club'] as const)(
       },
     ]);
     expect(game.room.world.position('judgment')).toBe('discard');
-    expect(game.room.history.facts('judgment.finished')).toHaveLength(1);
+    expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
     replay(game);
   },
 );
@@ -234,7 +238,7 @@ it.each(['indulgence', 'lightning'] as const)(
     });
     expect(game.room.world.position('second')).toBe('a:hand');
     expect(delayedCards(game.room.world, self ? 'a' : 'b')).toHaveLength(1);
-    expect(game.room.history.facts('judgment.finished')).toEqual([]);
+    expect(game.room.history.facts(Judgment.finished)).toEqual([]);
     replay(game);
   },
 );
@@ -252,7 +256,7 @@ it('无中生有仅以本人为目标，实际摸两张并完成材料善后', a
   expect(game.room.world.zone('a:hand').cards).toEqual(['one', 'two']);
   expect(game.room.world.zone('draw').cards).toEqual(['three']);
   expect(game.room.world.zone('discard').cards).toEqual(['spell']);
-  expect(game.room.history.facts('draw.completed')).toHaveLength(1);
+  expect(game.room.history.facts(Draw.completed)).toHaveLength(1);
   replay(game);
 });
 
@@ -284,8 +288,8 @@ it.each([1, 2])(
     expect(game.room.world.zone('discard').cards).toEqual(
       depth === 1 ? ['first', 'spell'] : ['second', 'first', 'spell'],
     );
-    expect(game.room.history.facts('card.used')).toHaveLength(depth + 1);
-    expect(game.room.history.facts('draw.completed')).toHaveLength(depth === 1 ? 0 : 1);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(depth + 1);
+    expect(game.room.history.facts(Draw.completed)).toHaveLength(depth === 1 ? 0 : 1);
     replay(game);
   },
 );

@@ -1,8 +1,7 @@
 import { DecisionHub } from '../decisions/hub';
 import type { DecisionResult, Decision } from '../decisions/hub';
 import { Journal } from '../history/journal';
-import type { Cause, Fact, FactKind, HistoryReader } from '../history/journal';
-import { factKind } from '../history/journal';
+import type { Cause, Fact, HistoryReader } from '../history/journal';
 import type { Change, WorldReader, WorldSeed } from '../model/state';
 import { World } from '../state/world';
 import { Random } from './random';
@@ -95,11 +94,9 @@ export class Context {
   }
 
   /** 以事件时点为种类提交时，detail 必须符合该时点的载荷类型。 */
-  commit<R>(kind: Timing<unknown, R>, changes: readonly Change[], detail: NoInfer<R>): Fact<R>;
-  commit<T>(kind: string, changes: readonly Change[], detail: T): Fact<T>;
-  commit<T>(kind: FactKind, changes: readonly Change[], detail: T): Fact<T> {
+  commit<R>(kind: Timing<unknown, R>, changes: readonly Change[], detail: NoInfer<R>): Fact<R> {
     this.#assertIdle();
-    return this.operations.commit(factKind(kind), changes, detail);
+    return this.operations.commit(kind.id, changes, detail);
   }
 
   randomInt(bound: number): number {

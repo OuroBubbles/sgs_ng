@@ -3,11 +3,13 @@ import { expect, it } from 'vitest';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
 import { shieldOf } from '../../src/sdk';
-import type { DamageResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { projectMatch } from '../../src/app/offline/projection';
 import { nextRequest } from '../fixtures/room';
+import { Damage } from '../../src/sdk';
+import { Shield } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 const content = practiceContent;
 
@@ -42,7 +44,7 @@ it('种子 4 自然起手凝障/缚阵/引焰，真实用牌后护盾吸收传�
   expect(match.room.world.player('甲席').hp).toBe(4);
   expect(match.room.world.player('乙席').hp).toBe(3);
   expect(shieldOf(match.room.world, '甲席')).toBe(1);
-  expect(match.room.history.facts('damage.dealt').map((fact) => fact.data.detail)).toMatchObject([
+  expect(match.room.history.facts(Damage.dealt).map((fact) => fact.data.detail)).toMatchObject([
     { amount: 1, shieldLost: 0, hpLoss: 1 },
     { amount: 1, shieldLost: 1, hpLoss: 0 },
   ]);
@@ -100,14 +102,14 @@ it.each([false, true])('演武代受真实选择、支付、材料关联与善�
   expect(match.room.world.player('乙席').hp).toBe(accept ? 4 : 3);
   expect(match.room.world.position('defense-card-39')).toBe(accept ? 'discard' : '乙席:hand');
   expect(match.room.world.position('defense-card-19')).toBe('discard');
-  const dealt = match.room.history.facts('damage.dealt')[0]!.data.detail as DamageResult;
+  const dealt = match.room.history.facts(Damage.dealt)[0]!.data.detail;
   expect(dealt.input.card).toMatchObject({
     actor: '甲席',
     target: '乙席',
     card: { materials: ['defense-card-19'] },
   });
-  expect(match.room.history.facts('damage.transferred')).toHaveLength(Number(accept));
-  expect(match.room.history.facts('skill.invoked')).toHaveLength(Number(accept));
+  expect(match.room.history.facts(Damage.transferred)).toHaveLength(Number(accept));
+  expect(match.room.history.facts(Skill.invoked)).toHaveLength(Number(accept));
   expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
     match.room.world.snapshot,
@@ -125,8 +127,8 @@ it.each([4, 17])(
       content,
     });
     await playMatch(match, { steps: 20000, decisions: 3000 });
-    expect(match.room.history.facts('shield.changed').length).toBeGreaterThan(0);
-    expect(match.room.history.facts('damage.transferred').length).toBeGreaterThan(0);
+    expect(match.room.history.facts(Shield.changed).length).toBeGreaterThan(0);
+    expect(match.room.history.facts(Damage.transferred).length).toBeGreaterThan(0);
     expect(match.initial.cards).toHaveLength(48);
   },
   30_000,

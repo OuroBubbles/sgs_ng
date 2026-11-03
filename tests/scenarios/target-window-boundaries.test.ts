@@ -20,6 +20,9 @@ import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Counter } from '../../src/sdk';
+import { Hp } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished' | 'cancelled' | 'removed' | 'replaced' | 'prohibited';
@@ -168,7 +171,7 @@ for (const [label, window] of points) {
       expect(game.room.world.player('b').hp).toBe(4);
       expect(game.room.world.player('d').hp).toBe(boundary === 'finished' ? 4 : 3);
       expect(game.room.world.player('c').hp).toBe(boundary === 'replaced' ? 3 : 4);
-      const effects = game.room.history.facts('card.effect').map((fact) => fact.data.detail);
+      const effects = game.room.history.facts(CardEvent.effect).map((fact) => fact.data.detail);
       expect(effects).toHaveLength(boundary === 'replaced' ? 3 : 2);
       expect(effects[0]).toMatchObject({
         target: 'b',
@@ -234,7 +237,7 @@ it('真实流离支付并转移后，不再执行旧目标同窗的后席候选�
   expect(game.room.world.player('c').hp).toBe(3);
   expect(
     game.room.history
-      .facts('card.targeting')
+      .facts(CardEvent.targeting)
       .map((fact) => fact.data.detail as { target: string; stage: string })
       .filter((entry) => entry.target === 'c')
       .map((entry) => entry.stage),
@@ -290,8 +293,8 @@ it('真实无懈取消决斗后，停止效果启动后组但保留完整反制�
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'counter' });
   expect(await running).toMatchObject({ value: { use: { effects: [{ state: 'cancelled' }] } } });
   expect(after.mock.calls.length).toBe(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('counter.finished')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(Counter.finished)).toHaveLength(2);
   expect(game.room.world.position('counter')).toBe('discard');
   expect(game.room.world.player('b').hp).toBe(4);
   conserved(game);
@@ -321,7 +324,7 @@ it('桃园启动候选已令目标满体力，canResolve 失效立即收束同�
   await use(game, { ...slash, choice: { kind: 'physical', card: 'salvation' }, targets: [] });
   expect(later.mock.calls.length).toBe(0);
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('hp.recovered')).toHaveLength(1);
+  expect(game.room.history.facts(Hp.recovered)).toHaveLength(1);
   conserved(game);
 });
 
@@ -337,7 +340,7 @@ it('canResolve 只约束实际效果，不提前跳过满体力桃园目标的�
   });
   await use(game, { ...slash, choice: { kind: 'physical', card: 'salvation' }, targets: [] });
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('hp.recovered')).toHaveLength(1);
+  expect(game.room.history.facts(Hp.recovered)).toHaveLength(1);
   conserved(game);
 });
 
@@ -418,7 +421,7 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
   await use(game, slash);
   expect(later).toEqual(['d']);
   expect(game.room.world.player('d').hp).toBe(3);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   conserved(game);
 });
 

@@ -18,6 +18,16 @@ import {
 } from '../../sdk';
 import type { CardDefinition, Context, SkillHandle } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { Skill } from '../../sdk';
+import { defineEvent } from '../../sdk';
+import { timing } from '../../sdk';
+
+export const Weapon = defineEvent('weapon', {
+  followUp: timing<unknown>(),
+  horseDiscarded: timing<unknown>(),
+  cardDiscarded: timing<unknown>(),
+  damageReplaced: timing<unknown>(),
+});
 
 function axeMaterials(ctx: Context, self: SkillHandle): readonly string[] {
   return ownedCards(ctx.world, self.owner, ['hand', 'equipment']).filter(
@@ -58,7 +68,7 @@ const blade = equipmentCard({
               self.active(at) && !draft.broken && at.world.player(draft.effect.target).alive,
           });
           if (used.kind === 'used')
-            ctx.commit('weapon.follow-up', [], {
+            ctx.commit(Weapon.followUp, [], {
               actor: self.owner,
               name: self.name,
               fromEffect: draft.effect.effectId,
@@ -106,7 +116,7 @@ const axe = equipmentCard({
             skill: self,
             cards: answer.value.cards,
             reason: self.skill,
-            factKind: 'skill.invoked',
+            factKind: Skill.invoked,
             declaration: { label: self.name, effect: draft.effect.effectId },
             legal: (at) =>
               !draft.broken &&
@@ -183,7 +193,7 @@ const kylinBow = equipmentCard({
           const paid = await pay(ctx, {
             skill: self,
             reason: self.skill,
-            factKind: 'skill.invoked',
+            factKind: Skill.invoked,
             declaration: { label: self.name, card, target },
             legal: (at) =>
               !draft.prevented &&
@@ -206,7 +216,7 @@ const kylinBow = equipmentCard({
           });
 
           if (discarded.kind !== 'discarded') return;
-          ctx.commit('weapon.horse-discarded', [], {
+          ctx.commit(Weapon.horseDiscarded, [], {
             actor: self.owner,
             name: self.name,
             target,

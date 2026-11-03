@@ -20,6 +20,8 @@ import { card, cardGame } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Draw } from '../../src/rules/cards/draw';
+import { Skill } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'test' } as const;
 type Game = ReturnType<typeof cardGame>;
@@ -82,7 +84,11 @@ it('次数从开窗时的权威状态读取一次，后效不改变当前总数�
       seen.push(occurrence);
       expect(Object.isFrozen(occurrence)).toBe(true);
       if (occurrence.index === 1)
-        ctx.commit('change-count', [{ kind: 'vitality', player: 'a', hp: 2 }], occurrence);
+        ctx.commit(
+          testTiming('change-count'),
+          [{ kind: 'vitality', player: 'a', hp: 2 }],
+          occurrence,
+        );
     },
   });
   await target.run('first', (ctx) => ctx.window(window, null));
@@ -111,7 +117,7 @@ it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, null, undefined, '
       times: () => times as number,
       eligible: () => true,
       run(ctx) {
-        ctx.commit('unexpected', [], {});
+        ctx.commit(testTiming('unexpected'), [], {});
       },
     });
     await expect(target.run('window', (ctx) => ctx.window(window, null))).rejects.toThrow(
@@ -137,7 +143,7 @@ it.each(['commit', 'random', 'defer', 'unregister'] as const)(
       id: 'bad',
       owner: 'a',
       times(ctx) {
-        if (action === 'commit') ctx.commit('bad', [], {});
+        if (action === 'commit') ctx.commit(testTiming('bad'), [], {});
         if (action === 'random') ctx.randomInt(2);
         if (action === 'defer') ctx.defer(() => {});
         if (action === 'unregister') remove();
@@ -264,7 +270,8 @@ it('后续次数只在轮到时检查资格，不在第一个后效改变状态�
     eligible: (ctx, _data, o) => o.index === 1 || ctx.world.player('a').hp === 3,
     run(ctx, _data, o) {
       seen.push(o.index);
-      if (o.index === 1) ctx.commit('mark', [{ kind: 'vitality', player: 'a', hp: 3 }], {});
+      if (o.index === 1)
+        ctx.commit(testTiming('mark'), [{ kind: 'vitality', player: 'a', hp: 3 }], {});
     },
   });
   await target.run('window', (ctx) => ctx.window(window, null));
@@ -303,7 +310,7 @@ it('一次效果的子流程中止只消费该次数，既有提交保留且后�
     times: () => 2,
     eligible: () => true,
     run(ctx, _data, o) {
-      ctx.commit('point', [], o);
+      ctx.commit(testTiming('point'), [], o);
       if (o.index === 1) return ctx.abort('local');
     },
   });
@@ -311,7 +318,9 @@ it('一次效果的子流程中止只消费该次数，既有提交保留且后�
     kind: 'resolved',
   });
   expect(
-    target.history.facts('point').map((f) => (f.data.detail as TriggerOccurrence).index),
+    target.history
+      .facts(testTiming('point'))
+      .map((f) => (f.data.detail as TriggerOccurrence).index),
   ).toEqual([1, 2]);
   replay(target, initial);
 });
@@ -516,7 +525,9 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
             reason: 'rule',
             cause: { kind: 'rule', seq: null, data: null },
           });
-          ctx.commit('entered-effect.finished', [], { alive: ctx.world.player('a').alive });
+          ctx.commit(testTiming('entered-effect.finished'), [], {
+            alive: ctx.world.player('a').alive,
+          });
         },
       }),
     ],
@@ -524,9 +535,9 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
   const game = cardGame({ skills: [effect] });
   await grant(game, effect.id);
   await game.room.run('window', (ctx) => ctx.window(window, null));
-  expect(game.room.history.facts('entered-effect.finished').map((f) => f.data.detail)).toEqual([
-    { alive: false },
-  ]);
+  expect(
+    game.room.history.facts(testTiming('entered-effect.finished')).map((f) => f.data.detail),
+  ).toEqual([{ alive: false }]);
   expect(
     candidates(game.room, 'ineligible')
       .filter((e) => e.window === window.id)
@@ -613,7 +624,7 @@ it('构造可选菜单不消费未选效果的失效前缀，其他效果可先�
     eligible: () => true,
     run(ctx) {
       seen.push('B');
-      ctx.commit('enable-earlier', [{ kind: 'vitality', player: 'a', hp: 3 }], {});
+      ctx.commit(testTiming('enable-earlier'), [{ kind: 'vitality', player: 'a', hp: 3 }], {});
     },
   });
   const running = target.run('window', (ctx) => ctx.window(window, null));
@@ -665,7 +676,7 @@ it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.zone('a:hand').cards).toEqual(['x0', 'x1', 'x3', 'x4']);
   expect(
-    game.room.history.facts('skill.invoked').map((f) => (f.data.detail as { skill: string }).skill),
+    game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:yiji', 'standard:ganglie', 'standard:yiji']);
   const points = candidates(game.room, 'running').filter((e) => e.window === 'damage.received');
   expect(
@@ -705,7 +716,7 @@ it('枭姬拒绝第一次后，能先连营再执行第二次；不会把两次�
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['x0', 'x1', 'x2']);
   expect(
-    game.room.history.facts('skill.invoked').map((f) => (f.data.detail as { skill: string }).skill),
+    game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:lianying', 'standard:xiaoji']);
   const points = candidates(game.room, 'running').filter(
     (e) => e.source === JSON.stringify([xiaoji.id, e.window]),
@@ -735,7 +746,7 @@ it('遗计给空手伤害来源一张牌后，同一窗口原本不合资格的�
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
   expect(game.room.world.zone('a:hand').cards).toEqual(['x1', 'x0']);
   expect(
-    game.room.history.facts('skill.invoked').map((f) => (f.data.detail as { skill: string }).skill),
+    game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:yiji', 'standard:fankui']);
   clean(game);
 });
@@ -755,7 +766,7 @@ it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，�
   await answer(game.room, true);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual([]);
-  const result = game.room.history.facts('draw.completed')[0]!.data.detail as {
+  const result = game.room.history.facts(Draw.completed)[0]!.data.detail as {
     edits: { reason: string; after: number }[];
   };
   expect(result.edits.map((edit) => [edit.reason, edit.after])).toEqual([
@@ -763,7 +774,7 @@ it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，�
     ['standard:luoyi', 0],
   ]);
   expect(
-    game.room.history.facts('skill.invoked').map((f) => (f.data.detail as { skill: string }).skill),
+    game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:yingzi', 'standard:luoyi']);
   clean(game);
 });
@@ -814,9 +825,7 @@ it.each(['观星', '洛神'])(
       first === '观星' ? ['x0', 'x4', 'x5', 'x2', 'x3'] : ['x4', 'x5', 'x1', 'x2', 'x3'],
     );
     expect(
-      game.room.history
-        .facts('skill.invoked')
-        .map((f) => (f.data.detail as { skill: string }).skill),
+      game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
     ).toEqual(
       first === '观星'
         ? ['standard:guanxing', 'standard:luoshen']

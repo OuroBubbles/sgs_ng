@@ -27,6 +27,8 @@ export interface AttackResult {
 }
 export const Attack = defineEvent('attack', {
   defended: timing<DefenseDraft, Pick<DefenseDraft, 'effect' | 'responses'>>(),
+  defenseBroken: timing<unknown>(),
+  finished: timing<unknown>(),
 });
 
 /** 作者可保留完整响应/突破管线，仅以普通函数指定命中后的伤害。 */
@@ -86,7 +88,7 @@ export async function resolveAttack(
       await at.window(Attack.defended, draft, { subject: effect.actor });
     }
     open = false;
-    if (brokenBy) at.commit('attack.defense-broken', [], { effect, reason: brokenBy });
+    if (brokenBy) at.commit(Attack.defenseBroken, [], { effect, reason: brokenBy });
     const kind: AttackResult['kind'] = !live()
       ? 'unavailable'
       : defended && !draft.broken
@@ -96,7 +98,7 @@ export async function resolveAttack(
     if (kind === 'undefended') {
       dealt = await deal(at, effect);
     }
-    at.commit('attack.finished', [], {
+    at.commit(Attack.finished, [], {
       effect,
       responses,
       kind,

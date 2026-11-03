@@ -30,6 +30,9 @@ import {
 } from '../../src/sdk';
 import type { PhaseView, UseIntent } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { Use } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -248,7 +251,7 @@ it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；�
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:hand'),
     run() {
-      expect(game.room.history.facts('use.materials-obtained')).toHaveLength(1);
+      expect(game.room.history.facts(Use.materialsObtained)).toHaveLength(1);
     },
   });
   const running = use(game, slash());
@@ -256,7 +259,7 @@ it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；�
   await running;
   expect(game.room.world.player('a').hp).toBe(2);
   expect(game.room.world.position('hit')).toBe('a:hand');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   replay(game);
 });
 it.each(['full', 'partial', 'empty'] as const)(
@@ -288,7 +291,7 @@ it.each(['full', 'partial', 'empty'] as const)(
     });
     if (kind === 'full') await answer(game, true);
     await running;
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(kind === 'full' ? 1 : 0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(kind === 'full' ? 1 : 0);
     expect(game.room.world.position('two')).toBe(
       kind === 'full' ? 'a:hand' : kind === 'partial' ? 'discard' : 'b:hand',
     );
@@ -318,7 +321,7 @@ it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理'
       await game.book.use(at, slash());
     }),
   );
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(game.room.world.position('hit')).toBe('discard');
 });
 it.each(['lost', 'moved', 'dead'] as const)(
@@ -364,7 +367,7 @@ it('奸雄取得群体牌后，后续目标依然结算，但不能重复取得�
   await running;
   expect(['b', 'c', 'd'].map((id) => game.room.world.player(id).hp)).toEqual([3, 3, 3]);
   expect(game.room.world.position('aoe')).toBe('b:hand');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   replay(game);
 });
 
@@ -389,13 +392,13 @@ it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由�
   await running;
   expect(
     game.room.history
-      .facts('response.requested')
+      .facts(Response.requested)
       .map((fact) => (fact.data.detail as { actor: string }).actor),
   ).toEqual(['a', 'c', 'd']);
   expect(game.room.world.player('a').hp).toBe(4);
   expect(game.room.world.position('j')).toBe('discard');
   expect(finished).toBe(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   replay(game);
 });
 it.each(['cancel', 'none'] as const)('护驾失败或不发动，仍可自己打闪：%s', async (kind) => {
@@ -439,7 +442,7 @@ it('没有其他存活魏角色时不询问护驾，也不会依静态武将势�
   await factions(game, { a: '魏', b: '吴', c: '蜀', d: '魏' });
   await game.room.run('dead', (ctx) => kill(ctx, { ...death, player: 'd' }));
   await use(game, slash());
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.world.player('a').hp).toBe(3);
 });
 it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供牌者的杀', async () => {
@@ -490,9 +493,9 @@ it('委托名称不能扩张原请求、为空或重复；失败不会支付或�
   const running = use(game, slash());
   await answer(game, { kind: 'physical', card: 'own' }, 'card-response');
   await running;
-  expect(game.room.history.facts('response.requested')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(Response.requested)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(game.room.world.position('wrong')).toBe('c:hand');
 });
 it.each(['qingguo', 'longdan', 'armor'] as const)(
@@ -525,7 +528,7 @@ it.each(['qingguo', 'longdan', 'armor'] as const)(
     }
     await running;
     expect(game.room.world.player('a').hp).toBe(4);
-    expect(game.room.history.facts('response.delegated')).toHaveLength(1);
+    expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
     replay(game);
   },
 );
@@ -563,7 +566,7 @@ it('护驾委托不会再次发动供牌者的护驾；动态势力按每次委�
   await answer(game, true);
   await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await running;
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.player('a').hp).toBe(4);
 });
 it.each(['lost', 'dead', 'faction'] as const)(
@@ -586,7 +589,7 @@ it.each(['lost', 'dead', 'faction'] as const)(
     await answer(game, true);
     if (kind === 'lost') await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
     await running;
-    expect(game.room.history.facts('card.responded')).toHaveLength(kind === 'lost' ? 1 : 0);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(kind === 'lost' ? 1 : 0);
     expect(game.room.world.position('j')).toBe(kind === 'lost' ? 'discard' : 'c:hand');
     replay(game);
   },
@@ -622,7 +625,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
     run() {
       expect(
         game.room.history
-          .facts('skill.invoked')[0]!
+          .facts(Skill.invoked)[0]!
           .data.changes.some(
             (change) => change.kind === 'setState' && change.state.key === 'core:phase-replacement',
           ),
@@ -658,7 +661,7 @@ it.each(['cancel', 'empty'] as const)('突袭取消或无合法目标，正常�
   if (kind === 'cancel') await cancel(game);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['draw1', 'draw2']);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
 });
 it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
   '突袭宣告后目标或来源变化不会恢复默认摸牌：%s',
@@ -690,7 +693,7 @@ it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
     if (kind !== 'dead-source') await takeHidden(game, 'c');
     expect(await running).toMatchObject({ value: { exit: 'replaced' } });
     expect(game.room.world.zone('draw').cards).toHaveLength(2);
-    expect(game.room.history.facts('cards.drawn')).toHaveLength(0);
+    expect(game.room.history.facts(Cards.drawn)).toHaveLength(0);
     replay(game);
   },
 );
@@ -724,9 +727,9 @@ it('含曹操、张辽的八人局，基础 AI 通过正式委托、替代摸牌
 
   expect(
     match.room.history
-      .facts('skill.invoked')
+      .facts(Skill.invoked)
       .some((fact) => (fact.data.detail as { skill: string }).skill === 'standard:tuxi'),
   ).toBe(true);
-  expect(match.room.history.facts('use.materials-obtained').length).toBeGreaterThan(0);
-  expect(match.room.history.facts('response.delegated').length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Use.materialsObtained).length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Response.delegated).length).toBeGreaterThan(0);
 }, 60_000);

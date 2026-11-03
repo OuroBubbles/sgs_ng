@@ -20,6 +20,7 @@ import { networkBuild, buildMismatch } from '../../src/app/network/build';
 import { readFile } from 'node:fs/promises';
 import { defaultContent, practiceContent } from '../../src/app/offline/practice';
 import { Match } from '../../src/app/offline/role-match';
+import { Game } from '../../src/sdk';
 
 const cleanup: (() => void | Promise<void>)[] = [];
 
@@ -683,7 +684,7 @@ it('两个真实 WebSocket 客户端绑定不同席位，复用预览并完整�
   expect(match.room.decisions.pending).toEqual([]);
   expect(match.room.world.snapshot.cards).toHaveLength(108);
   expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(match.room.history.facts('game.finished')).toHaveLength(1);
+  expect(match.room.history.facts(Game.finished)).toHaveLength(1);
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
     match.room.world.snapshot,
   );

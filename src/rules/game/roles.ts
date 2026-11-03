@@ -7,6 +7,12 @@ import { defineState, readState, stateChange } from '../state/state';
 import { finishGame, isGameOver, Game } from './end';
 import type { GameResult } from './end';
 import { Death } from '../combat/life-events';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const RoleEvent = defineEvent('role', {
+  assigned: timing<unknown>(),
+});
 
 export type Role = 'lord' | 'loyalist' | 'rebel' | 'renegade';
 export interface RoleSeat {
@@ -68,7 +74,7 @@ export function assignRoles(ctx: Context, input: readonly RoleSeat[]): void {
   )
     throw new Error('Invalid or repeated role assignment.');
   for (const seat of seats) ctx.world.player(seat.player);
-  ctx.commit('role.assigned', [stateChange(ctx, roleState, roleTarget, seats)], seats);
+  ctx.commit(RoleEvent.assigned, [stateChange(ctx, roleState, roleTarget, seats)], seats);
 }
 
 /** 获胜成员包含已死亡的同阵营角色；内奸仅在成为唯一存活者时获胜。 */

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { damage, kill, moveCards } from '../../src/sdk';
 import type { CardDefinition, Decision, UseIntent, Validation } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
+import { CardEvent } from '../../src/sdk';
 
 it('附属选择保留原型方法和实时资格，映射后仍完整验证再支付', async () => {
   type Selection = Pick<UseIntent, 'targets' | 'parameters'>;
@@ -68,7 +69,7 @@ it('附属选择保留原型方法和实时资格，映射后仍完整验证再�
     expect(decision.available?.()).toBe(false);
     expect(decision.validate('b').ok).toBe(false);
     expect(game.room.world.position('p')).toBe('a:hand');
-    expect(game.room.history.facts('card.used')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toEqual([]);
     selection.open = true;
 
     const replaced = () => {
@@ -89,7 +90,7 @@ it('附属选择保留原型方法和实时资格，映射后仍完整验证再�
   expect(result).toMatchObject({ kind: 'resolved', value: { kind: 'used' } });
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('p')).toBe('discard');
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
 });
 
 it('准备返回的参数仍经过牌定义的最终验证，未通过不支付', async () => {
@@ -121,7 +122,7 @@ it('准备返回的参数仍经过牌定义的最终验证，未通过不支付'
     }),
   ).toMatchObject({ value: { kind: 'unavailable', reason: 'Invalid prepared value.' } });
   expect(game.room.world.position('p')).toBe('a:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
 });
 
 it('准备期间生成牌材料被移动，不能重取新位置作为原始支付位置', async () => {
@@ -157,7 +158,7 @@ it('准备期间生成牌材料被移动，不能重取新位置作为原始支�
   });
   expect(result).toMatchObject({ value: { kind: 'unavailable' } });
   expect(game.room.world.position('material')).toBe('d:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
 });
 
@@ -197,5 +198,5 @@ it('准备期间自动目标集合变化时拒绝宣告，不悄悄用另一组�
     value: { kind: 'unavailable', reason: 'Card or targets changed during preparation.' },
   });
   expect(game.room.world.position('p')).toBe('a:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
 });

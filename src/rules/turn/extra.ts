@@ -5,6 +5,7 @@ import { isGameOver } from '../game/end';
 import { defineState, readState, stateChange } from '../state/state';
 import { phaseKinds } from './turn';
 import type { PhaseKind } from './turn';
+import { Turn } from './turn';
 
 export interface ExtraTurn {
   readonly id: string;
@@ -72,7 +73,7 @@ export function scheduleExtraTurn(ctx: Context, request: ExtraTurnRequest): Extr
     phases,
   });
   const pending = position === 'next' ? [turn, ...current.pending] : [...current.pending, turn];
-  ctx.commit('turn.extra-scheduled', [stateChange(ctx, queue, target, { serial, pending })], turn);
+  ctx.commit(Turn.extraScheduled, [stateChange(ctx, queue, target, { serial, pending })], turn);
   return turn;
 }
 
@@ -83,7 +84,7 @@ export function cancelExtraTurn(ctx: Context, id: string, reason: string): boole
   const turn = current.pending.find((item) => item.id === id);
   if (!turn) return false;
   ctx.commit(
-    'turn.extra-cancelled',
+    Turn.extraCancelled,
     [
       stateChange(ctx, queue, target, {
         serial: current.serial,
@@ -105,7 +106,7 @@ export function takeExtraTurn(ctx: Context): ExtraTurn | null {
     if (!turn) return null;
     const alive = ctx.world.player(turn.owner).alive;
     ctx.commit(
-      alive ? 'turn.extra-taken' : 'turn.extra-skipped',
+      alive ? Turn.extraTaken : Turn.extraSkipped,
       [
         stateChange(ctx, queue, target, {
           serial: current.serial,

@@ -43,6 +43,8 @@ import { isGameOver } from '../game/end';
 import { requestResponse, Response } from './response';
 import type { ResponseIntent, ResponseResult, ResponseConsumer } from './response';
 import { defineEvent, timing } from '../../core/runtime/event';
+import { CardEvent } from './move';
+import { Delayed } from './delayed';
 
 export type { ResponseResult } from './response';
 
@@ -88,6 +90,7 @@ export const Use = defineEvent('use', {
   declared: timing<UsePlanView>(),
   targets: timing<UsePlanView>(),
   finished: timing<UseSnapshot>(),
+  materialsObtained: timing<unknown>(),
 });
 export const Target = defineEvent('target', {
   specifying: timing<{
@@ -654,7 +657,7 @@ export class CardBook {
           cards: request.card.materials,
           to: processing.zone,
           reason: useId,
-          factKind: 'card.used',
+          factKind: CardEvent.used,
           changes: [plan.initializeChange(body)],
           ...(request.card.source?.kind === 'viewAs'
             ? {
@@ -717,7 +720,7 @@ export class CardBook {
         )
           throw new Error('Card body left unresolved target effects.');
         const finished = plan.close(outcome);
-        body.commit('card.finished', [], finished);
+        body.commit(CardEvent.finished, [], finished);
         await body.window(Use.finished, finished, { subject: intent.actor });
         return { kind: 'used', use: finished };
       });
@@ -751,11 +754,11 @@ export class CardBook {
         null,
         input.prohibitedCounters ?? [],
       );
-      child.commit('delayed.effect.declared', [plan.initializeChange(child)], { useId: plan.id });
+      child.commit(Delayed.effectDeclared, [plan.initializeChange(child)], { useId: plan.id });
       const rules: UseRules = { count: { min: 1, max: 1 }, target: () => true, resolve: resolver };
       await this.#resolveTargets(child, plan, rules, resolver, false);
       const result = plan.close();
-      child.commit('delayed.effect.finished', [], result);
+      child.commit(Delayed.effectFinished, [], result);
       return result;
     });
   }
@@ -913,7 +916,7 @@ export class CardBook {
             cards: card.materials,
             to: processing.zone,
             reason: id,
-            factKind: 'card.responded',
+            factKind: CardEvent.responded,
             ...(card.source?.kind === 'viewAs'
               ? { skill: this.#handle(body.world, card.source.instance) }
               : { actor }),
@@ -1070,7 +1073,7 @@ export class CardBook {
       }
       if (effect.state === 'pending') effect.begin();
       effect.enterTargetStage(stage);
-      ctx.commit('card.targeting', [], {
+      ctx.commit(CardEvent.targeting, [], {
         useId: plan.id,
         effectId: effect.effectId,
         target: effect.target,
@@ -1146,7 +1149,7 @@ export class CardBook {
         }
       }
       const snapshot = effect.snapshot();
-      ctx.commit('card.effect', [], snapshot);
+      ctx.commit(CardEvent.effect, [], snapshot);
       await ctx.window(
         Resolve.finished,
         { use: plan, effect: snapshot },

@@ -3,6 +3,11 @@ import { finishGame, kill, pay, loseHp, recover, Death, Hp } from '../../src/sdk
 import type { Context, DeathDraft, RecoveryDraft } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
+import { CardEvent } from '../../src/sdk';
+import { Cost } from '../../src/sdk';
+import { Dying } from '../../src/sdk';
+import { PlayerEvent } from '../../src/rules/combat/life';
+import { testTiming } from '../fixtures/timing';
 
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const death = { player: 'b', killer: null, reason: 'rule', cause } as const;
@@ -13,7 +18,7 @@ function create() {
 type Game = ReturnType<typeof create>;
 async function wound(game: Game, hp = 1) {
   await game.room.run('setup', (ctx) =>
-    ctx.commit('test.wound', [{ kind: 'vitality', player: 'b', hp }], null),
+    ctx.commit(testTiming('test.wound'), [{ kind: 'vitality', player: 'b', hp }], null),
   );
 }
 function conserved(game: Game) {
@@ -22,7 +27,7 @@ function conserved(game: Game) {
   expect(game.room.status).toBe('ready');
 }
 async function lateCost(ctx: Context) {
-  ctx.commit('test.late-candidate', [], null);
+  ctx.commit(testTiming('test.late-candidate'), [], null);
   await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:too-late' });
 }
 
@@ -57,9 +62,9 @@ it.each(['dead', 'finished'] as const)(
         edits: [{ before: 1, after: 3, reason: 'first' }],
       });
     });
-    expect(game.room.history.facts('test.late-candidate')).toEqual([]);
-    expect(game.room.history.facts('cost.paid')).toEqual([]);
-    expect(game.room.history.facts('hp.recovered')).toEqual([]);
+    expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
+    expect(game.room.history.facts(Cost.paid)).toEqual([]);
+    expect(game.room.history.facts(Hp.recovered)).toEqual([]);
     expect(game.room.world.position('fee')).toBe('c:hand');
     expect(() => held?.adjust(1, 'stale')).toThrow();
     conserved(game);
@@ -97,10 +102,10 @@ it.each(['prevented', 'rescued', 'dead', 'finished'] as const)(
         reason: boundary === 'prevented' ? 'already handled' : null,
       });
     });
-    expect(game.room.history.facts('test.late-candidate')).toEqual([]);
-    expect(game.room.history.facts('cost.paid')).toEqual([]);
+    expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
+    expect(game.room.history.facts(Cost.paid)).toEqual([]);
     expect(game.room.world.position('fee')).toBe('c:hand');
-    expect(game.room.history.facts('player.died')).toHaveLength(boundary === 'dead' ? 1 : 0);
+    expect(game.room.history.facts(PlayerEvent.died)).toHaveLength(boundary === 'dead' ? 1 : 0);
     expect(() => held?.prevent('late')).toThrow();
     conserved(game);
   },
@@ -128,7 +133,7 @@ it('濒死死亡请求在入口已经恢复正体力时直接返回 rescued，�
     });
   });
   expect(counts).toBe(0);
-  expect(game.room.history.facts('test.late-candidate')).toEqual([]);
+  expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
   expect(game.room.world.player('b')).toMatchObject({ hp: 2, alive: true });
   conserved(game);
 });
@@ -151,7 +156,7 @@ it('规则直接死亡不套用濒死正体力豁免，窗口中回复后仍可�
       event: { before: { hp: 2, alive: true } },
     });
   });
-  expect(game.room.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
   expect(game.room.world.player('b')).toMatchObject({ hp: 2, alive: false });
   conserved(game);
 });
@@ -225,14 +230,14 @@ it('回复已经提交后目标死亡不改写实际回复快照，完成窗口�
     run(ctx, result) {
       expect(ctx.world.player('b').alive).toBe(false);
       expect(result).toMatchObject({ kind: 'recovered', amount: 1, afterHp: 2 });
-      ctx.commit('test.committed-recovery', [], result);
+      ctx.commit(testTiming('test.committed-recovery'), [], result);
     },
   });
   await game.room.run('heal', async (ctx) => {
     expect(await recover(ctx, heal)).toMatchObject({ kind: 'recovered', amount: 1 });
   });
-  expect(game.room.history.facts('test.committed-recovery')).toHaveLength(1);
-  expect(game.room.history.facts('hp.recovered')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.committed-recovery'))).toHaveLength(1);
+  expect(game.room.history.facts(Hp.recovered)).toHaveLength(1);
   conserved(game);
 });
 
@@ -268,8 +273,8 @@ it('死亡已提交后终局仍完成既有死亡事实与埋葬善后，不能�
   });
   expect(seen).toEqual(['death', 'burial']);
   expect(game.room.world.position('legacy')).toBe('discard');
-  expect(game.room.history.facts('player.died')).toHaveLength(1);
-  expect(game.room.history.facts('player.buried')).toHaveLength(1);
+  expect(game.room.history.facts(PlayerEvent.died)).toHaveLength(1);
+  expect(game.room.history.facts(PlayerEvent.buried)).toHaveLength(1);
   conserved(game);
 });
 
@@ -280,7 +285,7 @@ it.each(['dead', 'finished'] as const)(
       hands: { a: [card('peach', 'peach', 'heart')], c: [card('fee', 'jink')] },
     });
     await game.room.run('wound', (ctx) =>
-      ctx.commit('test.wound', [{ kind: 'vitality', player: 'a', hp: 1 }], null),
+      ctx.commit(testTiming('test.wound'), [{ kind: 'vitality', player: 'a', hp: 1 }], null),
     );
     game.room.on(Hp.recovering, {
       id: 'a-stop',
@@ -300,9 +305,9 @@ it.each(['dead', 'finished'] as const)(
         timing: { kind: 'effect' },
       }),
     ).toMatchObject({ kind: 'resolved', value: { kind: 'used' } });
-    expect(game.room.history.facts('test.late-candidate')).toEqual([]);
-    expect(game.room.history.facts('hp.recovered')).toEqual([]);
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
+    expect(game.room.history.facts(Hp.recovered)).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
     expect(game.room.world.position('peach')).toBe('discard');
     expect(game.room.world.position('fee')).toBe('c:hand');
     expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
@@ -339,9 +344,9 @@ it('真正濒死在死亡前由已宣告桃救回，后续死亡费用不执行�
     });
   });
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
-  expect(game.room.history.facts('test.late-candidate')).toEqual([]);
-  expect(game.room.history.facts('player.died')).toEqual([]);
-  expect(game.room.history.facts('dying.finished')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
+  expect(game.room.history.facts(PlayerEvent.died)).toEqual([]);
+  expect(game.room.history.facts(Dying.finished)[0]!.data.detail).toMatchObject({
     kind: 'rescued',
   });
   expect(game.room.world.snapshot.states).toEqual([]);
@@ -373,8 +378,8 @@ it('已支付的死亡防止费用保留，只停止本次后续候选', async (
     });
   });
   expect(game.room.world.position('fee')).toBe('discard');
-  expect(game.room.history.facts('cost.paid')).toHaveLength(1);
-  expect(game.room.history.facts('test.late-candidate')).toEqual([]);
+  expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('test.late-candidate'))).toEqual([]);
   conserved(game);
 });
 
@@ -385,7 +390,11 @@ it('满体力不会提前关闭回复准备，扩展提高上限后仍可实际�
     owner: null,
     eligible: () => true,
     run(ctx) {
-      ctx.commit('test.capacity', [{ kind: 'vitality', player: 'b', hp: 4, maxHp: 5 }], null);
+      ctx.commit(
+        testTiming('test.capacity'),
+        [{ kind: 'vitality', player: 'b', hp: 4, maxHp: 5 }],
+        null,
+      );
     },
   });
   await game.room.run('heal', async (ctx) => {
@@ -428,7 +437,7 @@ it.each(['recovery', 'death'] as const)(
         expect((await kill(ctx, death)).kind).toBe('dead');
       });
     }
-    expect(game.room.history.facts('cost.paid')).toHaveLength(1);
+    expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
     expect(game.room.world.position('fee')).toBe('discard');
     conserved(game);
   },

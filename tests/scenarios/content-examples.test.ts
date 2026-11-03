@@ -8,6 +8,7 @@ import { createOfflineMatch } from '../../src/app/offline/practice';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Skill } from '../../src/sdk';
 
 it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣告后失去技能仍完成', async () => {
   expect(definition.generals[0]!.abilities).toHaveLength(1);
@@ -54,7 +55,7 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
     expect(await running).toMatchObject({ kind: 'resolved', value: { kind: 'used' } });
     expect(draws).toEqual(accepted ? ['study', 'standard:ex_nihilo'] : ['standard:ex_nihilo']);
     expect(game.room.world.zone('a:hand').cards).toHaveLength(accepted ? 3 : 2);
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(accepted ? 1 : 0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(accepted ? 1 : 0);
     expect(game.room.world.snapshot.skills).toHaveLength(accepted ? 0 : 1);
     expect(game.room.decisions.pending).toEqual([]);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);

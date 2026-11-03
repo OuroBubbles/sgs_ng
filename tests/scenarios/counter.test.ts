@@ -17,6 +17,7 @@ import type { CounterOpportunity, UseTiming } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
 
 function create(count = 1) {
   const game = cardGame({
@@ -80,8 +81,8 @@ it.each([1, 2, 3])('%s 层无懈嵌套为真正用牌：顺序、处理区和结
   expect(game.room.world.player('b').hp).toBe(count % 2 ? 4 : 3);
   expect(order).toEqual([...Array.from({ length: count }, (_, i) => `n${count - i}`), 'duel']);
   expect(maxProcessing).toBe(count + 1);
-  expect(game.room.history.facts('card.used')).toHaveLength(count + 1);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(count + 1);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -271,7 +272,7 @@ it('反制提交记录明确关联原效果与每层用牌，结果不包含生�
   const result = await running;
   expect(subjects).toEqual(['use', 'use', 'effect']);
   expect(() => structuredClone(result)).not.toThrow();
-  const facts = game.room.history.facts('card.used');
+  const facts = game.room.history.facts(CardEvent.used);
   expect(facts[1]!.data.detail).toMatchObject({
     declaration: {
       context: { kind: 'counter', subject: { kind: 'effect', effect: { target: 'b' } } },

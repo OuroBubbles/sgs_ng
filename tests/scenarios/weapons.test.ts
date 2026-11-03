@@ -19,6 +19,8 @@ import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const strike = (
@@ -74,10 +76,10 @@ it.each([false, true])(
     expect(game.room.world.player('b').hp).toBe(prevent ? 4 : 3);
     expect(game.room.world.position('weapon')).toBe('a:equipment');
     expect(game.room.world.position('j')).toBe('discard');
-    expect(game.room.history.facts('card.used')).toHaveLength(2);
-    expect(game.room.history.facts('card.responded')).toHaveLength(0);
-    expect(game.room.history.facts('attack.defense-broken')).toHaveLength(1);
-    expect(game.room.history.facts('attack.finished')).toMatchObject([
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+    expect(game.room.history.facts(Attack.defenseBroken)).toHaveLength(1);
+    expect(game.room.history.facts(Attack.finished)).toMatchObject([
       {
         data: { detail: { kind: 'undefended', damage: { kind: prevent ? 'prevented' : 'dealt' } } },
       },
@@ -97,7 +99,7 @@ it.each([1, 2])('贯石斧材料不足或取消不收费：其他牌 %s', async 
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('fee0')).toBe('a:hand');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
 });
 
 it.each(['lost', 'dead'])('贯石斧已支付后来源 %s，已宣告突破仍生效', async (event) => {
@@ -127,7 +129,7 @@ it.each(['lost', 'dead'])('贯石斧已支付后来源 %s，已宣告突破仍�
   await answer(game, { cards: ['fee0', 'fee1'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
 });
 
 it('防御结果在全部闪满足后才开放；部分成功不会激活贯石斧', async () => {
@@ -143,8 +145,8 @@ it('防御结果在全部闪满足后才开放；部分成功不会激活贯石�
   await answer(game, { kind: 'physical', card: 'j' });
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('attack.defended')).toHaveLength(0);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Attack.defended)).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
 });
 
 it('防御结果禁止纯查询修改，封口后迟到突破被拒绝', async () => {
@@ -179,13 +181,13 @@ it('万箭的闪不激活贯石斧；防具直接取消杀也不冒充闪避', a
   const running = use(volley, strike({ kind: 'physical', card: 'v' }, []));
   await answer(volley, { kind: 'physical', card: 'j' });
   await running;
-  expect(volley.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(volley.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(volley.room.world.player('b').hp).toBe(4);
   const shield = cardGame({
     equipment: { a: [card('weapon', 'axe')], b: [card('armor', 'nioh_shield')] },
   });
   await use(shield, strike({ kind: 'physical', card: 'slash1' }));
-  expect(shield.room.history.facts('attack.defended')).toHaveLength(0);
+  expect(shield.room.history.facts(Attack.defended)).toHaveLength(0);
 });
 
 it('青龙追加杀具有独立身份与处理区，原杀仍是已防御', async () => {
@@ -211,14 +213,14 @@ it('青龙追加杀具有独立身份与处理区，原杀仍是已防御', asyn
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(maxProcessing).toBe(2);
-  const facts = game.room.history.facts('card.used');
+  const facts = game.room.history.facts(CardEvent.used);
   expect(facts).toHaveLength(3);
   expect(facts[1]?.data.detail).toMatchObject({ declaration: { card: { name: 'standard:jink' } } });
   expect(facts[2]?.data.detail).toMatchObject({
     declaration: { context: { kind: 'effect', ignoreDistance: true } },
   });
   expect(
-    game.room.history.facts('attack.finished').map((f) => (f.data.detail as { kind: string }).kind),
+    game.room.history.facts(Attack.finished).map((f) => (f.data.detail as { kind: string }).kind),
   ).toEqual(['undefended', 'defended']);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -238,8 +240,8 @@ it('青龙连续追杀依次嵌套，每次仍能闪避与选择继续', async (
   }
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('card.used')).toHaveLength(5);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(5);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
 });
 
 it.each([false, true])('青龙忽略变化后的距离，但仍受目标禁令约束：禁止 %s', async (prohibited) => {
@@ -326,7 +328,7 @@ it('青龙允许武圣以刀本身追杀，宣告离场后不再继续追杀', a
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('weapon')).toBe('discard');
-  expect(game.room.history.facts('card.used')).toHaveLength(4);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(4);
 });
 
 it('方天最后手牌杀的目标数量与最终验证一致，支付后不丢失已声明目标', async () => {
@@ -353,7 +355,7 @@ it('方天有其他手牌时仍限一目标；空手零材料杀也不凭空增�
     expect(await use(game, strike(choice, ['b', 'c']))).toMatchObject({
       value: { kind: 'unavailable' },
     });
-    expect(game.room.history.facts('card.used')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   }
 });
 
@@ -512,5 +514,5 @@ it('麒麟弓不处理无牌伤害或已经防止的伤害', async () => {
   await use(game, strike());
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('horse0')).toBe('b:equipment');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
 });

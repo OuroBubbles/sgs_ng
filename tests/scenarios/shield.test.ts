@@ -13,10 +13,11 @@ import {
   Dying,
   Shield,
 } from '../../src/sdk';
-import type { Context, DamageDraft, DamageResult } from '../../src/sdk';
+import type { Context, DamageDraft } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'normal' } as const;
@@ -28,7 +29,7 @@ function rebuilt(game: Game) {
   expect(game.room.decisions.pending).toEqual([]);
 }
 function dealt(game: Game) {
-  return game.room.history.facts('damage.dealt').map((fact) => fact.data.detail as DamageResult);
+  return game.room.history.facts(Damage.dealt).map((fact) => fact.data.detail);
 }
 
 it('护盾增减有实际量与尝试量，减少至零，无变化不发事实/窗口', async () => {
@@ -65,7 +66,7 @@ it('护盾增减有实际量与尝试量，减少至零，无变化不发事实/
     );
   });
   expect(changes).toEqual([3, -3]);
-  expect(game.room.history.facts('shield.changed')).toHaveLength(2);
+  expect(game.room.history.facts(Shield.changed)).toHaveLength(2);
   rebuilt(game);
 });
 
@@ -115,8 +116,8 @@ it('扣血、护盾消耗与解链同次提交，状态窗口看见同一个完�
       expect(shieldOf(ctx.world, 'b')).toBe(0);
       expect(isChained(ctx.world, 'b')).toBe(false);
       const fact = ctx.history
-        .facts('damage.dealt')
-        .find((fact) => (fact.data.detail as DamageResult).id === event.damage)!;
+        .facts(Damage.dealt)
+        .find((fact) => fact.data.detail.id === event.damage)!;
       expect(fact.data.changes.map((change) => change.kind)).toEqual([
         'vitality',
         'setState',
@@ -274,7 +275,7 @@ it('护盾全抵消时不新开濒死，即使角色已由外层规则处于零�
     },
   });
   await game.room.run('hit', async (ctx) => {
-    ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 0 }], null);
+    ctx.commit(testTiming('setup.hp'), [{ kind: 'vitality', player: 'b', hp: 0 }], null);
     await damage(ctx, hit);
   });
   expect(dying).toBe(0);

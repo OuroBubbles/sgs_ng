@@ -12,6 +12,8 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import type { Context } from '../../src/sdk';
 import type { Validation } from '../../src/core/decisions/hub';
+import { Game } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
 
@@ -30,7 +32,7 @@ it('本地预览与回复把规则故障留在主持侧，返回不可操作结�
           : ((async () => {
               await Promise.resolve();
               try {
-                at.commit('invalid.preview.late', [], null);
+                at.commit(testTiming('invalid.preview.late'), [], null);
               } catch (error) {
                 lateError = (error as Error).message;
               }
@@ -121,7 +123,8 @@ function game(options: { wounded?: boolean; response?: boolean } = {}) {
         })),
         'fixture',
       );
-      if (options.wounded) ctx.commit('wounded', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+      if (options.wounded)
+        ctx.commit(testTiming('wounded'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
     },
   });
   const session = new LocalSession(match);
@@ -395,7 +398,7 @@ it('胜负提交后清理失败保留事实，并将原始作者故障传给主�
     expect(final.result).toEqual({ winners: ['a'], reason: 'probe' });
     expect(final.decision).toBeNull();
     expect(match.room.decisions.pending).toEqual([]);
-    expect(match.room.history.facts('game.finished')).toHaveLength(1);
+    expect(match.room.history.facts(Game.finished)).toHaveLength(1);
     expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
       match.room.world.snapshot,
     );

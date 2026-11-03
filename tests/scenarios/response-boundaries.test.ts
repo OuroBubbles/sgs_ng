@@ -24,6 +24,9 @@ import { wushuang } from '../../src/content/standard/generals/lvbu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Damage } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const owners = ['a', 'b', 'c', 'd'];
 function watchOrder<T>(game: ReturnType<typeof cardGame>, window: Timing<T, unknown>): string[] {
@@ -100,8 +103,8 @@ for (const delegated of [false, true]) {
     ]);
     expect(materialMoved).toEqual(['c', 'd', 'a', 'b']);
     expect(game.room.world.position('j')).toBe('discard');
-    expect(game.room.history.facts('card.responded')).toHaveLength(delegated ? 1 : 0);
-    expect(game.room.history.facts('card.used')).toHaveLength(2);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(delegated ? 1 : 0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   });
 }
@@ -149,7 +152,7 @@ it('独立供牌保留原接收者与查询守卫，从实际 c 结算完成窗�
     #world = game.room.world;
 
     available(ctx: Context) {
-      if (this.write) ctx.commit('probe.supply-query-write', [], null);
+      if (this.write) ctx.commit(testTiming('probe.supply-query-write'), [], null);
       const actor = this.#world.player(this.actor);
       return ctx.world === this.#world && actor.alive && actor.hp < actor.maxHp;
     }
@@ -181,7 +184,7 @@ it('独立供牌保留原接收者与查询守卫，从实际 c 结算完成窗�
   expect(finished).toEqual(['c', 'd', 'a', 'b']);
   expect(paid).toEqual(['c', 'd', 'a', 'b']);
   expect(game.room.world.position('supply')).toBe('discard');
-  expect(game.room.history.facts('probe.supply-query-write')).toEqual([]);
+  expect(game.room.history.facts(testTiming('probe.supply-query-write'))).toEqual([]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
@@ -203,7 +206,7 @@ it('供牌支付后的异步资格不能被布尔组合掩盖，已提交费用�
       },
       (at, supply) => {
         asynchronous = true;
-        if (supply.available(at)) at.commit('probe.supply-after-async', [], null);
+        if (supply.available(at)) at.commit(testTiming('probe.supply-after-async'), [], null);
         return supply.card.name;
       },
     ),
@@ -212,8 +215,8 @@ it('供牌支付后的异步资格不能被布尔组合掩盖，已提交费用�
   await answer(game.room, { kind: 'physical', card: 'supply' });
   await failed;
   expect(game.room.status).toBe('faulted');
-  expect(game.room.history.facts('probe.supply-after-async')).toEqual([]);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.supply-after-async'))).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   expect(game.room.world.position('supply')).not.toBe('c:hand');
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -264,8 +267,8 @@ it('救援 b 时，受伤的 a 不能把这次桃改用于自己；合法救援�
   await game.room.run('dying-b', (ctx) => loseHp(ctx, { player: 'b', amount: 4, reason: 'probe' }));
   expect(game.room.world.player('a').hp).toBe(3);
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
@@ -325,8 +328,8 @@ for (const interruptAt of [1, 2]) {
     });
     expect(room.world.player('a').hp).toBe(4);
     expect(room.world.player('b').hp).toBe(4);
-    expect(room.history.facts('damage.dealt')).toHaveLength(0);
-    expect(room.history.facts('card.responded')).toHaveLength(interruptAt - 1);
+    expect(room.history.facts(Damage.dealt)).toHaveLength(0);
+    expect(room.history.facts(CardEvent.responded)).toHaveLength(interruptAt - 1);
     expect(room.world.position('a1')).toBe('discard');
     if (interruptAt === 2) expect(room.world.position('b1')).toBe('discard');
     expect(room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
@@ -356,7 +359,7 @@ it('无双决斗要求 b 连续两杀：第二张流程中止不变成失败，�
   expect(book.actors).toEqual(['b', 'b']);
   expect(room.world.player('b').hp).toBe(4);
   expect(room.world.position('b1')).toBe('discard');
-  expect(room.history.facts('card.responded')).toHaveLength(1);
+  expect(room.history.facts(CardEvent.responded)).toHaveLength(1);
   expect(rebuildWorld(initial, room.history.facts())).toEqual(room.world.snapshot);
 });
 
@@ -396,7 +399,7 @@ it('多目标决斗只中止当前 b 效果，后续 c 的真实未提供响应�
   });
   expect(room.world.player('b').hp).toBe(4);
   expect(room.world.player('c').hp).toBe(3);
-  expect(room.history.facts('damage.dealt')).toHaveLength(1);
+  expect(room.history.facts(Damage.dealt)).toHaveLength(1);
   expect(room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
   expect(rebuildWorld(initial, room.history.facts())).toEqual(room.world.snapshot);
 });
@@ -421,7 +424,7 @@ for (const hasSlash of [false, true]) {
       value: { kind: 'used', use: { effects: [{ state: 'resolved' }] } },
     });
     expect(game.room.world.player('b').hp).toBe(3);
-    expect(game.room.history.facts('damage.dealt')).toHaveLength(1);
+    expect(game.room.history.facts(Damage.dealt)).toHaveLength(1);
   });
 }
 
@@ -439,7 +442,7 @@ it('救援桃仍可治疗濒死的自己，救援装配使用的是真实用牌�
   ).toEqual({ kind: 'accepted' });
   await running;
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });

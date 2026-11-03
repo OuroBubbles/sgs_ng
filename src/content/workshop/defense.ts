@@ -10,6 +10,7 @@ import {
 } from '../../sdk';
 import type { CardDefinition, Context, DamageDraft, SkillHandle } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { Skill } from '../../sdk';
 
 export const ward: CardDefinition = {
   id: 'workshop:ward',
@@ -78,7 +79,7 @@ export const relay = {
           reason: self.skill,
           legal: () => model.validate(answer.value).ok,
           intent,
-          factKind: 'skill.invoked',
+          factKind: Skill.invoked,
           declaration: { label: self.name, ...intent.data },
         });
         if (paid.kind === 'paid') await intent.resolve(ctx);

@@ -2,8 +2,10 @@ import type { CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { defineEvent, timing } from '../../core/runtime/event';
+import type { Timing } from '../../core/runtime/event';
 import type { DrawDraft, DrawResult } from './draw';
 import type { RevealedCards } from './reveal';
+import type { PaymentReceipt } from '../costs/pay';
 
 export interface MoveResult {
   readonly kind: 'moved' | 'unchanged';
@@ -14,15 +16,44 @@ export interface MoveResult {
   readonly after: readonly Zone[];
 }
 
+/** cards.moved 写入历史的记录；declaration 来自 MoveDeclaration.data。 */
+export interface MoveRecord {
+  readonly moves: readonly CardMove[];
+  readonly before: readonly Zone[];
+  readonly declaration?: unknown;
+}
+
 export const Cards = defineEvent('cards', {
   drawing: timing<DrawDraft>(),
   drawn: timing<DrawResult>(),
-  moved: timing<MoveResult>('attachments', 'main'),
+  moved: timing<MoveResult, MoveRecord>('attachments', 'main'),
   revealed: timing<RevealedCards>(),
+
+  discarded: timing<PaymentReceipt>(),
+  given: timing<unknown>(),
+  peeked: timing<unknown>(),
+  arranged: timing<unknown>(),
+  distributed: timing<unknown>(),
+});
+
+export const CardEvent = defineEvent('card', {
+  used: timing<PaymentReceipt>(),
+  responded: timing<PaymentReceipt>(),
+  chosen: timing<unknown>(),
+  finished: timing<unknown>(),
+  targeting: timing<unknown>(),
+  effect: timing<unknown>(),
+  planChanged: timing<unknown>(),
+  targetReplaced: timing<unknown>(),
+  taken: timing<unknown>(),
+  takenPublic: timing<unknown>(),
+  takenDelayed: timing<unknown>(),
+  discardedDelayed: timing<unknown>(),
+  discardedByEffect: timing<unknown>(),
 });
 
 export interface MoveDeclaration {
-  readonly kind: string;
+  readonly kind: Timing<unknown, unknown>;
   readonly data: unknown;
   /** 与移动同次提交的领域元数据；额外移动必须放在 moves 中，不能绕过移动后效。 */
   readonly changes?: readonly Exclude<Change, { readonly kind: 'move' }>[];
@@ -45,7 +76,7 @@ export function moveCards(
         return immutable({ kind: 'unchanged', moves: effective, before, after: before });
 
       child.commit(
-        declaration?.kind ?? 'cards.moved',
+        declaration?.kind ?? Cards.moved,
         [
           ...effective.map((move): Change => ({ kind: 'move', ...move })),
           ...(declaration?.changes ?? []),

@@ -19,10 +19,13 @@ import {
   Cards,
   Cost,
 } from '../../src/sdk';
-import type { DiscardQuery, UsageLimit } from '../../src/sdk';
+import type { DiscardQuery, PaymentReceipt, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { jieyin } from '../../src/content/standard/generals/sunshangxiang';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Discard } from '../../src/rules/cards/discard';
+import { Weapon } from '../../src/content/standard/weapons';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -115,7 +118,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
       return this.#reason;
     }
     get factKind() {
-      return this.#reason;
+      return testTiming<unknown, PaymentReceipt>(this.#reason);
     }
     get declaration() {
       return { label: this.#reason };
@@ -231,7 +234,7 @@ for (const free of [0, 1]) {
     });
     await grant(game, 'a');
     await game.room.run('hp', (ctx) =>
-      ctx.commit('fixture', [{ kind: 'vitality', player: 'a', hp: 1 }], null),
+      ctx.commit(testTiming('fixture'), [{ kind: 'vitality', player: 'a', hp: 1 }], null),
     );
     const running = game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
     if (free) {
@@ -245,7 +248,7 @@ for (const free of [0, 1]) {
     }
     await running;
     expect(game.room.world.zone('a:hand').cards).toHaveLength(4 - free);
-    expect(game.room.history.facts('discard.limited')).toHaveLength(1);
+    expect(game.room.history.facts(Discard.limited)).toHaveLength(1);
     expect(game.room.decisions.pending).toEqual([]);
   });
 }
@@ -259,7 +262,7 @@ it('结姻的候选和支付使用同一弃置权限，不能提交受保护手�
   await grant(game, 'a');
   await game.room.run('setup', (ctx) => {
     setGender(ctx, 'b', 'male');
-    ctx.commit('wound', [{ kind: 'vitality', player: 'b', hp: 2 }], null);
+    ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'b', hp: 2 }], null);
   });
   const running = game.room.run('play', (ctx) => runPhase(ctx, game.book, 'a', 'play', playPhase));
   const request = await nextRequest(game.room);
@@ -358,7 +361,7 @@ for (const count of [0, 2]) {
         ).toBe(false);
         // 捕获移牌事实已提交、附件善后尚未执行的瞬间，剩余材料仍归逻辑延时牌管理。
         ctx.commit(
-          'fixture-before-attachment-cleanup',
+          testTiming('fixture-before-attachment-cleanup'),
           [{ kind: 'move', cards: ['m0'], from: entry.id, to: 'discard', place: 'bottom' }],
           null,
         );
@@ -496,7 +499,7 @@ it('寒冰剑目标没有可弃牌时不提供防伤替代；麒麟弓宣告后�
   await running;
   expect(bow.room.world.position('horse')).toBe('b:equipment');
   expect(bow.room.world.player('b').hp).toBe(3);
-  expect(bow.room.history.facts('weapon.horse-discarded')).toEqual([]);
+  expect(bow.room.history.facts(Weapon.horseDiscarded)).toEqual([]);
 });
 
 it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续，存活资格不被权限查询重复代判', async () => {
@@ -526,5 +529,5 @@ it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续�
   expect(game.room.world.player('a').alive).toBe(false);
   expect(game.room.world.position('horse')).toBe('discard');
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('weapon.horse-discarded')).toHaveLength(1);
+  expect(game.room.history.facts(Weapon.horseDiscarded)).toHaveLength(1);
 });

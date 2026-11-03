@@ -77,6 +77,7 @@ export const Effect = defineEvent('effect', {
     readonly after: EffectRecord;
   }>(),
   ended: timing<EffectEnd>(),
+  removed: timing<unknown>(),
 });
 
 /** 校验后直接使用声明本身：不复制、不冻结、不绑定方法。 */
@@ -291,7 +292,7 @@ export class EffectBook implements TriggerSource {
       const entry = at.world.state(id);
       if (entry?.key !== stateKey) return null;
       const before = this.#record(at.world, entry);
-      at.commit('effect.removed', [{ kind: 'removeState', state: id }], { before, reason });
+      at.commit(Effect.removed, [{ kind: 'removeState', state: id }], { before, reason });
       await this.#finished(at, before, reason);
       return before;
     });

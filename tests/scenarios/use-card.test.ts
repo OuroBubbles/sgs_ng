@@ -4,6 +4,9 @@ import type { CardEffect, UsePlanView, UseSnapshot } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Hp } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const slash = {
   actor: 'a',
@@ -54,11 +57,11 @@ it('杀宣告支付、伤害关联、收束与处理区善后完整结束', asyn
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.zone('discard').cards).toEqual(['slash1']);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.history.facts('card.used')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[0]?.data.detail).toMatchObject({
     cards: ['slash1'],
     declaration: { card: { name: 'standard:slash' }, targets: ['b'] },
   });
-  expect(game.room.history.facts('damage.dealt')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Damage.dealt)[0]?.data.detail).toMatchObject({
     input: {
       card: { useId: stringMatcher, effectId: stringMatcher, card: { materials: ['slash1'] } },
     },
@@ -84,14 +87,14 @@ it('闪响应只防止当前效果，回复关联稳定 UseId/EffectId，重复�
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.zone('discard').cards).toEqual(['jink', 'slash1']);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('card.used')[1]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)[1]?.data.detail).toMatchObject({
     declaration: {
       context: { kind: 'response', to: { useId: stringMatcher, effectId: stringMatcher } },
     },
   });
-  expect(game.room.history.facts('damage.dealt')).toEqual([]);
+  expect(game.room.history.facts(Damage.dealt)).toEqual([]);
 });
 
 it('取消闪响应后正常受伤，不支付未打出的闪', async () => {
@@ -121,7 +124,7 @@ it('攻击距离、重复目标和不可主动使用的牌均在支付前拒绝'
   expect(await use(game, { ...slash, choice: generated })).toMatchObject({
     value: { kind: 'unavailable' },
   });
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   expect(game.room.world.zone('discard').cards).toEqual([]);
 });
 
@@ -151,7 +154,7 @@ it('出牌阶段杀次数只在宣告时记录，每次额外阶段有独立次�
       });
   });
   expect(game.room.world.player('b').hp).toBe(2);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(game.room.world.snapshot.states).toEqual([]);
 });
 
@@ -164,7 +167,7 @@ it('冒用其他角色的出牌阶段不能宣告', async () => {
       ).toMatchObject({ kind: 'unavailable' });
     }),
   );
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
 });
 
 it('技能添加的目标各自响应，防止一个目标不防止整张牌', async () => {
@@ -191,7 +194,7 @@ it('技能添加的目标各自响应，防止一个目标不防止整张牌', a
   if (result.kind !== 'resolved' || result.value.kind !== 'used') throw new Error('Expected use.');
   expect(result.value.use.effects.map((effect) => effect.target)).toEqual(['b', 'c']);
   expect(new Set(result.value.use.effects.map((effect) => effect.effectId)).size).toBe(2);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
 });
 
 it('转移目标创建新的效果身份，旧效果取消且不退材料', async () => {
@@ -242,7 +245,7 @@ it('显式再次结算创建新 EffectId，已结算目标不会隐式重跑', a
   expect(result).toMatchObject({
     value: { use: { effects: [{ state: 'resolved' }, { state: 'resolved' }] } },
   });
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
 });
 
 it('多材料中的一张被伤害后技能获得，结尾只清理余牌', async () => {
@@ -282,7 +285,11 @@ it('来源在宣告后死亡，已产生的牌效果仍结算', async () => {
     owner: 'b',
     eligible: (_ctx, cost) => cost.cards.includes('slash1'),
     run: (ctx) => {
-      ctx.commit('source.died', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(
+        testTiming('source.died'),
+        [{ kind: 'vitality', player: 'a', hp: 0, alive: false }],
+        {},
+      );
     },
   });
   expect(await use(game, slash)).toMatchObject({ value: { kind: 'used' } });
@@ -374,7 +381,7 @@ it('回复不能伪造 generated 指令或不匹配的响应牌', async () => {
   ).toMatchObject({ reason: 'invalid' });
   game.room.decisions.cancel(request.id, request.token);
   await running;
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
 });
 
 it('桃只回复合法目标，满体力时不支付', async () => {
@@ -382,11 +389,11 @@ it('桃只回复合法目标，满体力时不支付', async () => {
   const intent = { ...slash, choice: { kind: 'physical', card: 'peach' }, targets: ['a'] } as const;
   expect(await use(game, intent)).toMatchObject({ value: { kind: 'unavailable' } });
   await game.room.run('wound', (ctx) =>
-    ctx.commit('hp.changed', [{ kind: 'vitality', player: 'a', hp: 3 }], {}),
+    ctx.commit(testTiming('hp.changed'), [{ kind: 'vitality', player: 'a', hp: 3 }], {}),
   );
   expect(await use(game, intent)).toMatchObject({ value: { kind: 'used' } });
   expect(game.room.world.player('a').hp).toBe(4);
-  expect(game.room.history.facts('hp.recovered')).toHaveLength(1);
+  expect(game.room.history.facts(Hp.recovered)).toHaveLength(1);
 });
 
 it('决斗轮流响应杀，不消耗出牌阶段杀次数', async () => {
@@ -409,9 +416,9 @@ it('决斗轮流响应杀，不消耗出牌阶段杀次数', async () => {
   game.room.decisions.submit(second.id, second.token, { kind: 'physical', card: 'slash1' });
   await running;
   expect(game.room.world.player('b').hp).toBe(2);
-  const responses = game.room.history.facts('card.responded');
+  const responses = game.room.history.facts(CardEvent.responded);
   expect(responses).toHaveLength(2);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
 });
 
 it('响应中使用闪的后效与处理区关闭完成后，上层用牌才返回', async () => {
@@ -465,9 +472,9 @@ it('距离修正经具名查询参与同一目标验证，不需要特殊杀实�
   });
   await game.room.run('live-policy', (ctx) => {
     expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
-    ctx.commit('wound', [{ kind: 'vitality', player: 'a', hp: 3 }], null);
+    ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'a', hp: 3 }], null);
     expect(game.book.distance(ctx, 'a', 'c')).toBe(2);
-    ctx.commit('recover', [{ kind: 'vitality', player: 'a', hp: 4 }], null);
+    ctx.commit(testTiming('recover'), [{ kind: 'vitality', player: 'a', hp: 4 }], null);
     expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
   });
   expect(await use(game, { ...slash, targets: ['c'] })).toMatchObject({ value: { kind: 'used' } });

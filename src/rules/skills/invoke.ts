@@ -4,6 +4,7 @@ import type { SkillHandle } from './skills';
 import { pay, payDiscard } from '../costs/pay';
 import type { UsageLimit } from '../costs/pay';
 import { isGameOver } from '../game/end';
+import { Skill } from './skills';
 
 /** 只询问技能选择；资格由 available 表达，接受后的支付和继续条件由调用者编排。 */
 export async function askInvoke(
@@ -53,7 +54,7 @@ export async function declare(
   const spec = {
     skill: self,
     reason: self.skill,
-    factKind: 'skill.invoked',
+    factKind: Skill.invoked,
     declaration: { label: self.name, ...data },
     ...(legal ? { legal } : {}),
     ...(changes ? { changes } : {}),

@@ -13,6 +13,7 @@ import {
   Phase,
 } from '../../../sdk';
 import type { Context, Processing } from '../../../sdk';
+import { Cards } from '../../../sdk';
 
 /** 私有区正常/局部中止的余牌回顶；不能用遗计的默认弃置善后。 */
 async function returnRemaining(ctx: Context, pool: Processing): Promise<void> {
@@ -75,7 +76,7 @@ export const guanxing = skill({
               ],
               self.skill,
               {
-                kind: 'cards.arranged',
+                kind: Cards.arranged,
                 data: { player: self.owner, reason: self.skill, top, bottom },
               },
             );

@@ -23,6 +23,10 @@ import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Counter } from '../../src/sdk';
+import { Damage } from '../../src/sdk';
+import { Delayed } from '../../src/rules/cards/delayed';
 
 const play = (id: string, actor = 'a', targets: readonly string[] = ['b']): UseIntent => ({
   actor,
@@ -55,8 +59,8 @@ it('延时牌使用只安装，不提前判定或反制；同名牌不能重复�
   installCounterspells(game.room, game.book);
   expect(await use(game, play('delay'))).toMatchObject({ value: { kind: 'used' } });
   expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
-  expect(game.room.history.facts('counter.finished')).toHaveLength(0);
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(0);
+  expect(game.room.history.facts(Counter.finished)).toHaveLength(0);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(0);
   expect(game.room.world.position('delay')).toBe(delayedCards(game.room.world, 'b')[0]!.id);
   expect(await use(game, play('other'))).toMatchObject({ value: { kind: 'unavailable' } });
   expect(game.room.world.position('other')).toBe('a:hand');
@@ -80,7 +84,7 @@ it.each(['heart', 'spade'] as const)(
     expect(
       phases(await turn(game, 'b')).find((phase) => phase.phase.kind === 'play'),
     ).toMatchObject({ exit: 'completed' });
-    expect(game.room.history.facts('judgment.finished')).toHaveLength(1);
+    expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
   },
 );
 
@@ -94,12 +98,12 @@ it.each([2, 9, 1, 10])('闪电黑桃 %s：2–9 为无来源雷电伤害，其�
   const hit = rank >= 2 && rank <= 9;
   expect(game.room.world.player('a').hp).toBe(hit ? 1 : 4);
   if (hit) {
-    expect(game.room.history.facts('damage.dealt')[0]!.data.detail).toMatchObject({
+    expect(game.room.history.facts(Damage.dealt)[0]!.data.detail).toMatchObject({
       input: { from: null, nature: 'thunder', amount: 3 },
     });
     expect(game.room.world.position('lightning')).toBe('discard');
   } else expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
 });
 
 it('延时牌到生效时才进入反制，乐不思蜀被无懈后不判定也不跳阶段', async () => {
@@ -117,14 +121,14 @@ it('延时牌到生效时才进入反制，乐不思蜀被无懈后不判定也�
       .kind,
   ).toBe('accepted');
   await running;
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(0);
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(0);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(0);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(0);
   expect(game.room.world.position('delay')).toBe('discard');
   const effects = game.room.history
-    .facts('card.effect')
+    .facts(CardEvent.effect)
     .map((fact) => fact.data.detail as { effectId: string });
   expect(new Set(effects.map((effect) => effect.effectId)).size).toBe(effects.length);
-  expect(game.room.history.facts('delayed.effect.finished')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Delayed.effectFinished)[0]!.data.detail).toMatchObject({
     stage: 'delayed',
   });
 });
@@ -140,7 +144,7 @@ it('闪电被无懈后仍向下传递，不能当成普通锦囊直接丢弃', a
   const request = await nextRequest(game.room);
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'counter' });
   await running;
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(0);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(0);
   expect(delayedCards(game.room.world, 'b')[0]!.source.card.name).toBe('standard:lightning');
 });
 
@@ -157,7 +161,7 @@ it('闪电传递跳过重复与禁止目标，回到自己也不会在同一判�
   expect(delayedCards(game.room.world, 'a')).toHaveLength(1);
   expect(delayedCards(game.room.world, 'a')[0]!.id).not.toBe(original);
   expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(1);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
 });
 
 it('判定区后放先结算，只快照已有实例，新安装的牌留到下一次', async () => {
@@ -333,7 +337,7 @@ it('跳过判定阶段不消耗判定区实例，下一回合仍可结算', asyn
   });
   await turn(game, 'b');
   expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(0);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(0);
   release();
   await turn(game, 'b');
   expect(delayedCards(game.room.world, 'b')).toHaveLength(0);
@@ -413,7 +417,7 @@ it('转化来源在宣告后消失仍保留延时牌名，原使用者死亡也�
     }),
   );
   await turn(game, 'b');
-  expect(game.room.history.facts('phase.skipped')).toHaveLength(1);
+  expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
   expect(game.room.world.position('red')).toBe('discard');
 });
 
@@ -432,7 +436,7 @@ it('判定完成后效结束整局，乐不思蜀不再产生新的阶段跳过�
   });
   await use(game, play('delay'));
   await turn(game, 'b');
-  expect(game.room.history.facts('phase.skip.scheduled')).toHaveLength(0);
+  expect(game.room.history.facts(Phase.skipScheduled)).toHaveLength(0);
   expect(game.room.world.position('delay')).toBe('discard');
 });
 

@@ -18,6 +18,8 @@ import type { TriggerSource } from '../../src/core/runtime/event';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Cost } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 const window = testTiming<null>('probe.provider-lifecycle');
 const source: SkillHandle = {
@@ -47,7 +49,7 @@ it('卸载 Provider 后不执行剩余次数', async () => {
         times: () => 3,
         effect(ctx, _event, _self, _value, occurrence) {
           seen.push(occurrence.index);
-          ctx.commit('probe.provider', [], occurrence);
+          ctx.commit(testTiming('probe.provider'), [], occurrence);
           remove(ctx);
         },
       }),
@@ -59,7 +61,7 @@ it('卸载 Provider 后不执行剩余次数', async () => {
     await ctx.window(window, null);
   });
   expect(seen).toEqual([1]);
-  expect(game.room.history.facts('probe.provider')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.provider'))).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -283,7 +285,7 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
   });
   await running;
   expect(accepted).toBe(false);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
   rebuilt(game);
 });
 
@@ -321,7 +323,7 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
             ).kind,
           ).toBe('unavailable');
           await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
-          ctx.commit('probe.continued', [], null);
+          ctx.commit(testTiming('probe.continued'), [], null);
         },
       }),
     ],
@@ -337,9 +339,9 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
   expect(game.room.world.position('slash1')).toBe('discard');
   expect(game.room.world.position('slash2')).toBe('a:hand');
   expect(game.room.world.position('reward')).toBe('a:hand');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-  expect(game.room.history.facts('cost.paid')).toHaveLength(1);
-  expect(game.room.history.facts('probe.continued')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+  expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.continued'))).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -561,7 +563,7 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
         locked: true,
         id: 'run',
         effect(ctx) {
-          ctx.commit('probe.class', [], null);
+          ctx.commit(testTiming('probe.class'), [], null);
         },
       }),
     ];
@@ -592,7 +594,7 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     expect(handle.active(ctx)).toBe(false);
     expect(handle.active(ctx)).toBe(false);
   });
-  expect(game.room.history.facts('probe.class')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.class'))).toHaveLength(1);
   rebuilt(game);
 });
 

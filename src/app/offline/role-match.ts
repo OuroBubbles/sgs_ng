@@ -75,6 +75,8 @@ const matchState = defineState<MatchProgress | null>(
 const matchTarget = Object.freeze({ owner: null, source: 'match', lifetime: null });
 export const Match = defineEvent('match', {
   prepared: timing<{ readonly first: string }>(),
+  preparing: timing<unknown>(),
+  turn: timing<unknown>(),
 });
 
 /** Fisher–Yates 只消耗 Context 随机源；最终身份/牌序都通过事实提交。 */
@@ -224,7 +226,7 @@ export class RoleMatch {
       const lord = roleSeats(ctx.world).find((seat) => seat.role === 'lord')!.player;
       const player = ctx.world.player(lord);
       ctx.commit(
-        'match.preparing',
+        Match.preparing,
         [
           stateChange(ctx, matchState, matchTarget, { stage: 'preparing', turns: 0, next: lord }),
           ...this.#players.map((player) => genderChange(ctx, player.id, player.gender ?? 'none')),
@@ -310,7 +312,7 @@ export class RoleMatch {
         // 额外回合只插入执行，不移动正常轮转游标。
         const next = extra ? progress.next : seats[(seats.indexOf(owner) + 1) % seats.length]!;
         ctx.commit(
-          'match.turn',
+          Match.turn,
           [
             stateChange(ctx, matchState, matchTarget, {
               stage: 'playing',

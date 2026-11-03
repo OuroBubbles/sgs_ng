@@ -4,6 +4,13 @@ import type { Context } from '../../core/runtime/room';
 import { moveCards, Cards } from './move';
 import { withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const ProcessingEvent = defineEvent('processing', {
+  opened: timing<unknown>(),
+  closed: timing<unknown>(),
+});
 
 export interface Processing {
   readonly zone: string;
@@ -46,7 +53,7 @@ export async function withProcessing<T>(
       moves.some((move) => move.from === item.id),
     );
     owner.commit(
-      'processing.opened',
+      ProcessingEvent.opened,
       [
         {
           kind: 'createZone',
@@ -94,7 +101,7 @@ export async function withProcessing<T>(
       if (cleaned.kind === 'aborted') throw new Error('Processing cleanup cannot abort.');
     }
     if (processing.remaining().length) throw new Error('Processing cleanup left cards behind.');
-    owner.commit('processing.closed', [{ kind: 'removeZone', zone }], { zone });
+    owner.commit(ProcessingEvent.closed, [{ kind: 'removeZone', zone }], { zone });
     if (result.kind === 'aborted') return owner.abort(result.reason);
     return result.value;
   });

@@ -14,6 +14,8 @@ import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const original = { kind: 'general', id: 'original' } as const;
 const additional = { kind: 'effect', id: 'additional' } as const;
@@ -44,7 +46,7 @@ async function prepare(game: Game, skill: string) {
     setGender(ctx, 'c', 'male');
     setGender(ctx, 'd', 'male');
     ctx.commit(
-      'fixture.wounds',
+      testTiming('fixture.wounds'),
       ['a', 'b', 'c'].map((player) => ({ kind: 'vitality', player, hp: 2 })),
       null,
     );
@@ -131,8 +133,8 @@ for (const rule of cases) {
       await resolveAction(game, rule);
       expect(await first).toMatchObject({ kind: 'resolved' });
       expect(replaced).toBe(true);
-      expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-      expect(game.room.history.facts('skill.invoked')[0]?.data.detail).toMatchObject({
+      expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+      expect(game.room.history.facts(Skill.invoked)[0]?.data.detail).toMatchObject({
         skill,
         instance: firstInstance,
       });
@@ -152,13 +154,13 @@ for (const rule of cases) {
       );
       await resolveAction(game, rule);
       expect(await second).toMatchObject({ kind: 'resolved' });
-      expect(game.room.history.facts('skill.invoked')).toHaveLength(2);
+      expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
       if (rule.id === 'jieyin') {
         expect(game.room.world.player('a').hp).toBe(4);
         expect(game.room.world.player('b').hp).toBe(4);
       } else if (rule.id === 'qingnang') expect(game.room.world.player('b').hp).toBe(4);
       else if (rule.id === 'lijian') {
-        expect(game.room.history.facts('card.used')).toHaveLength(2);
+        expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
         // b 无杀；第二次伤害进入濒死并死亡，已声明决斗仍完整清理。
         expect(game.room.world.player('b').alive).toBe(false);
       } else if (rule.id === 'zhiheng') {
@@ -199,7 +201,7 @@ it.each(cases)('$name嵌套同角色出牌阶段有独立次数，返回后外�
   await resolveAction(game, rule);
   await resolveAction(game, rule);
   expect(await running).toMatchObject({ kind: 'resolved' });
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(2);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
   await game.room.run('fresh-phase', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
       // 即使离间已杀死 b，c/d 仍是合法男性组合；不是缺目标导致旧额度不可用。

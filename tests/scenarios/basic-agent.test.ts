@@ -12,6 +12,7 @@ import { nextRequest } from '../fixtures/room';
 import type { Card, FlowResult } from '../../src/sdk';
 import { card } from '../fixtures/cards';
 import { playMatch } from '../fixtures/match';
+import { testTiming } from '../fixtures/timing';
 
 function fixture() {
   const match = new RoleMatch({
@@ -179,7 +180,7 @@ it('救援按本人身份与公开主公判断：不救敌方，保留的桃通�
     match,
     match.room.run('rescue-choice', async (ctx) => {
       ctx.commit(
-        'dying-fixture',
+        testTiming('dying-fixture'),
         [
           { kind: 'vitality', player: 'a', hp: 0 },
           { kind: 'vitality', player: 'b', hp: 0 },

@@ -18,6 +18,8 @@ import {
 import type { Context, UseIntent } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
+import { CardEvent } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'counter-eligibility-probe' } as const;
@@ -162,8 +164,8 @@ for (const [name, boundary] of cases) {
       expect(asked).toEqual(depth === 0 ? [] : ['c']);
       expect(game.room.world.position('n1')).toBe(depth === 0 ? 'c:hand' : 'discard');
       expect(game.room.world.position('n2')).toBe('d:hand');
-      expect(game.room.history.facts('card.used')).toHaveLength(1 + depth);
-      const finished = game.room.history.facts('counter.finished').map((fact) => fact.data.detail);
+      expect(game.room.history.facts(CardEvent.used)).toHaveLength(1 + depth);
+      const finished = game.room.history.facts(Counter.finished).map((fact) => fact.data.detail);
       expect(finished).toHaveLength(1 + depth);
       expect(finished).toMatchObject(
         depth === 0
@@ -175,7 +177,7 @@ for (const [name, boundary] of cases) {
       );
       expect(
         game.room.history
-          .facts('card.effect')
+          .facts(CardEvent.effect)
           .map((fact) => fact.data.detail as { target: string; state: string })
           .find((effect) => effect.target === 'b'),
       ).toMatchObject({ state: 'skipped' });
@@ -201,9 +203,9 @@ it.each(['healed', 'last-card-gone', 'source-dead'] as const)(
     const { asked, result } = await drain(game, use(game, intent('duel')));
     expect(asked).toEqual(['c']);
     expect(result).toMatchObject({ value: { use: { effects: [{ state: 'cancelled' }] } } });
-    expect(
-      game.room.history.facts('counter.finished').map((fact) => fact.data.detail),
-    ).toMatchObject([{ kind: 'unopposed' }, { kind: 'countered', by: { actor: 'c' } }]);
+    expect(game.room.history.facts(Counter.finished).map((fact) => fact.data.detail)).toMatchObject(
+      [{ kind: 'unopposed' }, { kind: 'countered', by: { actor: 'c' } }],
+    );
     conserved(game);
   },
 );
@@ -225,7 +227,7 @@ it('同一候选中桃园目标先治满再失去体力，不把中途的假值�
   const { asked } = await drain(game, use(game, intent('god_salvation')));
   expect(asked).toEqual(['c']);
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('counter.finished').at(-1)!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Counter.finished).at(-1)!.data.detail).toMatchObject({
     kind: 'countered',
   });
   conserved(game);
@@ -265,7 +267,7 @@ it('普通作者 canResolve 闭包没有修改 World，也能关闭嵌套反制�
   const { asked } = await drain(game, use(game, intent('probe:conditional')));
   expect(asked).toEqual([]);
   expect(game.room.world.position('n1')).toBe('c:hand');
-  expect(game.room.history.facts('counter.finished')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Counter.finished)[0]!.data.detail).toMatchObject({
     kind: 'unavailable',
   });
   conserved(game);
@@ -277,7 +279,7 @@ it('延时牌后续生效使用本次 resolver 的资格，不错误套回放置
     id: 'probe:conditional-delayed',
     label: '条件延时牌',
     resolve(ctx) {
-      ctx.commit('probe.delayed-body', [], null);
+      ctx.commit(testTiming('probe.delayed-body'), [], null);
     },
   });
   const game = cardGame({
@@ -297,10 +299,10 @@ it('延时牌后续生效使用本次 resolver 的资格，不错误套回放置
     ),
   );
   expect(asked).toEqual(['c']);
-  expect(game.room.history.facts('counter.finished').at(-1)!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Counter.finished).at(-1)!.data.detail).toMatchObject({
     kind: 'countered',
   });
-  expect(game.room.history.facts('probe.delayed-body')).toHaveLength(0);
+  expect(game.room.history.facts(testTiming('probe.delayed-body'))).toHaveLength(0);
   conserved(game);
 });
 
@@ -329,7 +331,7 @@ it('反制结论封口后的公共后效治满桃园目标，不倒改已完成�
       },
     },
   });
-  expect(game.room.history.facts('counter.finished').at(-1)!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Counter.finished).at(-1)!.data.detail).toMatchObject({
     kind: 'countered',
     by: { actor: 'c' },
   });

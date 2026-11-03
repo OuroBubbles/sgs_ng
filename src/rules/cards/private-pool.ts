@@ -7,6 +7,7 @@ import { withProcessing } from './processing';
 import type { Processing, ProcessingCleanup } from './processing';
 import { moveCards } from './move';
 import { reshuffle } from './draw';
+import { Cards } from './move';
 
 const privatePool = defineState(
   'core:private-pool',
@@ -67,7 +68,7 @@ export function withPrivateTopCards<T>(
           cards.length ? [{ cards, from: 'draw', to: pool.zone, place: 'bottom' }] : [],
           input.reason,
           {
-            kind: 'cards.peeked',
+            kind: Cards.peeked,
             data: { ...input, zone: pool.zone, cards },
             changes: [
               stateChange(

@@ -26,6 +26,9 @@ import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Equipment } from '../../src/sdk';
+import { Judgment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const stages = [
@@ -88,7 +91,7 @@ async function answer(game: Game, value: unknown, kind = 'invoke') {
   });
 }
 function targetFacts(game: Game) {
-  return game.room.history.facts('card.targeting').map(
+  return game.room.history.facts(CardEvent.targeting).map(
     (f) =>
       f.data.detail as {
         effectId: string;
@@ -183,7 +186,7 @@ it.each(stages)('在 %s 追加目标只补齐新身份，旧身份不重复进�
   expect(facts.findIndex((f) => f.stage === stage && f.target === 'b')).toBeLessThan(
     facts.findIndex((f) => f.target === 'c'),
   );
-  expect(game.room.history.facts('card.effect')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.effect)).toHaveLength(2);
   replay(game);
 });
 
@@ -243,7 +246,9 @@ it('补入较早座次不倒退已访问目标，各层仍各自排序', async (
     'confirmed:d',
   ]);
   expect(
-    game.room.history.facts('card.effect').map((f) => (f.data.detail as { target: string }).target),
+    game.room.history
+      .facts(CardEvent.effect)
+      .map((f) => (f.data.detail as { target: string }).target),
   ).toEqual(['b', 'c', 'd']);
   replay(game);
 });
@@ -351,7 +356,7 @@ it.each(['resolver', 'aftereffect'] as const)(
       value: { use: { effects: [{ target: 'b' }, { target: 'c' }, { target: 'b' }] } },
     });
     const actual = game.room.history
-      .facts('card.effect')
+      .facts(CardEvent.effect)
       .map((f) => f.data.detail as { effectId: string; target: string });
     expect(actual.map((e) => e.effectId.split(':').at(-1))).toEqual(['1', '3', '2']);
     expect(log).toEqual([
@@ -393,7 +398,7 @@ it('后席目标确认后可以取消已准备的前席效果，取消身份仍�
     value: { use: { effects: [{ state: 'cancelled' }, { state: 'resolved' }] } },
   });
   expect(started).toEqual(['c']);
-  expect(game.room.history.facts('card.effect')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.effect)).toHaveLength(2);
   replay(game);
 });
 
@@ -445,8 +450,8 @@ it('首个伤害后来源死亡并失去武器/无双，后席已声明的无双
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('jink')).toBe('discard');
   expect(game.room.world.position('slash')).toBe('discard');
-  const targeting = game.room.history.facts('card.targeting');
-  expect(targeting.at(-1)!.seq).toBeLessThan(game.room.history.facts('damage.dealt')[0]!.seq);
+  const targeting = game.room.history.facts(CardEvent.targeting);
+  expect(targeting.at(-1)!.seq).toBeLessThan(game.room.history.facts(Damage.dealt)[0]!.seq);
   replay(game);
 });
 
@@ -479,14 +484,14 @@ it('铁骑对全部初始目标先判定，再执行首个伤害，来源随后�
   await answer(game, true);
   const second = await nextRequest(game.room);
   expect(second.kind).toBe('invoke');
-  expect(game.room.history.facts('damage.dealt')).toHaveLength(0);
+  expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
   await answer(game, true);
   await answer(game, { kind: 'physical', card: 'jink' }, 'card-response');
   await running;
   expect(game.room.world.player('a').alive).toBe(false);
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(2);
-  expect(game.room.history.facts('judgment.finished').at(-1)!.seq).toBeLessThan(
-    game.room.history.facts('damage.dealt')[0]!.seq,
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(2);
+  expect(game.room.history.facts(Judgment.finished).at(-1)!.seq).toBeLessThan(
+    game.room.history.facts(Damage.dealt)[0]!.seq,
   );
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.player('c').hp).toBe(4);
@@ -511,7 +516,7 @@ it('目标确认时失去青釭，后续指定后不宣告无视防具', async (
     },
   });
   await use(game, slash(['b']));
-  expect(game.room.history.facts('equipment.ignored')).toHaveLength(0);
+  expect(game.room.history.facts(Equipment.ignored)).toHaveLength(0);
   expect(game.room.world.player('b').hp).toBe(4);
   replay(game);
 });
@@ -588,7 +593,9 @@ it.each([
   expect(game.room.world.position('top1')).toBe('b:hand');
   expect(game.room.world.position('top2')).toBe('d:hand');
   expect(
-    game.room.history.facts('card.effect').map((f) => (f.data.detail as { state: string }).state),
+    game.room.history
+      .facts(CardEvent.effect)
+      .map((f) => (f.data.detail as { state: string }).state),
   ).toEqual(['resolved', 'resolved', 'skipped', 'resolved']);
   replay(game);
 });
@@ -615,7 +622,7 @@ it('延时牌放置经过四层，后续判定生效使用新效果身份且不�
   ]);
   expect(targetFacts(game).map((f) => f.stage)).toEqual(stages.map(([s]) => s));
   const effects = game.room.history
-    .facts('card.effect')
+    .facts(CardEvent.effect)
     .map((f) => f.data.detail as { effectId: string; useId: string });
   expect(effects).toHaveLength(2);
   expect(effects[0]!.useId).toBe(effects[1]!.useId);

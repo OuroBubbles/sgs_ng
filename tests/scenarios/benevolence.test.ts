@@ -26,6 +26,9 @@ import {
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -58,7 +61,7 @@ async function cancel(game: Game) {
 }
 async function wound(game: Game, player = 'a', hp = 2) {
   await game.room.run('wound', (ctx) =>
-    ctx.commit('test.hp', [{ kind: 'vitality', player, hp }], null),
+    ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
   );
 }
 function replay(game: Game) {
@@ -165,7 +168,7 @@ it('仁德满体力跨过两张也消耗首次门槛，随后受伤再给牌不�
   const running = game.room.run('phase', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
       await act(at, game, phase, 'standard:rende');
-      at.commit('test.hp', [{ kind: 'vitality', player: 'a', hp: 2 }], null);
+      at.commit(testTiming('test.hp'), [{ kind: 'vitality', player: 'a', hp: 2 }], null);
       await act(at, game, phase, 'standard:rende');
     }),
   );
@@ -192,7 +195,7 @@ it('仁德取消不付费，装备/他人牌/自己目标均非法；重新选�
   await cancel(game);
   await answer(game, { cards: ['one', 'two'], targets: ['b'] });
   await running;
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.player('a').hp).toBe(3);
 });
 it('仁德计数不因支付后失去并重获技能重置，重复出牌阶段各有独立门槛', async () => {
@@ -363,8 +366,8 @@ it.each(['hand', 'equipment'] as const)(
     await running;
     expect(game.room.world.player('b').hp).toBe(1);
     expect(game.room.world.player('b').alive).toBe(true);
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
-    expect(game.room.history.facts('card.responded')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
     expect(game.room.world.position('red')).toBe('discard');
     replay(game);
   },
@@ -468,8 +471,8 @@ it('激将由蜀角色打出、刘备使用：两种归属各一次，实际材�
   await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
   await running;
   expect(played).toBe(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   expect(game.room.world.player('b').hp).toBe(3);
   replay(game);
 });
@@ -520,7 +523,7 @@ it('激将第一人放弃后询问下一人，只有实际供牌者支付', asyn
   await answer(game, { kind: 'physical', card: 'last' }, 'card-response');
   await running;
   expect(game.room.world.position('first')).toBe('c:hand');
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
 });
 it('激将失败不消耗用杀次数，本阶段隐藏该用牌配方；下一阶段自动恢复', async () => {
   const { game } = await setupJijiang();
@@ -544,7 +547,7 @@ it('激将失败不消耗用杀次数，本阶段隐藏该用牌配方；下一�
     }),
   );
   await running;
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   expect(game.room.world.snapshot.states.some((s) => s.key === 'standard:jijiang-failed')).toBe(
     false,
   );
@@ -564,9 +567,9 @@ it('激将普通打出请求走已有委托，不伪造刘备第二次用牌或�
   await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
   await running;
   expect(game.room.world.player('a').hp).toBe(4);
-  expect(game.room.history.facts('response.delegated')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   replay(game);
 });
 it('激将以实际供牌牌面重新检查目标禁令，失败不宣告刘备用牌、不追回供牌费用', async () => {
@@ -583,7 +586,7 @@ it('激将以实际供牌牌面重新检查目标禁令，失败不宣告刘备�
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('red')).toBe('discard');
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   replay(game);
 });
 it.each(['moved', 'donor-dead', 'lord-dead'] as const)(
@@ -617,8 +620,8 @@ it.each(['moved', 'donor-dead', 'lord-dead'] as const)(
     await answer(game, { kind: 'physical', card: 'first' }, 'card-response');
     await running;
     expect(game.room.world.position('next')).toBe('d:hand');
-    expect(game.room.history.facts('card.responded')).toHaveLength(1);
-    expect(game.room.history.facts('card.used')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.used)).toEqual([]);
     replay(game);
   },
 );
@@ -718,7 +721,7 @@ it('本人出牌阶段激将打出失败后仍可自己响应，但本阶段不�
   await answer(game, true, 'invoke');
   await answer(game, { kind: 'physical', card: 'own' }, 'card-response');
   await running;
-  expect(game.room.history.facts('card.responded')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(2);
   expect(game.room.world.player('b').hp).toBe(3);
   replay(game);
 });
@@ -729,7 +732,7 @@ it('刘备、华佗八人标准局以基础 AI 走过供牌与治疗，最终正
 
   expect(
     match.room.history
-      .facts('card.used')
+      .facts(CardEvent.used)
       .some(
         (f) =>
           (f.data.detail as { declaration: { card: { source: { reason?: string } | null } } })

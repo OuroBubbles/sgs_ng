@@ -31,6 +31,9 @@ import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
+import { Attack } from '../../src/sdk';
+import { Cost } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'fire' } as const;
@@ -40,7 +43,7 @@ async function link(game: Game, players = ['b', 'c', 'd']) {
   });
 }
 function results(game: Game) {
-  return game.room.history.facts('damage.dealt').map((fact) => fact.data.detail as DamageResult);
+  return game.room.history.facts(Damage.dealt).map((fact) => fact.data.detail);
 }
 function rebuilt(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -67,7 +70,7 @@ it('连环是公开权威状态，实际变化才提交并开放只读窗口', a
     expect((await setChained(ctx, 'b', false, 'reset')).kind).toBe('changed');
   });
   expect(changed).toEqual([true, false]);
-  expect(game.room.history.facts('chain.changed')).toHaveLength(2);
+  expect(game.room.history.facts(Chain.changed)).toHaveLength(2);
   rebuilt(game);
 });
 
@@ -185,7 +188,7 @@ it('传播中的防止只影响该名角色，它保留连环，后续角色继�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(results(game).map((result) => result.input.to)).toEqual(['b', 'd']);
   expect(isChained(game.room.world, 'c')).toBe(true);
-  expect(game.room.history.facts('damage.prevented')).toHaveLength(1);
+  expect(game.room.history.facts(Damage.prevented)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -300,7 +303,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
     },
   });
   await game.room.run('hit', async (ctx) => {
-    ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+    ctx.commit(testTiming('setup.hp'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
     await damage(ctx, hit);
   });
   expect(order).toEqual(['dying', 'saved', 'c', 'd']);
@@ -365,7 +368,7 @@ it('起点死亡不丢失已提交的传播计划，死亡善后结束后才继�
   const game = cardGame();
   await link(game);
   await game.room.run('hit', async (ctx) => {
-    ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+    ctx.commit(testTiming('setup.hp'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
     await damage(ctx, hit);
   });
   expect(game.room.world.player('b').alive).toBe(false);
@@ -592,11 +595,10 @@ it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连�
   expect(match.room.world.snapshot.players.map((player) => player.hp)).toEqual(
     before.map((hp) => hp - 1),
   );
-  expect(
-    match.room.history
-      .facts('damage.dealt')
-      .map((fact) => (fact.data.detail as DamageResult).input.to),
-  ).toEqual(['乙席', '甲席']);
+  expect(match.room.history.facts(Damage.dealt).map((fact) => fact.data.detail.input.to)).toEqual([
+    '乙席',
+    '甲席',
+  ]);
   for (const id of ['chain-card-7', 'chain-card-19'])
     expect(match.room.world.position(id)).toBe('discard');
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
@@ -616,11 +618,11 @@ it.each([4, 17])(
       content,
     });
     await playMatch(match, { steps: 15000, decisions: 2400 });
-    expect(match.room.history.facts('chain.changed').length).toBeGreaterThan(0);
+    expect(match.room.history.facts(Chain.changed).length).toBeGreaterThan(0);
     expect(
       match.room.history
-        .facts('damage.dealt')
-        .some((fact) => (fact.data.detail as DamageResult).input.origin?.kind === 'chain'),
+        .facts(Damage.dealt)
+        .some((fact) => fact.data.detail.input.origin?.kind === 'chain'),
     ).toBe(true);
     expect(match.initial.cards).toHaveLength(48);
   },
@@ -685,7 +687,7 @@ it.each(['workshop:ice', '', '  '])(
       if (built.ok) expect(built.value.nature).toBe(nature);
     });
     expect(game.room.world.position('slash1')).toBe('a:hand');
-    expect(game.room.history.facts('cost.paid')).toEqual([]);
+    expect(game.room.history.facts(Cost.paid)).toEqual([]);
     rebuilt(game);
   },
 );
@@ -733,7 +735,7 @@ it('自定义属性攻击复用完整闪/突破流程，仅用普通伤害函数
   );
   expect(results(game).map((result) => result.amount)).toEqual([1, 1]);
   expect(results(game).every((result) => result.input.nature === 'workshop:ice')).toBe(true);
-  expect(game.room.history.facts('attack.finished')).toHaveLength(1);
+  expect(game.room.history.facts(Attack.finished)).toHaveLength(1);
   expect(game.room.world.position('ice')).toBe('discard');
   rebuilt(game);
 });

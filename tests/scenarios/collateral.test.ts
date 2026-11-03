@@ -17,6 +17,9 @@ import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Collateral } from '../../src/content/standard/collateral';
+import { Equipment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const intent = (parameters: unknown = { victim: 'c' }): UseIntent => ({
@@ -67,7 +70,7 @@ it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随�
     kind: 'play-action',
   });
   expect(game.room.world.position('borrow')).toBe('a:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   expect(
     game.room.decisions.submit(request.id, request.token, {
       choice: intent().choice,
@@ -82,17 +85,17 @@ it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随�
     kind: 'use-card',
     data: { targets: ['c'], timing: 'effect' },
   });
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   await answer(game, { kind: 'physical', card: 's0' });
   expect((await running).kind).toBe('resolved');
-  expect(game.room.history.facts('card.finished')[1]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.finished)[1]?.data.detail).toMatchObject({
     parameters: { victim: 'c' },
     effects: [{ target: 'b' }],
   });
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
@@ -106,7 +109,7 @@ it('取消附属选择不支付、不开放反制，且没有遗留处理区', a
   expect(game.room.decisions.cancel(request.id, request.token).kind).toBe('accepted');
   expect(await running).toMatchObject({ value: { kind: 'cancelled' } });
   expect(game.room.world.position('borrow')).toBe('a:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
 });
 
@@ -120,7 +123,7 @@ it('没有杀自动获得武器；选择拒绝用杀时同样获得，装备能�
     }
     await running;
     expect(game.room.world.position('weapon')).toBe('a:hand');
-    expect(game.room.history.facts('collateral.weapon-taken')).toHaveLength(1);
+    expect(game.room.history.facts(Collateral.weaponTaken)).toHaveLength(1);
     expect(
       game.skills.bindings(game.room.world).some(({ self }) => self.origin?.id === 'weapon'),
     ).toBe(false);
@@ -134,7 +137,7 @@ it.each([null, {}, { victim: 'b' }, { victim: 'd' }, { victim: 'unknown' }])(
     const game = create();
     expect(await use(game, intent(parameters))).toMatchObject({ value: { kind: 'unavailable' } });
     expect(game.room.world.position('borrow')).toBe('a:hand');
-    expect(game.room.history.facts('card.used')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   },
 );
 
@@ -183,8 +186,8 @@ it('杀被仁王盾抵消仍已履行用杀，不再交武器', async () => {
   await running;
   expect(game.room.world.player('c').hp).toBe(4);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
-  expect(game.room.history.facts('equipment.blocked')).toHaveLength(1);
-  expect(game.room.history.facts('collateral.weapon-taken')).toHaveLength(0);
+  expect(game.room.history.facts(Equipment.blocked)).toHaveLength(1);
+  expect(game.room.history.facts(Collateral.weaponTaken)).toHaveLength(0);
 });
 
 it('被要求的杀可用转换配方，仍是用牌而非打出响应', async () => {
@@ -209,7 +212,7 @@ it('被要求的杀可用转换配方，仍是用牌而非打出响应', async (
   await running;
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('red')).toBe('discard');
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
 });
 
 it('借刀额外用杀不受出牌阶段限次影响，也不消耗新的阶段次数', async () => {
@@ -262,7 +265,7 @@ it.each([false, true])('拒绝用杀时只取结算当前的武器：替换 %s',
   await use(game, intent());
   expect(game.room.world.position('weapon')).toBe(replace ? 'discard' : 'd:hand');
   if (replace) expect(game.room.world.position('new')).toBe('a:hand');
-  else expect(game.room.history.facts('collateral.weapon-taken')).toHaveLength(0);
+  else expect(game.room.history.facts(Collateral.weaponTaken)).toHaveLength(0);
 });
 
 it('持武器者死亡则跳过；受害者死亡导致无法出杀时执行交武器分支', async () => {
@@ -271,7 +274,7 @@ it('持武器者死亡则跳过；受害者死亡导致无法出杀时执行交�
     killPlayer(game, target);
     await use(game, intent());
     expect(game.room.world.position('weapon')).toBe(target === 'b' ? 'discard' : 'a:hand');
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   }
 });
 
@@ -298,7 +301,7 @@ it('无懈只反制持武器者上的借刀效果，不向附属目标再开一�
     value: { use: { effects: [{ target: 'b', state: 'cancelled' }] } },
   });
   expect(game.room.world.position('weapon')).toBe('b:equipment');
-  expect(game.room.history.facts('collateral.weapon-taken')).toHaveLength(0);
+  expect(game.room.history.facts(Collateral.weaponTaken)).toHaveLength(0);
 });
 
 it('转移、重复与追加持械者保留同一受害者，各自完整用杀', async () => {

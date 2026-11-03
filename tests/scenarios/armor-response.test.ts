@@ -18,6 +18,9 @@ import { eightDiagram } from '../../src/content/standard/armor';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Equipment } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const slash = (id = 'slash1', actor = 'a', target = 'b'): UseIntent => ({
@@ -57,9 +60,9 @@ it('八卦阵无手牌也能判定供闪，抵消杀时零材料走一次使用�
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('armor')).toBe('b:equipment');
   expect(game.room.world.zone('discard').cards).toEqual(['red', 'slash1']);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(finished).toBe(1);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -75,9 +78,9 @@ it.each([false, true])('八卦不发动或黑判后回到普通闪选择：发�
   await answer(game, { kind: 'physical', card: 'jink' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('judgment.finished')).toHaveLength(invoke ? 1 : 0);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(Judgment.finished)).toHaveLength(invoke ? 1 : 0);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
 });
 
 it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过最终供牌验证', async () => {
@@ -88,7 +91,7 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
   });
   await use(before, slash());
   expect(before.room.world.player('b').hp).toBe(3);
-  expect(before.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(before.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(before.room.world.position('red')).toBe('draw');
   let prohibited = false;
   const after = cardGame({
@@ -107,8 +110,8 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
   const running = use(after, slash());
   await answer(after, true);
   await running;
-  expect(after.room.history.facts('skill.invoked')).toHaveLength(1);
-  expect(after.room.history.facts('card.responded')).toHaveLength(0);
+  expect(after.room.history.facts(Skill.invoked)).toHaveLength(1);
+  expect(after.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(after.room.world.player('b').hp).toBe(3);
 });
 
@@ -132,7 +135,7 @@ it('八卦已经发动，判定期间失去防具不撤销本次技能；以后�
   expect(game.room.world.player('b').hp).toBe(4);
   await use(game, slash('slash2'));
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
 });
 
 it('装备失效生存期关闭后恢复；多闪需求分别打开机会，不把一次判定算作两闪', async () => {
@@ -152,8 +155,8 @@ it('装备失效生存期关闭后恢复；多闪需求分别打开机会，不�
   await answer(game, false);
   await running;
   expect(game.room.world.player('b').hp).toBe(2);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(3);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(3);
 });
 
 it.each(['spade', 'heart'] as const)('仁王盾按语义颜色防杀：%s', async (suit) => {
@@ -196,7 +199,7 @@ it.each(['nioh_shield', 'eight_diagram'])(
       },
     });
     expect(game.room.world.player('b').hp).toBe(3);
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
     expect(game.room.world.position('red')).toBe('draw');
     if (name === 'nioh_shield') {
       await use(game, slash('slash2'));
@@ -230,7 +233,7 @@ it('青釭剑不污染同一目标上的嵌套杀；效果快照关闭后不能�
   });
   await use(game, slash());
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('equipment.blocked')).toHaveLength(1);
+  expect(game.room.history.facts(Equipment.blocked)).toHaveLength(1);
   await game.room.run('late', (ctx) => {
     expect(() => liveEffect!.ignoreEquipment(ctx, 'armor', 'late')).toThrow();
   });
@@ -302,8 +305,8 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
   });
   await use(game, slash());
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(reentered).toBe(1);
   await game.room.run('expired', async (ctx) => {
     expect(request.available(ctx)).toBe(false);
@@ -340,10 +343,10 @@ it('跨角色委托只由实际供牌者支付，原受益者和 responseFinishe
   expect(responders).toEqual(['c']);
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('donor')).toBe('discard');
-  expect(game.room.history.facts('card.responded')).toMatchObject([
+  expect(game.room.history.facts(CardEvent.responded)).toMatchObject([
     { data: { detail: { actor: 'c', declaration: { beneficiary: 'b' } } } },
   ]);
-  expect(game.room.history.facts('response.delegated')).toHaveLength(1);
+  expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
 });
 
 it('规则供牌入口不变成玩家伪造 generated 回复的入口，活跃请求也拒绝外部 World', async () => {
@@ -366,9 +369,9 @@ it('规则供牌入口不变成玩家伪造 generated 回复的入口，活跃�
   expect(game.room.world.position('j')).toBe('b:hand');
   await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await running;
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(foreign.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(foreign.room.history.facts(CardEvent.responded)).toHaveLength(0);
 });
 
 it('青釭剑作用于目标防具，受委托队友仍可发动自己的八卦阵', async () => {
@@ -390,7 +393,7 @@ it('青釭剑作用于目标防具，受委托队友仍可发动自己的八卦�
   game.room.decisions.submit(pending.id, pending.token, true);
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toMatchObject([
+  expect(game.room.history.facts(CardEvent.responded)).toMatchObject([
     { data: { detail: { actor: 'c' } } },
   ]);
 });
@@ -410,7 +413,7 @@ it('委托环被有界拒绝，失败委托仍可回退原角色供牌', async (
   const running = use(game, slash());
   await answer(game, { kind: 'physical', card: 'own' }, 'card-response');
   await running;
-  expect(game.room.history.facts('response.requested')).toHaveLength(2);
+  expect(game.room.history.facts(Response.requested)).toHaveLength(2);
   expect(game.room.world.player('b').hp).toBe(4);
 });
 
@@ -441,8 +444,8 @@ it('原受益者在队友支付后死亡，已打出事实保留，父请求不�
   await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
   await running;
   expect(game.room.world.player('b').alive).toBe(false);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('response.delegated')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(Response.delegated)).toHaveLength(0);
 });
 
 it('同一窗口可选择技能顺序，供牌后其余候选失效；选择说明使用可读名称', async () => {
@@ -480,7 +483,7 @@ it('同一窗口可选择技能顺序，供牌后其余候选失效；选择说�
   );
   await running;
   expect(game.room.world.position('red')).toBe('draw');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
 });
 
 it('复用防具代码的普通角色技能不被误当成实际装备来源', async () => {

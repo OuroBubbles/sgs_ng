@@ -20,6 +20,9 @@ import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { Weapon } from '../../src/content/standard/weapons';
 
 type Game = ReturnType<typeof cardGame>;
 const strike: UseIntent = {
@@ -133,7 +136,7 @@ it('雌雄由来源确认目标发动，对方只可交手牌，弃置后仍执�
   expect(game.room.world.position('b0')).toBe('discard');
   expect(game.room.world.position('top0')).toBe('draw');
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
 });
 
 it.each([0, 1])('雌雄无手牌或拒绝弃手牌时来源摸一张：手牌 %s', async (count) => {
@@ -163,7 +166,7 @@ it('雌雄不发动或不构成异性时没有弃牌/摸牌分支', async () => 
     await running;
     expect(game.room.world.position('b0')).toBe('b:hand');
     expect(game.room.world.position('top0')).toBe('draw');
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
   }
 });
 
@@ -177,7 +180,7 @@ it('目标确认前被取消，不再发动后续的雌雄剑指定后技能', a
     run: (ctx, { effect }) => effect.cancel(ctx, 'probe'),
   });
   await use(game, strike);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(game.room.world.position('top0')).toBe('draw');
   expect(game.room.world.player('b').hp).toBe(4);
 });
@@ -260,7 +263,7 @@ it('重复目标各自指定与发动；确认前改变性别使用当前属性'
     run: (ctx) => setGender(ctx, 'b', 'male'),
   });
   await use(changed, strike);
-  expect(changed.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(changed.room.history.facts(Skill.invoked)).toHaveLength(0);
 });
 
 it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标伤害处理', async () => {
@@ -297,12 +300,12 @@ it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标�
     purpose: 'owned-card',
     reason: 'standard:ice_sword-ability',
   });
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.decisions.submit(request.id, request.token, true)).toMatchObject({
     kind: 'rejected',
     reason: 'invalid',
   });
-  expect(game.room.history.facts('weapon.damage-replaced')).toEqual([]);
+  expect(game.room.history.facts(Weapon.damageReplaced)).toEqual([]);
   await chooseFirst(game);
   expect((await nextRequest(game.room)).optional).toBe(false);
   await chooseFirst(game);
@@ -311,9 +314,9 @@ it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标�
   expect(receiving).toBe(0);
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-  expect(game.room.history.facts('damage.dealt')).toHaveLength(0);
-  expect(game.room.history.facts('damage.prevented')).toMatchObject([
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+  expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
+  expect(game.room.history.facts(Damage.prevented)).toMatchObject([
     {
       data: { detail: { sourceSnapshot: { amount: 3 }, prevention: 'standard:ice_sword-ability' } },
     },
@@ -329,7 +332,7 @@ it.each([0, 1])('寒冰目标无牌不发动，只有一张则只弃一张：%s'
   }
   await running;
   expect(game.room.world.player('b').hp).toBe(count ? 4 : 3);
-  expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(count);
+  expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(count);
 });
 
 it('寒冰不发动则正常伤害，不触碰目标手牌', async () => {
@@ -341,8 +344,8 @@ it('寒冰不发动则正常伤害，不触碰目标手牌', async () => {
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.zone('b:hand').cards).toHaveLength(2);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
-  expect(game.room.history.facts('card.chosen')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
+  expect(game.room.history.facts(CardEvent.chosen)).toEqual([]);
 });
 
 it('寒冰第二次重新生成选项，包括第一次移牌后效获得的新牌', async () => {
@@ -413,10 +416,8 @@ it.each(['weapon', 'source', 'target'])(
     await chooseFirst(game);
     if (lost === 'weapon') await chooseFirst(game);
     await running;
-    expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(
-      lost === 'weapon' ? 2 : 1,
-    );
-    expect(game.room.history.facts('damage.dealt')).toHaveLength(0);
+    expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(lost === 'weapon' ? 2 : 1);
+    expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
   },
 );
 
@@ -463,10 +464,10 @@ it('寒冰发动支付后出现其他防止时不覆盖原因，也不继续弃�
   const running = use(game, strike);
   await chooseFirst(game);
   await running;
-  expect(game.room.history.facts('damage.prevented')).toMatchObject([
+  expect(game.room.history.facts(Damage.prevented)).toMatchObject([
     { data: { detail: { prevention: 'other' } } },
   ]);
-  expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(0);
+  expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(0);
 });
 
 it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已宣告弃牌', async () => {
@@ -510,12 +511,10 @@ it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已�
     const running = use(game, strike);
     await chooseFirst(game);
     await running;
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-    expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(
-      branch === 'weapon' ? 1 : 0,
-    );
-    expect(game.room.history.facts('damage.dealt')).toEqual([]);
-    expect(game.room.history.facts('damage.prevented')).toHaveLength(1);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+    expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(branch === 'weapon' ? 1 : 0);
+    expect(game.room.history.facts(Damage.dealt)).toEqual([]);
+    expect(game.room.history.facts(Damage.prevented)).toHaveLength(1);
     expect(game.room.world.player('b').hp).toBe(4);
     expect(game.room.decisions.pending).toEqual([]);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);

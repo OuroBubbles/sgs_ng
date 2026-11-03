@@ -163,10 +163,10 @@ it('历史按显式阶段作用域包含后代操作，不靠父事件层数猜�
       [{ cards: ['a2'], from: 'a:hand', to: 'discard', place: 'bottom' }],
       'outside phase',
     );
-    expect(ctx.history.facts('cards.moved', phaseId)).toHaveLength(1);
-    expect(ctx.history.facts('cards.moved')).toHaveLength(2);
+    expect(ctx.history.facts(Cards.moved, phaseId)).toHaveLength(1);
+    expect(ctx.history.facts(Cards.moved)).toHaveLength(2);
   });
-  expect(game.history.facts('cards.moved', phaseId)[0]?.scopeId).not.toBe(phaseId);
+  expect(game.history.facts(Cards.moved, phaseId)[0]?.scopeId).not.toBe(phaseId);
 });
 
 it('处理区创建、取得材料和善后可由提交事实重建，乱序或遗漏事实被拒绝', async () => {

@@ -9,6 +9,9 @@ import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
 import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
+import { Draw } from '../../src/rules/cards/draw';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const source = { kind: 'general', id: 'test' } as const;
 const top = [
@@ -52,8 +55,8 @@ it('分筹可拒绝，未看牌、未宣告发动，也不改变牌序', async (
   const running = prepare(game);
   await answer(game, false);
   await running;
-  expect(game.room.history.facts('cards.peeked')).toHaveLength(0);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
+  expect(game.room.history.facts(Cards.peeked)).toHaveLength(0);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(game.room.world.zone('draw').cards).toEqual(top.map((card) => card.id));
   replay(game);
 });
@@ -62,7 +65,7 @@ it('红牌接收条件与每人额度共用最终校验，全部分配同次提�
   const game = create();
   await grant(game);
   await game.room.run('wound', (ctx) =>
-    ctx.commit('wound', [{ kind: 'vitality', player: 'b', hp: 2 }], {}),
+    ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'b', hp: 2 }], {}),
   );
   let observed = 0;
   game.room.on(Cards.moved, {
@@ -105,13 +108,13 @@ it('红牌接收条件与每人额度共用最终校验，全部分配同次提�
   expect(game.room.decisions.submit(request.id, request.token, invalid)).toMatchObject({
     reason: 'invalid',
   });
-  expect(game.room.history.facts('cards.distributed')).toHaveLength(0);
+  expect(game.room.history.facts(Cards.distributed)).toHaveLength(0);
   expect(game.room.decisions.preview(request.id, valid)?.valid).toBe(true);
   await answer(game, valid);
   await running;
   expect(observed).toBe(1);
-  expect(game.room.history.facts('cards.distributed')).toHaveLength(1);
-  expect(game.room.history.facts('draw.completed')).toHaveLength(0);
+  expect(game.room.history.facts(Cards.distributed)).toHaveLength(1);
+  expect(game.room.history.facts(Draw.completed)).toHaveLength(0);
   replay(game);
 });
 
@@ -168,9 +171,9 @@ it.each(['dead', 'finished'] as const)(
     const running = prepare(game);
     await answer(game, true);
     await running;
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-    expect(game.room.history.facts('cards.peeked')).toHaveLength(0);
-    expect(game.room.history.facts('cards.distributed')).toHaveLength(0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+    expect(game.room.history.facts(Cards.peeked)).toHaveLength(0);
+    expect(game.room.history.facts(Cards.distributed)).toHaveLength(0);
     replay(game);
   },
 );
@@ -224,7 +227,7 @@ it.each([4, 17])(
       }
     });
     expect(assignments).toBeGreaterThan(0);
-    expect(match.room.history.facts('cards.distributed').length).toBeGreaterThan(0);
+    expect(match.room.history.facts(Cards.distributed).length).toBeGreaterThan(0);
   },
   30_000,
 );

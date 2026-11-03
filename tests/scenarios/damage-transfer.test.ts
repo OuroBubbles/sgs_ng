@@ -13,13 +13,20 @@ import {
   Damage,
   Cost,
 } from '../../src/sdk';
-import type { DamageDraft, DamageResult, DamageTransferIntent, Context } from '../../src/sdk';
+import type {
+  DamageDraft,
+  DamageResult,
+  DamageTransferIntent,
+  Context,
+  Timing,
+} from '../../src/sdk';
 import { cardGame, card } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'normal' } as const;
-const facts = (game: Game, kind = 'damage.dealt') =>
+const facts = (game: Game, kind: Timing<unknown, unknown> = Damage.dealt) =>
   game.room.history.facts(kind).map((fact) => fact.data.detail as DamageResult);
 function rebuilt(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -120,7 +127,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
   expect(parent.transfer).toEqual({ to: 'c', reason: 'redirect', damage: child.id });
   expect(shieldOf(game.room.world, 'b')).toBe(3);
   expect(game.room.world.player('c').hp).toBe(2);
-  expect(facts(game, 'damage.transferred')).toEqual([parent]);
+  expect(facts(game, Damage.transferred)).toEqual([parent]);
   rebuilt(game);
 });
 
@@ -150,7 +157,7 @@ it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', asy
   expect(sourceCalls).toBe(1);
   expect(facts(game)).toHaveLength(1);
   expect(facts(game)[0]!.input.to).toBe('b');
-  expect(facts(game, 'damage.transferred')).toHaveLength(2);
+  expect(facts(game, Damage.transferred)).toHaveLength(2);
   rebuilt(game);
 });
 
@@ -158,7 +165,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
   const game = cardGame();
   if (kind === 'dead')
     await game.room.run('setup', (ctx) => {
-      ctx.commit('death', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
+      ctx.commit(testTiming('death'), [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
     });
   game.room.on(Damage.inflicting, {
     id: 'invalid',
@@ -176,7 +183,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(facts(game)[0]!.input.to).toBe('b');
-  expect(game.room.history.facts('damage.transferring')).toHaveLength(0);
+  expect(game.room.history.facts(Damage.transferring)).toHaveLength(0);
   rebuilt(game);
 });
 
@@ -190,7 +197,12 @@ it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消
     run(ctx, draft) {
       if (kind === 'prevent') draft.prevent('defense');
       else if (kind === 'zero') draft.setAmount(0, 'defense');
-      else ctx.commit('death', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
+      else
+        ctx.commit(
+          testTiming('death'),
+          [{ kind: 'vitality', player: 'c', hp: 0, alive: false }],
+          {},
+        );
     },
   });
   let result!: DamageResult;
@@ -203,7 +215,7 @@ it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消
   expect(
     facts(
       game,
-      `damage.${kind === 'prevent' ? 'prevented' : kind === 'die' ? 'unavailable' : 'zero'}`,
+      kind === 'prevent' ? Damage.prevented : kind === 'die' ? Damage.unavailable : Damage.zero,
     ),
   ).toHaveLength(1);
   rebuilt(game);
@@ -225,7 +237,11 @@ it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防�
     eligible: () => true,
     run(ctx, draft) {
       expect(draft.input.to).toBe('c');
-      ctx.commit('source.dies', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(
+        testTiming('source.dies'),
+        [{ kind: 'vitality', player: 'a', hp: 0, alive: false }],
+        {},
+      );
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -244,10 +260,10 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
     eligible: (_ctx, event) => event.moves.some((move) => move.cards.includes('fee')),
     run(ctx) {
       expect(draft.pending).toBe(false);
-      expect(ctx.history.facts('damage.transferring')).toHaveLength(1);
+      expect(ctx.history.facts(Damage.transferring)).toHaveLength(1);
       expect(ctx.world.position('fee')).toBe('discard');
       ctx.commit(
-        'cost.death',
+        testTiming('cost.death'),
         [{ kind: 'vitality', player: kind === 'receiver' ? 'c' : 'b', hp: 0, alive: false }],
         {},
       );
@@ -281,8 +297,8 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(game.room.world.position('fee')).toBe('discard');
   expect(game.room.world.player('c').hp).toBe(kind === 'receiver' ? 0 : 2);
-  expect(facts(game, 'damage.transferred')[0]!.hpLoss).toBe(0);
-  expect(JSON.stringify(game.room.history.facts('cost.paid'))).toContain('"target":"c"');
+  expect(facts(game, Damage.transferred)[0]!.hpLoss).toBe(0);
+  expect(JSON.stringify(game.room.history.facts(Cost.paid))).toContain('"target":"c"');
   rebuilt(game);
 });
 
@@ -326,7 +342,11 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
       async run(ctx, draft) {
         const intent = draft.prepareTransfer(ctx, 'c', 'relay');
         if (kind === 'recipient-dies')
-          ctx.commit('death', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
+          ctx.commit(
+            testTiming('death'),
+            [{ kind: 'vitality', player: 'c', hp: 0, alive: false }],
+            {},
+          );
         if (kind === 'prevented') draft.prevent('other');
         const paid = await pay(ctx, {
           actor: 'b',
@@ -345,7 +365,7 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
     await game.room.run('hit', (ctx) => damage(ctx, hit));
     expect(game.room.world.position('fee')).toBe('b:hand');
     expect(game.room.world.player('b').hp).toBe(kind === 'prevented' ? 4 : 2);
-    expect(game.room.history.facts('damage.transferring')).toEqual([]);
+    expect(game.room.history.facts(Damage.transferring)).toEqual([]);
     rebuilt(game);
   },
 );
@@ -384,7 +404,7 @@ it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭�
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(facts(game)[0]).toMatchObject({ amount: 1, sourceSnapshot: { amount: 2 } });
-  expect(game.room.history.facts('damage.transferring')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Damage.transferring)[0]!.data.detail).toMatchObject({
     amount: 1,
   });
   rebuilt(game);

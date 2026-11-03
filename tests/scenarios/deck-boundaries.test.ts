@@ -12,6 +12,10 @@ import {
 import type { Context, DrawDraft } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
+import { CardEvent } from '../../src/sdk';
+import { Deck } from '../../src/rules/cards/draw';
+import { Draw } from '../../src/rules/cards/draw';
+import { Judgment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished';
@@ -76,8 +80,8 @@ it.each(['dead', 'finished'] as const)(
     });
     expect(game.room.world.zone('a:hand').cards).toEqual([]);
     expect(game.room.world.zone('draw').cards).toHaveLength(3);
-    expect(game.room.history.facts('deck.reshuffled')).toHaveLength(1);
-    expect(game.room.history.facts('draw.completed')).toHaveLength(0);
+    expect(game.room.history.facts(Deck.reshuffled)).toHaveLength(1);
+    expect(game.room.history.facts(Draw.completed)).toHaveLength(0);
     expect(completed).toBe(0);
     conserved(game);
   },
@@ -104,8 +108,8 @@ it.each(['dead', 'finished'] as const)(
       });
     });
     expect(windows).toBe(0);
-    expect(game.room.history.facts('deck.reshuffled')).toHaveLength(0);
-    expect(game.room.history.facts('draw.completed')).toHaveLength(0);
+    expect(game.room.history.facts(Deck.reshuffled)).toHaveLength(0);
+    expect(game.room.history.facts(Draw.completed)).toHaveLength(0);
     conserved(game);
   },
 );
@@ -141,7 +145,7 @@ it.each(['dead', 'finished'] as const)(
       });
     });
     expect(later).toBe(false);
-    expect(game.room.history.facts('deck.reshuffled')).toHaveLength(0);
+    expect(game.room.history.facts(Deck.reshuffled)).toHaveLength(0);
     conserved(game);
   },
 );
@@ -159,7 +163,7 @@ it('洗牌后嵌套摸牌消耗牌顶，外层读取最新牌序与余量，不�
     expect([...result.cards].sort()).toEqual(['x', 'y']);
   });
   expect(game.room.world.zone('b:hand').cards).toEqual(['top']);
-  expect(game.room.history.facts('draw.completed')).toHaveLength(2);
+  expect(game.room.history.facts(Draw.completed)).toHaveLength(2);
   conserved(game);
 });
 
@@ -189,7 +193,7 @@ it.each(['dead', 'finished'] as const)(
         cards: ['top'],
       });
     });
-    expect(game.room.history.facts('draw.completed')).toHaveLength(1);
+    expect(game.room.history.facts(Draw.completed)).toHaveLength(1);
     expect(after).toBe(1);
     expect(game.room.world.position('top')).toBe(boundary === 'dead' ? 'discard' : 'a:hand');
     conserved(game);
@@ -244,7 +248,7 @@ it.each(['dead', 'finished'] as const)(
         matched: null,
       });
     });
-    expect(game.room.history.facts('judgment.revealed')).toHaveLength(0);
+    expect(game.room.history.facts(Judgment.revealed)).toHaveLength(0);
     expect(game.room.world.zone('draw').cards).toHaveLength(2);
     conserved(game);
   },
@@ -292,8 +296,8 @@ it.each(['dead', 'finished'] as const)(
     ).toMatchObject({ kind: 'resolved', value: { kind: 'used' } });
     expect(game.room.world.zone('a:hand').cards).toEqual([]);
     expect(game.room.world.position('spell')).toBe('discard');
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
-    expect(game.room.history.facts('draw.completed')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+    expect(game.room.history.facts(Draw.completed)).toHaveLength(0);
     expect(game.room.world.zone('draw').cards).toHaveLength(3);
     conserved(game);
   },

@@ -4,6 +4,12 @@ import type { DeepReadonly } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const StateEvent = defineEvent('state', {
+  changed: timing<unknown>(),
+});
 
 export interface StateKey<T> {
   readonly id: string;
@@ -76,7 +82,7 @@ export function setState<T>(
   target: StateTarget,
   value: T | DeepReadonly<T>,
 ): void {
-  ctx.commit('state.changed', [stateChange(ctx, key, target, value)], { key: key.id });
+  ctx.commit(StateEvent.changed, [stateChange(ctx, key, target, value)], { key: key.id });
 }
 
 export const useCount = defineState(

@@ -13,6 +13,8 @@ import type {
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const slash = { actor: 'a', targets: ['b'], timing: { kind: 'effect' } } as const;
 
@@ -311,7 +313,7 @@ it('自定义转换可同步拒绝或直接返回用牌 Promise，原方法与�
     },
   });
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   expect(game.room.world.snapshot.cards).toHaveLength(0);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -460,7 +462,7 @@ it('重复材料、错误参数、未知配方与错误拥有者均不支付', a
     { kind: 'viewAs', instance, recipe: 'missing', materials: ['peach'] },
   ] as const)
     expect(await use(game, { ...slash, choice })).toMatchObject({ value: { kind: 'unavailable' } });
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   expect(game.room.world.zone('a:hand').cards).toContain('peach');
 });
 
@@ -541,8 +543,8 @@ it('零材料配方也可响应，同一个目标效果保存完整关联', asyn
   });
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
 });
 
 it('处理区材料可被子用牌借走，子结算结束后父善后不会重复处理', async () => {
@@ -571,7 +573,7 @@ it('处理区材料可被子用牌借走，子结算结束后父善后不会重�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.zone('discard').cards).toEqual(['slash1']);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
 });
 
 it('具名查询和计划修改均受纯查询守卫约束', async () => {
@@ -589,7 +591,7 @@ it('具名查询和计划修改均受纯查询守卫约束', async () => {
     use(game, { ...slash, choice: { kind: 'physical', card: 'slash1' } }),
   ).rejects.toThrow('Pure queries');
   expect(game.room.status).toBe('faulted');
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
 });
 
 it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
@@ -608,7 +610,11 @@ it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
     owner: 'a',
     eligible: (_ctx, event) => event.effect.target === 'b',
     run: (ctx) => {
-      ctx.commit('c.died', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
+      ctx.commit(
+        testTiming('c.died'),
+        [{ kind: 'vitality', player: 'c', hp: 0, alive: false }],
+        {},
+      );
     },
   });
   game.room.on(Resolve.starting, {

@@ -10,6 +10,7 @@ import { isGameOver } from '../game/end';
 import type { CardBook } from '../cards/book';
 import { Cards } from '../cards/move';
 import { defineEvent, timing } from '../../core/runtime/event';
+import type { Timing } from '../../core/runtime/event';
 
 export interface UsageLimit {
   readonly key: string;
@@ -39,7 +40,7 @@ export interface PaymentOptions {
   readonly declaration?: unknown;
   /** 待决规则意图：费用提交前重查，同步确定后才开放支付后效；不写入事实。 */
   readonly intent?: PaymentIntent;
-  readonly factKind?: string;
+  readonly factKind?: Timing<unknown, PaymentReceipt>;
   readonly materialAllowed?: (ctx: Context, card: string, zone: Zone) => boolean;
   /** 与费用同次提交的规则变更；其中的移动也纳入同一 cardsMoved 批次。 */
   readonly changes?: readonly Change[];
@@ -202,7 +203,7 @@ function performPayment(
         instance: skill?.id ?? null,
         declaration: spec.declaration ?? null,
       });
-      const fact = child.commit(spec.factKind ?? 'cost.paid', changes, receipt);
+      const fact = child.commit(spec.factKind ?? Cost.paid, changes, receipt);
       // 快照属于这次提交，不追随同步宣告或后续嵌套结算的另一次变更。
       const moved = moves.length
         ? immutable({

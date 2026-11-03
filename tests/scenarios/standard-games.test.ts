@@ -5,6 +5,9 @@ import { createOfflineMatch, defaultContent } from '../../src/app/offline/practi
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { generalOf, genderOf, kingdomOf, roleOf } from '../../src/sdk';
 import type { GameResult } from '../../src/sdk';
+import { CardEvent } from '../../src/sdk';
+import { Hp } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 interface GameEvidence {
   readonly general: string;
@@ -115,10 +118,10 @@ for (const [index, general] of generals.entries()) {
     if (general.id === 'standard:huanggai') {
       expect(
         match.room.history
-          .facts('skill.invoked')
+          .facts(Skill.invoked)
           .some((fact) => (fact.data.detail as { skill: string }).skill === 'standard:kurou'),
       ).toBe(true);
-      expect(match.room.history.facts('hp.lost').length).toBeGreaterThan(0);
+      expect(match.room.history.facts(Hp.lost).length).toBeGreaterThan(0);
     }
     evidence.push({
       general: general.id,
@@ -131,14 +134,14 @@ for (const [index, general] of generals.entries()) {
       invokedSkills: [
         ...new Set(
           match.room.history
-            .facts('skill.invoked')
+            .facts(Skill.invoked)
             .map((fact) => (fact.data.detail as { skill: string }).skill),
         ),
       ].sort(),
       usedCards: [
         ...new Set(
           match.room.history
-            .facts('card.used')
+            .facts(CardEvent.used)
             .map(
               (fact) =>
                 (fact.data.detail as { declaration: { card: { name: string } } }).declaration.card

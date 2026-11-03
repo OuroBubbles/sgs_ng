@@ -16,6 +16,9 @@ import type { CardDefinition } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { testTiming } from '../fixtures/timing';
 
 const automatic = (name: string) =>
   ({
@@ -55,7 +58,7 @@ it.each(['savage_assault', 'archery_attack'])(
       value: { use: { effects: [{ target: 'b' }, { target: 'd' }] } },
     });
     expect(game.room.world.snapshot.players.map((player) => player.hp)).toEqual([4, 4, 4, 3]);
-    expect(game.room.history.facts('card.used')[0]!.data.detail).toMatchObject({
+    expect(game.room.history.facts(CardEvent.used)[0]!.data.detail).toMatchObject({
       declaration: { targets: ['b', 'd'] },
     });
   },
@@ -128,7 +131,7 @@ it('桃园保留全部目标，未受伤者在效果前跳过，不提前消费�
   installCounterspells(game.room, game.book);
   await game.room.run('wounded', (ctx) => {
     ctx.commit(
-      'wounded',
+      testTiming('wounded'),
       [
         { kind: 'vitality', player: 'b', hp: 3 },
         { kind: 'vitality', player: 'd', hp: 1 },
@@ -173,8 +176,8 @@ it('五谷共享公开牌池，某目标被无懈后不取牌；余牌与用牌�
   await running;
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
   expect(game.room.world.zone('discard').cards).toEqual(['n', 'w', 'grace']);
-  expect(game.room.history.facts('draw.completed')).toEqual([]);
-  expect(game.room.history.facts('cards.revealed')).toHaveLength(1);
+  expect(game.room.history.facts(Draw.completed)).toEqual([]);
+  expect(game.room.history.facts(Cards.revealed)).toHaveLength(1);
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -253,7 +256,7 @@ it('顺手暗选不给出隐藏牌 ID/牌名，实体 ID 不能冒充选项，�
   });
   await running;
   expect(game.room.world.position('secret-b')).toBe('a:hand');
-  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail).toMatchObject({
     card: 'secret-b',
     open: false,
   });
@@ -276,7 +279,7 @@ it('顺手受距离限制，拆桥可选远处公开装备和判定牌，但不�
   });
   await game.room.run('zones', async (ctx) => {
     ctx.commit(
-      'zones',
+      testTiming('zones'),
       [
         {
           kind: 'createZone',
@@ -362,7 +365,11 @@ it('整牌本体不能遗漏或重复执行目标；发生作者错误时不回�
         count: { min: 1, max: 1 },
         target: () => true,
         resolve(ctx, { effect }) {
-          ctx.commit('probe:resolved', [{ kind: 'vitality', player: effect.target, hp: 3 }], null);
+          ctx.commit(
+            testTiming('probe:resolved'),
+            [{ kind: 'vitality', player: effect.target, hp: 3 }],
+            null,
+          );
         },
         async execute(ctx, { resolveTargets }) {
           if (!twice) return;
@@ -379,7 +386,7 @@ it('整牌本体不能遗漏或重复执行目标；发生作者错误时不回�
       twice ? 'once' : 'unresolved',
     );
     expect(game.room.status).toBe('faulted');
-    expect(game.room.history.facts('probe:resolved')).toHaveLength(twice ? 1 : 0);
+    expect(game.room.history.facts(testTiming('probe:resolved'))).toHaveLength(twice ? 1 : 0);
   }
 });
 
@@ -407,20 +414,20 @@ it('全部目标被取消仍须调度一次，保留每个效果的完成事实�
       owner: null,
       eligible: () => true,
       run(ctx, { effect }) {
-        ctx.commit('probe:finished', [], effect);
+        ctx.commit(testTiming('probe:finished'), [], effect);
       },
     });
     const running = use(game, { ...automatic('body'), targets: ['b'] });
     if (!dispatched) {
       await expect(running).rejects.toThrow('unresolved');
       expect(game.room.status).toBe('faulted');
-      expect(game.room.history.facts('card.effect')).toHaveLength(0);
+      expect(game.room.history.facts(CardEvent.effect)).toHaveLength(0);
     } else {
       expect(await running).toMatchObject({
         value: { kind: 'used', use: { effects: [{ target: 'b', state: 'cancelled' }] } },
       });
-      expect(game.room.history.facts('card.effect')).toHaveLength(1);
-      expect(game.room.history.facts('probe:finished')).toHaveLength(1);
+      expect(game.room.history.facts(CardEvent.effect)).toHaveLength(1);
+      expect(game.room.history.facts(testTiming('probe:finished'))).toHaveLength(1);
       expect(game.room.world.position('body')).toBe('discard');
     }
   }
@@ -463,7 +470,7 @@ it('作者转换可借用五谷公开牌池材料反制当前目标，两个处�
         materials(ctx) {
           const pools = new Set(
             ctx.history
-              .facts('cards.revealed')
+              .facts(Cards.revealed)
               .map((fact) => (fact.data.detail as { zone: string }).zone),
           );
           return ctx.world.snapshot.zones
@@ -514,7 +521,7 @@ it('扩展选择特殊私有区时默认仍暗选，选择与移动分离', asyn
   const game = cardGame({ hands: { a: [], b: [card('secret-special', 'peach')] } });
   await game.room.run('setup', async (ctx) => {
     ctx.commit(
-      'zone',
+      testTiming('zone'),
       [
         {
           kind: 'createZone',

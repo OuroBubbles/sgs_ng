@@ -25,6 +25,9 @@ import {
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { Skill } from '../../src/sdk';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -68,11 +71,11 @@ it.each([true, false])('集智普通锦囊接受=%s，在锦囊效果之前摸�
   await answer(game, accepted);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(accepted ? 3 : 2);
-  const draws = game.room.history.facts('draw.completed');
+  const draws = game.room.history.facts(Draw.completed);
   expect(draws.map((f) => (f.data.detail as { input: { reason: string } }).input.reason)).toEqual(
     accepted ? ['standard:jizhi', 'standard:ex_nihilo'] : ['standard:ex_nihilo'],
   );
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   replay(game);
 });
 it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as const)(
@@ -114,7 +117,7 @@ it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as 
       };
     await use(game, intent);
     expect(game.room.decisions.pending).toEqual([]);
-    expect(game.room.history.facts('skill.invoked')).toEqual([]);
+    expect(game.room.history.facts(Skill.invoked)).toEqual([]);
     replay(game);
   },
 );
@@ -240,8 +243,8 @@ it.each([0, 1, 2])('无双杀连续两闪，实际提供 %i 张', async (count) 
     await answer(game, { kind: 'physical', card: `j${i}` }, 'card-response');
   const result = await running;
   expect(game.room.world.player('b').hp).toBe(count === 2 ? 4 : 3);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(count + 1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(count + 1);
   expect(result).toMatchObject({
     value: {
       use: {
@@ -348,7 +351,7 @@ it('国色拒绝非方块和他人材料，不改变材料位置', async () => {
         },
       }),
     ).toMatchObject({ value: { kind: 'unavailable' } });
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   replay(game);
 });
 
@@ -393,7 +396,7 @@ it('流离费用与目标替换原子提交，忽略出杀者距离，保留杀�
       },
     },
   });
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   replay(game);
 });
 it.each(['weapon', 'horse'])(
@@ -439,7 +442,7 @@ it('流离不能给本人、出杀者、被禁止或已在本次杀内的目标'
   const running = use(game, physical('slash'));
   await cancel(game);
   await running;
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.world.position('fee')).toBe('b:hand');
   expect(game.room.world.player('b').hp).toBe(3);
   replay(game);
@@ -601,7 +604,7 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
   expect(useDeclarations(match.room.world)).toEqual([]);
   await match.room.run('later public history', (ctx) => {
     for (let i = 0; i < 110; i++)
-      ctx.commit('draw.completed', [], { input: { player: 'a' }, cards: [] });
+      ctx.commit(Draw.completed, [], { input: { player: 'a' }, cards: [] });
   });
   const later = projectMatch(match, 'a', null);
   expect(

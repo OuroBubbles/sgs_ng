@@ -15,6 +15,8 @@ import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
 import { lianying } from '../../src/content/standard/generals/luxun';
 import { nextRequest, room, worldSeed } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 it('技能支付只声明来源即可确定付款人，费用原因仍由调用者显式指定', async () => {
   const game = room();
@@ -63,7 +65,7 @@ it('技能支付只声明来源即可确定付款人，费用原因仍由调用�
       return pay(ctx, { actor: 'b', skill: self, reason: 'ambiguous' });
     }),
   ).rejects.toThrow('Payment requires exactly one actor or skill source.');
-  expect(invalid.history.facts('cost.paid')).toEqual([]);
+  expect(invalid.history.facts(Cost.paid)).toEqual([]);
   expect(rebuildWorld(worldSeed(), invalid.history.facts())).toEqual(invalid.world.snapshot);
 });
 
@@ -89,7 +91,7 @@ it('支付移牌包含接收区的提交前后快照，同步宣告的另一次�
         available: () => true,
         committed(at) {
           at.commit(
-            'separate.intent-move',
+            testTiming('separate.intent-move'),
             [{ kind: 'move', cards: ['b1'], from: 'b:hand', to: 'draw', place: 'bottom' }],
             null,
           );
@@ -100,8 +102,8 @@ it('支付移牌包含接收区的提交前后快照，同步宣告的另一次�
   expect(batches).toHaveLength(1);
   expect(batches[0]!.before.find((zone) => zone.id === 'b:hand')?.cards).toEqual(['b1']);
   expect(batches[0]!.after.find((zone) => zone.id === 'b:hand')?.cards).toEqual(['b1', 'a1']);
-  expect(game.history.facts('cost.paid')[0]!.seq).toBeLessThan(
-    game.history.facts('separate.intent-move')[0]!.seq,
+  expect(game.history.facts(Cost.paid)[0]!.seq).toBeLessThan(
+    game.history.facts(testTiming('separate.intent-move'))[0]!.seq,
   );
   expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
 });
@@ -134,7 +136,7 @@ it.each([{ cards: ['a1'], to: 'discard' }, {}] as const)(
     expect(result).toMatchObject({ kind: 'resolved', value: { kind: 'paid', receipt: { cards } } });
     expect(game.world.zone('b:hand').cards).toEqual(['d1']);
     expect(game.world.zone('discard').cards).toEqual(cards);
-    expect(game.history.facts('skill.invoked')).toHaveLength(1);
+    expect(game.history.facts(Skill.invoked)).toHaveLength(1);
     expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
   },
 );
@@ -178,7 +180,7 @@ it('意图在费用提交后、所有支付后效之前同步确定；失效意�
   });
   expect(seen).toEqual(['declared', 'moved', 'paid']);
   expect(game.world.zone('a:hand').cards).toEqual(['a2']);
-  expect(game.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.history.facts(Cost.paid)).toHaveLength(1);
 });
 
 it.each(['throw', 'async'])(
@@ -190,7 +192,7 @@ it.each(['throw', 'async'])(
       available: () => true,
       committed: async (ctx: import('../../src/sdk').Context) => {
         await Promise.resolve();
-        ctx.commit('late.intent', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
+        ctx.commit(testTiming('late.intent'), [{ kind: 'vitality', player: 'b', hp: 1 }], {});
       },
     };
     game.on(Cards.moved, {
@@ -223,7 +225,7 @@ it.each(['throw', 'async'])(
     expect(game.status).toBe('faulted');
     expect(game.world.position('a1')).toBe('discard');
     expect(game.world.player('b').hp).toBe(4);
-    expect(game.history.facts('late.intent')).toEqual([]);
+    expect(game.history.facts(testTiming('late.intent'))).toEqual([]);
     expect(after).toBe(false);
     expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
   },
@@ -245,7 +247,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
               hand: child.world.zone('a:hand').cards,
               discard: child.world.zone('discard').cards,
               uses: used(child.world, 'a', limit),
-              declaration: child.history.facts('cost.paid')[0]?.data.detail,
+              declaration: child.history.facts(Cost.paid)[0]?.data.detail,
             });
           },
         }),
@@ -286,7 +288,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
     },
   ]);
   expect(game.world.zone('discard').cards).toEqual(['a1']);
-  expect(game.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.history.facts(Cost.paid)).toHaveLength(1);
   expect(game.world.snapshot.states).toEqual([]);
 });
 
@@ -304,7 +306,11 @@ it('取消选择不支付、不增加次数；选择接纳后目标条件改变�
       for (const prompt of ['支付一张牌', '再次支付一张牌']) {
         const choice = await phase.ask(model.decision('a', prompt, { optional: true }));
         if (choice.kind === 'chosen') {
-          phase.commit('target.died', [{ kind: 'vitality', player: 'b', hp: 0, alive: false }], {});
+          phase.commit(
+            testTiming('target.died'),
+            [{ kind: 'vitality', player: 'b', hp: 0, alive: false }],
+            {},
+          );
           const result = await pay(phase, {
             actor: 'a',
             cards: choice.value.cards,
@@ -319,7 +325,7 @@ it('取消选择不支付、不增加次数；选择接纳后目标条件改变�
           });
         }
         expect(used(phase.world, 'a', limit)).toBe(0);
-        expect(game.history.facts('cost.paid')).toEqual([]);
+        expect(game.history.facts(Cost.paid)).toEqual([]);
         expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
       }
     }),
@@ -357,7 +363,7 @@ it.each([
   );
   expect(game.world.zone('discard').cards).toEqual([]);
   expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
-  expect(game.history.facts('cost.paid')).toEqual([]);
+  expect(game.history.facts(Cost.paid)).toEqual([]);
   expect(game.status).toBe('ready');
 });
 
@@ -368,7 +374,11 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
     owner: 'b',
     eligible: (_ctx, event) => event.moves.some((move) => move.to === 'discard'),
     run: (ctx) => {
-      ctx.commit('actor.died', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(
+        testTiming('actor.died'),
+        [{ kind: 'vitality', player: 'a', hp: 0, alive: false }],
+        {},
+      );
     },
   });
   await game.run('turn', (ctx) =>
@@ -387,7 +397,7 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
     }),
   );
   expect(game.world.zone('discard').cards).toEqual(['a1']);
-  expect(game.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.history.facts(Cost.paid)).toHaveLength(1);
 });
 
 it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚构实体移动', async () => {
@@ -404,7 +414,11 @@ it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚�
   await game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
       const limit: UsageLimit = { key: 'zero', source: null, lifetime, max: 1 };
-      phase.commit('remove-unused-discard', [{ kind: 'removeZone', zone: 'discard' }], null);
+      phase.commit(
+        testTiming('remove-unused-discard'),
+        [{ kind: 'removeZone', zone: 'discard' }],
+        null,
+      );
       const result = await pay(phase, { actor: 'a', reason: 'zero', limit });
       expect(result).toMatchObject({ kind: 'paid', receipt: { actor: 'a', cards: [] } });
       expect(used(phase.world, 'a', limit)).toBe(1);
@@ -415,7 +429,7 @@ it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚�
     }),
   );
   expect(paid).toHaveLength(1);
-  expect(game.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.history.facts(Cost.paid)).toHaveLength(1);
   expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
   expect(
     game.history.entries.filter(
@@ -477,6 +491,6 @@ it('技能已失效或材料被取走时最终支付返回 unavailable', async (
       await pay(ctx, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'activate' }),
     ).toMatchObject({ kind: 'unavailable' });
   });
-  expect(game.history.facts('cost.paid')).toEqual([]);
+  expect(game.history.facts(Cost.paid)).toEqual([]);
   expect(game.status).toBe('ready');
 });

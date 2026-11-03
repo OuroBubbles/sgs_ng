@@ -16,6 +16,16 @@ import type {
 import { moveCards, Cards } from './move';
 import { withProcessing } from './processing';
 import { Death } from '../combat/life-events';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const Delayed = defineEvent('delayed', {
+  placed: timing<unknown>(),
+  effectDeclared: timing<unknown>(),
+  effectFinished: timing<unknown>(),
+  removed: timing<unknown>(),
+  resolving: timing<unknown>(),
+});
 
 /** 判定阶段的具名输入；正常生效保留可操作效果，取消后效使用已封口快照。 */
 export interface DelayedInput<Effect extends EffectRef = CardEffect> {
@@ -105,7 +115,7 @@ export function placeDelayed(
       child,
       [{ cards: input.card.materials, from: input.processing, to: zone, place: 'bottom' }],
       input.card.name,
-      { kind: 'delayed.placed', data: { zone, owner, source: input }, changes },
+      { kind: Delayed.placed, data: { zone, owner, source: input }, changes },
     );
 
     return 'placed';
@@ -140,7 +150,7 @@ export function moveDelayed(
       [{ cards: entry.cards, from: entry.id, to, place: 'bottom' }],
       'delayed card removed',
       {
-        kind: 'delayed.removed',
+        kind: Delayed.removed,
         data: { ...result, zone: entry.id, to },
         changes: [
           { kind: 'removeState', state: entry.stateId },
@@ -213,7 +223,7 @@ export async function resolveJudgmentPhase(
         [{ cards: entry.cards, from: entry.id, to: processing.zone, place: 'bottom' }],
         entry.source.card.name,
         {
-          kind: 'delayed.resolving',
+          kind: Delayed.resolving,
           data: { entry, processing: processing.zone },
           changes: [
             { kind: 'removeState', state: entry.stateId },

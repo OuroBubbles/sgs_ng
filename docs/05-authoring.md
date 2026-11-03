@@ -57,7 +57,7 @@ export const Provision = defineEvent('provision', {
 // 订阅：on(Provision.finished, { who: (r) => r.target, effect: ... })
 ```
 
-`timing<T, R = T>(...groups)` 的 T 是挂钩载荷（可变草案或结果），R 是同名历史事实的记录类型。提交历史时直接传事件：`ctx.commit(Damage.dealt, changes, detail)`，detail 按 R 检查；读取时 `ctx.history.facts(Damage.dealt)` 返回 `Fact<DamageResult>[]`，遍历混合事实用 `isFact(fact, Turn.started)` 收窄。不再手写 `Fact<unknown>` 与字符串 kind 比较。窗口候选在开窗时一次收集，没有中途入窗（include / listen 已删除）。
+`timing<T, R = T>(...groups)` 的 T 是挂钩载荷（可变草案或结果），R 是同名历史事实的记录类型。提交历史时直接传事件：`ctx.commit(Damage.dealt, changes, detail)`，detail 按 R 检查；读取时 `ctx.history.facts(Damage.dealt)` 返回 `Fact<DamageResult>[]`，遍历混合事实用 `isFact(fact, Turn.started)` 收窄。不再手写 `Fact<unknown>` 与字符串 kind 比较。所有事实（包括只入历史、没有挂钩的事实，如 `Cards.revealed`、`CardEvent.used`）都由 defineEvent 声明；`commit` / `facts` / 移牌声明的 `kind` 只接受事件时点，没有字符串重载。窗口候选在开窗时一次收集，没有中途入窗（include / listen 已删除）。
 
 ## 主动技：action
 

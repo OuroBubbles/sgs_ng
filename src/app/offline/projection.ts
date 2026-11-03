@@ -28,6 +28,8 @@ import { privateCardPools } from '../../rules/cards/private-pool';
 import { useDeclarations } from '../../rules/cards/plan';
 import { isChained } from '../../rules/combat/chain';
 import { shieldOf } from '../../rules/combat/shield';
+import { CardEvent } from '../../rules/cards/move';
+import { Cards } from '../../rules/cards/move';
 
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -530,9 +532,9 @@ function publicHistory(
         message = `${text(detail.owner)}跳过了${labels[text(detail.kind)] ?? text(detail.kind)}阶段`;
         break;
       }
-      case 'card.taken.delayed':
-      case 'card.discarded.delayed':
-        message = `${text(detail.actor)}移除了 ${text(detail.target)} 的【${match.book.definition(text(record(detail.card).name)).label}】${fact.data.kind === 'card.taken.delayed' ? `，获得 ${strings(detail.cards).length} 张材料牌` : ''}`;
+      case 'card.taken-delayed':
+      case 'card.discarded-delayed':
+        message = `${text(detail.actor)}移除了 ${text(detail.target)} 的【${match.book.definition(text(record(detail.card).name)).label}】${fact.data.kind === 'card.taken-delayed' ? `，获得 ${strings(detail.cards).length} 张材料牌` : ''}`;
         break;
       case 'equipment.equipped': {
         const equipment = record(detail.declaration);
@@ -561,10 +563,10 @@ function publicHistory(
         message = `${text(taken.actor)}从 ${text(taken.target)} 获得${taken.open === true ? `【${printedCardView(match, text(taken.card)).name}】` : '一张手牌'}`;
         break;
       }
-      case 'card.discarded.by-effect':
+      case 'card.discarded-by-effect':
         message = `${text(detail.actor)}弃置了 ${text(detail.target)} 的【${printedCardView(match, text(detail.card)).name}】`;
         break;
-      case 'card.taken.public':
+      case 'card.taken-public':
         message = `${text(detail.actor)}获得${strings(detail.cards)
           .map((id) => `【${printedCardView(match, id).name}】`)
           .join('')}`;
@@ -580,12 +582,12 @@ function publicHistory(
   const revealed = new Map<string, readonly string[]>();
   const neededUses = new Set(actionUses.values());
   const finishedTargets = new Map<string, readonly string[]>();
-  for (const fact of history.facts('cards.revealed')) {
+  for (const fact of history.facts(Cards.revealed)) {
     const detail = record(fact.data.detail);
     const zone = text(detail.zone);
     if (zones.has(zone)) revealed.set(zone, strings(detail.cards));
   }
-  for (const fact of history.facts('card.finished')) {
+  for (const fact of history.facts(CardEvent.finished)) {
     const use = record(fact.data.detail);
     const id = text(use.id);
     if (neededUses.has(id) && !declarations.has(id))

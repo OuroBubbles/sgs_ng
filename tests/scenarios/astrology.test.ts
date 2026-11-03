@@ -29,6 +29,8 @@ import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -254,13 +256,13 @@ it('观星两组顺序真实移入同一牌堆，既不是摸牌也不产生手�
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('arrange');
   expect(game.room.world.zone('a:hand').cards).toEqual([]);
-  expect(game.room.history.facts('cards.drawn')).toEqual([]);
+  expect(game.room.history.facts(Cards.drawn)).toEqual([]);
   await answer(game, arranged(['x2', 'x0'], ['x3', 'x1']), 'arrange');
   await running;
   expect(before).toEqual(['x0', 'x1', 'x2', 'x3', 'x4', 'x5']);
   expect(game.room.world.zone('draw').cards).toEqual(['x2', 'x0', 'x4', 'x5', 'x3', 'x1']);
-  expect(game.room.history.facts('cards.arranged')).toHaveLength(1);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Cards.arranged)).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   await game.room.run('draw', (ctx) => draw(ctx, { player: 'a', count: 2, reason: 'test' }));
   expect(game.room.world.zone('a:hand').cards).toEqual(['x2', 'x0']);
   replay(game);
@@ -280,7 +282,7 @@ it('观星计数排除阵亡席位，必选排序的非法重复回复不改变�
     game.room.decisions.submit(request.id, request.token, arranged(['x0', 'x1'], ['x1'])),
   ).toMatchObject({ kind: 'rejected', reason: 'invalid' });
   expect(game.room.world.snapshot).toEqual(before);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   await answer(game, arranged(['x2'], ['x0', 'x1']), 'arrange');
   await running;
   expect(game.room.world.zone('draw').cards).toEqual(['x2', 'x3', 'x4', 'x5', 'x0', 'x1']);
@@ -309,7 +311,7 @@ it('拒绝发动不取牌；跳过准备阶段与他人准备阶段均不询问'
   const running = prepare(game);
   await answer(game, false);
   await running;
-  expect(game.room.history.facts('cards.peeked')).toEqual([]);
+  expect(game.room.history.facts(Cards.peeked)).toEqual([]);
   await prepare(game, 'b');
   game.room.on(Phase.before, {
     id: 'skip',
@@ -318,7 +320,7 @@ it('拒绝发动不取牌；跳过准备阶段与他人准备阶段均不询问'
     run: (ctx, phase) => phase.skip(ctx, 'test'),
   });
   await prepare(game);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.world.zone('draw').cards).toEqual(topCards().map((c) => c.id));
   replay(game);
 });
@@ -550,7 +552,7 @@ it('空城只禁止空手角色成为杀/决斗目标，装备、私有池和响
   await answer(game, true);
   await mass;
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   await game.room.run('lose-skill', (ctx) =>
     game.skills.revoke(ctx, 'b', 'standard:kongcheng', source),
   );
@@ -615,5 +617,5 @@ it('混合八人标准对局的观星由基础 AI 经正式选择完成，最终
   const match = createOfflineMatch({ seed: 27, preset: 'standard:identity', lineup: roster });
   await playMatch(match, { steps: 24000 });
 
-  expect(match.room.history.facts('cards.arranged').length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Cards.arranged).length).toBeGreaterThan(0);
 }, 60000);

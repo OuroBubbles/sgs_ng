@@ -96,7 +96,7 @@ it('同步投影不产生事实、流程或随机编号，查询前后相同种�
   for (const game of [first, second])
     await game.run('real', (ctx) => {
       const value = ctx.randomInt(1000);
-      ctx.commit('random.value', [], { value });
+      ctx.commit(testTiming('random.value'), [], { value });
     });
   expect(first.history.entries).toEqual(second.history.entries);
 });
@@ -116,7 +116,7 @@ it('投影上下文返回后立即关闭，不能缓存它作为后续查询或�
   const game = room();
   const stale = game.inspect((ctx) => ctx);
   expect(() => stale.query(() => 1)).toThrow('Inspection finished');
-  expect(() => stale.commit('late', [], {})).toThrow();
+  expect(() => stale.commit(testTiming('late'), [], {})).toThrow();
   expect(game.history.entries).toEqual([]);
 });
 
@@ -124,7 +124,7 @@ it('投影拒绝提交、随机、监听、清理登记、中止和子流程，�
   const game = room();
   const window = testTiming<null>('inspect.probe');
   game.inspect((ctx) => {
-    expect(() => ctx.commit('bad', [], {})).toThrow('read-only');
+    expect(() => ctx.commit(testTiming('bad'), [], {})).toThrow('read-only');
     expect(() => ctx.randomInt(2)).toThrow('read-only');
     expect(() => ctx.defer(() => {})).toThrow('read-only');
     expect(() => ctx.abort('bad')).toThrow('read-only');
@@ -145,7 +145,7 @@ it('投影拒绝异步结果、关闭泄漏上下文，查询异常不会修改�
       stale = ctx;
       return (async () => {
         await Promise.resolve();
-        ctx.commit('late.projection', [], {});
+        ctx.commit(testTiming('late.projection'), [], {});
       })();
     }),
   ).toThrow('Queries cannot await');

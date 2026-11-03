@@ -13,6 +13,12 @@ import {
   on,
   Cards,
 } from '../../../sdk';
+import { defineEvent } from '../../../sdk';
+import { timing } from '../../../sdk';
+
+export const Fanjian = defineEvent('fanjian', {
+  guessed: timing<unknown>(),
+});
 
 export const yingzi = skill({
   id: 'standard:yingzi',
@@ -64,7 +70,7 @@ export const fanjian = skill({
           }),
         );
         if (guess.kind !== 'chosen') return;
-        ctx.commit('fanjian.guessed', [], { actor: target, owner: self.owner, suit: guess.value });
+        ctx.commit(Fanjian.guessed, [], { actor: target, owner: self.owner, suit: guess.value });
         const picked = await chooseOwnedCard(ctx, {
           actor: target!,
           target: self.owner,

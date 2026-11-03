@@ -118,6 +118,11 @@ export const Damage = defineEvent('damage', {
   dealt: timing<DamageResult>(),
   received: timing<DamageResult>(),
   settled: timing<DamageResult>(),
+  transferred: timing<DamageResult>(),
+  unavailable: timing<DamageResult>(),
+  prevented: timing<DamageResult>(),
+  zero: timing<DamageResult>(),
+  transferring: timing<unknown>(),
 });
 
 class Draft implements DamageDraft {
@@ -244,7 +249,7 @@ class Draft implements DamageDraft {
         amount = this.#amount;
         this.#redirection = immutable({ to, reason, damage: null });
         this.#open = false;
-        at.commit('damage.transferring', [], { ...data, amount });
+        at.commit(Damage.transferring, [], { ...data, amount });
       },
       resolve: (at: Context) =>
         at.flow<DamageTransferResult>('damage.transfer.resolve', async (inside) => {
@@ -456,7 +461,7 @@ function resolveDamage(
         await child.window(Damage.received, result, { subject: input.to });
       }
     } else {
-      child.commit(`damage.${kind}`, [], result);
+      child.commit(Damage[kind], [], result);
     }
     await child.window(Damage.settled, result, { subject: input.to });
     for (const player of result.chainPlan) {

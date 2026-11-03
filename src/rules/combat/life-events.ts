@@ -56,4 +56,5 @@ export const Death = defineEvent('death', {
   committed: timing<DeathEvent>(),
   buried: timing<BurialEvent>(),
   finished: timing<BurialEvent>('mode', 'after'),
+  prevented: timing<unknown>(),
 });

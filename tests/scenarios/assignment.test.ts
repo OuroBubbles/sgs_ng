@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { ArrangementSelection } from '../../src/sdk';
 import type { ArrangementChoice, ArrangementGroup } from '../../src/sdk';
 import { nextRequest, room } from '../fixtures/room';
+import { testTiming } from '../fixtures/timing';
 
 const items = ['x', 'y', 'z'].map((id) => ({ id, label: id }));
 const group = (id: string, min = 0, max: number | 'all' = 1): ArrangementGroup => ({
@@ -213,7 +214,7 @@ it.each(['groups', 'canPlace'] as const)(
     await expect(
       target.run('impure', (ctx) => {
         const write = () => {
-          ctx.commit('forbidden', [], {});
+          ctx.commit(testTiming('forbidden'), [], {});
           return true;
         };
         const model = new ArrangementSelection({
@@ -227,7 +228,7 @@ it.each(['groups', 'canPlace'] as const)(
         return ctx.ask(model.decision('a', 'impure'));
       }),
     ).rejects.toThrow(/Pure queries/);
-    expect(target.history.facts('forbidden')).toHaveLength(0);
+    expect(target.history.facts(testTiming('forbidden'))).toHaveLength(0);
     expect(target.decisions.pending).toEqual([]);
   },
 );

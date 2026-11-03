@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { damage, moveCards, Damage } from '../../src/sdk';
 import type { DamageDraft, DamageResult } from '../../src/sdk';
 import { room } from '../fixtures/room';
+import { testTiming } from '../fixtures/timing';
 
 const input = { from: 'a', to: 'b', amount: 2, nature: 'fire' } as const;
 
@@ -127,7 +128,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
       expect(game.world.player('b').hp).toBe(4);
       expect(received).toEqual([]);
       expect(settled[0]?.kind).toBe(kind === 'prevent' ? 'prevented' : 'zero');
-      expect(game.history.facts('damage.dealt')).toEqual([]);
+      expect(game.history.facts(Damage.dealt)).toEqual([]);
     },
   );
 
@@ -149,10 +150,14 @@ describe('伤害领域骨架与普通代码作者能力', () => {
   it('来源死亡不让已经产生的伤害被通用运行时吞掉', async () => {
     const game = room();
     await game.run('legacy', async (ctx) => {
-      ctx.commit('source.died', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(
+        testTiming('source.died'),
+        [{ kind: 'vitality', player: 'a', hp: 0, alive: false }],
+        {},
+      );
       await damage(ctx, input);
     });
     expect(game.world.player('b').hp).toBe(2);
-    expect(game.history.facts('damage.dealt')).toHaveLength(1);
+    expect(game.history.facts(Damage.dealt)).toHaveLength(1);
   });
 });

@@ -25,6 +25,9 @@ import type { DeathDraft, DyingResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { PlayerEvent } from '../../src/rules/combat/life';
+import { testTiming } from '../fixtures/timing';
 
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const hit = { from: 'a', to: 'b', amount: 4, nature: 'normal' } as const;
@@ -79,8 +82,8 @@ it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 c
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'p' });
   expect(await running).toMatchObject({ value: { kind: 'dealt', afterHp: 0 } });
   expect(order).toEqual(['heal', 'after']);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   expect(game.room.world.position('p')).toBe('discard');
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -107,7 +110,7 @@ it('负体力允许同一救援者连续用桃，放弃后按座次交给下一�
   await running;
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
   expect(game.room.world.zone('b:hand').cards).toEqual(['own']);
-  expect(game.room.history.facts('card.used')).toHaveLength(3);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(3);
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
 });
 
@@ -232,7 +235,7 @@ it('死亡前防止与濒死末尾回复均可阻止死亡，关闭后的草案�
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(game.room.world.player('b')).toMatchObject({ hp: 0, alive: true });
-  expect(game.room.history.facts('player.died')).toEqual([]);
+  expect(game.room.history.facts(PlayerEvent.died)).toEqual([]);
   expect(isDying(game.room.world, 'b')).toBe(false);
   expect(() => draft?.prevent('late')).toThrow();
   const saved = cardGame({ hands: { a: [] } });
@@ -246,7 +249,7 @@ it('死亡前防止与濒死末尾回复均可阻止死亡，关闭后的草案�
   });
   await saved.room.run('hit', (ctx) => damage(ctx, hit));
   expect(saved.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
-  expect(saved.room.history.facts('player.died')).toEqual([]);
+  expect(saved.room.history.facts(PlayerEvent.died)).toEqual([]);
 });
 
 it('同角色嵌套濒死的内层退出不清掉外层身份；内层救回后外层不重复求桃', async () => {
@@ -316,7 +319,7 @@ it('失去体力独立于伤害，可进入濒死；没有伤害来源或伤害�
   await game.room.run('loss', (ctx) => loseHp(ctx, { player: 'b', amount: 4, reason: 'cost' }));
   expect(seen).toEqual(['loss']);
   expect(game.room.world.player('b').alive).toBe(false);
-  expect(game.room.history.facts('damage.dealt')).toEqual([]);
+  expect(game.room.history.facts(Damage.dealt)).toEqual([]);
 });
 
 it('已宣告牌的来源死亡不会移走处理材料或取消已产生效果', async () => {
@@ -348,7 +351,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
   installRescue(game.room, game.book);
   installRoleMode(game.room);
   await game.room.run('setup', (ctx) => {
-    ctx.commit('setup', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+    ctx.commit(testTiming('setup'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
   });
   let finished: DyingResult | undefined;
   game.room.on(Dying.started, {
@@ -413,5 +416,5 @@ it('死亡效果故障保留已提交死亡与未善后区域，不伪造完成/
   expect(game.room.status).toBe('faulted');
   expect(game.room.world.player('b').alive).toBe(false);
   expect(game.room.world.position('b')).toBe('b:hand');
-  expect(game.room.history.facts('player.buried')).toEqual([]);
+  expect(game.room.history.facts(PlayerEvent.buried)).toEqual([]);
 });

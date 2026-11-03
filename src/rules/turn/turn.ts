@@ -24,6 +24,8 @@ import { defineState, readState, stateChange } from '../state/state';
 import { activeTurn, activeTarget, validTurnOrigin } from './state';
 import type { TurnOrigin } from './state';
 import { defineEvent, timing } from '../../core/runtime/event';
+import { Cards } from '../cards/move';
+import { Discard } from '../cards/discard';
 
 export { activeTurn, activeTarget, validTurnOrigin } from './state';
 export type { TurnOrigin } from './state';
@@ -97,6 +99,12 @@ export const Phase = defineEvent('phase', {
   before: timing<PhaseView, PhaseSnapshot>(),
   started: timing<PhaseView, PhaseSnapshot>(),
   ending: timing<PhaseView>(),
+  finished: timing<unknown>(),
+  skipped: timing<unknown>(),
+  skipPlanned: timing<unknown>(),
+  skipScheduled: timing<unknown>(),
+  skipDeclared: timing<unknown>(),
+  replaceDeclared: timing<unknown>(),
 });
 /** 回合开始写入历史的快照。 */
 export interface TurnStart {
@@ -108,6 +116,12 @@ export interface TurnStart {
 export const Turn = defineEvent('turn', {
   started: timing<TurnView, TurnStart>(),
   ending: timing<TurnView>(),
+  finished: timing<unknown>(),
+  endDeclared: timing<unknown>(),
+  extraScheduled: timing<unknown>(),
+  extraCancelled: timing<unknown>(),
+  extraTaken: timing<unknown>(),
+  extraSkipped: timing<unknown>(),
 });
 
 interface ActivePhase {
@@ -179,7 +193,7 @@ class PhaseControl implements PhaseView {
   replace(ctx: Context, reason: string): void {
     this.#assertReplacement(ctx, reason);
     if (this.replaced) return;
-    ctx.commit('phase.replace.declared', [this.replaceChange(ctx, reason)], {
+    ctx.commit(Phase.replaceDeclared, [this.replaceChange(ctx, reason)], {
       id: this.id,
       owner: this.owner,
       reason,
@@ -198,7 +212,7 @@ class PhaseControl implements PhaseView {
   skip(ctx: Context, reason: string): void {
     this.#assertBefore(ctx, reason);
     if (this.skipped) return;
-    ctx.commit('phase.skip.declared', [this.skipChange(ctx, reason)], {
+    ctx.commit(Phase.skipDeclared, [this.skipChange(ctx, reason)], {
       id: this.id,
       owner: this.owner,
       reason,
@@ -353,7 +367,7 @@ export async function defaultPhaseBody(
         );
       const count = Math.min(excess, selectable().length);
       if (count < excess)
-        ctx.commit('discard.limited', [], { actor: phase.owner, required: excess, count });
+        ctx.commit(Discard.limited, [], { actor: phase.owner, required: excess, count });
       if (!count) break;
       const model = new JointSelection({
         cards: () => selectable().map((id) => ({ id, label: ctx.world.card(id).name })),
@@ -366,7 +380,7 @@ export async function defaultPhaseBody(
           cards: answer.value.cards,
           reason: 'discard-phase',
           areas: ['hand'],
-          factKind: 'cards.discarded',
+          factKind: Cards.discarded,
           declaration: { phaseId: phase.id },
           legal: () => model.validate(answer.value).ok,
         });
@@ -420,7 +434,7 @@ export function runPhase(
           const reason = readState(child.world, plannedSkip, target);
           if (reason)
             child.commit(
-              'phase.skip.planned',
+              Phase.skipPlanned,
               [phase.skipChange(child, reason), stateChange(child, plannedSkip, target, null)],
               { id: phase.id, owner, kind, reason },
             );
@@ -440,7 +454,7 @@ export function runPhase(
           );
         phase.start();
         if (phase.skipped) {
-          child.commit('phase.skipped', [], phase.snapshot());
+          child.commit(Phase.skipped, [], phase.snapshot());
           return { phase: phase.snapshot(), exit: 'skipped', reason: phase.snapshot().reason };
         }
         child.commit(
@@ -476,11 +490,7 @@ export function runPhase(
     if (!phase) throw new Error('Phase did not initialize.');
     const summary: PhaseResult =
       result.kind === 'resolved' ? result.value : { phase, exit: 'aborted', reason: result.reason };
-    host.commit(
-      'phase.finished',
-      [stateChange(host, activePhase, activeTarget, previous)],
-      summary,
-    );
+    host.commit(Phase.finished, [stateChange(host, activePhase, activeTarget, previous)], summary);
     return immutable(summary);
   });
 }
@@ -521,7 +531,7 @@ export function runTurn(
             assertLifetime(at, lifetime);
             if (!reason) throw new Error('Ending a turn requires a reason.');
             if (readState(at.world, turnEnd, target) !== null) return;
-            at.commit('turn.end.declared', [stateChange(at, turnEnd, target, reason)], {
+            at.commit(Turn.endDeclared, [stateChange(at, turnEnd, target, reason)], {
               id: lifetime.id,
               owner,
               reason,
@@ -532,7 +542,7 @@ export function runTurn(
             if (!phaseKinds.includes(kind) || !reason)
               throw new Error('Invalid planned phase skip.');
             at.commit(
-              'phase.skip.scheduled',
+              Phase.skipScheduled,
               [stateChange(at, plannedSkip, { owner, source: kind, lifetime }, reason)],
               { turn: lifetime.id, owner, kind, reason },
             );
@@ -562,7 +572,7 @@ export function runTurn(
         });
       }),
     );
-    host.commit('turn.finished', [stateChange(host, activeTurn, activeTarget, previous)], {
+    host.commit(Turn.finished, [stateChange(host, activeTurn, activeTarget, previous)], {
       owner,
       exit: result.kind,
       result: result.kind === 'resolved' ? result.value : result.reason,

@@ -4,6 +4,13 @@ import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { delayedCards } from './delayed';
 import { moveCards } from './move';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const Discard = defineEvent('discard', {
+  limited: timing<unknown>(),
+  committed: timing<unknown>(),
+});
 
 export interface DiscardRequest {
   readonly actor: string;
@@ -82,7 +89,7 @@ export function discardCards(
     }
     const cards = moves.flatMap((move) => move.cards);
     await moveCards(child, moves, input.reason, {
-      kind: 'discard.committed',
+      kind: Discard.committed,
       data: { ...input, subjects: input.cards, cards },
       changes,
     });

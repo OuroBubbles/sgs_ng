@@ -18,6 +18,7 @@ import {
 } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -42,7 +43,7 @@ it('龙胆将闪当杀沿用原花色点数、材料和伤害管线', async () =
   });
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('j')).toBe('discard');
-  expect(game.room.history.facts('card.used')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[0]!.data.detail).toMatchObject({
     declaration: {
       card: { name: 'standard:slash', suit: 'diamond', rank: 9, source: { skill: longdan.id } },
     },
@@ -85,7 +86,7 @@ it('龙胆响应时杀可当闪，不能直接以实体杀响应闪，不能冒�
   await running;
   expect(game.room.world.player('a').hp).toBe(4);
   expect(game.room.world.position('mine')).toBe('discard');
-  expect(game.room.history.facts('card.used')[1]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[1]!.data.detail).toMatchObject({
     declaration: { card: { name: 'standard:jink', source: { skill: longdan.id } } },
   });
 });
@@ -190,7 +191,7 @@ it('奇袭可以使用受自弃禁止的黑色装备作材料，仍触发枭姬�
   expect(game.room.world.position('weapon')).toBe('discard');
   expect(game.room.world.position('victim')).toBe('discard');
   expect(game.room.world.zone('a:hand').cards).toEqual(['d1', 'd2']);
-  expect(game.room.history.facts('card.used')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[0]!.data.detail).toMatchObject({
     declaration: { card: { name: 'standard:dismantlement', source: { skill: qixi.id } } },
   });
 });
@@ -222,7 +223,7 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
         .ok,
     ).toBe(false);
   });
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
 });
 
 it('首六武将完整初始化，主公奖励叠加目录体力，空武将引用不会被当作机制角色', async () => {

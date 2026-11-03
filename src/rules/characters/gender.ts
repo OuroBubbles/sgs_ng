@@ -1,6 +1,7 @@
 import type { WorldReader } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
 import { defineState, readState, stateChange } from '../state/state';
+import { Character } from './kingdom';
 
 export type Gender = 'male' | 'female' | 'dual' | 'none';
 const gender = defineState<Gender>(
@@ -20,7 +21,7 @@ export function genderChange(ctx: Context, player: string, value: Gender) {
 }
 export function setGender(ctx: Context, player: string, value: Gender): void {
   const before = genderOf(ctx.world, player);
-  ctx.commit('character.gender-changed', [genderChange(ctx, player, value)], {
+  ctx.commit(Character.genderChanged, [genderChange(ctx, player, value)], {
     player,
     before,
     after: value,

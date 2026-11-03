@@ -110,7 +110,7 @@ it('窗口继续条件在纯查询中执行，不能偷偷提交状态', async (
     target.run('window', (ctx) =>
       ctx.window(window, null, {
         active: (at) => {
-          at.commit('unexpected', [], null);
+          at.commit(testTiming('unexpected'), [], null);
           return true;
         },
       }),

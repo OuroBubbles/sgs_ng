@@ -11,6 +11,7 @@ import {
   Damage,
 } from '../../../sdk';
 import type { Context, EffectRef, ResponseOpportunity } from '../../../sdk';
+import { Use } from '../../../sdk';
 
 const materialsHere = (ctx: Context, card: EffectRef | undefined): card is EffectRef =>
   !!card &&
@@ -33,7 +34,7 @@ export const jianxiong = skill({
         if (!materialsHere(ctx, hit.input.card)) return;
         const { useId, card } = hit.input.card;
         return obtain(ctx, self.owner, card.materials, self.skill, {
-          kind: 'use.materials-obtained',
+          kind: Use.materialsObtained,
           data: { actor: self.owner, useId, cards: card.materials, reason: self.skill },
         });
       },

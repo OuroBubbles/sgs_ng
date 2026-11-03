@@ -28,6 +28,11 @@ import {
 import type { Role, GameResult } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
+import { Game } from '../../src/sdk';
+import { PlayerEvent } from '../../src/rules/combat/life';
+import { testTiming } from '../fixtures/timing';
 
 const roles = ['lord', 'loyalist', 'rebel', 'renegade'] as const;
 const cause = { kind: 'rule', seq: null, data: null } as const;
@@ -53,7 +58,7 @@ it.each([
   await prepareMode(game);
   await game.room.run('seed-deaths', (ctx) => {
     ctx.commit(
-      'seed-deaths',
+      testTiming('seed-deaths'),
       dead.map((player) => ({ kind: 'vitality', player, hp: 0, alive: false })),
       null,
     );
@@ -70,7 +75,11 @@ it('击杀反贼的三张奖励在埋葬后结算；无来源或已死来源不�
     await prepareMode(game);
     if (killer === 'b')
       await game.room.run('dead-source', (ctx) => {
-        ctx.commit('dead-source', [{ kind: 'vitality', player: 'b', hp: 0, alive: false }], null);
+        ctx.commit(
+          testTiming('dead-source'),
+          [{ kind: 'vitality', player: 'b', hp: 0, alive: false }],
+          null,
+        );
       });
     await game.room.run('death', (ctx) =>
       kill(ctx, { player: 'c', killer, cause, reason: 'rule' }),
@@ -79,8 +88,8 @@ it('击杀反贼的三张奖励在埋葬后结算；无来源或已死来源不�
     expect(game.room.world.zone('b:hand').cards).toEqual([]);
     expect(resultOf(game.room.world)).toBeNull();
     if (killer === 'a')
-      expect(game.room.history.facts('player.buried')[0]!.seq).toBeLessThan(
-        game.room.history.facts('draw.completed')[0]!.seq,
+      expect(game.room.history.facts(PlayerEvent.buried)[0]!.seq).toBeLessThan(
+        game.room.history.facts(Draw.completed)[0]!.seq,
       );
   }
 });
@@ -92,7 +101,7 @@ it('主公杀忠臣只弃置手牌和装备，正在结算的杀由独立处理�
   });
   await prepareMode(game);
   await game.room.run('wounded', (ctx) => {
-    ctx.commit('wounded', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+    ctx.commit(testTiming('wounded'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
   });
   await use(game, {
     actor: 'a',
@@ -124,7 +133,7 @@ it('死亡效果可以嵌套死亡；判胜只写一次，已完成的死亡区�
     kill(ctx, { player: 'c', killer: 'a', cause, reason: 'rule' }),
   );
   expect(resultOf(game.room.world)).toEqual({ winners: ['c'], reason: 'role:lord-dead' });
-  expect(game.room.history.facts('game.finished')).toHaveLength(1);
+  expect(game.room.history.facts(Game.finished)).toHaveLength(1);
   expect(game.room.world.zone('a:hand').cards).toEqual([]);
   expect(game.room.world.zone('c:hand').cards).toEqual([]);
   expect(game.room.status).toBe('ended');
@@ -193,7 +202,11 @@ it('空牌堆、无动作的多角色回合仍有强制热座暂停点，自动�
   const game = match({ fixed: roles, empty: true });
   await game.prepare();
   await game.room.run('dead-seat', (ctx) => {
-    ctx.commit('dead-seat', [{ kind: 'vitality', player: 'p1', hp: 0, alive: false }], null);
+    ctx.commit(
+      testTiming('dead-seat'),
+      [{ kind: 'vitality', player: 'p1', hp: 0, alive: false }],
+      null,
+    );
   });
   const running = game.play();
   for (const owner of ['p0', 'p2', 'p3', 'p0']) {
@@ -234,10 +247,10 @@ it('真实主动用牌驱动从准备到身份终局；回合/阶段状态和处
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
   expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
   expect(readState(game.room.world, activePhase, activeTarget)).toBeNull();
-  expect(game.room.history.facts('game.finished')[0]!.seq).toBeLessThan(
-    game.room.history.facts('card.finished')[0]!.seq,
+  expect(game.room.history.facts(Game.finished)[0]!.seq).toBeLessThan(
+    game.room.history.facts(CardEvent.finished)[0]!.seq,
   );
-  expect(game.room.history.facts('draw.completed')).toHaveLength(3); // 起手两次、摸牌阶段一次；终局无击杀奖励。
+  expect(game.room.history.facts(Draw.completed)).toHaveLength(3); // 起手两次、摸牌阶段一次；终局无击杀奖励。
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   expect(await game.play()).toEqual({ kind: 'resolved', value: game.result });
 });
@@ -313,5 +326,5 @@ it('配置与身份分配拒绝缺主公、重复座位或未知牌；结果不�
       kind: 'unavailable',
     });
   });
-  expect(game.room.history.facts('game.finished')).toHaveLength(1);
+  expect(game.room.history.facts(Game.finished)).toHaveLength(1);
 });

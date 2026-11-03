@@ -4,6 +4,7 @@ import { loseHp, runPhase } from '../../src/sdk';
 import type { CardChoice } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
 
 // 同样的数量/区域入口，对每个标准配方实测；成功用牌与响应另见各技能专项。
 const recipes = [
@@ -215,13 +216,13 @@ it.each(['wusheng', 'paoxiao'] as const)(
     expect(game.room.world.position('second')).toBe(skill === 'paoxiao' ? 'discard' : 'a:hand');
     expect(
       game.room.history
-        .facts('card.used')
+        .facts(CardEvent.used)
         .map(
           (fact) =>
             (fact.data.detail as { declaration: { card: { name: string } } }).declaration.card.name,
         ),
     ).toContain('standard:jink');
-    expect(game.room.history.facts('card.responded')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   },
 );
 
@@ -249,6 +250,6 @@ it('急救在无本人回合的规则使用中可用红牌自疗，仍是实际�
   ).toMatchObject({ value: { kind: 'used', use: { card: { name: 'standard:peach' } } } });
   expect(game.room.world.player('a').hp).toBe(4);
   expect(game.room.world.position('material')).toBe('discard');
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
 });

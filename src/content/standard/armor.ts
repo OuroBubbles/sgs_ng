@@ -10,6 +10,7 @@ import {
 } from '../../sdk';
 import type { CardChoice } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { Equipment } from '../../sdk';
 
 const jink: CardChoice = {
   kind: 'generated',
@@ -70,7 +71,7 @@ export const qinggangSword = equipmentCard({
           effect.state === 'targeting',
         effect(ctx, { use, effect }, self) {
           effect.ignoreEquipment(ctx, 'armor', 'standard:qinggang_sword');
-          ctx.commit('equipment.ignored', [], {
+          ctx.commit(Equipment.ignored, [], {
             actor: self.owner,
             name: 'standard:qinggang_sword',
             use: use.id,
@@ -102,7 +103,7 @@ export const niohShield = equipmentCard({
           equipmentEffectiveFor(ctx, self, effect, 'armor'),
         effect(ctx, { effect }, self) {
           effect.cancel(ctx, 'standard:nioh_shield');
-          ctx.commit('equipment.blocked', [], {
+          ctx.commit(Equipment.blocked, [], {
             actor: self.owner,
             name: 'standard:nioh_shield',
             effect: effect.effectId,

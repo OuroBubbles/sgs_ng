@@ -4,6 +4,7 @@ import type { Context, JudgmentResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished';
@@ -65,8 +66,8 @@ for (const stage of stages) {
       expect(later.mock.calls.length).toBe(0);
       expect(match).not.toHaveBeenCalled();
       expect(game.room.world.zone('c:hand').cards).toEqual([]);
-      expect(game.room.history.facts('judgment.revealed')).toHaveLength(1);
-      expect(game.room.history.facts('judgment.finished')).toHaveLength(1);
+      expect(game.room.history.facts(Judgment.revealed)).toHaveLength(1);
+      expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
       expect(game.room.world.position('outer')).toBe('discard');
       conserved(game);
     },
@@ -121,7 +122,7 @@ for (const stage of stages) {
         );
       });
       expect(later.mock.calls.length).toBe(0);
-      expect(game.room.history.facts('judgment.replaced')).toHaveLength(1);
+      expect(game.room.history.facts(Judgment.replaced)).toHaveLength(1);
       expect(game.room.world.position('outer')).toBe('b:hand');
       expect(game.room.world.position('replacement')).toBe('discard');
       conserved(game);
@@ -184,7 +185,7 @@ for (const stage of stages) {
       ),
     ).toMatchObject({ kind: 'resolved', value: { kind: 'judged', matched: true } });
     expect(later).toHaveBeenCalledTimes(1);
-    expect(game.room.history.facts('judgment.finished')).toHaveLength(1);
+    expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
     expect(game.room.world.position('outer')).toBe('discard');
     conserved(game);
   });
@@ -250,8 +251,8 @@ it.each(boundaries)('真实八卦阵翻牌后 %s，不执行旧判定后效或�
   expect(game.room.decisions.submit(request.id, request.token, true).kind).toBe('accepted');
   await running;
   expect(later.mock.calls.length).toBe(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('judgment.finished')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(Judgment.finished)[0]?.data.detail).toMatchObject({
     kind: 'unavailable',
     matched: null,
   });

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { room, choose, nextRequest } from '../fixtures/room';
+import { testTiming } from '../fixtures/timing';
 
 it('优雅结束关闭现有和未来输入，但允许当前根流程提交善后', async () => {
   const game = room();
@@ -7,7 +8,7 @@ it('优雅结束关闭现有和未来输入，但允许当前根流程提交善�
     expect(await ctx.ask(choose())).toEqual({ kind: 'aborted' });
     expect(await ctx.ask(choose())).toEqual({ kind: 'unavailable' });
     expect(game.status).toBe('running');
-    ctx.commit('cleanup', [], null);
+    ctx.commit(testTiming('cleanup'), [], null);
     return 'clean';
   });
   const request = await nextRequest(game);
@@ -15,7 +16,7 @@ it('优雅结束关闭现有和未来输入，但允许当前根流程提交善�
   expect(game.decisions.submit(request.id, request.token, 'yes').kind).toBe('rejected');
   expect(await running).toEqual({ kind: 'resolved', value: 'clean' });
   expect(game.status).toBe('ended');
-  expect(game.history.facts('cleanup')).toHaveLength(1);
+  expect(game.history.facts(testTiming('cleanup'))).toHaveLength(1);
   expect(() => game.run('late', () => undefined)).toThrow('ended');
   game.finish('again');
 });

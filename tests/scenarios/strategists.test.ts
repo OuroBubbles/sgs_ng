@@ -30,6 +30,9 @@ import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Lifetime } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -100,7 +103,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
     run(ctx) {
       expect(judgment.card?.id).toBe('new');
       expect(ctx.world.position('old')).toBe('discard');
-      expect(game.room.history.facts('judgment.replaced')[0]!.data.detail).toMatchObject({
+      expect(game.room.history.facts(Judgment.replaced)[0]!.data.detail).toMatchObject({
         declaration: { invocation: { actor: 'a', instance: skill.id, cards: ['new'] } },
       });
     },
@@ -131,8 +134,8 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
   expect(await running).toMatchObject({ value: { matched: true, card: { id: 'new' } } });
   expect(paid).toBe(1);
   expect(played).toBe(1);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   replay(game);
 });
 
@@ -186,7 +189,7 @@ it('鬼才取消不宣告；候选仅限本人手牌，拒绝装备、他人牌�
     expect(game.room.decisions.preview(request.id, { cards, targets: [] })!.valid).toBe(false);
   await cancel(game);
   await running;
-  expect(game.room.history.facts('judgment.replaced')).toEqual([]);
+  expect(game.room.history.facts(Judgment.replaced)).toEqual([]);
   expect(game.room.world.position('mine')).toBe('a:hand');
 });
 
@@ -213,7 +216,7 @@ it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，�
   expect(await running).toMatchObject({
     value: { matched: false, card: { id: 'last' } },
   });
-  expect(game.room.history.facts('judgment.replaced')).toHaveLength(2);
+  expect(game.room.history.facts(Judgment.replaced)).toHaveLength(2);
   replay(game);
 });
 
@@ -243,7 +246,7 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
     );
     await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
     expect(await running).toMatchObject({ value: { matched: true } });
-    expect(game.room.history.facts('judgment.replaced')).toHaveLength(1);
+    expect(game.room.history.facts(Judgment.replaced)).toHaveLength(1);
     replay(game);
   }
 });
@@ -277,7 +280,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
     await game.room.run('judge', (ctx) =>
       judge(ctx, { player: 'b', reason: 'probe', match: () => true }),
     );
-    expect(game.room.history.facts('judgment.replaced')).toEqual([]);
+    expect(game.room.history.facts(Judgment.replaced)).toEqual([]);
     expect(game.room.world.position('new')).toBe('a:hand');
     expect(game.room.world.position('other')).toBe('c:hand');
   },
@@ -292,7 +295,7 @@ it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', a
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('cards-targets');
   expect(request.optional).toBe(true);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(JSON.stringify(request.data)).not.toContain('secret');
   expect(JSON.stringify(request.data)).not.toContain('无中生有');
   const option = (request.data as { preview: { cards: { id: string }[] } }).preview.cards[0]!.id;
@@ -303,14 +306,14 @@ it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', a
       kind: 'rejected',
       reason: 'invalid',
     });
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   await answer(game, { cards: [option], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['secret']);
-  expect(game.room.history.facts('card.taken')).toHaveLength(1);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.taken)).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail).toMatchObject({
     declaration: { open: false },
   });
   replay(game);
@@ -341,7 +344,7 @@ it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不�
   await answer(game, { cards: [choices[0]!.id], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['hand', 'weapon']);
-  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail).toMatchObject({
     declaration: { open: true },
   });
 });
@@ -369,9 +372,9 @@ it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；�
     );
     if (branch === 'decline') await cancel(game);
     await running;
-    expect(game.room.history.facts('card.taken')).toEqual([]);
-    expect(game.room.history.facts('skill.invoked')).toEqual([]);
-    expect(game.room.history.facts('card.chosen')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.taken)).toEqual([]);
+    expect(game.room.history.facts(Skill.invoked)).toEqual([]);
+    expect(game.room.history.facts(CardEvent.chosen)).toEqual([]);
   }
 });
 
@@ -403,9 +406,11 @@ it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取'
     const option = (request.data as { preview: { cards: { id: string }[] } }).preview.cards[0]!.id;
     await answer(game, { cards: [option], targets: [] }, 'cards-targets');
     await running;
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-    expect(game.room.history.facts('card.chosen')).toHaveLength(1);
-    expect(game.room.history.facts('card.taken')).toHaveLength(branch === 'declared-skill' ? 1 : 0);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.chosen)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.taken)).toHaveLength(
+      branch === 'declared-skill' ? 1 : 0,
+    );
     expect(game.room.world.zone('a:hand').cards).toEqual(
       branch === 'declared-skill' ? ['chosen'] : [],
     );
@@ -473,7 +478,7 @@ it('天妒与洛神共享一次判定，不重复取得同一张牌，结果仍�
   await answer(game, false);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['top']);
-  expect(game.room.history.facts('judgment.card-obtained')).toHaveLength(1);
+  expect(game.room.history.facts(Judgment.cardObtained)).toHaveLength(1);
   expect(game.room.world.position('next')).toBe('draw');
 });
 
@@ -555,7 +560,7 @@ it('遗计每点伤害独立征询，拒绝第一点不取消第二点，可一�
   await running;
   expect(game.room.world.zone('c:hand').cards).toEqual(['one', 'two']);
   expect(game.room.world.position('unused')).toBe('draw');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   replay(game);
 });
 
@@ -667,7 +672,7 @@ it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者�
   expect(result).toMatchObject({ kind: 'resolved', value: 'outer-result' });
   expect(game.room.world.zone('discard').cards).toEqual(['inner', 'outer']);
   expect(game.room.world.snapshot.states).toEqual([]);
-  expect(game.room.history.facts('lifetime.ended').map((fact) => fact.data.detail)).toMatchObject([
+  expect(game.room.history.facts(Lifetime.ended).map((fact) => fact.data.detail)).toMatchObject([
     {
       kind: 'processing',
       exit: 'aborted',
@@ -767,16 +772,16 @@ it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗
   const match = createOfflineMatch({ seed: 3, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 5000 });
 
-  expect(match.room.history.facts('judgment.replaced').length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Judgment.replaced).length).toBeGreaterThan(0);
   expect(
     match.room.history
-      .facts('card.taken')
+      .facts(CardEvent.taken)
       .some(
         (fact) =>
           (fact.data.detail as { declaration?: { reason?: string } }).declaration?.reason ===
           'standard:fankui',
       ),
   ).toBe(true);
-  expect(match.room.history.facts('cards.peeked').length).toBeGreaterThan(0);
-  expect(match.room.history.facts('cards.given').length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Cards.peeked).length).toBeGreaterThan(0);
+  expect(match.room.history.facts(Cards.given).length).toBeGreaterThan(0);
 }, 60_000);

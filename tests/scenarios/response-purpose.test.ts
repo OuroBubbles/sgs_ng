@@ -15,6 +15,10 @@ import {
 import type { UseTiming } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { CardEvent } from '../../src/sdk';
+import { Damage } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const attack = (name = 'slash') => ({
   actor: 'a',
@@ -65,8 +69,8 @@ it('抵消杀的闪是完整使用，提交使用事实和完成时点，不伪�
   });
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(completed).toEqual(['use']);
   replay(game);
 });
@@ -89,8 +93,8 @@ it('禁止使用闪不禁止万箭齐发要求的打出，实际完成类型仍�
   const game = create('archery_attack', false, true);
   await dodge(game, use(game, attack('archery_attack')));
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   replay(game);
 });
 
@@ -105,7 +109,7 @@ it('禁止使用闪时杀无法被本人闪抵消，实体与未开启的八卦�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('red')).toBe('draw');
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   replay(game);
 });
 it('禁止打出闪时万箭齐发未获得响应，普通闪与八卦均不绕过', async () => {
@@ -153,7 +157,7 @@ it.each(['effect', 'play'] as const)(
       }
     });
     expect(game.room.world.position('dodge')).toBe('b:hand');
-    expect(game.room.history.facts('card.used')).toEqual([]);
+    expect(game.room.history.facts(CardEvent.used)).toEqual([]);
     replay(game);
   },
 );
@@ -230,13 +234,13 @@ it('真实倾国按使用用途转换黑色杀为闪，使用后效归本人且�
   ).toBe('accepted');
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.used')[1]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[1]?.data.detail).toMatchObject({
     actor: 'b',
     declaration: {
       card: { name: 'standard:jink', source: { kind: 'viewAs', skill: 'standard:qingguo' } },
     },
   });
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 it.each(['slash', 'archery_attack'])(
@@ -257,14 +261,14 @@ it.each(['slash', 'archery_attack'])(
     expect(game.room.decisions.submit(invoke.id, invoke.token, true).kind).toBe('accepted');
     await dodge(game, running);
     expect(game.room.world.player('b').hp).toBe(4);
-    expect(game.room.history.facts('card.responded')).toHaveLength(1);
-    expect(game.room.history.facts('card.responded')[0]?.data.detail).toMatchObject({
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.responded)[0]?.data.detail).toMatchObject({
       actor: 'c',
       declaration: { beneficiary: 'b' },
     });
-    expect(game.room.history.facts('card.used')).toHaveLength(name === 'slash' ? 2 : 1);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(name === 'slash' ? 2 : 1);
     if (name === 'slash')
-      expect(game.room.history.facts('card.used')[1]?.data.detail).toMatchObject({
+      expect(game.room.history.facts(CardEvent.used)[1]?.data.detail).toMatchObject({
         actor: 'b',
         declaration: {
           card: { source: { kind: 'generated', origin: { actor: 'c' } } },
@@ -292,8 +296,8 @@ it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种�
   });
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   replay(game);
 });
 it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', async () => {
@@ -312,7 +316,7 @@ it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', a
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('other')).toBe('c:hand');
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 it.each(['prohibit', 'take', 'death'] as const)(
@@ -363,8 +367,8 @@ it.each(['prohibit', 'take', 'death'] as const)(
       },
     });
     await dodge(game, use(game, attack()));
-    expect(game.room.history.facts('card.responded')).toHaveLength(1);
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
     expect(game.room.world.player('b').alive).toBe(change !== 'death');
     if (change !== 'death') expect(game.room.world.player('b').hp).toBe(3);
     expect(game.room.world.position('dodge')).toBe(change === 'take' ? 'd:hand' : 'discard');
@@ -383,11 +387,13 @@ it('两层委托仍只有末端 d 打出与原请求者 b 使用，候选不重�
   });
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')[0]?.data.detail).toMatchObject({ actor: 'd' });
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('response.delegated')).toHaveLength(2);
-  for (const fact of game.room.history.facts('response.delegated'))
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)[0]?.data.detail).toMatchObject({
+    actor: 'd',
+  });
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(Response.delegated)).toHaveLength(2);
+  for (const fact of game.room.history.facts(Response.delegated))
     expect(fact.data.detail).toMatchObject({ provider: 'd' });
   replay(game);
 });
@@ -400,7 +406,7 @@ it('本人取消使用闪不支付，杀正常命中且请求关闭', async () =
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
-  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   replay(game);
 });
 it('连续两闪各有独立使用身份、完成和处理区，不合并为一次使用或打出', async () => {
@@ -419,7 +425,7 @@ it('连续两闪各有独立使用身份、完成和处理区，不合并为一�
   ).toBe('accepted');
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
-  const uses = game.room.history.facts('card.used');
+  const uses = game.room.history.facts(CardEvent.used);
   expect(uses).toHaveLength(3);
   expect(
     new Set(
@@ -428,8 +434,8 @@ it('连续两闪各有独立使用身份、完成和处理区，不合并为一�
       ),
     ).size,
   ).toBe(3);
-  expect(game.room.history.facts('card.finished')).toHaveLength(3);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.finished)).toHaveLength(3);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，不重开请求', async () => {
@@ -457,10 +463,10 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
   });
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').alive).toBe(false);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('response.delegated')).toHaveLength(1);
-  expect(game.room.history.facts('damage.committed')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('damage.committed'))).toEqual([]);
   replay(game);
 });
 it('主公禁止使用闪时不诱导护驾供牌或收取发动费用', async () => {
@@ -474,8 +480,8 @@ it('主公禁止使用闪时不诱导护驾供牌或收取发动费用', async (
   await use(game, attack());
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('c:hand');
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不会造成空候选等待', async () => {
@@ -510,7 +516,7 @@ it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不�
     game.skills.revoke(ctx, 'b', recipe.id, { kind: 'general', id: 'probe' }),
   );
   await game.room.run('no-playable', (ctx) => runPhase(ctx, game.book, 'b', 'play'));
-  expect(game.room.history.facts('card.used')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   replay(game);
 });
 it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留队友牌', async () => {
@@ -539,8 +545,8 @@ it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留�
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('c:hand');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 it('响应中的使用局部中止向上延续，不伪造缺闪伤害或撤销已提交材料', async () => {
@@ -556,7 +562,7 @@ it('响应中的使用局部中止向上延续，不伪造缺闪伤害或撤销�
   await dodge(game, use(game, attack()));
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('dodge')).toBe('discard');
-  expect(game.room.history.facts('card.used')).toHaveLength(2);
-  expect(game.room.history.facts('damage.dealt')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
+  expect(game.room.history.facts(Damage.dealt)).toEqual([]);
   replay(game);
 });

@@ -3,6 +3,7 @@ import type { Context } from '../../src/sdk';
 import { withProcessing } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed, choose, nextRequest } from '../fixtures/room';
+import { testTiming } from '../fixtures/timing';
 
 it('普通 await 返回业务值，declined/unavailable/undefined 都不冒充流程中止', async () => {
   const game = room();
@@ -26,24 +27,24 @@ it('中止默认向外传播，到显式 attempt 才恢复，清理按子到父�
       try {
         await effect.flow('operation', (operation) => {
           operation.defer(() => seen.push('operation cleanup'));
-          operation.commit('paid', [{ kind: 'vitality', player: 'a', hp: 3 }], {});
+          operation.commit(testTiming('paid'), [{ kind: 'vitality', player: 'a', hp: 3 }], {});
           operation.abort('author:stop');
         });
         seen.push('must not resume');
       } catch (error) {
         // JS catch 不能复活已经中止的上下文；恢复发生在外层拥有者。
         expect(effect.scope.active).toBe(false);
-        expect(() => effect.commit('invalid recovery', [], {})).toThrow('author:stop');
+        expect(() => effect.commit(testTiming('invalid recovery'), [], {})).toThrow('author:stop');
         throw error;
       }
     });
     expect(outcome).toEqual({ kind: 'aborted', reason: 'author:stop' });
-    root.commit('recovered', [], {});
+    root.commit(testTiming('recovered'), [], {});
     seen.push('outer recovery');
   });
   expect(seen).toEqual(['operation cleanup', 'effect cleanup', 'outer recovery']);
   expect(game.world.player('a').hp).toBe(3);
-  expect(game.history.facts('recovered')).toHaveLength(1);
+  expect(game.history.facts(testTiming('recovered'))).toHaveLength(1);
   expect(game.history.entries.some((entry) => entry.type === 'fault')).toBe(false);
   expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
 });
@@ -65,7 +66,7 @@ it('处理区先清理真实余牌再传播中止，已付事实不回滚', asyn
     const outcome = await ctx.attempt('processing attempt', (at) =>
       withProcessing(at, [{ cards: ['a1'], from: 'a:hand' }], async (body) => {
         await body.flow('resolution', (child) => {
-          child.commit('declaration', [], { card: 'a1' });
+          child.commit(testTiming('declaration'), [], { card: 'a1' });
           child.abort('resolution interrupted');
         });
         resumed = true;
@@ -78,7 +79,7 @@ it('处理区先清理真实余牌再传播中止，已付事实不回滚', asyn
   });
   expect(result).toEqual({ kind: 'aborted', reason: 'resolution interrupted' });
   expect(resumed).toBe(false);
-  expect(game.history.facts('declaration')).toHaveLength(1);
+  expect(game.history.facts(testTiming('declaration'))).toHaveLength(1);
   expect(game.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
   expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
 });

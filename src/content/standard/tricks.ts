@@ -11,6 +11,7 @@ import {
   resolveAttack,
 } from '../../sdk';
 import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
+import { CardEvent } from '../../sdk';
 
 const otherLiving = (ctx: Context, { actor }: CardFixedTargetsInput) =>
   ctx.world.snapshot.players
@@ -43,7 +44,7 @@ async function takeOrDiscard(ctx: Context, effect: CardEffect, take: boolean): P
         });
 
     if (moved.kind !== 'unavailable')
-      ctx.commit(take ? 'card.taken.delayed' : 'card.discarded.delayed', [], {
+      ctx.commit(take ? CardEvent.takenDelayed : CardEvent.discardedDelayed, [], {
         actor: effect.actor,
         target: effect.target,
         card: chosen.card,
@@ -67,7 +68,7 @@ async function takeOrDiscard(ctx: Context, effect: CardEffect, take: boolean): P
       });
 
   if (moved.kind === 'unavailable') return;
-  ctx.commit(take ? 'card.taken' : 'card.discarded.by-effect', [], {
+  ctx.commit(take ? CardEvent.taken : CardEvent.discardedByEffect, [], {
     actor: effect.actor,
     target: effect.target,
     card,
@@ -197,7 +198,7 @@ export const trickCards: readonly CardDefinition[] = [
                 'standard:amazing_grace',
               );
 
-              child.commit('card.taken.public', [], {
+              child.commit(CardEvent.takenPublic, [], {
                 actor: effect.target,
                 cards: answer.value.cards,
                 reason: 'standard:amazing_grace',

@@ -16,6 +16,9 @@ import type { CardEffect } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const attack = {
@@ -74,7 +77,7 @@ it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('answer')).toBe('discard');
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   replay(game);
 });
 
@@ -171,14 +174,14 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
     owner: null,
     eligible: () => true,
     async run(ctx) {
-      ctx.commit('test.extra-provider', [], null);
+      ctx.commit(testTiming('test.extra-provider'), [], null);
       await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'late-provider' });
     },
   });
   await use(game, attack);
-  expect(game.room.history.facts('test.extra-provider')).toEqual([]);
+  expect(game.room.history.facts(testTiming('test.extra-provider'))).toEqual([]);
   expect(game.room.world.position('fee')).toBe('c:hand');
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   replay(game);
 });
 
@@ -212,8 +215,8 @@ it('混合请求的菜单和最终回复仅允许未被禁用的牌，八卦不�
   ).toBe('accepted');
   await running;
   expect(game.room.world.zone('draw').cards).toEqual(['red']);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
-  expect(game.room.history.facts('response.requested')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
+  expect(game.room.history.facts(Response.requested)[0]!.data.detail).toMatchObject({
     requestedNames: ['standard:jink', 'standard:slash'],
     names: ['standard:slash'],
   });
@@ -261,7 +264,7 @@ it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未�
     },
   });
   await use(game, attack);
-  expect(game.room.history.facts('card.responded')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.responded)[0]!.data.detail).toMatchObject({
     declaration: { card: { name: 'standard:slash', source: null } },
   });
   replay(game);
@@ -306,7 +309,7 @@ it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际�
   });
   await use(game, attack);
   expect(seen).toEqual(['b', 'c']);
-  expect(game.room.history.facts('card.responded')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.responded)[0]!.data.detail).toMatchObject({
     actor: 'c',
     declaration: { beneficiary: 'b' },
   });
@@ -369,8 +372,10 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
   });
   await use(game, attack);
   expect(game.room.world.position('supply')).toBe('c:hand');
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
-  expect(game.room.history.facts('card.responded')[0]!.data.detail).toMatchObject({ actor: 'b' });
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
+  expect(game.room.history.facts(CardEvent.responded)[0]!.data.detail).toMatchObject({
+    actor: 'b',
+  });
   replay(game);
 });
 
@@ -451,7 +456,7 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
   expect(opened).toBe(0);
   expect(counts).toBe(0);
   expect(collections).toBe(0);
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   replay(game);
 });
 

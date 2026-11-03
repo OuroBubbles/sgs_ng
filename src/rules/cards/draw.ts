@@ -4,6 +4,16 @@ import { moveCards, Cards } from './move';
 import { isGameOver } from '../game/end';
 import type { PhaseSnapshot, PhaseView } from '../turn/turn';
 import { assertLifetime } from '../scopes/lifetime';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const Draw = defineEvent('draw', {
+  completed: timing<unknown>(),
+});
+
+export const Deck = defineEvent('deck', {
+  reshuffled: timing<unknown>(),
+});
 
 export interface DrawInput {
   readonly player: string;
@@ -81,7 +91,7 @@ export function reshuffle(ctx: Context): Promise<readonly string[]> {
       cards[j] = a;
     }
     const move = { cards, from: 'discard', to: 'draw', place: 'bottom' as const };
-    child.commit('deck.reshuffled', [{ kind: 'move', ...move }], { cards });
+    child.commit(Deck.reshuffled, [{ kind: 'move', ...move }], { cards });
     await child.window(
       Cards.moved,
       immutable({
@@ -154,7 +164,7 @@ export function draw(ctx: Context, request: DrawRequest): Promise<DrawResult> {
         cards,
         edits: draft.edits,
       });
-      child.commit('draw.completed', [], result);
+      child.commit(Draw.completed, [], result);
       if (cards.length) await child.window(Cards.drawn, result, { subject: input.player });
       return result;
     },

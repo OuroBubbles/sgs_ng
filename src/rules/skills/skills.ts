@@ -12,6 +12,7 @@ import type { ActiveSkill } from './active';
 import { EffectBook } from '../effects/effects';
 import type { CardBook } from '../cards/book';
 import { Death } from '../combat/life-events';
+import type { PaymentReceipt } from '../costs/pay';
 
 export interface SkillHandle {
   readonly id: string;
@@ -170,6 +171,7 @@ export interface SkillChange {
 }
 export const Skill = defineEvent('skill', {
   changed: timing<SkillChange>(),
+  invoked: timing<PaymentReceipt>(),
 });
 
 export interface GrantSkill {

@@ -12,8 +12,8 @@ import type { JointChoice, JointSelectionSpec } from '../core/decisions/selectio
 import type { Decision } from '../core/decisions/hub';
 import type { CardMove, Zone } from '../core/model/state';
 import { isGameOver } from './game/end';
-import { moveCards } from './cards/move';
-import type { MoveResult } from './cards/move';
+import { CardEvent, Cards, moveCards } from './cards/move';
+import type { MoveDeclaration, MoveResult } from './cards/move';
 import { ownedCards } from './cards/types';
 import type { ViewAs, ViewAsInput } from './cards/types';
 import type { PhysicalCardFace } from './cards/face';
@@ -31,6 +31,7 @@ import type { JudgmentResult } from './cards/judge';
 import { readState } from './state/state';
 import { activeTarget, activeTurn } from './turn/state';
 import type { PhaseView } from './turn/turn';
+import { Judgment } from './cards/judge';
 
 export type Areas = readonly Zone['kind'][];
 /** 手牌与装备区。 */
@@ -79,17 +80,13 @@ export const nth = (at: TriggerOccurrence): string =>
 
 // ───────────────────────── 动词
 
-export interface MoveFact {
-  readonly kind: string;
-  readonly data: unknown;
-}
 /** 牌从当前位置进入 player 的手牌；接收者阵亡或终局时不移动。 */
 export async function obtain(
   ctx: Context,
   player: string,
   cards: string | readonly string[],
   reason: string,
-  fact?: MoveFact,
+  fact?: MoveDeclaration,
 ): Promise<MoveResult | null> {
   const ids = typeof cards === 'string' ? [cards] : cards;
   if (!ids.length || !alive(ctx, player) || isGameOver(ctx.world)) return null;
@@ -113,7 +110,7 @@ export function takeCard(
   if (ctx.world.position(card) !== from) return Promise.resolve(null);
   const open = ctx.world.zone(from).kind !== 'hand';
   return obtain(ctx, actor, card, reason, {
-    kind: 'card.taken',
+    kind: CardEvent.taken,
     data: { actor, target, card, open, reason },
   });
 }
@@ -128,7 +125,7 @@ export function obtainJudgment(
   const card = judgment.card;
   if (!card || ctx.world.position(card.id) !== judgment.processing) return Promise.resolve(null);
   return obtain(ctx, player, card.id, reason, {
-    kind: 'judgment.card-obtained',
+    kind: Judgment.cardObtained,
     data: { judgment: judgment.id, player, reason, card: card.id },
   });
 }
@@ -146,7 +143,7 @@ export function give(
 ) {
   const { actor, target, cards, reason, visible } = input;
   return obtain(ctx, target, cards, reason, {
-    kind: 'cards.given',
+    kind: Cards.given,
     data: {
       actor,
       target,
@@ -228,7 +225,7 @@ export async function askDiscard(
     cards: picked.cards,
     areas,
     reason,
-    factKind: 'cards.discarded',
+    factKind: Cards.discarded,
     legal: () => live() && picked.valid(),
   });
   return paid.kind === 'paid';

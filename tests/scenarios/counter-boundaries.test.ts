@@ -14,6 +14,9 @@ import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sd
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Cost } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished' | 'cancelled';
@@ -122,8 +125,8 @@ it.each(boundaries)(
     expect(game.room.world.position('cost')).toBe('c:hand');
     expect(game.room.world.position('counter')).toBe('c:hand');
     expect(game.room.world.position('duel')).toBe('discard');
-    expect(game.room.history.facts('card.used')).toHaveLength(1);
-    expect(game.room.history.facts('cost.paid')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
+    expect(game.room.history.facts(Cost.paid)).toHaveLength(0);
     conserved(game);
   },
 );
@@ -156,7 +159,7 @@ it.each(boundaries)('同窗候选已支付再令反制 %s，保留真实费用�
   expect(later.mock.calls.length).toBe(0);
   expect(game.room.world.position('cost')).toBe('discard');
   expect(game.room.world.position('counter')).toBe('c:hand');
-  expect(game.room.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
   conserved(game);
 });
 
@@ -230,12 +233,10 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
   await use(game, intent);
   expect(later).toEqual(['d']);
   expect(game.room.world.player('d').hp).toBe(3);
-  expect(game.room.history.facts('counter.finished').map((fact) => fact.data.detail)).toMatchObject(
-    [
-      { kind: 'unopposed', subject: { effect: { target: 'd' } } },
-      { kind: 'unavailable', subject: { effect: { target: 'b' } } },
-    ],
-  );
+  expect(game.room.history.facts(Counter.finished).map((fact) => fact.data.detail)).toMatchObject([
+    { kind: 'unopposed', subject: { effect: { target: 'd' } } },
+    { kind: 'unavailable', subject: { effect: { target: 'b' } } },
+  ]);
   conserved(game);
 });
 
@@ -282,7 +283,7 @@ it('反制完成是已封口公共事实，完成后效终局不重写结果或�
   await use(game, intent);
   expect(later).toHaveBeenCalledTimes(1);
   expect(later.mock.calls[0]![1]).toMatchObject({ kind: 'unopposed', by: null });
-  expect(game.room.history.facts('counter.finished')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Counter.finished)[0]!.data.detail).toMatchObject({
     kind: 'unopposed',
   });
   expect(game.room.world.player('b').hp).toBe(4);
@@ -298,7 +299,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
     #relevant = true;
 
     relevant(ctx: Context) {
-      if (this.write) ctx.commit('probe.counter-query-write', [], null);
+      if (this.write) ctx.commit(testTiming('probe.counter-query-write'), [], null);
       return this.#relevant;
     }
 
@@ -328,7 +329,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
     });
   });
   expect(later.mock.calls.length).toBe(0);
-  expect(game.room.history.facts('probe.counter-query-write')).toEqual([]);
+  expect(game.room.history.facts(testTiming('probe.counter-query-write'))).toEqual([]);
   conserved(game);
 });
 
@@ -341,7 +342,7 @@ it('反制机会在普通后效中检查相关性也拒绝异步结果，不提�
     eligible: () => true,
     run: (ctx, opportunity) => {
       asynchronous = true;
-      if (opportunity.available(ctx)) ctx.commit('probe.counter-after-async', [], null);
+      if (opportunity.available(ctx)) ctx.commit(testTiming('probe.counter-after-async'), [], null);
     },
   });
   await expect(
@@ -357,8 +358,8 @@ it('反制机会在普通后效中检查相关性也拒绝异步结果，不提�
     ),
   ).rejects.toThrow('Queries cannot await');
   expect(game.room.status).toBe('faulted');
-  expect(game.room.history.facts('probe.counter-after-async')).toEqual([]);
-  expect(game.room.history.facts('counter.finished')).toEqual([]);
+  expect(game.room.history.facts(testTiming('probe.counter-after-async'))).toEqual([]);
+  expect(game.room.history.facts(Counter.finished)).toEqual([]);
   expect(game.room.decisions.pending).toEqual([]);
   expect(game.room.world.snapshot.zones).toEqual(game.initial.zones);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -380,12 +381,12 @@ it.each(boundaries)(
     game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'counter' });
     await running;
 
-    const completed = game.room.history.facts('counter.finished').map((fact) => fact.data.detail);
+    const completed = game.room.history.facts(Counter.finished).map((fact) => fact.data.detail);
     expect(completed).toMatchObject([
       { kind: 'unavailable', subject: { kind: 'use' }, by: null },
       { kind: 'unavailable', subject: { kind: 'effect' }, by: { actor: 'c' } },
     ]);
-    expect(game.room.history.facts('card.used')).toHaveLength(2);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
     expect(game.room.world.position('counter')).toBe('discard');
     expect(game.room.world.position('cost')).toBe('c:hand');
     conserved(game);
@@ -447,7 +448,7 @@ it('最后询问席位的反制在准备中失效，未支付时也不误报未�
   expect(request.player).toBe('d');
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'prepared' });
   expect(await running).toMatchObject({ value: { kind: 'unavailable', by: null } });
-  expect(game.room.history.facts('card.used')).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   expect(game.room.world.position('prepared')).toBe('d:hand');
   conserved(game);
 });

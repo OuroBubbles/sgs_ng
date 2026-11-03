@@ -125,7 +125,7 @@ it.each(['prepare', 'add', 'update'] as const)(
         const input = { owner: 'a', origin: data, data };
         if (mode === 'prepare') {
           const prepared = await game.book.effects.prepare(ctx, definition, input);
-          ctx.commit('snapshot.prepared', [prepared.change], prepared.record);
+          ctx.commit(testTiming('snapshot.prepared'), [prepared.change], prepared.record);
           record = prepared.record;
         } else record = await game.book.effects.add(ctx, definition, input);
         expect(record.origin).toBe(record.data);
@@ -209,7 +209,7 @@ it.each([false, true])(
     const game = create({
       onEnd(ctx, { before }) {
         expect(game.skills.query(ctx, strength, null, 0)).toBe(0);
-        ctx.commit('probe.expiry-started', [], { amount: before.data.amount });
+        ctx.commit(testTiming('probe.expiry-started'), [], { amount: before.data.amount });
         if (before.data.amount === 1) ctx.abort('only this expiry');
         completed.push(before.data.amount);
       },
@@ -226,8 +226,8 @@ it.each([false, true])(
 
     expect(game.ended).toHaveLength(2);
     expect(completed).toEqual([2]);
-    expect(game.room.history.facts('effect.ended')).toHaveLength(2);
-    expect(game.room.history.facts('probe.expiry-started')).toHaveLength(2);
+    expect(game.room.history.facts(Effect.ended)).toHaveLength(2);
+    expect(game.room.history.facts(testTiming('probe.expiry-started'))).toHaveLength(2);
     expect(game.effects.instances(game.room.world)).toEqual([]);
     expect(result).toEqual(
       abortBody
@@ -254,7 +254,7 @@ it('显式结束的后效中止仍传播给调用者，不借批量到期边界�
   expect(result).toEqual({ kind: 'aborted', reason: 'explicit end stopped' });
   expect(resumed).toBe(false);
   expect(game.room.status).toBe('ready');
-  expect(game.room.history.facts('effect.ended')).toHaveLength(1);
+  expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
   expect(game.effects.instances(game.room.world)).toEqual([]);
   replay(game);
 });
@@ -267,7 +267,7 @@ it.each(['fault', 'close'] as const)(
         if (before.data.amount !== 1) throw new Error('Must not run another expiry.');
         if (exit === 'fault') throw new Error('expiry fault');
         game.room.abort('room closed');
-        ctx.commit('must not write', [], {});
+        ctx.commit(testTiming('must not write'), [], {});
       },
     });
     const running = game.room.run('expiry', (ctx) =>
@@ -281,8 +281,8 @@ it.each(['fault', 'close'] as const)(
     else expect(await running).toEqual({ kind: 'aborted', reason: 'room closed' });
     expect(game.room.status).toBe(exit === 'fault' ? 'faulted' : 'ended');
     expect(game.ended).toHaveLength(1);
-    expect(game.room.history.facts('effect.ended')).toHaveLength(1);
-    expect(game.room.history.facts('must not write')).toEqual([]);
+    expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('must not write'))).toEqual([]);
     expect(game.effects.instances(game.room.world)).toEqual([]);
     replay(game);
   },
@@ -469,7 +469,7 @@ it('前组结束效果后，已收集的后组候选不再执行或收费', asyn
   });
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(charged).toBe(0);
-  expect(game.room.history.facts('cost.paid')).toEqual([]);
+  expect(game.room.history.facts(Cost.paid)).toEqual([]);
   replay(game);
 });
 
@@ -536,7 +536,7 @@ it('创建流程中止仍结束临时效果；结束回调不能恢复查询资�
   );
   expect(value(game)).toBe(0);
   expect(game.ended).toHaveLength(1);
-  expect(game.room.history.facts('effect.ended')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Effect.ended)[0]?.data.detail).toMatchObject({
     reason: 'lifetime:aborted:aborted',
   });
   replay(game);
@@ -726,7 +726,7 @@ it('数据声明复制冻结，非法更新在提交前拒绝，旧内容与事�
     ),
   ).rejects.toThrow('Invalid updated');
   expect(game.room.world.snapshot).toEqual(before);
-  expect(game.room.history.facts('effect.changed')).toEqual([]);
+  expect(game.room.history.facts(Effect.changed)).toEqual([]);
 });
 it('真实守约跨回合与来源死亡：修改上限、仅减一次伤害、目标回合结束后撤销并摸牌', async () => {
   const game = cardGame({
@@ -769,7 +769,7 @@ it('真实守约跨回合与来源死亡：修改上限、仅减一次伤害、�
   expect(game.book.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.position('reward')).toBe('b:hand');
   expect(game.room.inspect((ctx) => game.book.handLimit(ctx, 'b'))).toBe(1);
-  expect(game.room.history.facts('effect.ended')).toHaveLength(1);
+  expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   expect(game.room.decisions.pending).toEqual([]);
 });
@@ -791,7 +791,7 @@ it('守约受益者死亡按普通死亡时点撤销，已死来源与死者归�
   );
   expect(game.book.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.position('reward')).toBe('draw');
-  expect(game.room.history.facts('effect.ended')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Effect.ended)[0]?.data.detail).toMatchObject({
     reason: 'covenant:target-died',
   });
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -854,7 +854,7 @@ it('外局仍活跃的领域不能赋给本局效果，拒绝前不提交状态'
     }),
   );
   expect(game.effects.instances(game.room.world)).toEqual([]);
-  expect(game.room.history.facts('effect.added')).toEqual([]);
+  expect(game.room.history.facts(Effect.added)).toEqual([]);
   replay(other);
 });
 it.each(['factory', 'contribution'] as const)(
@@ -863,11 +863,12 @@ it.each(['factory', 'contribution'] as const)(
     let writing: Context | null = null;
     const game = create({
       behavior: (self) => {
-        if (kind === 'factory' && writing) writing.commit('bad-factory', [], null);
+        if (kind === 'factory' && writing) writing.commit(testTiming('bad-factory'), [], null);
         return {
           modifiers: [
             effectModify(strength, () => {
-              if (kind === 'contribution' && writing) writing.commit('bad-query', [], null);
+              if (kind === 'contribution' && writing)
+                writing.commit(testTiming('bad-query'), [], null);
               return self.data.amount;
             }),
           ],
@@ -884,10 +885,10 @@ it.each(['factory', 'contribution'] as const)(
       expect(ctx.world.snapshot).toBe(before);
       writing = null;
       expect(game.skills.query(ctx, strength, null, 0)).toBe(2);
-      ctx.commit('after-query', [], null);
+      ctx.commit(testTiming('after-query'), [], null);
     });
-    expect(game.room.history.facts('bad-factory')).toEqual([]);
-    expect(game.room.history.facts('bad-query')).toEqual([]);
+    expect(game.room.history.facts(testTiming('bad-factory'))).toEqual([]);
+    expect(game.room.history.facts(testTiming('bad-query'))).toEqual([]);
     replay(game);
   },
 );
@@ -910,7 +911,7 @@ it.each(['finish', 'abort', 'fault'] as const)(
       ).rejects.toThrow('probe:failure');
     expect(self.current(game.room.world)).toBeNull();
     expect(game.ended).toEqual([]);
-    expect(game.room.history.facts('effect.ended')).toEqual([]);
+    expect(game.room.history.facts(Effect.ended)).toEqual([]);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   },
 );

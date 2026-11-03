@@ -1,5 +1,11 @@
 import { JointSelection, equipmentInSlot, isGameOver, moveCards } from '../../sdk';
 import type { CardBook, CardDefinition, CardChoice, Context, UseRequest } from '../../sdk';
+import { defineEvent } from '../../sdk';
+import { timing } from '../../sdk';
+
+export const Collateral = defineEvent('collateral', {
+  weaponTaken: timing<unknown>(),
+});
 
 function victimOf(input: unknown): string | null {
   return input !== null &&
@@ -123,7 +129,7 @@ export const collateral: CardDefinition = {
         }));
         await moveCards(at, moves, 'standard:collateral');
 
-        at.commit('collateral.weapon-taken', [], {
+        at.commit(Collateral.weaponTaken, [], {
           actor: effect.actor,
           holder: effect.target,
           victim,

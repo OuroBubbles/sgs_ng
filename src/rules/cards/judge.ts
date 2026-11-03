@@ -61,6 +61,8 @@ export const Judgment = defineEvent('judgment', {
   revealed: timing<Judgment>(),
   retrial: timing<Judgment>(),
   finished: timing<JudgmentResult>(),
+  replaced: timing<unknown>(),
+  cardObtained: timing<unknown>(),
 });
 const currentCard = defineState<JudgmentCard | null>(
   'core:judgment-card',
@@ -120,7 +122,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
             [{ cards: [id], from: 'draw', to: processing.zone, place: 'bottom' }],
             input.reason,
             {
-              kind: 'judgment.revealed',
+              kind: Judgment.revealed,
               data: { id: control.id, ...input, processing: processing.zone, card },
               changes: [stateChange(at, currentCard, target, card)],
             },
@@ -232,7 +234,7 @@ async function replaceJudgment(
       ],
       input.reason,
       {
-        kind: 'judgment.replaced',
+        kind: Judgment.replaced,
         data: {
           id: judgment.id,
           player: judgment.player,

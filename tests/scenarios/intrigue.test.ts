@@ -37,6 +37,10 @@ import {
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { CardEvent } from '../../src/sdk';
+import { Fanjian } from '../../src/content/standard/generals/zhouyu';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -167,7 +171,11 @@ it('具名选项固定描述快照、拒绝未知项与强制取消，结束后�
   expect(game.room.decisions.cancel(next.id, next.token).kind).toBe('accepted');
   expect(await optional).toMatchObject({ value: { kind: 'cancelled' } });
   await game.room.run('actor-leaves', (ctx) =>
-    ctx.commit('actor.left', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], null),
+    ctx.commit(
+      testTiming('actor.left'),
+      [{ kind: 'vitality', player: 'a', hp: 0, alive: false }],
+      null,
+    ),
   );
   expect(await game.room.run('closed-choice', (ctx) => ctx.ask(decision))).toMatchObject({
     value: { kind: 'unavailable' },
@@ -199,8 +207,8 @@ it.each(['red', 'black', 'decline', 'empty'])('铁骑 %s 判定只影响本次�
   if (kind !== 'red') await answer(game, { kind: 'physical', card: 'jink' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(kind === 'red' ? 3 : 4);
-  expect(game.room.history.facts('card.responded')).toHaveLength(0);
-  expect(game.room.history.facts('card.used')).toHaveLength(kind === 'red' ? 1 : 2);
+  expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(kind === 'red' ? 1 : 2);
   replay(game);
 });
 it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受的判定效果', async () => {
@@ -358,7 +366,7 @@ it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
       await draw(at, { player: 'a', count: 1, reason: 'author:nested' });
     }),
   );
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(ownedCards(game.room.world, 'a')).toHaveLength(1);
   replay(game);
 });
@@ -459,7 +467,7 @@ it('反间取消不消耗次数，空手或只有装备时不能发动', async (
   });
   await cancel(game);
   await running;
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   await game.room.run('remove', (ctx) =>
     moveCards(ctx, [{ cards: ['gift'], from: 'a:hand', to: 'discard', place: 'bottom' }], 'test'),
   );
@@ -532,7 +540,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
     await selectFanjianCard(game);
     await running;
     expect(game.room.world.player('b').hp).toBe(3);
-    expect(game.room.history.facts('damage.dealt')[0]!.data.detail).toMatchObject({
+    expect(game.room.history.facts(Damage.dealt)[0]!.data.detail).toMatchObject({
       input: { from: 'a', to: 'b' },
     });
     replay(game);
@@ -565,7 +573,7 @@ it('反间支付后手牌被取走，不生成假牌或多问一次花色，次�
   });
   await answer(game, { cards: [], targets: ['b'] }, 'cards-targets');
   await running;
-  expect(game.room.history.facts('fanjian.guessed')).toEqual([]);
+  expect(game.room.history.facts(Fanjian.guessed)).toEqual([]);
   expect(game.room.world.player('b').hp).toBe(4);
   replay(game);
 });
@@ -597,7 +605,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
   expect(game.room.world.position('null')).toBe('b:hand');
   expect(game.room.world.player('b').hp).toBe(3);
   expect(counters).toBe(0);
-  expect(game.room.history.facts('card.used')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[0]!.data.detail).toMatchObject({
     actor: 'c',
     cards: [],
     declaration: {
@@ -723,7 +731,7 @@ it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确�
   const shown = finished.actions.find((action) => action.kind === 'reveal')!;
   expect(shown).toMatchObject({ actor: 'a', targets: ['b'], card: { name: '闪', suit: '♥' } });
   expect(Number.isSafeInteger(shown.seq)).toBe(true);
-  expect(match.room.history.facts('cards.given').some((fact) => fact.seq === shown.seq)).toBe(true);
+  expect(match.room.history.facts(Cards.given).some((fact) => fact.seq === shown.seq)).toBe(true);
   expect(finished.log.some((line) => line.text.includes('公开：【闪】♥7'))).toBe(true);
 });
 it('单次反制禁令随持久延时牌保存到后续生效，不依赖原计划句柄', async () => {
@@ -770,7 +778,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
     await answer(game, { cards: ['fee'], targets: ['b', 'c'] }, 'cards-targets');
     await running;
     expect(game.room.world.position('fee')).toBe('discard');
-    expect(game.room.history.facts('card.used')).toHaveLength(blocked ? 0 : 1);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(blocked ? 0 : 1);
     expect(game.room.world.player('b').hp).toBe(blocked ? 4 : 3);
     replay(game);
   }
@@ -791,7 +799,7 @@ it('离间的实际决斗者可触发集智，无双要求对方两杀，伤害�
     await answer(game, { kind: 'physical', card: id }, 'card-response');
   await running;
   expect(game.room.world.player('c').hp).toBe(3);
-  expect(game.room.history.facts('damage.dealt')[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(Damage.dealt)[0]!.data.detail).toMatchObject({
     input: { from: 'b', to: 'c', card: { actor: 'c' } },
   });
   expect(game.room.world.position('drawn')).toBe('c:hand');
@@ -887,7 +895,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
   await answer(game, { kind: 'physical', card: 'an' }, 'use-card');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts('card.used')).toHaveLength(3);
+  expect(game.room.history.facts(CardEvent.used)).toHaveLength(3);
   replay(game);
 });
 it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
@@ -897,7 +905,7 @@ it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=2
   await playMatch(match, { steps: 12000 });
 
   const invoked = match.room.history
-    .facts('skill.invoked')
+    .facts(Skill.invoked)
     .map((f) => (f.data.detail as { skill: string }).skill);
   expect(invoked).toContain('standard:fanjian');
   expect(invoked).toContain('standard:lijian');

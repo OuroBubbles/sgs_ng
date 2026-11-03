@@ -7,6 +7,7 @@ import { parseCardChoice } from './book';
 import { withProcessing } from './processing';
 import type { CardChoice, SemanticCard } from './types';
 import { Response } from './response';
+import { CardEvent } from './move';
 
 export interface CardSupplyInput {
   readonly actor: string;
@@ -105,7 +106,7 @@ export function withCardSupply<T>(
             JSON.stringify(current.value) === JSON.stringify(card)
           );
         },
-        factKind: 'card.responded',
+        factKind: CardEvent.responded,
         declaration: {
           id: responseId,
           card,

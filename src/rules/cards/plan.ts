@@ -14,6 +14,7 @@ import type {
   UseTiming,
 } from './types';
 import { targetStages, timingSnapshot } from './types';
+import { CardEvent } from './move';
 
 interface DeclaredEffect {
   readonly effectId: string;
@@ -336,7 +337,7 @@ export class UsePlan implements UsePlanView {
   #commit(ctx: Context, value: UseDeclaration): void {
     this.assertMutable(ctx);
     ctx.commit(
-      'card.plan.changed',
+      CardEvent.planChanged,
       [stateChange(ctx, declarationKey, this.#stateTarget(), value)],
       { useId: this.id },
     );
@@ -472,7 +473,7 @@ export class UsePlan implements UsePlanView {
     options?: TargetOptions,
   ): string {
     const change = this.replaceTargetChange(ctx, id, target, reason, options);
-    ctx.commit('card.target.replaced', [change], {
+    ctx.commit(CardEvent.targetReplaced, [change], {
       useId: this.id,
       fromEffectId: id,
       target,

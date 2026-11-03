@@ -32,6 +32,8 @@ import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
+import { Cost } from '../../src/sdk';
+import { PlayerEvent } from '../../src/rules/combat/life';
 
 const original = { kind: 'general', id: 'original' } as const;
 const additional = { kind: 'effect', id: 'additional' } as const;
@@ -99,7 +101,7 @@ it('离场装备能使用普通 invoke 宣告并摸牌，当前能力目录仍�
   await running;
   expect(captured!.active(capturedAt!)).toBe(false);
   expect(game.room.world.zone('a:hand').cards).toEqual(['reward']);
-  expect(game.room.history.facts('skill.invoked')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Skill.invoked)[0]?.data.detail).toMatchObject({
     skill: 'probe:retained-armor-ability',
     instance: captured!.id,
   });
@@ -115,7 +117,7 @@ it.each(['revoke', 'expiration'] as const)(
     const respond = async (ctx: Context, self: SkillHandle) => {
       expect(self.active(ctx)).toBe(true);
       if (await invoke(ctx, self, '是否发动遗响？'))
-        ctx.commit('probe.retained', [], { instance: self.id });
+        ctx.commit(testTiming('probe.retained'), [], { instance: self.id });
     };
     const legacy = defineSkill({
       id: 'probe:legacy',
@@ -157,8 +159,8 @@ it.each(['revoke', 'expiration'] as const)(
     expect((await answer(game)).kind).toBe('invoke');
     await running;
     expect(game.room.world.snapshot.skills).toHaveLength(0);
-    expect(game.room.history.facts('probe.retained')).toHaveLength(1);
-    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(1);
+    expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
     rebuilt(game);
   },
 );
@@ -173,7 +175,7 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
         id: 'lost',
         when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
         effect: (ctx) => {
-          ctx.commit('probe.unexpected', [], null);
+          ctx.commit(testTiming('probe.unexpected'), [], null);
         },
       }),
     ],
@@ -183,7 +185,7 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
     await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
     await game.skills.revoke(ctx, 'a', legacy.id, original);
   });
-  expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
+  expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
   rebuilt(game);
 });
 
@@ -234,7 +236,7 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
     ).toBe('unavailable');
   });
   expect(game.room.world.position('fee')).toBe('discard');
-  expect(game.room.history.facts('cost.paid')).toHaveLength(1);
+  expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -250,7 +252,7 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 retain，值�
         when: (_ctx, event, self) => event.player === self.owner,
         async effect(ctx, _event, self) {
           if (await invoke(ctx, self, '是否留下遗言？'))
-            ctx.commit('probe.last-word', [], { owner: self.owner });
+            ctx.commit(testTiming('probe.last-word'), [], { owner: self.owner });
         },
       }),
     ],
@@ -264,7 +266,7 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 retain，值�
   );
   if (allowDead) expect((await answer(game)).kind).toBe('invoke');
   await running;
-  expect(game.room.history.facts('probe.last-word')).toHaveLength(allowDead ? 1 : 0);
+  expect(game.room.history.facts(testTiming('probe.last-word'))).toHaveLength(allowDead ? 1 : 0);
   expect(game.room.world.player('a').alive).toBe(false);
   rebuilt(game);
 });
@@ -280,7 +282,7 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
         retain: (ctx, change, self) => skillLost(ctx.world, change.before, self),
         when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
         effect: (ctx) => {
-          ctx.commit('probe.retained', [], null);
+          ctx.commit(testTiming('probe.retained'), [], null);
         },
       }),
     ],
@@ -292,16 +294,16 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
     await game.skills.setEnabled(ctx, 'a', legacy.id, original, false);
     await game.skills.setEnabled(ctx, 'a', legacy.id, original, true);
     await game.skills.revoke(ctx, 'a', legacy.id, original);
-    expect(game.room.history.facts('probe.retained')).toHaveLength(0);
+    expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(0);
     await game.skills.revoke(ctx, 'a', legacy.id, additional);
   });
-  expect(game.room.history.facts('probe.retained')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(1);
   rebuilt(game);
 });
 
 it('当前失效仍能阻止历史来源', async () => {
   const armor = lostArmor((ctx) => {
-    ctx.commit('probe.unexpected', [], null);
+    ctx.commit(testTiming('probe.unexpected'), [], null);
   });
   const game = cardGame({
     hands: { a: [] },
@@ -321,7 +323,7 @@ it('当前失效仍能阻止历史来源', async () => {
       );
     }),
   );
-  expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
+  expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
   rebuilt(game);
 });
 
@@ -346,7 +348,7 @@ for (const [window, group] of [
             expect(event.skillsBefore).toHaveLength(0);
             expect(event.burial.skillsBefore).toHaveLength(1);
             if (await invoke(ctx, self, '是否留下遗言？'))
-              ctx.commit('probe.buried', [], { instance: self.id });
+              ctx.commit(testTiming('probe.buried'), [], { instance: self.id });
           },
         }),
       ],
@@ -365,13 +367,13 @@ for (const [window, group] of [
     );
     await answer(game);
     await running;
-    expect(game.room.history.facts('player.died')[0]?.data.detail).toMatchObject({
+    expect(game.room.history.facts(PlayerEvent.died)[0]?.data.detail).toMatchObject({
       skillsBefore: [],
     });
-    expect(game.room.history.facts('player.buried')[0]?.data.detail).toMatchObject({
+    expect(game.room.history.facts(PlayerEvent.buried)[0]?.data.detail).toMatchObject({
       burial: { skillsBefore: [{ skill: legacy.id }] },
     });
-    expect(game.room.history.facts('probe.buried')).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('probe.buried'))).toHaveLength(1);
     expect(game.room.world.snapshot.skills).toHaveLength(0);
     rebuilt(game);
   });
@@ -391,7 +393,7 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
         async effect(ctx, _event, self) {
           started = true;
           if (await invoke(ctx, self, '是否继续已开始的后效？'))
-            ctx.commit('probe.started', [], null);
+            ctx.commit(testTiming('probe.started'), [], null);
         },
       }),
     ],
@@ -403,7 +405,7 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
   });
   await answer(game);
   await running;
-  expect(game.room.history.facts('probe.started')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.started'))).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -439,7 +441,7 @@ it('后效执行中被明确失效会停止后续支付，不回滚已经完成�
   );
   await answer(game);
   await running;
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.position('fee')).toBe('a:hand');
   rebuilt(game);
 });
@@ -487,7 +489,7 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
         locked: true,
         id: 'lost',
         retain(ctx) {
-          ctx.commit('probe.unexpected', [], null);
+          ctx.commit(testTiming('probe.unexpected'), [], null);
           return true;
         },
         effect: () => {},
@@ -501,7 +503,7 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
       await game.skills.revoke(ctx, 'a', legacy.id, original);
     }),
   ).rejects.toThrow(/quer/i);
-  expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
+  expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
   const other = cardGame();
   await expect(
     other.room.run('impure-available', async (ctx) => {
@@ -512,14 +514,14 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
         name: '错误资格',
         origin: null,
         active(at) {
-          at.commit(window.id, [], null);
+          at.commit(window, [], null);
           return true;
         },
       };
       await pay(ctx, { skill: self, cards: [], to: 'discard', reason: 'bad' });
     }),
   ).rejects.toThrow(/quer/i);
-  expect(other.room.history.facts(window.id)).toHaveLength(0);
+  expect(other.room.history.facts(window)).toHaveLength(0);
 });
 
 it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二次', async () => {
@@ -542,7 +544,7 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
             if (first) expect(first.active(ctx)).toBe(false);
             first ??= self;
             if (await invoke(ctx, self, `第${occurrence.index}次？`))
-              ctx.commit('probe.occurrence', [], { index: occurrence.index });
+              ctx.commit(testTiming('probe.occurrence'), [], { index: occurrence.index });
           },
         }),
       ],
@@ -563,8 +565,10 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
   await answer(game, false);
   await answer(game, true);
   await running;
-  expect(game.room.history.facts('probe.occurrence')[0]?.data.detail).toEqual({ index: 2 });
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.occurrence'))[0]?.data.detail).toEqual({
+    index: 2,
+  });
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -580,7 +584,8 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
         retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
         when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
         async effect(ctx, _event, self) {
-          if (await invoke(ctx, self, '是否发动旧来源？')) ctx.commit('probe.custom', [], null);
+          if (await invoke(ctx, self, '是否发动旧来源？'))
+            ctx.commit(testTiming('probe.custom'), [], null);
         },
       }),
     ],
@@ -605,7 +610,7 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
   });
   await answer(game);
   await running;
-  expect(game.room.history.facts('probe.custom')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.custom'))).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -621,7 +626,7 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
           locked: true,
           id: 'effect',
           effect: (ctx) => {
-            ctx.commit('probe.unexpected', [], null);
+            ctx.commit(testTiming('probe.unexpected'), [], null);
           },
         }),
       ],
@@ -642,7 +647,7 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
         await ctx.window(window, { before: ctx.world.snapshot.skills });
       }),
     ).rejects.toThrow(kind === 'invalid-array' ? /array/ : /Conflicting/);
-    expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
+    expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
   },
 );
 
@@ -679,7 +684,7 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
   });
   await answer(game);
   await running;
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -776,7 +781,8 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
         locked: true,
         id: 'run',
         async effect(ctx, _event, self) {
-          if (await invoke(ctx, self, '普通类来源？')) ctx.commit('probe.class', [], null);
+          if (await invoke(ctx, self, '普通类来源？'))
+            ctx.commit(testTiming('probe.class'), [], null);
         },
       }),
     ],
@@ -790,7 +796,7 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
   const running = game.room.run('event', (ctx) => ctx.window(window, null));
   await answer(game);
   await running;
-  expect(game.room.history.facts('probe.class')).toHaveLength(1);
+  expect(game.room.history.facts(testTiming('probe.class'))).toHaveLength(1);
   rebuilt(game);
 });
 
@@ -830,9 +836,9 @@ it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否�
   expect(match.room.world.zone('甲席:hand').cards).toHaveLength(before - 2 + Number(accept));
   expect(match.room.world.position('relic-card-2')).toBe('discard');
   expect(match.room.world.position('relic-card-14')).toBe('甲席:equipment');
-  expect(match.room.history.facts('skill.invoked')).toHaveLength(Number(accept));
+  expect(match.room.history.facts(Skill.invoked)).toHaveLength(Number(accept));
   if (accept)
-    expect(match.room.history.facts('skill.invoked')[0]?.data.detail).toMatchObject({
+    expect(match.room.history.facts(Skill.invoked)[0]?.data.detail).toMatchObject({
       skill: 'workshop:jade-echo',
       instance: JSON.stringify(['equipment', '甲席', 'relic-card-2']),
     });

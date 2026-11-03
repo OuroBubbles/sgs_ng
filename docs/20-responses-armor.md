@@ -41,7 +41,7 @@ if (judgment.matched && request.canProvide(ctx, jink)) {
 
 `ResponseResult` 成功分为 responded（实际打出者）和 used（实际使用者与完整 use），委托使用另附 supplied；`isResponseSatisfied` 判断两项成功。实际打出完成窗口以 subject 区分 effect / judgment / supply，见 [30](30-strategists-private-pools.md) 与 [32](32-benevolence-supply-rescue.md)。`responseFinished` 只属于实际打出的牌，不为委托父层重复触发；原请求者的使用则有自己的 useFinished。宣告保留 beneficiary 和请求身份，委托另有 response.delegated 事实。失败尝试不阻止换人或本人继续供牌。
 
-请求句柄/闭包不进入历史；`response.requested`、`response.request.finished` 保存普通数据。它们用于说明原因链，不承诺恢复暂停中的 JavaScript 调用栈。
+请求句柄/闭包不进入历史；`response.requested`、`response.request-finished` 保存普通数据。它们用于说明原因链，不承诺恢复暂停中的 JavaScript 调用栈。
 
 ## 八卦阵：宣告和后续效果分开
 

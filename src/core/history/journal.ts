@@ -41,18 +41,14 @@ export interface Fact<T = unknown> extends Cause {
 
 export type JournalEntry = Trace | Fact;
 
-/** 历史记录的种类：事件时点本身（带类型）或其序列化 id。 */
-export type FactKind = Timing<unknown, unknown> | string;
-export const factKind = (kind: FactKind): string => (typeof kind === 'string' ? kind : kind.id);
-
 /** 按事件时点收窄一条历史记录的载荷类型。 */
 export const isFact = <R>(fact: Fact, kind: Timing<unknown, R>): fact is Fact<R> =>
   fact.data.kind === kind.id;
 
 export interface HistoryReader {
   readonly entries: readonly JournalEntry[];
+  facts(): readonly Fact[];
   facts<R>(kind: Timing<unknown, R>, withinScope?: string): readonly Fact<R>[];
-  facts(kind?: string, withinScope?: string): readonly Fact[];
 }
 
 /** 单调序号与父子因果分别保存；中文叙事不参与状态还原。 */
@@ -85,10 +81,10 @@ export class Journal {
     return Object.freeze([...this.#entries]);
   }
 
+  facts(): readonly Fact[];
   facts<R>(kind: Timing<unknown, R>, withinScope?: string): readonly Fact<R>[];
-  facts(kind?: string, withinScope?: string): readonly Fact[];
-  facts(kind?: FactKind, withinScope?: string): readonly Fact[] {
-    const facts = kind === undefined ? this.#facts : (this.#factsByKind.get(factKind(kind)) ?? []);
+  facts(kind?: Timing<unknown, unknown>, withinScope?: string): readonly Fact[] {
+    const facts = kind === undefined ? this.#facts : (this.#factsByKind.get(kind.id) ?? []);
     return Object.freeze(
       withinScope === undefined
         ? [...facts]

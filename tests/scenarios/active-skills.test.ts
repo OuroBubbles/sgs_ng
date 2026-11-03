@@ -39,6 +39,9 @@ import {
 import { inspectActive, activeAvailable } from '../../src/rules/skills/active';
 import type { ActiveSkill, ActiveRunInput, Context, PhaseView } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
+import { Hp } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const source = { kind: 'general', id: 'fixture' } as const;
 
@@ -78,7 +81,7 @@ it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候
       expect(selection.validate(choice).ok).toBe(true);
       await ctx.flow('target-leaves', (at) =>
         at.commit(
-          'target.left',
+          testTiming('target.left'),
           [{ kind: 'vitality', player: this.#target, hp: 0, alive: false }],
           null,
         ),
@@ -117,7 +120,7 @@ it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候
       expect(activeAvailable(at, game.book, phase)).toBe(false);
     }),
   );
-  expect(game.room.history.facts('cost.paid')).toEqual([]);
+  expect(game.room.history.facts(Cost.paid)).toEqual([]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
@@ -141,7 +144,7 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
               cardCount: { min: 1, max: 1 },
             }),
           run(ctx) {
-            ctx.commit('must-not-run', [], null);
+            ctx.commit(testTiming('must-not-run'), [], null);
           },
         },
       ],
@@ -192,7 +195,7 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
       await activate(at, game.book, phase, input);
     }),
   );
-  expect(game.room.history.facts('must-not-run')).toEqual([]);
+  expect(game.room.history.facts(testTiming('must-not-run'))).toEqual([]);
 });
 type Game = ReturnType<typeof cardGame>;
 async function grant(game: Game, skill: string) {
@@ -261,7 +264,7 @@ async function setupSupport(game: Game) {
     setGender(ctx, 'c', 'female');
     setGender(ctx, 'd', 'dual');
     ctx.commit(
-      'wounds',
+      testTiming('wounds'),
       ['a', 'b', 'c', 'd'].map((player) => ({ kind: 'vitality', player, hp: 2 })),
       null,
     );
@@ -288,8 +291,8 @@ it('零牌也提供苦肉；同一阶段可反复发动，失去体力与摸牌�
   await pass(game);
   await running;
   expect(game.room.world.zone('a:hand').cards).toHaveLength(4);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(2);
-  expect(game.room.history.facts('hp.lost')).toHaveLength(2);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
+  expect(game.room.history.facts(Hp.lost)).toHaveLength(2);
 });
 
 it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段；纯候选不执行写入', async () => {
@@ -347,7 +350,7 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
     }),
   );
   expect(game.room.world.player('a').hp).toBe(4);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
 });
 
 it('苦肉一血进入濒死，救援成功后才摸两张；死亡后不摸', async () => {
@@ -360,7 +363,7 @@ it('苦肉一血进入濒死，救援成功后才摸两张；死亡后不摸', a
     installRescue(game.room, game.book);
     const instance = await grant(game, kurou.id);
     await game.room.run('wound', (ctx) =>
-      ctx.commit('wound', [{ kind: 'vitality', player: 'a', hp: 1 }], null),
+      ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'a', hp: 1 }], null),
     );
     const running = startPlay(game);
     await useSkill(game, instance, 'lose-hp-draw');
@@ -412,7 +415,7 @@ it('结姻取消不支付；拒绝装备、自己和女性目标，双性男性�
   game.room.decisions.cancel(choice.id, choice.token);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['one', 'two']);
-  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts(Skill.invoked)).toEqual([]);
 });
 
 it('结姻费用、次数和宣告同次提交；回复先目标后本人，一阶段不能再次发动', async () => {
@@ -433,7 +436,7 @@ it('结姻费用、次数和宣告同次提交；回复先目标后本人，一�
         }),
       ).toBe(1);
       expect(ctx.world.zone('a:hand').cards).toEqual(['three', 'four']);
-      expect(ctx.history.facts('skill.invoked')).toHaveLength(1);
+      expect(ctx.history.facts(Skill.invoked)).toHaveLength(1);
     },
   });
   const running = startPlay(game, (phase) => {
@@ -446,7 +449,7 @@ it('结姻费用、次数和宣告同次提交；回复先目标后本人，一�
   ).toBe(false);
   await pass(game);
   await running;
-  expect(game.room.history.facts('hp.recovered').map((fact) => fact.data.detail)).toMatchObject([
+  expect(game.room.history.facts(Hp.recovered).map((fact) => fact.data.detail)).toMatchObject([
     { input: { to: 'b' } },
     { input: { to: 'a' } },
   ]);
@@ -461,7 +464,7 @@ it('结姻不要求本人受伤，下一独立出牌阶段重新获得次数', a
   const game = supportGame(true);
   const instance = await setupSupport(game);
   await game.room.run('heal-source', (ctx) =>
-    ctx.commit('fixture', [{ kind: 'vitality', player: 'a', hp: 4 }], null),
+    ctx.commit(testTiming('fixture'), [{ kind: 'vitality', player: 'a', hp: 4 }], null),
   );
   for (const cards of [
     ['one', 'two'],
@@ -474,7 +477,7 @@ it('结姻不要求本人受伤，下一独立出牌阶段重新获得次数', a
   }
   expect(game.room.world.player('a').hp).toBe(4);
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(2);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
 });
 
 it('结姻支付后目标死亡仍消耗次数，本人按当前状态回复；技能失去不撤销已宣告效果', async () => {
@@ -500,7 +503,7 @@ it('结姻支付后目标死亡仍消耗次数，本人按当前状态回复；�
   expect(game.room.world.player('b').alive).toBe(false);
   expect(game.room.world.player('a').hp).toBe(3);
   expect(game.room.world.zone('discard').cards).toContain('one');
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
 });
 
 for (const answers of [

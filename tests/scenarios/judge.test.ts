@@ -47,7 +47,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
     run(ctx) {
       expect(held!.card?.id).toBe('new');
       expect(ctx.world.position('old')).toBe('a:hand');
-      expect(game.room.history.facts('judgment.replaced')).toHaveLength(1);
+      expect(game.room.history.facts(Judgment.replaced)).toHaveLength(1);
     },
   });
   game.room.on(Judgment.retrial, {
@@ -104,7 +104,7 @@ it('连续改判按行动顺序结算，前一个改判不会封闭后一个', a
       }),
     ),
   ).toMatchObject({ value: { matched: true, card: { id: 'last' } } });
-  expect(game.room.history.facts('judgment.replaced')).toHaveLength(2);
+  expect(game.room.history.facts(Judgment.replaced)).toHaveLength(2);
   expect(game.room.world.zone('discard').cards).toEqual(['old', 'first', 'last']);
 });
 

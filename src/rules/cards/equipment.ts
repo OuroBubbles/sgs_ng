@@ -10,6 +10,14 @@ import type { MoveResult } from './move';
 import type { CardBook } from './book';
 import type { CardDefinition, EffectRef } from './types';
 import { isGameOver } from '../game/end';
+import { defineEvent } from '../../core/runtime/event';
+import { timing } from '../../core/runtime/event';
+
+export const Equipment = defineEvent('equipment', {
+  equipped: timing<unknown>(),
+  ignored: timing<unknown>(),
+  blocked: timing<unknown>(),
+});
 
 /** 标准槽位为 weapon/armor/offensive-horse/defensive-horse；扩展可直接命名新槽位。 */
 export type EquipmentSlot = string;
@@ -108,7 +116,7 @@ export function equip(
         { cards: [request.card], from: request.from, to: destination.id, place: 'bottom' },
       ],
       'equipment',
-      { kind: 'equipment.equipped', data: result },
+      { kind: Equipment.equipped, data: result },
     );
 
     return result;

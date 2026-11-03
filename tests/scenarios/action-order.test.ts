@@ -29,6 +29,7 @@ import { jijiang } from '../../src/content/standard/generals/liubei';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
 
 const seats = ['a', 'b', 'c', 'd'];
 const probe = testTiming<string>('probe.action-order');
@@ -203,11 +204,11 @@ for (const bad of ['missing', undefined, 1]) {
 
 it('政策是纯查询，不能借取行动序提交事实', async () => {
   const room = generic((ctx) => {
-    ctx.commit('illegal', [], {});
+    ctx.commit(testTiming('illegal'), [], {});
     return 'b';
   });
   await expect(room.run('bad', (ctx) => fire(ctx, ''))).rejects.toThrow('Pure queries');
-  expect(room.history.facts('illegal')).toHaveLength(0);
+  expect(room.history.facts(testTiming('illegal'))).toHaveLength(0);
 });
 
 it('未知主体即使被显式覆盖也拒绝，避免窗口描述与已知席位矛盾', async () => {
@@ -396,7 +397,7 @@ it('孤立阶段不冒充回合，重建事实里的旧回合 ID 也不冒充当
   observe(game.room, probe, seen);
   await game.room.run('stale', async (ctx) => {
     ctx.commit(
-      'stale-turn',
+      testTiming('stale-turn'),
       [
         stateChange(ctx, activeTurn, activeTarget, {
           id: 'old:not-an-ancestor',
@@ -629,7 +630,7 @@ it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际
   expect(request.player).toBe('c');
   await running;
   expect(seen).toEqual(['b', 'c', 'd', 'a', 'b', 'c', 'd', 'a']);
-  expect(game.room.history.facts('card.used')[1]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.used)[1]?.data.detail).toMatchObject({
     actor: 'c',
     declaration: { context: { kind: 'response', to: { target: 'c' } } },
   });
@@ -744,7 +745,7 @@ for (const custom of [false, true]) {
     await running;
     expect(asked).toEqual(custom ? ['c', 'b'] : ['b', 'c']);
     expect(game.room.world.player('a').alive).toBe(false);
-    expect(game.room.history.facts('card.used')).toHaveLength(0);
+    expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   });
 
@@ -755,7 +756,11 @@ for (const custom of [false, true]) {
       ...(custom ? { actionAnchor: () => 'd' } : {}),
     });
     await game.room.run('grant', async (ctx) => {
-      ctx.commit('kingdoms', [kingdomChange(ctx, 'b', '魏'), kingdomChange(ctx, 'd', '魏')], {});
+      ctx.commit(
+        testTiming('kingdoms'),
+        [kingdomChange(ctx, 'b', '魏'), kingdomChange(ctx, 'd', '魏')],
+        {},
+      );
       await game.skills.grant(ctx, { owner: 'a', skill: hujia.id, source });
     });
     const running = game.room.run('turn', (ctx) =>
@@ -792,7 +797,11 @@ for (const custom of [false, true]) {
       ...(custom ? { actionAnchor: () => 'd' } : {}),
     });
     const granted = await game.room.run('grant', async (ctx) => {
-      ctx.commit('kingdoms', [kingdomChange(ctx, 'b', '蜀'), kingdomChange(ctx, 'd', '蜀')], {});
+      ctx.commit(
+        testTiming('kingdoms'),
+        [kingdomChange(ctx, 'b', '蜀'), kingdomChange(ctx, 'd', '蜀')],
+        {},
+      );
       return await game.skills.grant(ctx, { owner: 'a', skill: jijiang.id, source });
     });
     if (granted.kind !== 'resolved') throw new Error('Grant must resolve.');
@@ -820,7 +829,7 @@ for (const custom of [false, true]) {
     expect(supplied.player).toBe(custom ? 'd' : 'b');
     await running;
     expect(game.room.world.player('c').hp).toBe(3);
-    expect(game.room.history.facts('card.responded')[0]?.data.detail).toMatchObject({
+    expect(game.room.history.facts(CardEvent.responded)[0]?.data.detail).toMatchObject({
       actor: custom ? 'd' : 'b',
     });
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);

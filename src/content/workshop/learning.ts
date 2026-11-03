@@ -1,5 +1,6 @@
 import { draw, invoke, isGameOver, on, pay, rulesOf, Damage } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { Skill } from '../../sdk';
 
 export const echo = {
   id: 'workshop:echo',
@@ -33,7 +34,7 @@ export const insight = {
         const paid = await pay(ctx, {
           skill: self,
           reason: self.skill,
-          factKind: 'skill.invoked',
+          factKind: Skill.invoked,
           declaration: { label: self.name },
         });
         if (paid.kind !== 'paid' || !ctx.world.player(self.owner).alive || isGameOver(ctx.world))

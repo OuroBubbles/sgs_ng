@@ -33,6 +33,9 @@ import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { World } from '../../src/core/state/world';
+import { Equipment } from '../../src/sdk';
+import { Skill } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 const install = (id: string, actor = 'a'): UseIntent => ({
   actor,
@@ -78,7 +81,7 @@ it('装备自动以自己为目标，同槽替换一次提交，移牌后效立�
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:equipment'),
     run(ctx) {
       expect(ctx.world.position('old')).toBe('discard');
-      expect(game.room.history.facts('equipment.equipped')).toHaveLength(1);
+      expect(game.room.history.facts(Equipment.equipped)).toHaveLength(1);
       expect(equipmentInSlot(ctx.world, game.book, 'a', 'weapon')).toEqual(['new']);
       observations.push(game.book.attackRange(ctx, 'a', semantic));
     },
@@ -330,7 +333,10 @@ function lossDefinition(allowDead = false): CardDefinition {
             equipmentLost(ctx.world, moved, self),
           when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
           effect(ctx, _event, self) {
-            ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
+            ctx.commit(testTiming('probe:equipment-lost'), [], {
+              owner: self.owner,
+              card: self.origin!.id,
+            });
           },
         }),
       ],
@@ -351,20 +357,20 @@ it('离场能力从移动前快照补入，支付材料后也触发，普通手�
       [{ cards: ['hand'], from: 'a:hand', to: 'discard', place: 'bottom' }],
       'not-equipment',
     );
-    expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(0);
+    expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(0);
     await moveCards(
       ctx,
       [{ cards: ['armor'], from: 'a:equipment', to: 'a:hand', place: 'bottom' }],
       'lost',
     );
-    expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(1);
     await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'a:hand' });
   });
   // 普通费用接口同样经 cardsMoved；无需装备专用卸载函数。
   await game.room.run('pay', (ctx) =>
     pay(ctx, { actor: 'a', cards: ['armor'], to: 'discard', reason: 'probe' }),
   );
-  expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(2);
+  expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(2);
   expect(game.room.world.snapshot.skills).toHaveLength(0);
 });
 
@@ -383,7 +389,9 @@ it.each([false, true])('埋葬移牌保留装备离场事实，是否允许死�
       cause: { kind: 'rule', seq: null, data: null },
     }),
   );
-  expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(allowDead ? 1 : 0);
+  expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(
+    allowDead ? 1 : 0,
+  );
   expect(game.room.world.position('armor')).toBe('discard');
 });
 
@@ -407,7 +415,7 @@ it('装备材料宣告后被取走，不安装新装备，也不弃置原装备�
   await use(game, install('new'));
   expect(game.room.world.position('new')).toBe('b:hand');
   expect(game.room.world.position('old')).toBe('a:equipment');
-  expect(game.room.history.facts('equipment.equipped')).toHaveLength(0);
+  expect(game.room.history.facts(Equipment.equipped)).toHaveLength(0);
 });
 
 it('新装备在移牌后效中被取走，装备事实仍在真实安装的提交处，查询立即停止', async () => {
@@ -417,7 +425,7 @@ it('新装备在移牌后效中被取走，装备事实仍在真实安装的提�
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:equipment'),
     async run(ctx) {
-      expect(game.room.history.facts('equipment.equipped')).toHaveLength(1);
+      expect(game.room.history.facts(Equipment.equipped)).toHaveLength(1);
       expect(game.book.attackRange(ctx, 'a', semantic)).toBe(3);
       await moveCards(
         ctx,
@@ -429,8 +437,8 @@ it('新装备在移牌后效中被取走，装备事实仍在真实安装的提�
   });
   expect(await use(game, install('weapon'))).toMatchObject({ value: { kind: 'used' } });
   expect(game.room.world.position('weapon')).toBe('b:hand');
-  const installed = game.room.history.facts('equipment.equipped')[0]!;
-  const moved = game.room.history.facts('cards.moved').find((fact) => fact.seq > installed.seq)!;
+  const installed = game.room.history.facts(Equipment.equipped)[0]!;
+  const moved = game.room.history.facts(Cards.moved).find((fact) => fact.seq > installed.seq)!;
   expect(moved.seq).toBeGreaterThan(installed.seq);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -453,7 +461,7 @@ it('已失效装备的离场候选不能绕过失效；到期重新装回后可�
         [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
         'blocked',
       );
-      expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(0);
+      expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(0);
     });
     await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' });
     await moveCards(
@@ -461,7 +469,7 @@ it('已失效装备的离场候选不能绕过失效；到期重新装回后可�
       [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
       'active',
     );
-    expect(game.room.history.facts('probe:equipment-lost')).toHaveLength(1);
+    expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(1);
   });
 });
 
@@ -593,5 +601,5 @@ it('重建和替换快照后，装备能力按当前实体与持有者派生', a
     ]);
     expect(current.self.active({ world: restored.reader } as Context)).toBe(to === 'a');
   }
-  expect(game.room.history.facts('skill.changed')).toHaveLength(0);
+  expect(game.room.history.facts(Skill.changed)).toHaveLength(0);
 });

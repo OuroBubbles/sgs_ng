@@ -16,6 +16,7 @@ import type { Context } from '../../src/sdk';
 import '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed } from '../fixtures/room';
+import { Skill } from '../../src/sdk';
 
 const general = { kind: 'general', id: 'general:a' } as const;
 const equipment = { kind: 'equipment', id: 'equipment:1' } as const;
@@ -176,7 +177,7 @@ describe('技能实例与独立授予来源', () => {
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
     });
-    expect(game.history.facts('skill.changed')).toHaveLength(1);
+    expect(game.history.facts(Skill.changed)).toHaveLength(1);
     await expect(
       game.run('unknown', (ctx) =>
         book.grant(ctx, { owner: 'a', skill: 'missing', source: general }),
@@ -215,7 +216,7 @@ describe('技能实例与独立授予来源', () => {
     book.attach(game);
     await game.run('death', async (ctx) => {
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
-      ctx.commit('death', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
+      ctx.commit(testTiming('death'), [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], {});
       await ctx.window(window, null);
     });
     expect(hits).toEqual(['legacy']);

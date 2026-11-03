@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 import { damage, draw, Cards, Damage } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { choose, nextRequest } from '../fixtures/room';
+import { CardEvent } from '../../src/sdk';
+import { Draw } from '../../src/rules/cards/draw';
 
 it('伤害开窗后调用方修改输入，不改变本次目标、数量和来源快照', async () => {
   const game = cardGame();
@@ -23,7 +25,7 @@ it('伤害开窗后调用方修改输入，不改变本次目标、数量和来�
   await running;
   expect(game.room.world.player('b').hp).toBe(2);
   expect(game.room.world.player('c').hp).toBe(4);
-  expect(game.room.history.facts('damage.dealt')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Damage.dealt)[0]?.data.detail).toMatchObject({
     input: { from: 'a', to: 'b', amount: 2 },
     sourceSnapshot: { amount: 2 },
   });
@@ -49,7 +51,7 @@ it('摸牌开窗后外部修改输入，不改变已开始流程的接收者与�
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['top']);
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
-  expect(game.room.history.facts('draw.completed')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(Draw.completed)[0]?.data.detail).toMatchObject({
     input: { player: 'a', count: 1, reason: 'original draw' },
   });
 });
@@ -78,7 +80,7 @@ it('响应请求冻结匹配牌名和关联 ID，不追踪调用方后续修改'
     game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'jink' }).kind,
   ).toBe('accepted');
   await running;
-  expect(game.room.history.facts('card.responded')[0]?.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.responded)[0]?.data.detail).toMatchObject({
     declaration: { to: { useId: 'use-original', effectId: 'effect-original' } },
   });
 });

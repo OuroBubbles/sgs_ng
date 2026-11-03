@@ -96,7 +96,6 @@ export {
 } from '../rules/author';
 export type {
   Areas,
-  MoveFact,
   AskOptions,
   Picked,
   ActionContext,
@@ -137,6 +136,7 @@ export {
   equipmentInSlot,
   equipmentLost,
   equipmentEffectiveFor,
+  Equipment,
 } from '../rules/cards/equipment';
 export type { EquipmentSlot, EquipmentDefinition, EquipResult } from '../rules/cards/equipment';
 export { defineState, readState, setState, stateChange } from '../rules/state/state';
@@ -336,7 +336,7 @@ export { Response } from '../rules/cards/response';
 export { Effect } from '../rules/effects/effects';
 export { Lifetime } from '../rules/scopes/lifetime';
 export { Cost } from '../rules/costs/pay';
-export { Cards } from '../rules/cards/move';
+export { Cards, CardEvent } from '../rules/cards/move';
 export { Damage } from '../rules/combat/damage';
 export { Chain } from '../rules/combat/chain';
 export { Shield } from '../rules/combat/shield';

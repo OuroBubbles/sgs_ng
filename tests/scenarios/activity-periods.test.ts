@@ -18,6 +18,8 @@ import {
 import type { CardActivity, Context, PhaseView } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
+import { CardEvent } from '../../src/sdk';
+import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const extra = { kind: 'extra', id: 'nested', reason: 'author:inserted-turn' } as const;
@@ -50,7 +52,7 @@ function outer(game: Game, body: (ctx: Context, phase: PhaseView) => Promise<voi
       phases: ['play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'play') await body(at, phase);
-        else at.commit('test.discard-body', [], null);
+        else at.commit(testTiming('test.discard-body'), [], null);
       },
     }),
   );
@@ -100,7 +102,9 @@ async function complete(
         : new Error('Non-Error test rejection.', { cause: failure });
     expect(questions).toBe(invokes);
     expect(answered).toBe(replies.length);
-    expect(game.room.history.facts('test.discard-body')).toHaveLength(Number(invokes === 0));
+    expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(
+      Number(invokes === 0),
+    );
     expect(game.room.decisions.pending).toEqual([]);
     expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
     expect(readState(game.room.world, activePhase, activeTarget)).toBeNull();
@@ -276,7 +280,7 @@ it('嵌套判定阶段中鬼才打出的杀归属实际判定阶段，不漏打�
     1,
     [{ kind: 'cards-targets', value: { cards: ['hit'], targets: [] } }],
   );
-  expect(game.room.history.facts('card.responded')).toEqual([]);
+  expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   expect(
     cardActivities(game.room.history.facts()).filter((entry) => entry.kind === 'response'),
   ).toMatchObject([{ actor: 'a', phase: { id: phaseId, owner: 'a', kind: 'judge' } }]);
