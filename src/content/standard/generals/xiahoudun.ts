@@ -30,10 +30,4 @@ export const ganglie = skill({
   ],
 });
 
-export default general({
-  id: 'standard:xiahoudun',
-  name: '夏侯惇',
-  kingdom: '魏',
-  hp: 4,
-  skills: [ganglie],
-});
+export default general('standard:xiahoudun', '夏侯惇', '魏', 4, [ganglie]);

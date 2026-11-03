@@ -85,10 +85,4 @@ export const yiji = skill({
   ai: { targets: 'ally' },
 });
 
-export default general({
-  id: 'standard:guojia',
-  name: '郭嘉',
-  kingdom: '魏',
-  hp: 3,
-  skills: [tiandu, yiji],
-});
+export default general('standard:guojia', '郭嘉', '魏', 3, [tiandu, yiji]);

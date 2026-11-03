@@ -39,10 +39,4 @@ export const jiuyuan = skill({
   ],
 });
 
-export default general({
-  id: 'standard:sunquan',
-  name: '孙权',
-  kingdom: '吴',
-  hp: 4,
-  skills: [zhiheng, jiuyuan],
-});
+export default general('standard:sunquan', '孙权', '吴', 4, [zhiheng, jiuyuan]);

@@ -43,7 +43,7 @@ export function collectStandardCatalogue(read, names) {
   for (const file of names) {
     const path = `src/content/standard/${file}`;
     const source = parse(path);
-    // 同文件内 `const x = skill({ id: '...' })` 或普通对象的变量名，供 general({ skills: [x] }) 解析。
+    // 同文件内 `const x = skill({ id: '...' })` 或普通对象的变量名，供 general(id, name, kingdom, hp, [x]) 解析。
     const local = new Map();
     walk(source, (node) => {
       if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || !node.initializer)
@@ -67,6 +67,23 @@ export function collectStandardCatalogue(read, names) {
         if (!id || !name) throw new Error('Horse inventory requires literal IDs and labels.');
         definitions.set(`standard:${id}`, { name, source: at(path, source, node) });
       }
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.getText(source) === 'general' &&
+        node.arguments.length >= 5
+      ) {
+        const id = literal(node.arguments[0]);
+        const name = literal(node.arguments[1]);
+        const list = node.arguments[4];
+        if (!id || !name || !ts.isArrayLiteralExpression(list))
+          throw new Error('General requires literal ID, name and skill list.');
+        const ids = list.elements.map((entry) => {
+          if (literal(entry) !== null) return literal(entry);
+          if (ts.isIdentifier(entry) && local.has(entry.text)) return local.get(entry.text);
+          throw new Error(`Unsupported general skill expression: ${entry.getText(source)}`);
+        });
+        generals.push({ id, name, skills: ids, source: at(path, source, node) });
+      }
       if (!ts.isObjectLiteralExpression(node)) return;
       const values = fields(node);
       const id = literal(values.get('id'));
@@ -77,21 +94,6 @@ export function collectStandardCatalogue(read, names) {
           skills.set(id, { id, name, description, source: at(path, source, node) });
         const label = literal(values.get('label'));
         if (label) definitions.set(id, { name: label, source: at(path, source, node) });
-        const list = values.get('skills');
-        if (name && list && ts.isArrayLiteralExpression(list)) {
-          const ids = list.elements.map((entry) => {
-            if (literal(entry) !== null) return literal(entry);
-            if (ts.isIdentifier(entry) && local.has(entry.text)) return local.get(entry.text);
-            if (
-              ts.isPropertyAccessExpression(entry) &&
-              entry.name.text === 'id' &&
-              ts.isIdentifier(entry.expression)
-            )
-              return `standard:${entry.expression.text}`;
-            throw new Error(`Unsupported general skill expression: ${entry.getText(source)}`);
-          });
-          generals.push({ id, name, skills: ids, source: at(path, source, node) });
-        }
       }
       for (const property of node.properties) {
         if (!ts.isPropertyAssignment(property)) continue;

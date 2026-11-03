@@ -4,7 +4,7 @@
 
 ## 一将一文件
 
-标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general({...})`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件，不再改任何登记列表。`general({ id, name, kingdom, hp, gender?, skills })` 直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
+标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件，不再改任何登记列表。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
 ```ts
 import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';
@@ -23,7 +23,7 @@ export const study = skill({
   ],
 });
 
-export default general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, skills: [study] });
+export default general('scholar', '学士', '群', 3, [study]);
 ```
 
 技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。

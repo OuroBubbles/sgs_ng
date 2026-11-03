@@ -101,11 +101,4 @@ export const biyue = skill({
   ],
 });
 
-export default general({
-  id: 'standard:diaochan',
-  name: '貂蝉',
-  kingdom: '群',
-  gender: 'female',
-  hp: 3,
-  skills: [lijian, biyue],
-});
+export default general('standard:diaochan', '貂蝉', '群', 3, [lijian, biyue], { gender: 'female' });

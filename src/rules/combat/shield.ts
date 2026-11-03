@@ -5,12 +5,7 @@ import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
 import { defineEvent, timing } from '../../core/runtime/event';
 
-const shield = defineState(
-  'combat:shield',
-  0,
-  (value): value is number =>
-    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
-);
+const shield = defineState('combat:shield', 0);
 const target = (player: string) => ({ owner: player, source: 'profile', lifetime: null });
 
 export interface ShieldChange {

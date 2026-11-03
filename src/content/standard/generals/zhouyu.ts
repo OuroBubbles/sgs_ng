@@ -103,10 +103,4 @@ export const fanjian = skill({
   },
 });
 
-export default general({
-  id: 'standard:zhouyu',
-  name: '周瑜',
-  kingdom: '吴',
-  hp: 3,
-  skills: [yingzi, fanjian],
-});
+export default general('standard:zhouyu', '周瑜', '吴', 3, [yingzi, fanjian]);

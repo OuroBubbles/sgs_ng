@@ -102,10 +102,4 @@ export const kongcheng = skill({
   ],
 });
 
-export default general({
-  id: 'standard:zhugeliang',
-  name: '诸葛亮',
-  kingdom: '蜀',
-  hp: 3,
-  skills: [guanxing, kongcheng],
-});
+export default general('standard:zhugeliang', '诸葛亮', '蜀', 3, [guanxing, kongcheng]);

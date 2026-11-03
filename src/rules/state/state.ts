@@ -24,10 +24,26 @@ export interface StateTarget {
   readonly lifetime: Lifetime | null;
 }
 
+const counter = (input: unknown): input is number =>
+  Number.isSafeInteger(input) && Number(input) >= 0;
+const flag = (input: unknown): input is boolean => typeof input === 'boolean';
+
+/** 布尔值默认只接受布尔值，数值默认是非负整数计数；其他形状必须给出 accepts。 */
+export function defineState(id: string, initial: boolean): StateKey<boolean>;
+export function defineState(id: string, initial: number): StateKey<number>;
 export function defineState<T>(
   id: string,
   initial: T,
   accepts: (input: unknown) => input is T,
+): StateKey<T>;
+export function defineState<T>(
+  id: string,
+  initial: T,
+  accepts: (input: unknown) => input is T = (typeof initial === 'boolean'
+    ? flag
+    : typeof initial === 'number'
+      ? counter
+      : () => false) as (input: unknown) => input is T,
 ): StateKey<T> {
   if (!id) throw new Error('Invalid state key or initial value.');
   const value = immutable(initial);
@@ -85,9 +101,4 @@ export function setState<T>(
   ctx.commit(StateEvent.changed, [stateChange(ctx, key, target, value)], { key: key.id });
 }
 
-export const useCount = defineState(
-  'core:use-count',
-  0,
-  (input): input is number =>
-    typeof input === 'number' && Number.isSafeInteger(input) && input >= 0,
-);
+export const useCount = defineState('core:use-count', 0);

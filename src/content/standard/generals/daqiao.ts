@@ -121,11 +121,4 @@ export const liuli = skill({
   ],
 });
 
-export default general({
-  id: 'standard:daqiao',
-  name: '大乔',
-  kingdom: '吴',
-  gender: 'female',
-  hp: 3,
-  skills: [guose, liuli],
-});
+export default general('standard:daqiao', '大乔', '吴', 3, [guose, liuli], { gender: 'female' });

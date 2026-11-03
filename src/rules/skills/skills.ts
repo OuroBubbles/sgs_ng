@@ -114,11 +114,7 @@ export function defineSkill(definition: SkillDefinition): SkillDefinition {
   return definition;
 }
 
-export const skillBlocked = defineState(
-  'core:skill-blocked',
-  false,
-  (input): input is boolean => typeof input === 'boolean',
-);
+export const skillBlocked = defineState('core:skill-blocked', false);
 
 export function skillEffective(world: WorldReader, instance: string): boolean {
   const current = world.snapshot.skills.find((skill) => skill.id === instance);

@@ -38,10 +38,4 @@ export const jijiu = skill({
   ],
 });
 
-export default general({
-  id: 'standard:huatuo',
-  name: '华佗',
-  kingdom: '群',
-  hp: 3,
-  skills: [qingnang, jijiu],
-});
+export default general('standard:huatuo', '华佗', '群', 3, [qingnang, jijiu]);

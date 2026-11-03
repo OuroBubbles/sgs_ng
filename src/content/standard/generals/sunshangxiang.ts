@@ -75,11 +75,6 @@ export const jieyin = skill({
   },
 });
 
-export default general({
-  id: 'standard:sunshangxiang',
-  name: '孙尚香',
-  kingdom: '吴',
+export default general('standard:sunshangxiang', '孙尚香', '吴', 3, [xiaoji, jieyin], {
   gender: 'female',
-  hp: 3,
-  skills: [xiaoji, jieyin],
 });

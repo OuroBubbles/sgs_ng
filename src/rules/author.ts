@@ -399,22 +399,22 @@ export interface AuthoredGeneral extends GeneralDefinition {
   /** 由内容装配自动登记的技能定义。 */
   readonly abilities: readonly SkillDefinition[];
 }
-/** 一个武将：直接引用技能对象，装配时自动登记；性别默认男性。 */
-export function general(spec: {
-  readonly id: string;
-  readonly name: string;
-  readonly kingdom: string;
-  readonly hp: number;
-  readonly gender?: Gender;
-  readonly skills: readonly SkillDefinition[];
-}): AuthoredGeneral {
+/** 一个武将：ID、名、势力、体力上限、技能（直接引用技能对象，装配时自动登记）；性别默认男性。 */
+export function general(
+  id: string,
+  name: string,
+  kingdom: string,
+  hp: number,
+  skills: readonly SkillDefinition[],
+  options: { readonly gender?: Gender } = {},
+): AuthoredGeneral {
   return {
-    id: spec.id,
-    name: spec.name,
-    kingdom: spec.kingdom,
-    gender: spec.gender ?? 'male',
-    maxHp: spec.hp,
-    skills: spec.skills.map((entry) => entry.id),
-    abilities: spec.skills,
+    id,
+    name,
+    kingdom,
+    gender: options.gender ?? 'male',
+    maxHp: hp,
+    skills: skills.map((entry) => entry.id),
+    abilities: skills,
   };
 }

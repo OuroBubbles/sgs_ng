@@ -11,10 +11,4 @@ export const paoxiao = skill({
   ],
 });
 
-export default general({
-  id: 'standard:zhangfei',
-  name: '张飞',
-  kingdom: '蜀',
-  hp: 4,
-  skills: [paoxiao],
-});
+export default general('standard:zhangfei', '张飞', '蜀', 4, [paoxiao]);

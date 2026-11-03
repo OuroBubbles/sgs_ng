@@ -45,11 +45,6 @@ export const qingguo = skill({
   viewAs: [convert('black-jink', { as: 'standard:jink', match: (c) => c.color === 'black' })],
 });
 
-export default general({
-  id: 'standard:zhenji',
-  name: '甄姬',
-  kingdom: '魏',
+export default general('standard:zhenji', '甄姬', '魏', 3, [luoshen, qingguo], {
   gender: 'female',
-  hp: 3,
-  skills: [luoshen, qingguo],
 });

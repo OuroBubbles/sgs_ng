@@ -17,10 +17,4 @@ export const kurou = skill({
   ai: { value: ({ self, hand }) => (self.hp > 2 && hand.length < 6 ? 15 : -1) },
 });
 
-export default general({
-  id: 'standard:huanggai',
-  name: '黄盖',
-  kingdom: '吴',
-  hp: 4,
-  skills: [kurou],
-});
+export default general('standard:huanggai', '黄盖', '吴', 4, [kurou]);

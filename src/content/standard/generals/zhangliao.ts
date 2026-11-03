@@ -67,10 +67,4 @@ export const tuxi = skill({
   ],
 });
 
-export default general({
-  id: 'standard:zhangliao',
-  name: '张辽',
-  kingdom: '魏',
-  hp: 4,
-  skills: [tuxi],
-});
+export default general('standard:zhangliao', '张辽', '魏', 4, [tuxi]);

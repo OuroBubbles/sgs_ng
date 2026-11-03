@@ -16,5 +16,5 @@ const study = skill({
 });
 
 export default {
-  generals: [general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, skills: [study] })],
+  generals: [general('scholar', '学士', '群', 3, [study])],
 } satisfies ContentDefinition;

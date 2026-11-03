@@ -36,11 +36,7 @@ export type {
   HealthCause,
 } from './life-events';
 
-const dyingState = defineState(
-  'core:dying',
-  false,
-  (value): value is boolean => typeof value === 'boolean',
-);
+const dyingState = defineState('core:dying', false);
 export function isDying(world: WorldReader, player: string): boolean {
   return world.snapshot.states.some(
     (state) => state.key === dyingState.id && state.owner === player && state.value === true,

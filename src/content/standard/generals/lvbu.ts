@@ -23,10 +23,4 @@ export const wushuang = skill({
   ],
 });
 
-export default general({
-  id: 'standard:lvbu',
-  name: '吕布',
-  kingdom: '群',
-  hp: 4,
-  skills: [wushuang],
-});
+export default general('standard:lvbu', '吕布', '群', 4, [wushuang]);

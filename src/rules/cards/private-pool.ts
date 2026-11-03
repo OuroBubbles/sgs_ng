@@ -9,11 +9,7 @@ import { moveCards } from './move';
 import { reshuffle } from './draw';
 import { Cards } from './move';
 
-const privatePool = defineState(
-  'core:private-pool',
-  false,
-  (value): value is boolean => typeof value === 'boolean',
-);
+const privatePool = defineState('core:private-pool', false);
 
 export interface PrivatePoolInput {
   readonly player: string;

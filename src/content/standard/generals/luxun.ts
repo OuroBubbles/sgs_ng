@@ -43,10 +43,4 @@ export const lianying = skill({
   ],
 });
 
-export default general({
-  id: 'standard:luxun',
-  name: '陆逊',
-  kingdom: '吴',
-  hp: 3,
-  skills: [qianxun, lianying],
-});
+export default general('standard:luxun', '陆逊', '吴', 3, [qianxun, lianying]);

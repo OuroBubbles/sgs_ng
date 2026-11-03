@@ -35,10 +35,4 @@ export const keji = skill({
   ],
 });
 
-export default general({
-  id: 'standard:lvmeng',
-  name: '吕蒙',
-  kingdom: '吴',
-  hp: 4,
-  skills: [keji],
-});
+export default general('standard:lvmeng', '吕蒙', '吴', 4, [keji]);

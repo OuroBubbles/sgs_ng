@@ -5,11 +5,7 @@ import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
 import { defineEvent, timing } from '../../core/runtime/event';
 
-const chained = defineState(
-  'combat:chained',
-  false,
-  (value): value is boolean => typeof value === 'boolean',
-);
+const chained = defineState('combat:chained', false);
 const target = (player: string) => ({ owner: player, source: 'profile', lifetime: null });
 
 export interface ChainChange {

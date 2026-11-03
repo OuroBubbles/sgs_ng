@@ -28,16 +28,8 @@ import type {
   UseIntent,
 } from '../../../sdk';
 
-const given = defineState(
-  'standard:rende-given',
-  0,
-  (value): value is number => Number.isSafeInteger(value) && Number(value) >= 0,
-);
-const failed = defineState(
-  'standard:jijiang-failed',
-  false,
-  (value): value is boolean => typeof value === 'boolean',
-);
+const given = defineState('standard:rende-given', 0);
+const failed = defineState('standard:jijiang-failed', false);
 const perPhase = (self: SkillHandle, phase: PhaseView) => ({
   owner: self.owner,
   source: self.skill,
@@ -187,10 +179,4 @@ export const jijiang = skill({
   ],
 });
 
-export default general({
-  id: 'standard:liubei',
-  name: '刘备',
-  kingdom: '蜀',
-  hp: 4,
-  skills: [rende, jijiang],
-});
+export default general('standard:liubei', '刘备', '蜀', 4, [rende, jijiang]);

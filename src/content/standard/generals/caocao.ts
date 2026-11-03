@@ -80,10 +80,4 @@ export const hujia = skill({
   ],
 });
 
-export default general({
-  id: 'standard:caocao',
-  name: '曹操',
-  kingdom: '魏',
-  hp: 4,
-  skills: [jianxiong, hujia],
-});
+export default general('standard:caocao', '曹操', '魏', 4, [jianxiong, hujia]);

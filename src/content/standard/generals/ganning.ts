@@ -13,10 +13,4 @@ export const qixi = skill({
   ],
 });
 
-export default general({
-  id: 'standard:ganning',
-  name: '甘宁',
-  kingdom: '吴',
-  hp: 4,
-  skills: [qixi],
-});
+export default general('standard:ganning', '甘宁', '吴', 4, [qixi]);

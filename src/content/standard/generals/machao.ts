@@ -51,10 +51,4 @@ export const tieqi = skill({
   ],
 });
 
-export default general({
-  id: 'standard:machao',
-  name: '马超',
-  kingdom: '蜀',
-  hp: 4,
-  skills: [mashu, tieqi],
-});
+export default general('standard:machao', '马超', '蜀', 4, [mashu, tieqi]);

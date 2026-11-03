@@ -18,10 +18,4 @@ export const longdan = skill({
   ],
 });
 
-export default general({
-  id: 'standard:zhaoyun',
-  name: '赵云',
-  kingdom: '蜀',
-  hp: 4,
-  skills: [longdan],
-});
+export default general('standard:zhaoyun', '赵云', '蜀', 4, [longdan]);

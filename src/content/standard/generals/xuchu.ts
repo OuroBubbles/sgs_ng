@@ -74,10 +74,4 @@ export const luoyi = skill({
   ],
 });
 
-export default general({
-  id: 'standard:xuchu',
-  name: '许褚',
-  kingdom: '魏',
-  hp: 4,
-  skills: [luoyi],
-});
+export default general('standard:xuchu', '许褚', '魏', 4, [luoyi]);

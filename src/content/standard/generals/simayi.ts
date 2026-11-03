@@ -120,10 +120,4 @@ export const fankui = skill({
 const areas = (source: string, self: SkillHandle) =>
   source === self.owner ? ['equipment' as const] : HE;
 
-export default general({
-  id: 'standard:simayi',
-  name: '司马懿',
-  kingdom: '魏',
-  hp: 3,
-  skills: [guicai, fankui],
-});
+export default general('standard:simayi', '司马懿', '魏', 3, [guicai, fankui]);

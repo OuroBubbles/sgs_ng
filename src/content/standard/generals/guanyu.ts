@@ -9,10 +9,4 @@ export const wusheng = skill({
   ],
 });
 
-export default general({
-  id: 'standard:guanyu',
-  name: '关羽',
-  kingdom: '蜀',
-  hp: 4,
-  skills: [wusheng],
-});
+export default general('standard:guanyu', '关羽', '蜀', 4, [wusheng]);

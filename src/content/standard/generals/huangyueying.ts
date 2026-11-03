@@ -35,11 +35,6 @@ export const qicai = skill({
   ],
 });
 
-export default general({
-  id: 'standard:huangyueying',
-  name: '黄月英',
-  kingdom: '蜀',
+export default general('standard:huangyueying', '黄月英', '蜀', 3, [jizhi, qicai], {
   gender: 'female',
-  hp: 3,
-  skills: [jizhi, qicai],
 });
