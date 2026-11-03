@@ -43,17 +43,12 @@ flowchart LR
 装备能力与武将技能用同一套作者层（`on` 的 ask / cost / declare / effect、`select` + `selection(ctx, …)`）。技能 ID 默认为 `${id}-ability`、技能名默认为牌名，只有另立名号时才显式写出；需要牌目录或完整用牌服务时，在回调里用 `rulesOf(ctx)`：
 
 ```ts
-equipmentCard({
-  id: 'my:weapon',
-  label: '示例武器',
-  slot: 'weapon',
-  range: 3,
-  skill: {
-    triggers: [
-      /* 回调中 rulesOf(ctx).askUse / cardDef(ctx, name) */
-    ],
-  },
-});
+equipment(
+  'my:weapon',
+  '示例武器',
+  { weapon: 3 },
+  on(/* 时点 */, { /* 回调中 rulesOf(ctx).askUse / cardDef(ctx, name) */ }),
+);
 ```
 
 CardBook 从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。

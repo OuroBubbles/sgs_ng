@@ -20,18 +20,16 @@ import type {
   UsePlanView,
 } from '../../../sdk';
 
-export const guose = skill({
-  id: 'standard:guose',
-  name: '国色',
-  description: '可以将一张方块手牌或装备牌当乐不思蜀使用。',
-  viewAs: [
-    convert('diamond-indulgence', {
-      as: 'standard:indulgence',
-      areas: HE,
-      match: (c) => c.suit === 'diamond',
-    }),
-  ],
-});
+export const guose = skill(
+  'standard:guose',
+  '国色',
+  '可以将一张方块手牌或装备牌当乐不思蜀使用。',
+  convert('diamond-indulgence', {
+    as: 'standard:indulgence',
+    areas: HE,
+    match: (c) => c.suit === 'diamond',
+  }),
+);
 
 function redirects(ctx: Context, self: SkillHandle, use: UsePlanView, effect: CardEffect) {
   const rules = rulesOf(ctx);
@@ -78,47 +76,44 @@ function redirects(ctx: Context, self: SkillHandle, use: UsePlanView, effect: Ca
   });
 }
 
-export const liuli = skill({
-  id: 'standard:liuli',
-  name: '流离',
-  description:
-    '当你成为杀的目标时，可以弃置一张手牌或装备，将此杀转移给你攻击范围内的一名其他角色（不能是出杀者）。弃置的装备不再提供范围。',
-  triggers: [
-    on(Target.confirming, {
-      who: ({ effect }) => effect.target,
-      when: (ctx, { use, effect }, self) =>
-        effect.actor !== self.owner &&
-        effect.card.name === 'standard:slash' &&
-        effect.state === 'targeting' &&
-        redirects(ctx, self, use, effect).available(),
-      cost: (ctx, { use, effect }, self) =>
-        select(
-          ctx,
-          self.owner,
-          redirects(ctx, self, use, effect),
-          '流离：弃置一张牌，将杀转移给攻击范围内的其他角色',
-          {
-            cancel: '不发动流离',
-            reason: self.skill,
-            describe: () => ({ previousTargets: use.effects.map((entry) => entry.target) }),
-          },
-        ),
-      declare(ctx, { use, effect }, self, picked) {
-        const target = picked.targets[0]!;
-        return {
-          discard: picked.cards,
-          areas: HE,
-          legal: picked.valid,
-          changes: [
-            use.replaceTargetChange(ctx, effect.effectId, target, self.skill, {
-              ignoreDistance: true,
-            }),
-          ],
-          data: { targets: [target], redirect: { useId: use.id, from: self.owner, to: target } },
-        };
-      },
-    }),
-  ],
-});
+export const liuli = skill(
+  'standard:liuli',
+  '流离',
+  '当你成为杀的目标时，可以弃置一张手牌或装备，将此杀转移给你攻击范围内的一名其他角色（不能是出杀者）。弃置的装备不再提供范围。',
+  on(Target.confirming, {
+    who: ({ effect }) => effect.target,
+    when: (ctx, { use, effect }, self) =>
+      effect.actor !== self.owner &&
+      effect.card.name === 'standard:slash' &&
+      effect.state === 'targeting' &&
+      redirects(ctx, self, use, effect).available(),
+    cost: (ctx, { use, effect }, self) =>
+      select(
+        ctx,
+        self.owner,
+        redirects(ctx, self, use, effect),
+        '流离：弃置一张牌，将杀转移给攻击范围内的其他角色',
+        {
+          cancel: '不发动流离',
+          reason: self.skill,
+          describe: () => ({ previousTargets: use.effects.map((entry) => entry.target) }),
+        },
+      ),
+    declare(ctx, { use, effect }, self, picked) {
+      const target = picked.targets[0]!;
+      return {
+        discard: picked.cards,
+        areas: HE,
+        legal: picked.valid,
+        changes: [
+          use.replaceTargetChange(ctx, effect.effectId, target, self.skill, {
+            ignoreDistance: true,
+          }),
+        ],
+        data: { targets: [target], redirect: { useId: use.id, from: self.owner, to: target } },
+      };
+    },
+  }),
+);
 
 export default general('standard:daqiao', '大乔', '吴', 3, [guose, liuli], { gender: 'female' });

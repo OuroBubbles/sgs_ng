@@ -43,13 +43,18 @@ export function collectStandardCatalogue(read, names) {
   for (const file of names) {
     const path = `src/content/standard/${file}`;
     const source = parse(path);
-    // 同文件内 `const x = skill({ id: '...' })` 或普通对象的变量名，供 general(id, name, kingdom, hp, [x]) 解析。
+    // 同文件内 `const x = skill('id', …)` 或普通对象的变量名，供 general(id, name, kingdom, hp, [x]) 解析。
     const local = new Map();
     walk(source, (node) => {
       if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || !node.initializer)
         return;
       let value = node.initializer;
       if (ts.isSatisfiesExpression(value)) value = value.expression;
+      if (ts.isCallExpression(value) && value.expression.getText(source) === 'skill') {
+        const id = literal(value.arguments[0]);
+        if (id) local.set(node.name.text, id);
+        return;
+      }
       if (ts.isCallExpression(value) && value.arguments.length === 1) value = value.arguments[0];
       if (!ts.isObjectLiteralExpression(value)) return;
       const id = literal(fields(value).get('id'));
@@ -66,6 +71,19 @@ export function collectStandardCatalogue(read, names) {
         const name = literal(node.arguments[1]);
         if (!id || !name) throw new Error('Horse inventory requires literal IDs and labels.');
         definitions.set(`standard:${id}`, { name, source: at(path, source, node) });
+      }
+      // 作者层位置参数：skill(id, name, description, …) 与 equipment(id, label, slot, …)。
+      if (
+        ts.isCallExpression(node) &&
+        ['skill', 'equipment'].includes(node.expression.getText(source))
+      ) {
+        const [id, name, description] = node.arguments.map(literal);
+        // 坐骑工厂内的模板 ID 由上面的 horse 分支登记。
+        if (!id?.startsWith('standard:') || !name) return;
+        if (node.expression.getText(source) === 'equipment')
+          definitions.set(id, { name, source: at(path, source, node) });
+        else if (description)
+          skills.set(id, { id, name, description, source: at(path, source, node) });
       }
       if (
         ts.isCallExpression(node) &&

@@ -1,63 +1,49 @@
-import { equipmentCard, modify, cardQueries, ownedCards } from '../../sdk';
+import { equipment, modify, cardQueries, ownedCards } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
 import { eightDiagram, qinggangSword, niohShield } from './armor';
 import { advancedWeapons } from './weapons';
 import { remainingSwords } from './swords';
 
-const crossbow = equipmentCard({
-  id: 'standard:crossbow',
-  label: '诸葛连弩',
-  slot: 'weapon',
-  range: 1,
-  skill: {
-    modifiers: [
-      modify(cardQueries.usageLimit, (_ctx, { input: request, self }) =>
-        request.actor === self.owner &&
-        request.card.name === 'standard:slash' &&
-        !request.card.materials.includes(self.origin?.id ?? '')
-          ? null
-          : undefined,
-      ),
-    ],
-  },
-});
+const crossbow = equipment(
+  'standard:crossbow',
+  '诸葛连弩',
+  { weapon: 1 },
+  modify(cardQueries.usageLimit, (_ctx, { input: request, self }) =>
+    request.actor === self.owner &&
+    request.card.name === 'standard:slash' &&
+    !request.card.materials.includes(self.origin?.id ?? '')
+      ? null
+      : undefined,
+  ),
+);
 
-const spear = equipmentCard({
-  id: 'standard:spear',
-  label: '丈八蛇矛',
-  slot: 'weapon',
-  range: 3,
-  skill: {
-    viewAs: [
-      {
-        id: 'two-cards-slash',
-        count: { min: 2, max: 2 },
-        materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
-        // 多材料的花色/点数为空，颜色独立按材料推导；作者只需指定名称。
-        make: { name: 'standard:slash' },
-      },
-    ],
+const spear = equipment(
+  'standard:spear',
+  '丈八蛇矛',
+  { weapon: 3 },
+  {
+    id: 'two-cards-slash',
+    count: { min: 2, max: 2 },
+    materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
+    // 多材料的花色/点数为空，颜色独立按材料推导；作者只需指定名称。
+    make: { name: 'standard:slash' },
   },
-});
+);
 
 function horse(id: string, label: string, defensive: boolean): CardDefinition {
-  return equipmentCard({
-    id: `standard:${id}`,
+  return equipment(
+    `standard:${id}`,
     label,
-    slot: defensive ? 'defensive-horse' : 'offensive-horse',
-    skill: {
-      modifiers: [
-        modify(cardQueries.distanceCorrection, (_ctx, { input: request, self }) => {
-          if (self.origin && request.card?.materials.includes(self.origin.id)) return undefined;
-          return (defensive ? request.to : request.from) === self.owner
-            ? defensive
-              ? 1
-              : -1
-            : undefined;
-        }),
-      ],
-    },
-  });
+    defensive ? 'defensive-horse' : 'offensive-horse',
+    modify(cardQueries.distanceCorrection, (_ctx, { input: request, self }) => {
+      if (self.origin && request.card?.materials.includes(self.origin.id)) return undefined;
+      return (defensive ? request.to : request.from) === self.owner
+        ? defensive
+          ? 1
+          : -1
+        : undefined;
+    }),
+  );
 }
 
 export const standardEquipment: readonly CardDefinition[] = [

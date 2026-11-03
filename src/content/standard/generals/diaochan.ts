@@ -61,44 +61,40 @@ function pairs(ctx: Context, { self, phase }: ActiveInput) {
   });
 }
 
-export const lijian = skill({
-  id: 'standard:lijian',
-  name: '离间',
-  description:
-    '出牌阶段限一次，弃置一张手牌或装备，选择两名其他男性角色。后选角色视为对先选角色使用一张不能被无懈可击的决斗。',
-  active: [
-    action({
-      id: 'forced-duel',
-      limit: 1,
-      selection: pairs,
-      cards: { count: 1, areas: HE },
-      pay: 'discard',
-      effect: (ctx, { targets: [first, second] }) => rulesOf(ctx).use(ctx, duel(second!, first!)),
-    }),
-  ],
-  ai: {
-    value: ({ cards, players, self, cost }) =>
-      cards.some((card) => cost(card.id) <= 5) &&
-      players.filter((p) => p.alive && p.id !== self.id && ['male', 'dual'].includes(p.gender))
-        .length >= 2
-        ? 16
-        : -1,
+export const lijian = skill(
+  'standard:lijian',
+  '离间',
+  '出牌阶段限一次，弃置一张手牌或装备，选择两名其他男性角色。后选角色视为对先选角色使用一张不能被无懈可击的决斗。',
+  action({
+    id: 'forced-duel',
+    limit: 1,
+    selection: pairs,
+    cards: { count: 1, areas: HE },
+    pay: 'discard',
+    effect: (ctx, { targets: [first, second] }) => rulesOf(ctx).use(ctx, duel(second!, first!)),
+  }),
+  {
+    ai: {
+      value: ({ cards, players, self, cost }) =>
+        cards.some((card) => cost(card.id) <= 5) &&
+        players.filter((p) => p.alive && p.id !== self.id && ['male', 'dual'].includes(p.gender))
+          .length >= 2
+          ? 16
+          : -1,
+    },
   },
-});
+);
 
-export const biyue = skill({
-  id: 'standard:biyue',
-  name: '闭月',
-  description: '结束阶段，你可以摸一张牌。',
-  triggers: [
-    on(Phase.started, {
-      who: (phase) => phase.owner,
-      when: (_ctx, phase) => phase.kind === 'finish',
-      ask: '是否发动【闭月】摸一张牌？',
-      effect: (ctx, _phase, self) =>
-        draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
-    }),
-  ],
-});
+export const biyue = skill(
+  'standard:biyue',
+  '闭月',
+  '结束阶段，你可以摸一张牌。',
+  on(Phase.started, {
+    who: (phase) => phase.owner,
+    when: (_ctx, phase) => phase.kind === 'finish',
+    ask: '是否发动【闭月】摸一张牌？',
+    effect: (ctx, _phase, self) => draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
+  }),
+);
 
 export default general('standard:diaochan', '貂蝉', '群', 3, [lijian, biyue], { gender: 'female' });

@@ -92,6 +92,7 @@ export {
   action,
   convert,
   skill,
+  equipment,
   general,
 } from '../rules/author';
 export type {

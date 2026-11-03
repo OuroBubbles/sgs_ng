@@ -9,22 +9,22 @@
 ```ts
 import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';
 
-export const study = skill({
-  id: 'study',
-  name: '研习',
-  description: '当你使用锦囊牌时，你可以摸一张牌。',
-  triggers: [
-    on(useDeclared, {
-      who: (use) => use.actor, // 只在事件主体是技能拥有者时触发
-      when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
-      ask: '是否发动【研习】摸一张牌？', // 询问 + 宣告由引擎完成
-      effect: (ctx, _use, self) => draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
-    }),
-  ],
-});
+export const study = skill(
+  'study',
+  '研习',
+  '当你使用锦囊牌时，你可以摸一张牌。',
+  on(useDeclared, {
+    who: (use) => use.actor, // 只在事件主体是技能拥有者时触发
+    when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
+    ask: '是否发动【研习】摸一张牌？', // 询问 + 宣告由引擎完成
+    effect: (ctx, _use, self) => draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
+  }),
+);
 
 export default general('scholar', '学士', '群', 3, [study]);
 ```
+
+`skill(id, name, description, ...parts)` 是作者层写法：每个部件按形状归类——`on(...)` 为触发、`modify(...)` 为查询修正、带 `run` 的为主动技、带 `make` 的为转换，带 `lord` / `ai` 的对象为选项。内核仍是 `defineSkill({ id, name, description, triggers, ... })` 对象形，需要 getter 或自定义结构时直接使用。
 
 技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。
 

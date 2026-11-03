@@ -19,7 +19,11 @@ import type { ViewAs, ViewAsInput } from './cards/types';
 import type { PhysicalCardFace } from './cards/face';
 import { payDiscard, used } from './costs/pay';
 import { rulesOf } from './skills/skills';
-import type { SkillDefinition, SkillHandle } from './skills/skills';
+import type { SkillDefinition, SkillHandle, SkillTrigger } from './skills/skills';
+import type { SkillModifier } from './skills/query';
+import { equipmentCard } from './cards/equipment';
+import type { EquipmentSlot } from './cards/equipment';
+import type { CardDefinition } from './cards/types';
 import type { ActiveInput, ActiveSkill } from './skills/active';
 import { declare } from './skills/invoke';
 import type { Declaration } from './skills/invoke';
@@ -392,8 +396,47 @@ export function convert(
 
 // ───────────────────────── 技能与武将
 
-/** 技能定义；类型检查用，原样返回。 */
-export const skill = <const S extends SkillDefinition>(definition: S): S => definition;
+/** 技能与装备技能的组成部分：触发、修正、主动、转换，以及可选的 { lord, ai }。 */
+export type SkillPart =
+  | SkillTrigger
+  | SkillModifier
+  | ActiveSkill
+  | ViewAs
+  | Pick<SkillDefinition, 'lord' | 'ai'>;
+function compose(parts: readonly SkillPart[]) {
+  const of = <T extends SkillPart>(key: string) => parts.filter((part) => key in part) as T[];
+  return Object.assign(
+    {
+      triggers: of<SkillTrigger>('bind'),
+      modifiers: of<SkillModifier>('contribution'),
+      active: of<ActiveSkill>('run'),
+      viewAs: of<ViewAs>('make'),
+    },
+    ...parts.filter((part) => 'lord' in part || 'ai' in part),
+  ) as Omit<SkillDefinition, 'id' | 'name'>;
+}
+/** 一个技能：ID、名称、描述，其后直接列出各部分。 */
+export const skill = (
+  id: string,
+  name: string,
+  description: string,
+  ...parts: readonly SkillPart[]
+): SkillDefinition => ({ id, name, description, ...compose(parts) });
+
+/** 一张装备牌：ID、牌名、栏位（武器写 { weapon: 攻击范围 }），其后列出装备技能的各部分。 */
+export function equipment(
+  id: string,
+  label: string,
+  slot: Exclude<EquipmentSlot, 'weapon'> | { readonly weapon: number },
+  ...parts: readonly SkillPart[]
+): CardDefinition {
+  return equipmentCard({
+    id,
+    label,
+    ...(typeof slot === 'string' ? { slot } : { slot: 'weapon', range: slot.weapon }),
+    ...(parts.length ? { skill: compose(parts) } : {}),
+  });
+}
 
 export interface AuthoredGeneral extends GeneralDefinition {
   /** 由内容装配自动登记的技能定义。 */

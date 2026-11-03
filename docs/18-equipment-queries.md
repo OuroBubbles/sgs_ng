@@ -12,7 +12,7 @@
 
 ## 安装与替换
 
-`equipmentCard({ id, label, slot, range?, skill? })` 生成普通牌定义。装备自动以自己为目标，不要求玩家再次点击自己；被禁止的目标不能通过过滤成零目标来支付掉装备。
+`equipment(id, label, slot | { weapon: range }, ...parts)` 生成普通牌定义，部件与 `skill(...)` 相同；内核对象形 `equipmentCard({ id, label, slot, range?, skill? })` 用于自定义能力 ID 或名号。装备自动以自己为目标，不要求玩家再次点击自己；被禁止的目标不能通过过滤成零目标来支付掉装备。
 
 `skill` 是静态 SkillDefinition，回调需要当前目录与用牌服务时调用 `rulesOf(ctx)`；方天等能力共用 `extraTargets` 查询。防御结果和青龙/斧/戟/弓的后续实现见 [22](22-weapons-defense.md)。
 
