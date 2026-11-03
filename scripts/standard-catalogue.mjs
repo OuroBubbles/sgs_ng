@@ -23,6 +23,14 @@ export function at(file, source, node) {
   return { file, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 };
 }
 
+/** 标准目录的 .ts 源文件（含一将一文件的 generals/），相对 src/content/standard、已排序。 */
+export function standardSourceNames(readdirSync, directory) {
+  return readdirSync(directory, { recursive: true })
+    .map((name) => String(name).split('\\').join('/'))
+    .filter((name) => name.endsWith('.ts'))
+    .sort();
+}
+
 /** 仅解析项目自有标准目录；引用审阅与行为审阅共用，普通检查不读取参考项目。 */
 export function collectStandardCatalogue(read, names) {
   function parse(file) {
@@ -35,6 +43,18 @@ export function collectStandardCatalogue(read, names) {
   for (const file of names) {
     const path = `src/content/standard/${file}`;
     const source = parse(path);
+    // 同文件内 `const x = skill({ id: '...' })` 或普通对象的变量名，供 general({ skills: [x] }) 解析。
+    const local = new Map();
+    walk(source, (node) => {
+      if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || !node.initializer)
+        return;
+      let value = node.initializer;
+      if (ts.isSatisfiesExpression(value)) value = value.expression;
+      if (ts.isCallExpression(value) && value.arguments.length === 1) value = value.arguments[0];
+      if (!ts.isObjectLiteralExpression(value)) return;
+      const id = literal(fields(value).get('id'));
+      if (id) local.set(node.name.text, id);
+    });
     walk(source, (node) => {
       // 这里只识别本目录明确使用的坐骑工厂调用，不解释任意作者函数。
       if (
@@ -61,6 +81,7 @@ export function collectStandardCatalogue(read, names) {
         if (name && list && ts.isArrayLiteralExpression(list)) {
           const ids = list.elements.map((entry) => {
             if (literal(entry) !== null) return literal(entry);
+            if (ts.isIdentifier(entry) && local.has(entry.text)) return local.get(entry.text);
             if (
               ts.isPropertyAccessExpression(entry) &&
               entry.name.text === 'id' &&

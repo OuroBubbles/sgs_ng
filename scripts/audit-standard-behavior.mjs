@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'n
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { collectStandardCatalogue } from './standard-catalogue.mjs';
+import { standardSourceNames, collectStandardCatalogue } from './standard-catalogue.mjs';
 import reviews from './standard-behavior-review.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -62,9 +62,7 @@ try {
   fresh('tsconfig.json', units.startTime);
   const catalogue = collectStandardCatalogue(
     read,
-    readdirSync(resolve(root, 'src/content/standard'))
-      .filter((name) => name.endsWith('.ts'))
-      .sort(),
+    standardSourceNames(readdirSync, resolve(root, 'src/content/standard')),
   );
   const subjects = new Map([
     ...[...catalogue.skills].map(([id, item]) => [id, { ...item, kind: 'skill' }]),

@@ -3,7 +3,13 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { collectStandardCatalogue, walk, literal, at } from './standard-catalogue.mjs';
+import {
+  standardSourceNames,
+  collectStandardCatalogue,
+  walk,
+  literal,
+  at,
+} from './standard-catalogue.mjs';
 
 // 显式调用才读取本地参考；只解析文本，不加载/执行参考项目，也不据此宣称行为通过。
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -45,9 +51,7 @@ function translations(file, lua = false) {
 
 const { skills, cards, generals, definitions } = collectStandardCatalogue(
   read,
-  readdirSync(resolve(root, 'src/content/standard'))
-    .filter((name) => name.endsWith('.ts'))
-    .sort(),
+  standardSourceNames(readdirSync, resolve(root, 'src/content/standard')),
 );
 
 const fkSkills = translations('../freekill/packages/standard/i18n/zh_CN.lua', true);
