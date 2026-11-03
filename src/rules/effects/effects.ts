@@ -240,22 +240,9 @@ export class EffectBook implements TriggerSource {
     const same =
       key && this.instances(ctx.world, definition).find((r) => key(r.data) === key(record.data));
     if (same) return Object.freeze({ record: same, changes: [] });
-    return Object.freeze({
-      record,
-      changes: [
-        immutable({
-          kind: 'setState' as const,
-          state: {
-            id: record.id,
-            key: stateKey,
-            owner: null,
-            source: definition.id,
-            scopeId: record.scopeId,
-            value: record,
-          },
-        }),
-      ],
-    });
+    const { id, scopeId } = record;
+    const state = { id, key: stateKey, owner: null, source: definition.id, scopeId, value: record };
+    return Object.freeze({ record, changes: [immutable({ kind: 'setState' as const, state })] });
   }
 
   prepare<Data>(

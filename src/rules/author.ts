@@ -1,8 +1,7 @@
 /**
  * 作者门面：在内核原语之上提供武将/技能的高层写法。
- * - trigger：「谁 / 何时 / 询问或代价 / 宣告 / 效果」分段，发动记录与终局重查由引擎负责；
- * - action：出牌阶段主动技能，声明选牌、选目标、次数与代价；
- * - convert：视为技；
+ * - skill / equipment / general：位置参数的定义，部件按形状归类；
+ * - action：出牌阶段主动技能；convert：视为技；dealtWith / landing：伤害时点前提；
  * - 动词：obtain / takeCard / give / askDiscard / select，自带存活与终局 no-op。
  */
 import type { Context } from '../core/runtime/room';
@@ -49,9 +48,6 @@ export const alive = (ctx: Context, player: string): boolean => ctx.world.player
 /** 本局行动顺序中除 owner 外的席位（含已阵亡者，由调用者筛选）。 */
 export const others = (ctx: Context, owner: string): readonly string[] =>
   ctx.actionOrder(owner).filter((id) => id !== owner);
-/** 存活的其他角色，按座位顺序。 */
-export const otherAlive = (ctx: Context, owner: string): readonly string[] =>
-  ctx.world.snapshot.players.filter((p) => p.alive && p.id !== owner).map((p) => p.id);
 /** 当前牌面（含锁定视为）。 */
 export const face = (ctx: Context, card: string, judgmentPlayer?: string) =>
   rulesOf(ctx).face(ctx, card, judgmentPlayer);
@@ -60,7 +56,7 @@ export const cardDef = (ctx: Context, name: string) => rulesOf(ctx).definition(n
 /** 实体牌的印刷名。 */
 export const cardLabel = (ctx: Context, card: string): string =>
   rulesOf(ctx).definition(ctx.world.card(card).name).label;
-export const handOf = (ctx: Context, player: string): string =>
+const handOf = (ctx: Context, player: string): string =>
   ctx.world.snapshot.zones.find((zone) => zone.owner === player && zone.kind === 'hand')!.id;
 export const canDiscard = (ctx: Context, actor: string, card: string, reason: string) =>
   rulesOf(ctx).canDiscard(ctx, { actor, owner: actor, card, reason });
@@ -241,8 +237,6 @@ export async function askDiscard(
   });
   return paid.kind === 'paid';
 }
-
-// ───────────────────────── 触发技
 
 // ───────────────────────── 主动技
 
