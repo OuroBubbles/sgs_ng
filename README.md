@@ -29,7 +29,7 @@ pnpm format:check
 
 ## 内容开发
 
-直接修改 [标准内容](src/content/standard/index.ts)、[机制演武](src/content/workshop/index.ts) 或其普通源码文件。导出 `ContentDefinition` 对象，再用 `createContent(...)` 组合；定义、Window、Query 与闭包共享真实对象，无需打包或注册内容版本。日常技能写法从 [制衡等技能](src/content/standard/wu.ts) 与 [开发入口](docs/05-authoring.md) 阅读。
+直接修改 [标准内容](src/content/standard/index.ts)、[机制演武](src/content/workshop/index.ts) 或其普通源码文件。导出 `ContentDefinition` 对象，再用 `createContent(...)` 组合；定义、Window、Query 与闭包共享真实对象，无需打包或注册内容版本。标准武将一将一文件，位于 [generals/](src/content/standard/generals/)（如 [孙权·制衡](src/content/standard/generals/sunquan.ts)），写法见 [开发入口](docs/05-authoring.md)。
 
 主动技能使用 `run(ctx, { self, phase, book, choice })`，按需解构字段；支付、后效和嵌套结算仍由普通函数、分支、循环与 await 组织。新增交互类型需要补齐 UI / AI 映射。跨文件合作使用普通 import，示例直接纳入类型检查与真实结算场景。
 
