@@ -40,7 +40,7 @@ flowchart LR
 
 ## 内容作者取得服务
 
-装备能力是静态 SkillDefinition；需要牌目录或完整用牌服务时，在回调里用 `rulesOf(ctx)`：
+装备能力与武将技能用同一套作者层（`on` 的 ask / cost / declare / effect、`select` + `selection(ctx, …)`）。技能 ID 默认为 `${id}-ability`、技能名默认为牌名，只有另立名号时才显式写出；需要牌目录或完整用牌服务时，在回调里用 `rulesOf(ctx)`：
 
 ```ts
 equipmentCard({
@@ -49,8 +49,6 @@ equipmentCard({
   slot: 'weapon',
   range: 3,
   skill: {
-    id: 'my:weapon-ability',
-    name: '示例武器',
     triggers: [
       /* 回调中 rulesOf(ctx).askUse / cardDef(ctx, name) */
     ],
@@ -60,7 +58,7 @@ equipmentCard({
 
 CardBook 从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。
 
-`SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；联合选择可通过 `decision(player, prompt, { optional: true, cancelLabel })` 指定取消文字，借刀复用它显示“取消用牌”。
+`SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；作者层 `select(..., { cancel })` 指定取消文字；`selection(ctx, …)` 的牌候选直接返回 ID，标签统一取印刷名。
 
 ## 验证入口
 

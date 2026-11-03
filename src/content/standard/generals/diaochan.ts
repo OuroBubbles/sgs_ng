@@ -48,8 +48,8 @@ function pairs(ctx: Context, { self, phase }: ActiveInput) {
     (first === undefined ? targets() : [first]).some((a) =>
       (second === undefined ? targets() : [second]).some((b) => valid(a, b)),
     );
-  return selection({
-    cards: () => cards().map((id) => ({ id, label: ctx.world.card(id).name })),
+  return selection(ctx, {
+    cards,
     targets,
     cardCount: { min: 1, max: 1 },
     targetCount: { min: 2, max: 2 },

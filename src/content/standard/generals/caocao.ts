@@ -9,9 +9,9 @@ import {
   on,
   Response,
   Damage,
+  Use,
 } from '../../../sdk';
 import type { Context, EffectRef, ResponseOpportunity } from '../../../sdk';
-import { Use } from '../../../sdk';
 
 const materialsHere = (ctx: Context, card: EffectRef | undefined): card is EffectRef =>
   !!card &&

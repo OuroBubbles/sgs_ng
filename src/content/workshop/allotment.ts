@@ -7,9 +7,9 @@ import {
   withPrivateTopCards,
   rulesOf,
   Phase,
+  Cards,
 } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
-import { Cards } from '../../sdk';
 
 /** 角色额度与逐牌接收条件，复用分组模型；分配一次提交，不逐个打开送牌菜单。 */
 export const allotment = {

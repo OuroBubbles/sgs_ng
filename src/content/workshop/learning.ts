@@ -1,6 +1,5 @@
-import { draw, invoke, isGameOver, on, pay, rulesOf, Damage } from '../../sdk';
+import { draw, invoke, isGameOver, on, pay, rulesOf, Damage, Skill } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
-import { Skill } from '../../sdk';
 
 export const echo = {
   id: 'workshop:echo',

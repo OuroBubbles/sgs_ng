@@ -3,7 +3,6 @@ import type { CardDefinition } from '../../sdk';
 import { eightDiagram, qinggangSword, niohShield } from './armor';
 import { advancedWeapons } from './weapons';
 import { remainingSwords } from './swords';
-import type { SkillDefinition } from '../../sdk';
 
 const crossbow = equipmentCard({
   id: 'standard:crossbow',
@@ -11,8 +10,6 @@ const crossbow = equipmentCard({
   slot: 'weapon',
   range: 1,
   skill: {
-    id: 'standard:crossbow-ability',
-    name: '诸葛连弩',
     modifiers: [
       modify(cardQueries.usageLimit, (_ctx, { input: request, self }) =>
         request.actor === self.owner &&
@@ -22,7 +19,7 @@ const crossbow = equipmentCard({
           : undefined,
       ),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 const spear = equipmentCard({
@@ -31,8 +28,6 @@ const spear = equipmentCard({
   slot: 'weapon',
   range: 3,
   skill: {
-    id: 'standard:spear-ability',
-    name: '丈八蛇矛',
     viewAs: [
       {
         id: 'two-cards-slash',
@@ -42,7 +37,7 @@ const spear = equipmentCard({
         make: { name: 'standard:slash' },
       },
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 function horse(id: string, label: string, defensive: boolean): CardDefinition {
@@ -51,8 +46,6 @@ function horse(id: string, label: string, defensive: boolean): CardDefinition {
     label,
     slot: defensive ? 'defensive-horse' : 'offensive-horse',
     skill: {
-      id: `standard:${id}-ability`,
-      name: label,
       modifiers: [
         modify(cardQueries.distanceCorrection, (_ctx, { input: request, self }) => {
           if (self.origin && request.card?.materials.includes(self.origin.id)) return undefined;
@@ -63,7 +56,7 @@ function horse(id: string, label: string, defensive: boolean): CardDefinition {
             : undefined;
         }),
       ],
-    } satisfies SkillDefinition,
+    },
   });
 }
 

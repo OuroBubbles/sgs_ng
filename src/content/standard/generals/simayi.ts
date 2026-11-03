@@ -1,6 +1,5 @@
 import {
   alive,
-  cardLabel,
   chooseOwnedCard,
   face,
   general,
@@ -45,8 +44,8 @@ export const guicai = skill({
         const picked = await select(
           ctx,
           self.owner,
-          selection({
-            cards: () => cards().map((id) => ({ id, label: cardLabel(ctx, id) })),
+          selection(ctx, {
+            cards,
             cardCount: { min: 1, max: 1 },
           }),
           `鬼才：选择一张手牌，替换 ${judgment.player} 的判定牌`,

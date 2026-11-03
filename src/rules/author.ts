@@ -192,9 +192,17 @@ export async function select(
   return { ...choice, valid: () => model.validate(choice).ok };
 }
 
-/** 构造联合选择的便捷写法；cards / targets 返回 ID 列表。 */
-export function selection(spec: JointSelectionSpec): JointSelection {
-  return new JointSelection(spec);
+/** 构造联合选择：cards / targets 直接返回 ID 列表，牌以印刷名作标签。 */
+export function selection(ctx: Context, spec: JointSelectionSpec): JointSelection {
+  const { cards } = spec;
+  if (!cards) return new JointSelection(spec);
+  return new JointSelection({
+    ...spec,
+    cards: () =>
+      cards().map((card) =>
+        typeof card === 'string' ? { id: card, label: cardLabel(ctx, card) } : card,
+      ),
+  });
 }
 
 /** 令 player 弃置 count 张牌；可拒绝。返回是否确实弃置。 */
@@ -211,11 +219,8 @@ export async function askDiscard(
   const { count, prompt, reason, areas = ['hand'] } = spec;
   const live = () => alive(ctx, player) && !isGameOver(ctx.world);
   if (!live()) return false;
-  const model = new JointSelection({
-    cards: () =>
-      live()
-        ? discardable(ctx, player, reason, areas).map((id) => ({ id, label: cardLabel(ctx, id) }))
-        : [],
+  const model = selection(ctx, {
+    cards: () => (live() ? discardable(ctx, player, reason, areas) : []),
     cardCount: { min: count, max: count },
   });
   const picked = await select(ctx, player, model, prompt, spec);

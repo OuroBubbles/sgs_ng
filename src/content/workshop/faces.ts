@@ -1,6 +1,5 @@
 import { cardQueries, modify } from '../../sdk';
-import type { Card } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
+import type { Card, SkillDefinition } from '../../sdk';
 
 /** 红颜式过滤的普通作者代码；不修改实体，也不重写武圣或判定流程。 */
 export const vermilion = {

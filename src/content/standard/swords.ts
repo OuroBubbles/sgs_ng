@@ -3,22 +3,19 @@ import {
   differentGender,
   draw,
   equipmentCard,
-  invoke,
   isGameOver,
   isDirectDamage,
-  JointSelection,
   discardCards,
   on,
   ownedCards,
-  pay,
   rulesOf,
-  cardLabel,
   Target,
   Damage,
+  select,
+  selection,
+  discardable,
 } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
-import { Skill } from '../../sdk';
 import { Weapon } from './weapons';
 
 const doubleSwords = equipmentCard({
@@ -27,8 +24,6 @@ const doubleSwords = equipmentCard({
   slot: 'weapon',
   range: 2,
   skill: {
-    id: 'standard:double_swords-ability',
-    name: '雌雄双股剑',
     triggers: [
       on(Target.specified, {
         when: (ctx, { effect }, self) =>
@@ -36,73 +31,54 @@ const doubleSwords = equipmentCard({
           effect.state === 'targeting' &&
           effect.card.name === 'standard:slash' &&
           differentGender(ctx.world, self.owner, effect.target),
-        async effect(ctx, { effect }, self) {
-          const invoked = await invoke(
+        ask: (_ctx, { effect }) => `是否对 ${effect.target} 发动【雌雄双股剑】？`,
+        keep: (at, { effect }, self) =>
+          effect.state === 'targeting' &&
+          at.world.player(effect.target).alive &&
+          differentGender(at.world, self.owner, effect.target),
+        async effect(ctx, { effect: { target } }, self) {
+          const picked = await select(
             ctx,
-            self,
-            `是否对 ${effect.target} 发动【雌雄双股剑】？`,
-            (at) =>
-              effect.state === 'targeting' &&
-              at.world.player(effect.target).alive &&
-              differentGender(at.world, self.owner, effect.target),
-          );
-          if (!invoked) return;
-          const model = new JointSelection({
-            cards: () =>
-              !ctx.world.player(effect.target).alive || isGameOver(ctx.world)
-                ? []
-                : ownedCards(ctx.world, effect.target)
-                    .filter((card) =>
-                      rulesOf(ctx).canDiscard(ctx, {
-                        actor: effect.target,
-                        owner: effect.target,
-                        card,
-                        reason: self.skill,
-                      }),
-                    )
-                    .map((id) => ({
-                      id,
-                      label: cardLabel(ctx, id),
-                    })),
-            cardCount: { min: 1, max: 1 },
-          });
-          const choice = await ctx.ask(
-            model.decision(effect.target, `雌雄双股剑：弃置一张手牌，否则 ${self.owner} 摸一张牌`, {
-              optional: true,
-              cancelLabel: '令对方摸牌',
+            target,
+            selection(ctx, {
+              cards: () =>
+                !ctx.world.player(target).alive || isGameOver(ctx.world)
+                  ? []
+                  : discardable(ctx, target, self.skill),
+              cardCount: { min: 1, max: 1 },
             }),
+            `雌雄双股剑：弃置一张手牌，否则 ${self.owner} 摸一张牌`,
+            { cancel: '令对方摸牌' },
           );
-          if (choice.kind === 'chosen') {
-            const card = choice.value.cards[0]!;
-            if (
-              ctx.world.player(effect.target).alive &&
-              ownedCards(ctx.world, effect.target).includes(card)
-            ) {
-              const from = ctx.world.position(card);
-              const moved = await discardCards(ctx, {
-                actor: effect.target,
-                owner: effect.target,
-                cards: [card],
-                reason: self.skill,
+          const card = picked?.cards[0];
+          if (
+            card &&
+            ctx.world.player(target).alive &&
+            ownedCards(ctx.world, target).includes(card)
+          ) {
+            const from = ctx.world.position(card);
+            const moved = await discardCards(ctx, {
+              actor: target,
+              owner: target,
+              cards: [card],
+              reason: self.skill,
+            });
+            if (moved.kind === 'discarded') {
+              ctx.commit(Weapon.cardDiscarded, [], {
+                actor: self.owner,
+                name: self.name,
+                target,
+                card,
+                from,
               });
-
-              if (moved.kind === 'discarded') {
-                ctx.commit(Weapon.cardDiscarded, [], {
-                  actor: self.owner,
-                  name: self.name,
-                  target: effect.target,
-                  card,
-                  from,
-                });
-                return;
-              }
+              return;
             }
           }
           await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 const iceSword = equipmentCard({
@@ -111,8 +87,6 @@ const iceSword = equipmentCard({
   slot: 'weapon',
   range: 2,
   skill: {
-    id: 'standard:ice_sword-ability',
-    name: '寒冰剑',
     triggers: [
       on(Damage.replacing, {
         when: (ctx, draft, self) =>
@@ -131,43 +105,34 @@ const iceSword = equipmentCard({
               reason: self.skill,
             }),
           ),
-        async effect(ctx, draft, self) {
-          const target = draft.input.to;
+        cost: async (ctx, draft, self) => {
           const first = await chooseOwnedCard(ctx, {
             actor: self.owner,
-            target,
+            target: draft.input.to,
             areas: ['hand', 'equipment'],
             reason: self.skill,
             discard: true,
             optional: true,
-            prompt: `寒冰剑：选择弃置 ${target} 的第一张牌，确认后发动并防止伤害`,
+            prompt: `寒冰剑：选择弃置 ${draft.input.to} 的第一张牌，确认后发动并防止伤害`,
           });
-          if (first.kind !== 'chosen') return;
-          const paid = await pay(ctx, {
-            skill: self,
-            reason: self.skill,
-            factKind: Skill.invoked,
-            declaration: { label: self.name },
-            legal: (at) =>
-              !draft.prevented &&
-              draft.amount > 0 &&
-              at.world.player(target).alive &&
-              at.world.position(first.card) === first.from &&
-              rulesOf(at).canDiscard(at, {
-                actor: self.owner,
-                owner: target,
-                card: first.card,
-                reason: self.skill,
-              }),
-          });
-          if (
-            paid.kind !== 'paid' ||
-            draft.prevented ||
-            draft.amount < 1 ||
-            isGameOver(ctx.world) ||
-            !ctx.world.player(target).alive
-          )
-            return;
+          return first.kind === 'chosen' ? first : null;
+        },
+        declare: (_ctx, draft, self, first) => ({
+          legal: (at) =>
+            !draft.prevented &&
+            draft.amount > 0 &&
+            at.world.player(draft.input.to).alive &&
+            at.world.position(first.card) === first.from &&
+            rulesOf(at).canDiscard(at, {
+              actor: self.owner,
+              owner: draft.input.to,
+              card: first.card,
+              reason: self.skill,
+            }),
+        }),
+        async effect(ctx, draft, self, first) {
+          const target = draft.input.to;
+          if (draft.prevented || draft.amount < 1 || !ctx.world.player(target).alive) return;
           draft.prevent(self.skill);
           ctx.commit(Weapon.damageReplaced, [], {
             actor: self.owner,
@@ -218,7 +183,7 @@ const iceSword = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 export const remainingSwords: readonly CardDefinition[] = [doubleSwords, iceSword];

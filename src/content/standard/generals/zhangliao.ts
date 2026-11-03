@@ -15,7 +15,7 @@ import {
 import type { Context, PhaseView, SkillHandle } from '../../../sdk';
 
 const victims = (ctx: Context, self: SkillHandle, phase: PhaseView) =>
-  selection({
+  selection(ctx, {
     targets: () =>
       !phase.replaced && alive(ctx, self.owner) && !isGameOver(ctx.world)
         ? others(ctx, self.owner).filter(

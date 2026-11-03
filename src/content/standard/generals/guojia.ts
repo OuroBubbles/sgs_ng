@@ -46,9 +46,8 @@ export const yiji = skill({
           { player: self.owner, count: 2, reason: self.skill },
           async (at, pool) => {
             const live = () => alive(at, self.owner) && !isGameOver(at.world);
-            const model = selection({
-              cards: () =>
-                live() ? pool.remaining().map((id) => ({ id, label: at.world.card(id).name })) : [],
+            const model = selection(at, {
+              cards: () => (live() ? pool.remaining() : []),
               targets: () =>
                 live() ? at.world.snapshot.players.filter((p) => p.alive).map((p) => p.id) : [],
               cardCount: { min: 1, max: 'all' },

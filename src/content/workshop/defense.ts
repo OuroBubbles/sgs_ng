@@ -7,10 +7,9 @@ import {
   payDiscard,
   rulesOf,
   Damage,
+  Skill,
 } from '../../sdk';
-import type { CardDefinition, Context, DamageDraft, SkillHandle } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
-import { Skill } from '../../sdk';
+import type { CardDefinition, Context, DamageDraft, SkillHandle, SkillDefinition } from '../../sdk';
 
 export const ward: CardDefinition = {
   id: 'workshop:ward',

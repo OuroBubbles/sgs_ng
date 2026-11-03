@@ -9,9 +9,9 @@ import {
   delayedCards,
   moveDelayed,
   resolveAttack,
+  CardEvent,
 } from '../../sdk';
 import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
-import { CardEvent } from '../../sdk';
 
 const otherLiving = (ctx: Context, { actor }: CardFixedTargetsInput) =>
   ctx.world.snapshot.players

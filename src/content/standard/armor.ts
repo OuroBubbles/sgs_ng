@@ -2,15 +2,13 @@ import {
   equipmentCard,
   equipmentEffectiveFor,
   on,
-  invoke,
   judge,
   Target,
   Resolve,
   Response,
+  Equipment,
 } from '../../sdk';
 import type { CardChoice } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
-import { Equipment } from '../../sdk';
 
 const jink: CardChoice = {
   kind: 'generated',
@@ -24,23 +22,16 @@ export const eightDiagram = equipmentCard({
   label: '八卦阵',
   slot: 'armor',
   skill: {
-    id: 'standard:eight_diagram-ability',
-    name: '八卦阵',
     triggers: [
       on(Response.requested, {
         when: (ctx, request, self) =>
           request.actor === self.owner &&
           equipmentEffectiveFor(ctx, self, request.to, 'armor') &&
           request.canProvide(ctx, jink),
+        ask: '是否发动【八卦阵】进行判定？',
+        keep: (at, request, self) =>
+          equipmentEffectiveFor(at, self, request.to, 'armor') && request.canProvide(at, jink),
         async effect(ctx, request, self) {
-          const invoked = await invoke(
-            ctx,
-            self,
-            '是否发动【八卦阵】进行判定？',
-            (at) =>
-              equipmentEffectiveFor(at, self, request.to, 'armor') && request.canProvide(at, jink),
-          );
-          if (!invoked) return;
           const result = await judge(ctx, {
             player: self.owner,
             reason: 'standard:eight_diagram',
@@ -51,7 +42,7 @@ export const eightDiagram = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 export const qinggangSword = equipmentCard({
@@ -60,8 +51,6 @@ export const qinggangSword = equipmentCard({
   slot: 'weapon',
   range: 2,
   skill: {
-    id: 'standard:qinggang_sword-ability',
-    name: '青釭剑',
     triggers: [
       on(Target.specified, {
         locked: true,
@@ -82,7 +71,7 @@ export const qinggangSword = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 export const niohShield = equipmentCard({
@@ -90,8 +79,6 @@ export const niohShield = equipmentCard({
   label: '仁王盾',
   slot: 'armor',
   skill: {
-    id: 'standard:nioh_shield-ability',
-    name: '仁王盾',
     triggers: [
       on(Resolve.starting, {
         locked: true,
@@ -111,5 +98,5 @@ export const niohShield = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });

@@ -12,9 +12,9 @@ import {
   skill,
   on,
   Cards,
+  defineEvent,
+  timing,
 } from '../../../sdk';
-import { defineEvent } from '../../../sdk';
-import { timing } from '../../../sdk';
 
 export const Fanjian = defineEvent('fanjian', {
   guessed: timing<unknown>(),

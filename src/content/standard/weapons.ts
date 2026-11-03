@@ -2,25 +2,22 @@ import {
   cardQueries,
   equipmentCard,
   equipmentInSlot,
-  isGameOver,
   isDirectDamage,
-  JointSelection,
   modify,
   discardCards,
   on,
   ownedCards,
-  pay,
-  payDiscard,
   rulesOf,
-  cardLabel,
   Attack,
   Damage,
+  defineEvent,
+  timing,
+  select,
+  selection,
+  discardable,
+  HE,
 } from '../../sdk';
 import type { CardDefinition, Context, SkillHandle } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
-import { Skill } from '../../sdk';
-import { defineEvent } from '../../sdk';
-import { timing } from '../../sdk';
 
 export const Weapon = defineEvent('weapon', {
   followUp: timing<unknown>(),
@@ -30,16 +27,7 @@ export const Weapon = defineEvent('weapon', {
 });
 
 function axeMaterials(ctx: Context, self: SkillHandle): readonly string[] {
-  return ownedCards(ctx.world, self.owner, ['hand', 'equipment']).filter(
-    (id) =>
-      id !== self.origin?.id &&
-      rulesOf(ctx).canDiscard(ctx, {
-        actor: self.owner,
-        owner: self.owner,
-        card: id,
-        reason: self.skill,
-      }),
-  );
+  return discardable(ctx, self.owner, self.skill, HE).filter((id) => id !== self.origin?.id);
 }
 
 const blade = equipmentCard({
@@ -48,8 +36,6 @@ const blade = equipmentCard({
   slot: 'weapon',
   range: 3,
   skill: {
-    id: 'standard:blade-ability',
-    name: '青龙偃月刀',
     triggers: [
       on(Attack.defended, {
         when: (ctx, draft, self) =>
@@ -77,7 +63,7 @@ const blade = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 const axe = equipmentCard({
@@ -86,8 +72,6 @@ const axe = equipmentCard({
   slot: 'weapon',
   range: 3,
   skill: {
-    id: 'standard:axe-ability',
-    name: '贯石斧',
     triggers: [
       on(Attack.defended, {
         when: (ctx, draft, self) =>
@@ -96,38 +80,26 @@ const axe = equipmentCard({
           draft.effect.card.name === 'standard:slash' &&
           ctx.world.player(draft.effect.target).alive &&
           axeMaterials(ctx, self).length >= 2,
-        async effect(ctx, draft, self) {
-          const model = new JointSelection({
-            cards: () =>
-              axeMaterials(ctx, self).map((id) => ({
-                id,
-                label: cardLabel(ctx, id),
-              })),
-            cardCount: { min: 2, max: 2 },
-          });
-          const answer = await ctx.ask(
-            model.decision(self.owner, '贯石斧：弃置两张其他牌，使此杀仍造成伤害', {
-              optional: true,
-              cancelLabel: '不发动',
-            }),
-          );
-          if (answer.kind !== 'chosen') return;
-          const paid = await payDiscard(ctx, {
-            skill: self,
-            cards: answer.value.cards,
-            reason: self.skill,
-            factKind: Skill.invoked,
-            declaration: { label: self.name, effect: draft.effect.effectId },
-            legal: (at) =>
-              !draft.broken &&
-              at.world.player(draft.effect.target).alive &&
-              answer.value.cards.every((id) => axeMaterials(at, self).includes(id)),
-          });
-          if (paid.kind === 'paid') draft.breakDefense(self.skill);
-        },
+        cost: (ctx, _draft, self) =>
+          select(
+            ctx,
+            self.owner,
+            selection(ctx, { cards: () => axeMaterials(ctx, self), cardCount: { min: 2, max: 2 } }),
+            '贯石斧：弃置两张其他牌，使此杀仍造成伤害',
+            { cancel: '不发动' },
+          ),
+        declare: (_ctx, draft, self, picked) => ({
+          discard: picked.cards,
+          data: { effect: draft.effect.effectId },
+          legal: (at) =>
+            !draft.broken &&
+            at.world.player(draft.effect.target).alive &&
+            picked.cards.every((id) => axeMaterials(at, self).includes(id)),
+        }),
+        effect: (_ctx, draft, self) => draft.breakDefense(self.skill),
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 const halberd = equipmentCard({
@@ -136,8 +108,6 @@ const halberd = equipmentCard({
   slot: 'weapon',
   range: 4,
   skill: {
-    id: 'standard:halberd-ability',
-    name: '方天画戟',
     modifiers: [
       modify(cardQueries.extraTargets, (ctx, { input: request, self }) => {
         const hand = ownedCards(ctx.world, self.owner);
@@ -150,7 +120,7 @@ const halberd = equipmentCard({
           : undefined;
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 const kylinBow = equipmentCard({
@@ -159,8 +129,6 @@ const kylinBow = equipmentCard({
   slot: 'weapon',
   range: 5,
   skill: {
-    id: 'standard:kylin_bow-ability',
-    name: '麒麟弓',
     triggers: [
       on(Damage.causing, {
         when: (ctx, draft, self) =>
@@ -172,41 +140,28 @@ const kylinBow = equipmentCard({
           draft.amount > 0 &&
           ctx.world.player(draft.input.to).alive &&
           horses(ctx, self.owner, draft.input.to).length > 0,
-        async effect(ctx, draft, self) {
-          const target = draft.input.to;
-          const model = new JointSelection({
-            cards: () =>
-              horses(ctx, self.owner, target).map((id) => ({
-                id,
-                label: cardLabel(ctx, id),
-              })),
-            cardCount: { min: 1, max: 1 },
-          });
-          const answer = await ctx.ask(
-            model.decision(self.owner, `麒麟弓：可弃置 ${target} 的一张坐骑`, {
-              optional: true,
-              cancelLabel: '不发动',
+        cost: (ctx, draft, self) =>
+          select(
+            ctx,
+            self.owner,
+            selection(ctx, {
+              cards: () => horses(ctx, self.owner, draft.input.to),
+              cardCount: { min: 1, max: 1 },
             }),
-          );
-          if (answer.kind !== 'chosen') return;
-          const card = answer.value.cards[0]!;
-          const paid = await pay(ctx, {
-            skill: self,
-            reason: self.skill,
-            factKind: Skill.invoked,
-            declaration: { label: self.name, card, target },
-            legal: (at) =>
-              !draft.prevented &&
-              draft.amount > 0 &&
-              at.world.player(target).alive &&
-              horses(at, self.owner, target).includes(card),
-          });
-          if (
-            paid.kind !== 'paid' ||
-            isGameOver(ctx.world) ||
-            !ctx.world.player(target).alive ||
-            !horses(ctx, self.owner, target).includes(card)
-          )
+            `麒麟弓：可弃置 ${draft.input.to} 的一张坐骑`,
+            { cancel: '不发动' },
+          ),
+        declare: (_ctx, draft, self, picked) => ({
+          data: { card: picked.cards[0], target: draft.input.to },
+          legal: (at) =>
+            !draft.prevented &&
+            draft.amount > 0 &&
+            at.world.player(draft.input.to).alive &&
+            horses(at, self.owner, draft.input.to).includes(picked.cards[0]!),
+        }),
+        async effect(ctx, draft, self, picked) {
+          const [target, card] = [draft.input.to, picked.cards[0]!];
+          if (!ctx.world.player(target).alive || !horses(ctx, self.owner, target).includes(card))
             return;
           const discarded = await discardCards(ctx, {
             actor: self.owner,
@@ -214,18 +169,17 @@ const kylinBow = equipmentCard({
             cards: [card],
             reason: self.skill,
           });
-
-          if (discarded.kind !== 'discarded') return;
-          ctx.commit(Weapon.horseDiscarded, [], {
-            actor: self.owner,
-            name: self.name,
-            target,
-            card,
-          });
+          if (discarded.kind === 'discarded')
+            ctx.commit(Weapon.horseDiscarded, [], {
+              actor: self.owner,
+              name: self.name,
+              target,
+              card,
+            });
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 export const advancedWeapons: readonly CardDefinition[] = [blade, axe, halberd, kylinBow];

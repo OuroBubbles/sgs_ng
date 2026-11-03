@@ -13,12 +13,11 @@ import {
   Use,
   Cards,
 } from '../../sdk';
-import type { Card, CardDefinition, ContentDefinition } from '../../sdk';
+import type { Card, CardDefinition, ContentDefinition, SkillDefinition } from '../../sdk';
 import { relay, ward } from './defense';
 import { vermilion, createFaceDeck } from './faces';
 import { insight, echo } from './learning';
 import { allotment } from './allotment';
-import type { SkillDefinition } from '../../sdk';
 
 /** 作者演示牌；复用标准锦囊与选择流程，无专用 UI 或内核分支。 */
 export const prepare: CardDefinition = {
@@ -121,7 +120,7 @@ export const relicJade = equipmentCard({
         },
       }),
     ],
-  } satisfies SkillDefinition,
+  },
 });
 
 export default {

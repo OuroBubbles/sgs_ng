@@ -65,8 +65,8 @@ function redirects(ctx: Context, self: SkillHandle, use: UsePlanView, effect: Ca
     (choice.cards.length ? choice.cards : cards()).some((card) =>
       (choice.targets.length ? choice.targets : targets()).some((target) => legal(card, target)),
     );
-  return selection({
-    cards: () => cards().map((id) => ({ id, label: ctx.world.card(id).name })),
+  return selection(ctx, {
+    cards,
     targets,
     cardCount: { min: 1, max: 1 },
     targetCount: { min: 1, max: 1 },

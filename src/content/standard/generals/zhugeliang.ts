@@ -11,9 +11,9 @@ import {
   on,
   withPrivateTopCards,
   Phase,
+  Cards,
 } from '../../../sdk';
 import type { Context, Processing } from '../../../sdk';
-import { Cards } from '../../../sdk';
 
 /** 私有区正常/局部中止的余牌回顶；不能用遗计的默认弃置善后。 */
 async function returnRemaining(ctx: Context, pool: Processing): Promise<void> {
