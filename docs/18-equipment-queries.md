@@ -28,7 +28,7 @@
 
 [defineQuery / modify](../src/rules/skills/query.ts) 定义带类型的查询与贡献函数。modify 的内容回调使用 `(ctx, { input, self })`，共享函数可标注 `ModifyInput<T>`；底层 `SkillModifier.contribution(ctx, input, self)` 继续支持自定义来源。`undefined` 表示不贡献，null 可以有查询自己定义的意义。查询对象标识类型身份，不依赖全局字符串注册，也不开一轮触发窗口。
 
-CardBook 的基础策略可通过 createBooks(policy) 或构造参数按需提供。distance、handLimit、attackRange、三类 prohibit、usage 与 responseTimes 均在建局时固定方法入口并保留原接收者；未提供的项使用默认策略，普通对象方法与原型方法使用相同语义。原对象不被冻结，函数内部的数据仍由调用者管理。每次查询继续读取当前 World 并组合技能修正，不缓存结果，也不以基础策略替代完整用牌或响应验证。
+CardBook 的基础策略可通过 createBooks(policy) 或构造参数按需提供。distance、handLimit、attackRange、三类 prohibit、usage 与 responseTimes 逐项取用（未提供的项使用默认策略），按普通函数调用，不绑定接收者、不冻结原对象。每次查询继续读取当前 World 并组合技能修正，不缓存结果，也不以基础策略替代完整用牌或响应验证。
 
 ```ts
 modify(cardQueries.distanceCorrection, (_ctx, { input: request, self }) =>

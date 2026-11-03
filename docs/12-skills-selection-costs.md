@@ -14,7 +14,7 @@ defineSkill / viewAs 可重复调用；本入口已固定的声明原样复用�
 
 装配期 `register` 可原子追加定义，第一次挂接后封口。需要牌规则的触发技能在回调中用 `rulesOf(ctx)` 取得本局 CardBook；转换与主动回调则直接取得本局目录。独立回合效果使用 [56](56-independent-effects.md) 的普通数据实例与闭包，裸衣不再手写专用 Provider。普通源码组合与未来接口见 [39](39-source-packages.md)。
 
-技能入口支持普通方法：on 的 times / retain / when / run、主动的 available / selection / run、转换的 available / materials / 动态 count / names / make / use，以及底层 bind / contribution。静态装配固定声明与方法入口，保留原接收者，原型方法与私有字段不因对象复制失效；原对象不会被冻结。对象字面量、闭包与类方法使用同一套调用形式。方法内部继续读取原接收者，其可变数据与方法间调用仍由作者管理，局内状态不能存入跨局共享的定义对象。
+技能入口支持普通方法：on 的 times / retain / when / run、主动的 available / selection / run、转换的 available / materials / 动态 count / names / make / use，以及底层 bind / contribution。装配只校验并按引用使用声明，方法在声明对象上调用；不复制、不冻结、不绑定。局内状态不能存入跨局共享的定义对象。
 
 同一角色同一技能只有一个实例，多个来源分别授予。最后一个来源移除才结束实例；之后重新获得创建新 ID，不能复活开窗快照中的旧候选。单个来源可以关闭；多个有效来源不会使技能重复触发。定义目录可跨 Room 共享，不在定义中存局内计数。
 

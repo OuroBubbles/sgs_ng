@@ -1,7 +1,6 @@
 import type { Context } from '../../core/runtime/room';
 import type { Validation } from '../../core/decisions/hub';
 import { immutable } from '../../core/model/value';
-import { syncQueryValue } from '../../core/runtime/query';
 import type { SkillHandle } from './skills';
 import type { CardBook } from '../cards/book';
 import { isGameOver } from '../game/end';
@@ -55,15 +54,8 @@ const isRecord = (input: unknown): input is Record<string, unknown> =>
   input !== null && typeof input === 'object';
 
 function availableSelection(ctx: Context, input: ActiveInput, action: ActiveSkill) {
-  const { self } = input;
-  if (
-    action.available !== undefined &&
-    !syncQueryValue(action.available(ctx, input), `${self.skill}/${action.id}.available`)
-  )
-    return null;
-  const model = action.selection
-    ? syncQueryValue(action.selection(ctx, input), `${self.skill}/${action.id}.selection`)
-    : emptySelection;
+  if (action.available !== undefined && !action.available(ctx, input)) return null;
+  const model = action.selection ? action.selection(ctx, input) : emptySelection;
   return model.available() ? model : null;
 }
 

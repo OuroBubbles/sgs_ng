@@ -2,7 +2,6 @@ import type { Decision, Validation } from '../../core/decisions/hub';
 import { normalizeChoiceCount } from '../../core/decisions/count';
 import type { ChoiceCount } from '../../core/decisions/count';
 import { immutable, isStringArray } from '../../core/model/value';
-import { syncQueryValue } from '../../core/runtime/query';
 import type { Context } from '../../core/runtime/room';
 import { pay, used } from '../costs/pay';
 import type { UsageLimit } from '../costs/pay';
@@ -171,78 +170,20 @@ const defaults: CardPolicy = {
   responseTimes: () => 1,
 };
 
-function fixedUse(rules: UseRules, id: string): UseRules {
-  const {
-    count: declaredCount,
-    timings,
-    usage,
-    canUse,
-    target,
-    selection,
-    prepare,
-    fixedTargets,
-    canResolve,
-    resolve,
-    execute,
-  } = rules;
-  if (!resolve && !execute) throw new Error('A usable card requires resolve or execute.');
-  const count = normalizeChoiceCount(declaredCount, `${id} target`);
-  return Object.freeze({
-    count,
-    target: target.bind(rules),
-    ...(timings === undefined ? {} : { timings: Object.freeze([...timings]) }),
-    ...(usage === undefined ? {} : { usage: Object.freeze({ key: usage.key, max: usage.max }) }),
-    ...(canUse === undefined ? {} : { canUse: canUse.bind(rules) }),
-    ...(selection === undefined ? {} : { selection: selection.bind(rules) }),
-    ...(prepare === undefined ? {} : { prepare: prepare.bind(rules) }),
-    ...(fixedTargets === undefined ? {} : { fixedTargets: fixedTargets.bind(rules) }),
-    ...(canResolve === undefined ? {} : { canResolve: canResolve.bind(rules) }),
-    ...(resolve === undefined ? {} : { resolve: resolve.bind(rules) }),
-    ...(execute === undefined ? {} : { execute: execute.bind(rules) }),
-  });
-}
-
-const definedCards = new WeakSet<CardDefinition>();
-
-/** 隔离可变声明并固定方法入口；原接收者保留，已完成的规范化直接复用。 */
+/** 校验牌定义后直接使用声明本身：不复制、不冻结、不绑定方法。 */
 export function defineCard(definition: CardDefinition): CardDefinition {
-  if (definedCards.has(definition)) return definition;
-  const { id, label, type, nature, response, counterable, delayed, equipment, use } = definition;
+  const { id, type, nature, equipment, use } = definition;
   if (!id) throw new Error('Duplicate or empty card definition.');
   if (!['basic', 'trick', 'equipment'].includes(type))
     throw new Error('Card definition requires an explicit type.');
   if (nature !== undefined && (typeof nature !== 'string' || !nature.trim()))
     throw new Error('Card nature must be a nonempty string.');
-  let fixedDelayed: CardDefinition['delayed'];
-  if (delayed !== undefined) {
-    const { resolve, cancelled } = delayed;
-    fixedDelayed = Object.freeze({
-      resolve: resolve.bind(delayed),
-      ...(cancelled === undefined ? {} : { cancelled: cancelled.bind(delayed) }),
-    });
+  if (equipment?.skill) defineSkill(equipment.skill);
+  if (use) {
+    if (!use.resolve && !use.execute) throw new Error('A usable card requires resolve or execute.');
+    normalizeChoiceCount(use.count, `${id} target`);
   }
-  let fixedEquipment: CardDefinition['equipment'];
-  if (equipment !== undefined) {
-    const { slot, range, skill } = equipment;
-    fixedEquipment = Object.freeze({
-      slot,
-      ...(range === undefined ? {} : { range }),
-      ...(skill === undefined ? {} : { skill: defineSkill(skill) }),
-    });
-  }
-  const fixed = Object.freeze({
-    id,
-    label,
-    type,
-    ...(nature === undefined ? {} : { nature }),
-    ...(response === undefined ? {} : { response }),
-    ...(counterable === undefined ? {} : { counterable }),
-    ...(fixedDelayed === undefined ? {} : { delayed: fixedDelayed }),
-    ...(fixedEquipment === undefined ? {} : { equipment: fixedEquipment }),
-    ...(use === undefined ? {} : { use: fixedUse(use, id) }),
-  });
-  definedCards.add(fixed);
-  return fixed;
+  return definition;
 }
 
 /** 固定牌定义与统一动作管线。牌与技能的自由代码只依赖公开的语义操作。 */
@@ -266,17 +207,16 @@ export class CardBook {
     )
       throw new Error('Duplicate or empty card definition.');
     this.#definitions = new Map(prepared.map((definition) => [definition.id, definition]));
-    // 逐项读取也支持原型方法；固定入口而保留原接收者，不缓存查询结果。
-    this.policy = Object.freeze({
-      distance: policy.distance?.bind(policy) ?? defaults.distance,
-      handLimit: policy.handLimit?.bind(policy) ?? defaults.handLimit,
-      attackRange: policy.attackRange?.bind(policy) ?? defaults.attackRange,
-      prohibitUse: policy.prohibitUse?.bind(policy) ?? defaults.prohibitUse,
-      prohibitResponse: policy.prohibitResponse?.bind(policy) ?? defaults.prohibitResponse,
-      prohibitTarget: policy.prohibitTarget?.bind(policy) ?? defaults.prohibitTarget,
-      usage: policy.usage?.bind(policy) ?? defaults.usage,
-      responseTimes: policy.responseTimes?.bind(policy) ?? defaults.responseTimes,
-    });
+    this.policy = {
+      distance: policy.distance ?? defaults.distance,
+      handLimit: policy.handLimit ?? defaults.handLimit,
+      attackRange: policy.attackRange ?? defaults.attackRange,
+      prohibitUse: policy.prohibitUse ?? defaults.prohibitUse,
+      prohibitResponse: policy.prohibitResponse ?? defaults.prohibitResponse,
+      prohibitTarget: policy.prohibitTarget ?? defaults.prohibitTarget,
+      usage: policy.usage ?? defaults.usage,
+      responseTimes: policy.responseTimes ?? defaults.responseTimes,
+    };
     this.skills.cards = this;
     this.skills.addProvider(equipmentAbilities([...this.#definitions.values()]));
   }
@@ -359,7 +299,7 @@ export class CardBook {
   ): boolean {
     return ctx.query(() => {
       for (const offer of this.#offerCandidates(ctx, actor, purpose, names))
-        if (!accepts || syncQueryValue(accepts(immutable(offer)), 'card.offer.filter')) return true;
+        if (!accepts || accepts(immutable(offer))) return true;
       return false;
     });
   }
@@ -394,18 +334,11 @@ export class CardBook {
       if (self.owner !== actor || !self.effective(ctx.world)) continue;
       const input: ViewAsInput = { self, book: this, purpose: operation };
       for (const recipe of definition.viewAs ?? []) {
-        if (
-          recipe.available &&
-          !syncQueryValue(recipe.available(ctx, input), `${self.skill}/${recipe.id}.available`)
-        )
-          continue;
+        if (recipe.available && !recipe.available(ctx, input)) continue;
         const possible = this.#names(ctx, input, recipe).filter(
           (name) => this.#supports(name, purpose) && (!names || names.includes(name)),
         );
-        const materials = syncQueryValue(
-          recipe.materials(ctx, input),
-          `${self.skill}/${recipe.id}.materials`,
-        );
+        const materials = recipe.materials?.(ctx, input) ?? [];
         const count = this.#count(ctx, input, recipe);
         if (!possible.length || materials.length < count.min) continue;
         yield {
@@ -433,10 +366,7 @@ export class CardBook {
       const built = this.#build(ctx, intent.actor, intent.choice, 'use');
       const rules = built.ok ? this.definition(built.value.name).use : undefined;
       if (rules?.selection) {
-        const selection = syncQueryValue(
-          rules.selection(ctx, { intent, book: this }),
-          `${built.ok ? built.value.name : ''}.selection`,
-        );
+        const selection = rules.selection(ctx, { intent, book: this });
         // 选择可由普通对象或原型方法实现；固定入口，不用展开对象丢失其声明。
         const { available, describe, feedback, validate } = selection;
         return {
@@ -450,22 +380,13 @@ export class CardBook {
           ...(available === undefined
             ? {}
             : { available: () => ctx.query(() => available.call(selection)) }),
-          feedback: (raw) =>
-            ctx.query(() =>
-              syncQueryValue(feedback?.call(selection, raw), 'use.selection.feedback'),
-            ),
+          feedback: (raw) => ctx.query(() => feedback?.call(selection, raw)),
           validate: (raw) =>
             ctx.query(() => {
               // 出牌草稿也直接调用 validate，不能依赖 DecisionHub 代查可用性。
-              if (
-                available &&
-                !syncQueryValue(available.call(selection), 'use.selection.available')
-              )
+              if (available && !available.call(selection))
                 return invalid('Card selection is no longer available.');
-              const chosen = syncQueryValue(
-                validate.call(selection, raw),
-                'use.selection.validate',
-              );
+              const chosen = validate.call(selection, raw);
               if (!chosen.ok) return chosen;
               const legal = this.validateUse(ctx, { ...intent, ...chosen.value });
               return legal.ok ? chosen : legal;
@@ -532,7 +453,7 @@ export class CardBook {
           !lifetime.active ||
           !lifetime.belongsTo(ctx.world) ||
           !ctx.cause.scopePath.includes(lifetime.id) ||
-          !syncQueryValue(opportunity.available(ctx), 'counter.available')
+          !opportunity.available(ctx)
         )
           return invalid('Counter opportunity is closed or outside this flow.');
       }
@@ -545,7 +466,7 @@ export class CardBook {
           !opportunity.lifetime.active ||
           !opportunity.lifetime.belongsTo(ctx.world) ||
           !ctx.cause.scopePath.includes(opportunity.lifetime.id) ||
-          !syncQueryValue(opportunity.available(ctx), 'response.available') ||
+          !opportunity.available(ctx) ||
           isResponseBlocked(opportunity.to, intent.actor, built.value.name)
         )
           return invalid('Response use opportunity is closed or outside this flow.');
@@ -565,10 +486,7 @@ export class CardBook {
         if (intent.targets.length)
           return invalid('Fixed-target cards do not accept manual targets.');
         const targets = immutable(
-          syncQueryValue(
-            rules.fixedTargets(ctx, { actor: intent.actor, card: built.value, book: this }),
-            `${built.value.name}.fixedTargets`,
-          ),
+          rules.fixedTargets(ctx, { actor: intent.actor, card: built.value, book: this }),
         );
         if (
           new Set(targets).size !== targets.length ||
@@ -595,10 +513,7 @@ export class CardBook {
       const limit = this.#limit(ctx, request);
       if (limit && used(ctx.world, intent.actor, limit) >= limit.max)
         return invalid('Usage limit reached.');
-      const reason = syncQueryValue(
-        rules.canUse?.(ctx, { request, book: this }),
-        `${request.card.name}.canUse`,
-      );
+      const reason = rules.canUse?.(ctx, { request, book: this });
       return reason ? invalid(reason) : { ok: true, value: request };
     });
   }
@@ -954,11 +869,7 @@ export class CardBook {
       const opportunity = Object.freeze({
         ...input.opportunity,
         available: (current: Context) =>
-          current.query(
-            () =>
-              syncQueryValue(input.opportunity.available(current), 'response.available') &&
-              available(current),
-          ),
+          current.query(() => input.opportunity.available(current) && available(current)),
       });
       const result = await this.use(at, {
         actor: input.actor,
@@ -1268,17 +1179,12 @@ export class CardBook {
     return binding.self;
   }
   #count(ctx: Context, input: ViewAsInput, recipe: ReturnType<typeof viewAs>): ChoiceCount {
-    if (typeof recipe.count !== 'function') return recipe.count;
-    const count = syncQueryValue(
-      recipe.count(ctx, input),
-      `${input.self.skill}/${recipe.id}.count`,
-    );
+    if (typeof recipe.count !== 'function') return recipe.count ?? { min: 0, max: 0 };
+    const count = recipe.count(ctx, input);
     return normalizeChoiceCount(count, `${input.self.skill}/${recipe.id} material`);
   }
   #names(ctx: Context, input: ViewAsInput, recipe: ViewAs): readonly string[] {
-    return typeof recipe.make === 'function'
-      ? syncQueryValue(recipe.names!(ctx, input), `${input.self.skill}/${recipe.id}.names`)
-      : [recipe.make.name];
+    return typeof recipe.make === 'function' ? recipe.names!(ctx, input) : [recipe.make.name];
   }
   #target(ctx: Context, request: UseRequest, target: string): boolean {
     return ctx.query(
@@ -1340,30 +1246,22 @@ export class CardBook {
       const recipe = definition.viewAs?.find((item) => item.id === choice.recipe);
       if (!recipe) return invalid('Unknown view-as recipe.');
       const input: ViewAsInput = { self, book: this, purpose };
-      if (
-        recipe.available &&
-        !syncQueryValue(recipe.available(ctx, input), `${self.skill}/${recipe.id}.available`)
-      )
+      if (recipe.available && !recipe.available(ctx, input))
         return invalid('Recipe is unavailable here.');
-      const candidates = syncQueryValue(
-        recipe.materials(ctx, input),
-        `${self.skill}/${recipe.id}.materials`,
-      );
+      const candidates = recipe.materials?.(ctx, input) ?? [];
       if (
         !countValid(this.#count(ctx, input, recipe), choice.materials.length, candidates.length) ||
         choice.materials.some((id) => !candidates.includes(id))
       )
         return invalid('Invalid recipe materials.');
-      const made = syncQueryValue(
+      const made =
         typeof recipe.make === 'function'
           ? recipe.make(ctx, {
               ...input,
               materials: choice.materials,
               parameters: choice.parameters ?? null,
             })
-          : recipe.make,
-        `${self.skill}/${recipe.id}.make`,
-      );
+          : recipe.make;
       if (!made || !this.#names(ctx, input, recipe).includes(made.name))
         return invalid('Recipe could not construct this card.');
       face = made;

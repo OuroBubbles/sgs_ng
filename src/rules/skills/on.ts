@@ -1,7 +1,6 @@
 import type { Context } from '../../core/runtime/room';
 import type { Timing, Trigger, TriggerOccurrence } from '../../core/runtime/event';
 import type { WorldReader } from '../../core/model/state';
-import { syncQueryValue } from '../../core/runtime/query';
 import { isGameOver } from '../game/end';
 import type { EffectHandle } from '../effects/effects';
 import type { SkillHandle } from './skills';
@@ -152,13 +151,10 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
 
   function bindSkill(self: SkillHandle): Trigger<unknown> {
     const available = (ctx: Context, payload: T) =>
-      syncQueryValue(self.registered?.() ?? true, `${self.skill}.registered`) &&
+      (self.registered?.() ?? true) &&
       (spec.allowDead || ctx.world.player(self.owner).alive) &&
-      (syncQueryValue(
-        self.available ? self.available(ctx) : self.effective(ctx.world),
-        `${self.skill}.available`,
-      ) ||
-        syncQueryValue(spec.retain?.(ctx, payload, self) ?? false, `${self.skill}/${id}.retain`));
+      ((self.available ? self.available(ctx) : self.effective(ctx.world)) ||
+        (spec.retain?.(ctx, payload, self) ?? false));
     return {
       ...common(self, locked ? 'automatic' : 'choose'),
       ...(times === undefined
@@ -175,8 +171,7 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
           skill: self.skill,
           name: self.name,
           origin: self.origin,
-          effective: (world: WorldReader) =>
-            syncQueryValue(self.effective(world), `${self.skill}.effective`),
+          effective: (world: WorldReader) => self.effective(world),
           ...(self.registered === undefined ? {} : { registered: () => self.registered!() }),
           available: (c: Context) =>
             active &&

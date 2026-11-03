@@ -65,21 +65,6 @@ export interface Trigger<T> {
   readonly run: (ctx: Context, payload: T, occurrence: TriggerOccurrence) => unknown;
 }
 
-/** 目录补充展示标签时，复制声明字段并保留原方法与接收者，不冻结作者对象。 */
-export function labelTrigger<T>(trigger: Trigger<T>, label: string): Trigger<T> {
-  const { id, owner, group, order, times, eligible, run } = trigger;
-  return Object.freeze({
-    id,
-    label,
-    owner,
-    ...(group === undefined ? {} : { group }),
-    ...(order === undefined ? {} : { order }),
-    ...(times === undefined ? {} : { times: times.bind(trigger) }),
-    eligible: eligible.bind(trigger),
-    run: run.bind(trigger),
-  });
-}
-
 export interface WindowOptions {
   /** 事件主体只提供模式没有默认起点时的回退，不覆盖模式政策。 */
   readonly subject?: string;

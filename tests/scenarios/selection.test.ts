@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { ArrangementSelection, createContent, JointSelection, viewAs } from '../../src/sdk';
-import type { ChoiceItem, Context, JointChoice, JointSelectionSpec } from '../../src/sdk';
+import type { ChoiceItem, JointChoice, JointSelectionSpec } from '../../src/sdk';
 import { nextRequest, room } from '../fixtures/room';
 
 it('数量声明只读一次原型字段，模型使用已校验的固定范围而不冻结原对象', () => {
@@ -14,7 +14,7 @@ it('数量声明只读一次原型字段，模型使用已校验的固定范围�
       return ++this.maxReads === 1 ? ('all' as const) : 0;
     }
   }
-  for (const kind of ['joint', 'card', 'recipe', 'arrange', 'dynamic-arrange'] as const) {
+  for (const kind of ['joint', 'arrange', 'dynamic-arrange'] as const) {
     const count = new Count();
     const expected = { min: 1, max: 'all' };
     if (kind === 'joint') {
@@ -44,28 +44,6 @@ it('数量声明只读一次原型字段，模型使用已校验的固定范围�
       expect(model.describe().cardCount).toEqual(expected);
       expect(model.validate({ cards: [], targets: [] }).ok).toBe(false);
       expect(model.validate({ cards: ['one'], targets: [] }).ok).toBe(true);
-    } else if (kind === 'card') {
-      const content = createContent({
-        cards: [
-          {
-            id: 'probe:range',
-            label: '范围',
-            type: 'basic',
-            use: { count, target: () => true, resolve: () => undefined },
-          },
-        ],
-      });
-      expect(content.cards[0]!.use!.count).toEqual(expected);
-    } else if (kind === 'recipe') {
-      expect(
-        viewAs({
-          id: 'convert',
-          label: '转换',
-          materials: () => ['one'],
-          count,
-          make: { name: 'standard:slash' },
-        }).count,
-      ).toEqual(expected);
     } else {
       const groups = [{ id: 'all', label: '全部', count }];
       const model = new ArrangementSelection({
@@ -145,49 +123,6 @@ it('联合、分组、牌目标与转换的静态数量使用同一整数范围�
         make: { name: 'standard:slash' },
       }),
     ).toThrow(/Invalid .* count/);
-  }
-});
-
-it('联合选择的异步候选和约束不能变成合法回复，立即关闭请求并拒绝晚到写入', async () => {
-  for (const field of ['cards', 'targets', 'partial', 'canComplete', 'complete'] as const) {
-    const game = room();
-    let at: Context;
-    let lateError = '';
-    const invalid = async () => {
-      await Promise.resolve();
-      try {
-        at.commit('invalid.selection.late', [], null);
-      } catch (error) {
-        lateError = (error as Error).message;
-      }
-      return false;
-    };
-    const constraints = { partial: () => null, canComplete: () => true, complete: () => null };
-    const spec = {
-      cards: () => [],
-      targets: () => [],
-      cardCount: { min: 0, max: 0 },
-      targetCount: { min: 0, max: 0 },
-      constraints:
-        field === 'cards' || field === 'targets'
-          ? constraints
-          : { ...constraints, [field]: invalid },
-      ...(field === 'cards' || field === 'targets' ? { [field]: invalid } : {}),
-    } as unknown as JointSelectionSpec;
-    const selection = new JointSelection(spec);
-    const before = game.world.snapshot;
-    await expect(
-      game.run('selection', (ctx) => {
-        at = ctx;
-        return ctx.ask(selection.decision('a', '异步约束'));
-      }),
-    ).rejects.toThrow(`Queries cannot await (selection.${field})`);
-    await Promise.resolve();
-    expect(lateError).toContain('Queries cannot await');
-    expect(game.status).toBe('faulted');
-    expect(game.decisions.pending).toEqual([]);
-    expect(game.world.snapshot).toBe(before);
-    expect(game.history.facts()).toEqual([]);
   }
 });
 

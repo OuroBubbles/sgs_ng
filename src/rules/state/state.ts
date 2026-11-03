@@ -2,7 +2,6 @@ import type { Change, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { syncQueryValue } from '../../core/runtime/query';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 
@@ -26,8 +25,7 @@ export function defineState<T>(
 ): StateKey<T> {
   if (!id) throw new Error('Invalid state key or initial value.');
   const value = immutable(initial);
-  if (!syncQueryValue(accepts(value), `${id}.accepts`))
-    throw new Error('Invalid state key or initial value.');
+  if (!accepts(value)) throw new Error('Invalid state key or initial value.');
   return Object.freeze({ id, initial: value, accepts });
 }
 
@@ -45,8 +43,7 @@ export function readState<T>(
   const id = stateId(key, target);
   const entry = world.state(id);
   if (!entry) return key.initial;
-  if (!syncQueryValue(key.accepts(entry.value), `${key.id}.accepts`))
-    throw new Error(`Stored state does not match its key: ${key.id}`);
+  if (!key.accepts(entry.value)) throw new Error(`Stored state does not match its key: ${key.id}`);
   return entry.value as DeepReadonly<T>;
 }
 

@@ -1,6 +1,5 @@
 import type { Decision, Validation } from './hub';
 import { immutable, isStringArray } from '../model/value';
-import { syncQueryValue } from '../runtime/query';
 import { normalizeChoiceCount } from './count';
 import type { ChoiceCount } from './count';
 
@@ -112,8 +111,8 @@ export class JointSelection {
   }
 
   #candidates(): Candidates {
-    const cardInput = syncQueryValue(this.#spec.cards(), 'selection.cards');
-    const targetInput = syncQueryValue(this.#spec.targets(), 'selection.targets');
+    const cardInput = this.#spec.cards();
+    const targetInput = this.#spec.targets();
     const cards = cardInput.map(choiceItem);
     const targets = targetInput.map(choiceItem);
     // 索引只属于本次读取；候选变化后重新建立，不能缓存上一次预览的资格。
@@ -142,12 +141,9 @@ export class JointSelection {
       if (ids.length > maximum(count, candidates[key])) return 'Too many selected items.';
       if (candidates[key].length < count.min) return 'No legal completion.';
     }
-    const partial = syncQueryValue(this.#spec.constraints?.partial?.(choice), 'selection.partial');
+    const partial = this.#spec.constraints?.partial?.(choice);
     if (partial) return partial;
-    if (
-      this.#spec.constraints &&
-      !syncQueryValue(this.#spec.constraints.canComplete(choice), 'selection.canComplete')
-    )
+    if (this.#spec.constraints && !this.#spec.constraints.canComplete(choice))
       return 'No legal completion.';
     return null;
   }
@@ -158,7 +154,7 @@ export class JointSelection {
       choice.targets.length < this.#spec.targetCount.min
     )
       return 'Selection is incomplete.';
-    return syncQueryValue(this.#spec.constraints?.complete(choice), 'selection.complete') ?? null;
+    return this.#spec.constraints?.complete(choice) ?? null;
   }
 
   /** 只判断空前缀能否继续，不投影逐项选中状态，也不要求选择已完成。 */

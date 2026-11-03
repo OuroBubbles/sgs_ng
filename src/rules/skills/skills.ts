@@ -1,8 +1,7 @@
 import type { SkillInstance, SkillSource, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
-import { syncQueryValue } from '../../core/runtime/query';
-import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
+import { defineEvent, timing } from '../../core/runtime/event';
 import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import { defineState, setState } from '../state/state';
@@ -35,10 +34,8 @@ export function skillAvailable(ctx: Context, self: SkillHandle): boolean {
     const owner = ctx.world.snapshot.players.find((player) => player.id === self.owner);
     return (
       owner !== undefined &&
-      syncQueryValue(self.registered?.() ?? true, `${self.skill}.registered`) &&
-      (self.available
-        ? syncQueryValue(self.available(ctx), `${self.skill}.available`)
-        : owner.alive && syncQueryValue(self.effective(ctx.world), `${self.skill}.effective`))
+      (self.registered?.() ?? true) &&
+      (self.available ? self.available(ctx) : owner.alive && self.effective(ctx.world))
     );
   });
 }
@@ -103,86 +100,21 @@ export interface SkillAi {
   readonly targets?: 'ally' | 'enemy';
 }
 
-/** 目录保留完整的触发与转换声明；内容代码可省略未用能力和空材料维度。 */
-type DefinedSkill = Omit<SkillDefinition, 'triggers' | 'viewAs'> & {
-  readonly triggers: readonly SkillTrigger[];
-  readonly viewAs?: readonly ReturnType<typeof viewAs>[];
-};
-
-/** 执行侧返回完整声明；Provider 输入仍可使用普通 SkillDefinition。 */
+/** 执行侧返回声明本身；Provider 输入仍可使用普通 SkillDefinition。 */
 interface DefinedBinding extends SkillBinding {
-  readonly definition: DefinedSkill;
+  readonly definition: SkillDefinition;
 }
 
-// 只复用本入口完成规范化的声明，外部浅冻结对象不代表子声明已经固定。
-const definedSkills = new WeakSet<SkillDefinition>();
-
-/** 只声明实际能力；固定方法入口并保留原接收者，不冻结作者对象。 */
-export function defineSkill(definition: SkillDefinition): DefinedSkill {
-  if (definedSkills.has(definition)) return definition as DefinedSkill;
-  const {
-    id,
-    name,
-    description,
-    lord,
-    triggers = [],
-    viewAs: recipes,
-    active,
-    modifiers,
-    ai,
-  } = definition;
+/** 校验局部 ID 后直接使用声明本身：不复制、不冻结、不绑定方法。 */
+export function defineSkill(definition: SkillDefinition): SkillDefinition {
+  const { id, name, triggers = [], viewAs: recipes = [], active = [] } = definition;
   if (!id) throw new Error(`Skill "${name}" requires an ID.`);
-
-  const fixed = Object.freeze({
-    id,
-    name,
-    ...(description === undefined ? {} : { description }),
-    ...(lord === undefined ? {} : { lord }),
-    ...(ai === undefined ? {} : { ai }),
-    triggers: Object.freeze(
-      triggers.map((trigger) =>
-        Object.freeze({
-          id: trigger.id,
-          window: trigger.window,
-          bind: trigger.bind.bind(trigger),
-        }),
-      ),
-    ),
-    ...(active === undefined
-      ? {}
-      : {
-          active: Object.freeze(
-            active.map((action) => {
-              const { id, label, available, selection, run } = action;
-              return Object.freeze({
-                id,
-                label,
-                ...(available === undefined ? {} : { available: available.bind(action) }),
-                ...(selection === undefined ? {} : { selection: selection.bind(action) }),
-                run: run.bind(action),
-              });
-            }),
-          ),
-        }),
-    ...(recipes === undefined ? {} : { viewAs: Object.freeze(recipes.map(viewAs)) }),
-    ...(modifiers === undefined
-      ? {}
-      : {
-          modifiers: Object.freeze(
-            modifiers.map((modifier) =>
-              Object.freeze({
-                query: modifier.query,
-                contribution: modifier.contribution.bind(modifier),
-              }),
-            ),
-          ),
-        }),
-  });
-  // 校验实际保存的能力快照；三类局部 ID 各自命名，允许跨种类复用。
+  recipes.forEach(viewAs);
+  // 三类局部 ID 各自命名，允许跨种类复用。
   for (const [kind, entries] of [
-    ['trigger', fixed.triggers],
-    ['view-as recipe', fixed.viewAs ?? []],
-    ['active action', fixed.active ?? []],
+    ['trigger', triggers],
+    ['view-as recipe', recipes],
+    ['active action', active],
   ] as const) {
     const ids = new Set<string>();
     for (const [index, entry] of entries.entries()) {
@@ -191,8 +123,7 @@ export function defineSkill(definition: SkillDefinition): DefinedSkill {
       ids.add(entry.id);
     }
   }
-  definedSkills.add(fixed);
-  return fixed;
+  return definition;
 }
 
 export const skillBlocked = defineState(
@@ -284,7 +215,7 @@ export class SkillBook implements TriggerSource {
   readonly effects = new EffectBook();
   /** 由 CardBook 构造时回填；同一 SkillBook 只服务一个牌目录。 */
   cards: CardBook | null = null;
-  readonly #definitions = new Map<string, DefinedSkill>();
+  readonly #definitions = new Map<string, SkillDefinition>();
   // 只共享不可变实例的身份描述；有效性仍逐次读取传入的 World。
   readonly #bindingsByInstance = new WeakMap<SkillInstance, DefinedBinding>();
   #providers = new Map<SkillProvider, object>();
@@ -331,7 +262,7 @@ export class SkillBook implements TriggerSource {
     return this.#definitions.get(id)?.ai;
   }
 
-  definition(id: string): DefinedSkill {
+  definition(id: string): SkillDefinition {
     const definition = this.#definitions.get(id);
     if (!definition) throw new Error(`Unknown skill definition: ${id}`);
     return definition;
@@ -402,7 +333,7 @@ export class SkillBook implements TriggerSource {
     let instances = world.snapshot.skills;
     const read = window && this.#snapshots.get(window.type);
     if (read) {
-      const snapshots = syncQueryValue(read(window.payload), 'skill snapshot reader');
+      const snapshots = read(window.payload);
       checkSnapshots(snapshots);
       // 普通查询直接读取当前列表；只有显式历史窗口需要合并与身份冲突检查。
       const merged = new Map(instances.map((instance) => [instance.id, instance]));
@@ -434,13 +365,9 @@ export class SkillBook implements TriggerSource {
       return binding;
     });
     for (const [provider, registration] of this.#providers) {
-      for (const { self, definition } of syncQueryValue(
-        provider.collect(world, window),
-        'skill provider',
-      )) {
+      for (const { self, definition } of provider.collect(world, window)) {
         const registered = () =>
-          this.#providers.get(provider) === registration &&
-          syncQueryValue(self.registered?.() ?? true, `${self.skill}.registered`);
+          this.#providers.get(provider) === registration && (self.registered?.() ?? true);
         // 显式转发保留 class 方法的接收者；旧引用只属于这一次登记。
         bindings.push({
           definition: defineSkill(definition),
@@ -451,13 +378,11 @@ export class SkillBook implements TriggerSource {
             name: self.name,
             origin: self.origin,
             registered,
-            effective: (current: WorldReader) =>
-              registered() && syncQueryValue(self.effective(current), `${self.skill}.effective`),
+            effective: (current: WorldReader) => registered() && self.effective(current),
             ...(self.available === undefined
               ? {}
               : {
-                  available: (at: Context) =>
-                    registered() && syncQueryValue(self.available!(at), `${self.skill}.available`),
+                  available: (at: Context) => registered() && self.available!(at),
                 }),
           }),
         });
@@ -480,35 +405,27 @@ export class SkillBook implements TriggerSource {
   ): Value {
     return ctx.query(() => {
       // 单项回调先检查同步性；合并后的普通值可能已把 Promise 隐藏掉。
-      let value = syncQueryValue(base, `${query.id}.base`);
+      let value = base;
       for (const { self, definition } of this.bindings(ctx.world)) {
         const modifiers = definition.modifiers?.filter((modifier) => modifier.query === query);
         if (!modifiers?.length) continue;
         if (!ctx.world.player(self.owner).alive || !self.effective(ctx.world)) continue;
         for (const modifier of modifiers) {
-          const contribution = syncQueryValue(modifier.contribution(ctx, input, self)) as
-            | Value
-            | undefined;
-          if (contribution !== undefined)
-            value = syncQueryValue(query.combine(value, contribution));
+          const contribution = modifier.contribution(ctx, input, self) as Value | undefined;
+          if (contribution !== undefined) value = query.combine(value, contribution);
         }
       }
       for (const contribution of this.effects.contributions(ctx, query, input))
-        value = syncQueryValue(query.combine(value, contribution));
+        value = query.combine(value, contribution);
       return value;
     });
   }
 
   collect<T>(type: Timing<T, unknown>, world: WorldReader, payload: T): readonly Trigger<T>[] {
     return this.bindings(world, { type, payload }).flatMap(({ self, definition }) => {
-      return definition.triggers
+      return (definition.triggers ?? [])
         .filter((trigger) => trigger.window === type)
-        .map((trigger) =>
-          labelTrigger(
-            syncQueryValue(trigger.bind(self), `${definition.id}/${trigger.id}.bind`),
-            definition.name,
-          ),
-        );
+        .map((trigger) => ({ ...trigger.bind(self), label: definition.name }));
     });
   }
 

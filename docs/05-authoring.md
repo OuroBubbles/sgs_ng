@@ -73,7 +73,7 @@ export const Provision = defineEvent('provision', {
 
 ## 组合与运行
 
-用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。组合时固定卡牌与技能的声明快照，之后修改原对象不影响对局；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果放在 `ContentDefinition.effects`（裸衣的 `luoyiAftereffect` 在[标准入口](../src/content/standard/index.ts)声明）。
+用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果放在 `ContentDefinition.effects`（裸衣的 `luoyiAftereffect` 在[标准入口](../src/content/standard/index.ts)声明）。
 
 用 [createOfflineMatch](../src/app/offline/practice.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 
@@ -138,7 +138,7 @@ World、事实和接纳后的决策值在类型与运行时均只读；需要本
 
 具名 Query 的开始值、贡献与合并函数、来源资格、retain、状态与独立效果的数据校验器、独立效果行为工厂及自定义触发绑定都必须同步。主动技能的 `available` / `selection`、用牌的 `UseRules.selection`、转换的候选/资格/数量/构牌函数，以及选择模型的候选与约束也遵循此约定；用牌目标和响应资格的最终重查仍是纯查询。
 
-规则层在组合前逐项检查其直接调用的回调，避免 Promise 被布尔运算、数组或行为对象访问隐藏。执行侧查询违规时立即冻结；本地投影、预览或回复出错则由主持侧停止本局并显示错误。普通内容继续直接使用现有入口，无需自行包裹守卫；异步后效仍放在 effect / onEnd 中。作者函数内部的普通表达式仍由作者负责，类型检查不能省略。
+查询回调的同步性由类型保证；运行时只在 Room 的查询边界检查返回值，执行侧查询返回 Promise 时立即冻结本局；本地投影、预览或回复出错则由主持侧停止本局并显示错误。普通内容继续直接使用现有入口，无需自行包裹守卫；异步后效仍放在 effect / onEnd 中。作者函数内部的普通表达式仍由作者负责，类型检查不能省略。
 
 ## 扩展与验证的边界
 

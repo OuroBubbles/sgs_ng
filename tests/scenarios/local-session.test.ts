@@ -3,16 +3,8 @@ import { LocalSession } from '../../src/app/offline/session';
 import { Match, RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
-import {
-  moveCards,
-  finishGame,
-  defineQuery,
-  defineSkill,
-  modify,
-  cardQueries,
-  Use,
-} from '../../src/sdk';
-import type { SkillHandle } from '../../src/sdk';
+import { moveCards, finishGame, Use } from '../../src/sdk';
+import '../../src/sdk';
 import type { GameSelection, GameView } from '../../src/core/view/game';
 import { card } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -171,68 +163,6 @@ it('交接前没有手牌、私有身份或请求描述；本人确认才显示�
     session.dispose();
   }
 });
-
-it.each([false, true])(
-  '资格查询先于规则执行出错=%s，仍报告原始错误和印刷牌面，保留已提交事实',
-  async (initiallyArmed) => {
-    const query = defineQuery<null, number>('probe:query-view', (a, b) => a + b);
-    let armed = false;
-    const definition = defineSkill({
-      id: 'probe:query-source',
-      name: '错误来源',
-      triggers: [],
-      // 两条实际入口分别覆盖牌面投影停止与规则执行冻结，不依赖无关查询检查来源。
-      modifiers: [modify(query, () => 1), modify(cardQueries.cardFace, () => ({}))],
-    });
-    const self: SkillHandle = {
-      id: 'probe:query-instance',
-      owner: 'a',
-      skill: definition.id,
-      name: definition.name,
-      origin: null,
-      effective: () => (armed ? (Promise.resolve(false) as unknown as boolean) : true),
-    };
-    const match = new RoleMatch({
-      id: 'query-fault-view',
-      seed: 2,
-      players: [{ id: 'a' }, { id: 'b' }],
-      roles: ['lord', 'rebel'],
-      content: {
-        cards: standardCards,
-      },
-      deck: Array.from({ length: 20 }, (_, i) => card(`fault${i}`, 'slash')),
-    });
-    await match.room.run('provider', (ctx) => {
-      match.skills.addProvider({ collect: () => [{ self, definition }] }, ctx);
-    });
-    match.room.on(Match.prepared, {
-      id: 'arm',
-      owner: null,
-      eligible: () => true,
-      run(ctx) {
-        armed = true;
-        match.skills.query(ctx, query, null, 0);
-      },
-    });
-    const session = new LocalSession(match, { human: 'a' });
-    if (initiallyArmed) armed = true;
-    session.start();
-    try {
-      const view = await waitView(session, (view) => view.error.includes('Queries cannot await'));
-      expect(view.error).toContain('probe:query-source.effective');
-      expect(view.status).toBe(initiallyArmed ? 'stopped' : 'faulted');
-      expect(view.hand).toHaveLength(4);
-      expect(view.hand.every((card) => card.name === '杀')).toBe(true);
-      expect(view.decision).toBeNull();
-      expect(match.room.history.facts('match.prepared')).toHaveLength(initiallyArmed ? 0 : 1);
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-    } finally {
-      session.dispose();
-    }
-  },
-);
 
 it('真实杀/闪切换席位，遮住前一人手牌；旧选择不能用于下一人或回流后的请求', async () => {
   const { session, match } = game({ response: true });

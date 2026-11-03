@@ -85,7 +85,7 @@ src-tauri/           # Windows / Android 原生壳与构建配置
 | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [World](../src/core/state/world.ts)、[immutable](../src/core/model/value.ts)              | 每局状态、原子变更准备、只读快照、实体牌唯一位置           |
 | [Room / Context](../src/core/runtime/room.ts)、[Scope](../src/core/runtime/scope.ts)      | 串行执行、父子因果、中止传播、同步资源释放与故障冻结       |
-| [Window](../src/core/runtime/event.ts)                                                   | 类型化时点与具名顺序组；候选调度由 Room 负责               |
+| [Window](../src/core/runtime/event.ts)                                                    | 类型化时点与具名顺序组；候选调度由 Room 负责               |
 | [DecisionHub](../src/core/decisions/hub.ts)                                               | 活跃请求、预览、token、最终验证、一次接纳与关闭            |
 | [Journal](../src/core/history/journal.ts)、[rebuildWorld](../src/core/history/rebuild.ts) | 有序事实、原因链、历史查询与状态重建                       |
 | [SDK](../src/sdk/index.ts)                                                                | 作者使用的实际类型和规则操作；用法见 [05](05-authoring.md) |

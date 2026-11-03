@@ -16,8 +16,8 @@ import {
   Phase,
 } from '../../src/sdk';
 import type { WorldSeed } from '../../src/core/model/state';
-import type { ArrangementGroup, ArrangementSpec } from '../../src/core/decisions/arrangement';
-import type { ChoiceItem, Context } from '../../src/sdk';
+import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
+import type { ChoiceItem } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
@@ -31,43 +31,6 @@ import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 type Game = ReturnType<typeof cardGame>;
-
-it('分组模型拒绝异步候选或去向，查询故障先于续体写入冻结本局', async () => {
-  for (const field of ['items', 'groups', 'canPlace'] as const) {
-    const game = room();
-    let at: Context;
-    let lateError = '';
-    const invalid = async () => {
-      await Promise.resolve();
-      try {
-        at.commit('invalid.arrangement.late', [], null);
-      } catch (error) {
-        lateError = (error as Error).message;
-      }
-      return false;
-    };
-    const spec = {
-      items: () => [{ id: 'one', label: '一' }],
-      groups: [{ id: 'top', label: '牌顶', count: { min: 0, max: 'all' } }],
-      canPlace: () => true,
-      [field]: invalid,
-    } as unknown as ArrangementSpec;
-    const model = new ArrangementSelection(spec);
-    const before = game.world.snapshot;
-    await expect(
-      game.run('arrange', (ctx) => {
-        at = ctx;
-        return ctx.ask(model.decision('a', '异步分组'));
-      }),
-    ).rejects.toThrow(`Queries cannot await (arrangement.${field})`);
-    await Promise.resolve();
-    expect(lateError).toContain('Queries cannot await');
-    expect(game.status).toBe('faulted');
-    expect(game.decisions.pending).toEqual([]);
-    expect(game.world.snapshot).toBe(before);
-    expect(game.history.facts()).toEqual([]);
-  }
-});
 const source = { kind: 'general', id: 'test' } as const;
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const groups: readonly ArrangementGroup[] = [

@@ -11,7 +11,6 @@ import {
   blockSkill,
   modify,
   defineQuery,
-  defineEffect,
   cardQueries,
   kill,
   pay,
@@ -20,15 +19,7 @@ import {
   Cards,
   Cost,
 } from '../../src/sdk';
-import type {
-  CardDefinition,
-  CardOffer,
-  CardChoice,
-  UseIntent,
-  SemanticCard,
-  Context,
-  SkillModifier,
-} from '../../src/sdk';
+import type { CardDefinition, CardOffer, CardChoice, UseIntent, SemanticCard } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { standardCards } from '../../src/content/standard/cards';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -527,69 +518,6 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
     }),
   ).rejects.toThrow('Pure queries cannot perform rule operations.');
 });
-
-it.each(['skill', 'effect', 'combine'] as const)(
-  '异步查询 %s 在组合前冻结本局，既不返回伪值也不允许延迟写入',
-  async (kind) => {
-    let current: Context | undefined;
-    const late = async (ctx: Context) => {
-      await Promise.resolve();
-      ctx.commit('late.query', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
-      return 1;
-    };
-    let combined = false;
-    const query = defineQuery<null, unknown>('probe:async-query', (left, right) => {
-      if (kind === 'combine') {
-        if (!combined) {
-          combined = true;
-          return late(current!);
-        }
-        return 0;
-      }
-      return Number(left) + Number(right);
-    });
-    // 公开的擦除类型允许普通 TypeScript 表达这些回调，不能只依赖类型检查。
-    const modifiers: SkillModifier[] =
-      kind === 'skill'
-        ? [{ query, contribution: late }]
-        : [
-            { query, contribution: () => 1 },
-            { query, contribution: () => 1 },
-          ];
-    const skill = defineSkill({ id: 'probe:async', name: '异步查询', triggers: [], modifiers });
-    const effect = defineEffect<null>({
-      id: 'probe:async-effect',
-      name: '异步效果',
-      accepts: (value): value is null => value === null,
-      create: () => ({ modifiers: [{ query, contribution: late }] }),
-    });
-    const game = cardGame({
-      skills: [skill],
-      setup: (book) => {
-        book.skills.effects.register([effect]);
-      },
-    });
-    await expect(
-      game.room.run('query', async (ctx) => {
-        if (kind === 'effect')
-          await game.skills.effects.add(ctx, effect, { owner: 'a', data: null });
-        else
-          await game.skills.grant(ctx, {
-            owner: 'a',
-            skill: skill.id,
-            source: { kind: 'general', id: 'g' },
-          });
-        current = ctx;
-        game.skills.query(ctx, query, null, 0);
-        await Promise.resolve();
-      }),
-    ).rejects.toThrow('Queries cannot await');
-    expect(game.room.status).toBe('faulted');
-    expect(game.room.world.player('b').hp).toBe(4);
-    expect(game.room.history.facts('late.query')).toEqual([]);
-    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  },
-);
 
 it('禁止目标查询阻止装备使用，不能以过滤成零目标的方式支付掉装备', async () => {
   const skill = defineSkill({

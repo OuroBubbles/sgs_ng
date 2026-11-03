@@ -125,16 +125,15 @@ export function equipmentCard(
   const { id, label, slot, range, skill } = input;
   if (!slot || (range !== undefined && (!Number.isSafeInteger(range) || range < 1)))
     throw new Error('Invalid equipment range.');
-  const equipment: EquipmentDefinition = {
-    slot,
-    ...(range === undefined ? {} : { range }),
-    ...(skill === undefined ? {} : { skill }),
-  };
-  const definition: CardDefinition = {
+  return {
     id,
     type: 'equipment',
     label,
-    equipment: Object.freeze(equipment),
+    equipment: {
+      slot,
+      ...(range === undefined ? {} : { range }),
+      ...(skill === undefined ? {} : { skill }),
+    },
     use: {
       count: { min: 0, max: 0 },
       fixedTargets: (_ctx, { actor }) => [actor],
@@ -155,7 +154,6 @@ export function equipmentCard(
       },
     },
   };
-  return Object.freeze(definition);
 }
 
 /** 离场能力必须明确引用本次移动前后快照，不把已离场装备重新伪装成当前装备。 */

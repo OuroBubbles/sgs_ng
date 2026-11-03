@@ -14,14 +14,10 @@ function create(content: ReturnType<typeof createContent>) {
   return { ...books, room, initial };
 }
 
-it('共用目录隔离两局效果，原始声明变化不影响真实创建、查询与重建', async () => {
-  const original = { ...covenant };
-  const effects = [original];
+it('共用目录隔离两局效果，列表固定后真实创建、查询与重建', async () => {
+  const effects = [covenant];
   const content = createContent(standard, { effects });
   effects.length = 0;
-  original.create = () => {
-    throw new Error('Changed effect factory must not run.');
-  };
   const left = create(content);
   const right = create(content);
   expect(left.book.effects).not.toBe(right.book.effects);

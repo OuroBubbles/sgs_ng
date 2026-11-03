@@ -25,9 +25,6 @@ import type {
   EffectDefinition,
   EffectRecord,
   Lifetime,
-  EffectEnd,
-  Trigger,
-  TriggerOccurrence,
 } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
 
@@ -55,45 +52,23 @@ function create(
       fired.push(self.id);
     },
   });
-  class Definition implements EffectDefinition<Data> {
-    id = 'probe:lasting';
-    name = '持续效果';
-    #accepts = accepts;
-    #options = options;
-
-    accepts(data: unknown): data is Data {
-      return this.#accepts(data);
-    }
-
-    create(self: EffectHandle<Data>) {
+  const definition = defineEffect<Data>({
+    id: 'probe:lasting',
+    name: '持续效果',
+    accepts,
+    create(self) {
       handle = self;
-      if (this.#options.behavior) return this.#options.behavior(self);
+      if (options.behavior) return options.behavior(self);
       return {
         modifiers: [effectModify(strength, () => self.data.amount)],
         triggers: [on(tick, tickHandler(self))],
       };
-    }
-
-    async onEnd(ctx: Context, input: EffectEnd<Data>) {
-      ended.push(input.before.id);
-      await this.#options.onEnd?.(ctx, input);
-    }
-  }
-  const original = new Definition();
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- 保留未绑定的工厂，验证声明入口固定方法及其接收者。
-  let factory = original.create;
-  let factoryReads = 0;
-  Object.defineProperty(original, 'create', {
-    get: () => {
-      factoryReads++;
-      return factory;
     },
-    set: (value: Definition['create']) => {
-      factory = value;
+    async onEnd(ctx, input) {
+      ended.push(input.before.id);
+      await options.onEnd?.(ctx, input);
     },
   });
-  const definition = defineEffect<Data>(original);
-  expect(factoryReads).toBe(1);
   const game = cardGame({
     effects: [definition],
   });
@@ -101,7 +76,6 @@ function create(
     ...game,
     effects: game.book.effects,
     definition,
-    original,
     ended,
     fired,
     handle: () => handle,
@@ -171,13 +145,6 @@ it.each(['prepare', 'add', 'update'] as const)(
 
 it('独立实例跨创建 Flow 存在、参与查询与触发，不授予假技能，显式结束幂等', async () => {
   const game = create();
-  game.original.create = () => {
-    throw new Error('Changed effect factory must not run.');
-  };
-  game.original.onEnd = () => {
-    throw new Error('Changed effect cleanup must not run.');
-  };
-  expect(Object.isFrozen(game.original)).toBe(false);
   const record = await game.room.run('create', (ctx) =>
     game.effects.add(ctx, game.definition, { owner: 'b', data: { amount: 2 } }),
   );
@@ -196,24 +163,6 @@ it('独立实例跨创建 Flow 存在、参与查询与触发，不授予假技�
   });
   expect(value(game)).toBe(0);
   expect(game.ended).toEqual([id]);
-  replay(game);
-});
-
-it('异步行为工厂立即报告定义位置，不被当作空行为，已提交事实不回滚', async () => {
-  const game = create({
-    behavior: (() =>
-      Promise.resolve({ modifiers: [effectModify(strength, () => 5)] })) as unknown as (
-      self: EffectHandle<Data>,
-    ) => EffectBehavior,
-  });
-  await expect(
-    game.room.run('create', (ctx) =>
-      game.effects.add(ctx, game.definition, { owner: 'a', data: { amount: 1 } }),
-    ),
-  ).rejects.toThrow('Queries cannot await (probe:lasting.create)');
-  expect(game.room.status).toBe('faulted');
-  expect(game.room.history.facts('effect.added')).toHaveLength(1);
-  expect(game.room.history.entries.filter((entry) => entry.type === 'fault')).toHaveLength(1);
   replay(game);
 });
 it('相同定义的多个实例独立叠加、更新与移除，不共享技能次数或数据', async () => {
@@ -521,51 +470,6 @@ it('前组结束效果后，已收集的后组候选不再执行或收费', asyn
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(charged).toBe(0);
   expect(game.room.history.facts('cost.paid')).toEqual([]);
-  replay(game);
-});
-it('自定义效果绑定保留原型身份与次数，执行仍按最新数据重绑', async () => {
-  const seen: { index: number; total: number; amount: number }[] = [];
-  class Bound implements Trigger<unknown> {
-    #self: EffectHandle;
-
-    constructor(self: EffectHandle) {
-      this.#self = self;
-    }
-
-    get id() {
-      return `${this.#self.id}:raw`;
-    }
-
-    get owner() {
-      return this.#self.owner;
-    }
-
-    times() {
-      return (this.#self.data as Data).amount;
-    }
-
-    eligible(ctx: Context) {
-      return this.#self.current(ctx.world) !== null;
-    }
-
-    async run(ctx: Context, _payload: unknown, occurrence: TriggerOccurrence) {
-      seen.push({ index: occurrence.index, total: occurrence.total, amount: this.times() });
-      if (occurrence.index === 1) await this.#self.update(ctx, { amount: 7 });
-    }
-  }
-  const game = create({
-    behavior: () => ({
-      triggers: [{ id: 'raw', window: tick, bind: (self) => new Bound(self) }],
-    }),
-  });
-  await game.room.run('add', (ctx) =>
-    game.effects.add(ctx, game.definition, { owner: 'b', data: { amount: 2 } }),
-  );
-  await game.room.run('tick', (ctx) => ctx.window(tick, null));
-  expect(seen).toEqual([
-    { index: 1, total: 2, amount: 2 },
-    { index: 2, total: 2, amount: 7 },
-  ]);
   replay(game);
 });
 

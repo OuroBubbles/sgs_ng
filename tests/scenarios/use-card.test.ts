@@ -1,16 +1,6 @@
 import { expect, it } from 'vitest';
-import {
-  moveCards,
-  withLifetime,
-  used,
-  runPhase,
-  Use,
-  Target,
-  Resolve,
-  Damage,
-  Cost,
-} from '../../src/sdk';
-import type { CardDefinition, CardEffect, Context, UsePlanView, UseSnapshot } from '../../src/sdk';
+import { moveCards, withLifetime, used, Use, Target, Resolve, Damage, Cost } from '../../src/sdk';
+import type { CardEffect, UsePlanView, UseSnapshot } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -45,72 +35,6 @@ it('目标与材料空槽返回不可用，不故障、不宣告或支付', asyn
     expect(game.room.world.position('slash1')).toBe('a:hand');
     expect(game.room.history.facts()).toEqual([]);
     expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  }
-});
-
-it('自动目标过滤、用牌条件和策略不能吞掉异步结果或留下晚到写入', async () => {
-  for (const field of [
-    'target',
-    'fixedTargets',
-    'canUse',
-    'usage',
-    'prohibitUse',
-    'prohibitResponse',
-  ] as const) {
-    let lateError = '';
-    const invalid = async (ctx: Context) => {
-      await Promise.resolve();
-      try {
-        ctx.commit('invalid.card-query.late', [], null);
-      } catch (error) {
-        lateError = (error as Error).message;
-      }
-      return false;
-    };
-    const policyField =
-      field === 'usage' || field === 'prohibitUse' || field === 'prohibitResponse';
-    const definition = {
-      id: 'probe:pure',
-      type: 'basic',
-      label: '纯查询',
-      response: true,
-      use: {
-        count: { min: 0, max: 0 },
-        usage: { key: 'probe', max: 1 },
-        target: () => true,
-        fixedTargets: () => ['b'],
-        canUse: () => null,
-        resolve: () => undefined,
-        ...(policyField ? {} : { [field]: invalid }),
-      },
-    } as unknown as CardDefinition;
-    const game = cardGame({
-      definitions: [definition],
-      hands: { a: [{ ...card('probe', 'slash'), name: definition.id }] },
-      policy: policyField ? { [field]: invalid } : {},
-    });
-    await expect(
-      game.room.run('card-query', (ctx) =>
-        runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
-          if (field === 'prohibitResponse')
-            game.book.build(at, 'a', { kind: 'physical', card: 'probe' }, 'response');
-          else
-            game.book.validateUse(at, {
-              actor: 'a',
-              choice: { kind: 'physical', card: 'probe' },
-              targets: [],
-              timing: phase.playTiming(),
-            });
-        }),
-      ),
-    ).rejects.toThrow('Queries cannot await');
-    await Promise.resolve();
-    expect(lateError).toContain('Queries cannot await');
-    expect(game.room.status).toBe('faulted');
-    expect(game.room.world.position('probe')).toBe('a:hand');
-    expect(game.room.history.facts('card.used')).toEqual([]);
-    expect(game.room.history.facts('invalid.card-query.late')).toEqual([]);
-    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   }
 });
 
@@ -244,14 +168,7 @@ it('冒用其他角色的出牌阶段不能宣告', async () => {
 });
 
 it('技能添加的目标各自响应，防止一个目标不防止整张牌', async () => {
-  class Policy {
-    #range = 3;
-
-    attackRange() {
-      return this.#range;
-    }
-  }
-  const game = cardGame({ hands: { b: [card('jink', 'jink')] }, policy: new Policy() });
+  const game = cardGame({ hands: { b: [card('jink', 'jink')] }, policy: { attackRange: () => 3 } });
   await game.room.run('range', (ctx) => {
     const built = game.book.build(ctx, 'a', slash.choice, 'use');
     if (!built.ok) throw new Error(built.reason);
@@ -409,19 +326,10 @@ it('关闭的计划/已结算效果不能继续改写，事实快照保持冻结
 });
 
 it('需要两张闪时，第一张已经支付但不足以防止伤害', async () => {
-  class Policy {
-    #count = 2;
-
-    responseTimes() {
-      return this.#count;
-    }
-  }
-  const policy = new Policy();
   const game = cardGame({
     hands: { b: [card('jink', 'jink')] },
-    policy,
+    policy: { responseTimes: () => 2 },
   });
-  policy.responseTimes = () => 0;
   const running = use(game, slash);
   const request = await nextRequest(game.room);
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'jink' });
@@ -549,17 +457,12 @@ it('多个效果重复取消同一目标是幂等的，不导致已付费对局�
 });
 
 it('距离修正经具名查询参与同一目标验证，不需要特殊杀实现', async () => {
-  class Policy {
-    #discount = 1;
-
-    distance(ctx: Context, from: string, _to: string, base: number) {
-      return from === 'a' && ctx.world.player(from).hp === 4 ? base - this.#discount : base;
-    }
-  }
-  const policy = new Policy();
-  const game = cardGame({ policy });
-  policy.distance = () => 99;
-  expect(Object.isFrozen(policy)).toBe(false);
+  const game = cardGame({
+    policy: {
+      distance: (ctx, from, _to, base) =>
+        from === 'a' && ctx.world.player(from).hp === 4 ? base - 1 : base,
+    },
+  });
   await game.room.run('live-policy', (ctx) => {
     expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
     ctx.commit('wound', [{ kind: 'vitality', player: 'a', hp: 3 }], null);

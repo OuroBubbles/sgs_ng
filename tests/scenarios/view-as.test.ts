@@ -5,7 +5,6 @@ import type {
   CardChoice,
   Context,
   SkillDefinition,
-  ViewAs,
   ViewAsInput,
   ViewAsMakeInput,
   ViewAsUseInput,
@@ -130,78 +129,7 @@ it('存在性与菜单共用候选，过滤可提前停止，仍须独立验证�
     expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(false);
     expect(game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'])).toBe(true);
   });
-  const asyncFilter = (async () => {
-    await Promise.resolve();
-    return true;
-  }) as unknown as () => boolean;
-  await expect(
-    game.room.run('invalid-filter', (ctx) =>
-      game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], asyncFilter),
-    ),
-  ).rejects.toThrow('Queries cannot await (card.offer.filter).');
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-});
-
-it('转换候选与构牌逐项拒绝异步资格、材料和牌面，故障后续体不能写入', async () => {
-  for (const field of ['available', 'names', 'materials', 'count', 'make'] as const) {
-    for (const entry of field === 'make'
-      ? (['build'] as const)
-      : (['offers', 'has-offers', 'build'] as const)) {
-      let lateError = '';
-      const invalid = async (ctx: Context) => {
-        await Promise.resolve();
-        try {
-          ctx.commit('invalid.view-as.late', [], null);
-        } catch (error) {
-          lateError = (error as Error).message;
-        }
-        return false;
-      };
-      // 外部 JS 内容可能绕过 TS 返回类型；其他字段仍是正常转换定义。
-      const recipe = {
-        id: 'convert',
-        label: '转换',
-        available: () => true,
-        names: () => ['standard:slash'],
-        materials: () => ['fee'],
-        count: { min: 1, max: 1 },
-        make: () => ({ name: 'standard:slash' }),
-        [field]: invalid,
-      } as unknown as ViewAs;
-      const skill = defineSkill({
-        id: 'probe:async-view',
-        name: '异步转换',
-        triggers: [],
-        viewAs: [recipe],
-      });
-      const game = cardGame({ skills: [skill], hands: { a: [card('fee', 'jink', 'heart')] } });
-      await game.room.run('grant', (ctx) =>
-        game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
-      );
-      const instance = game.room.world.snapshot.skills[0]!.id;
-      await expect(
-        game.room.run(entry, (ctx) => {
-          if (entry === 'offers') game.book.offers(ctx, 'a', 'use');
-          else if (entry === 'has-offers') game.book.hasOffers(ctx, 'a', 'use', ['standard:slash']);
-          else
-            game.book.build(
-              ctx,
-              'a',
-              { kind: 'viewAs', instance, recipe: 'convert', materials: ['fee'] },
-              'use',
-            );
-        }),
-      ).rejects.toThrow(`Queries cannot await (probe:async-view/convert.${field})`);
-      await Promise.resolve();
-      expect(game.room.status).toBe('faulted');
-      expect(lateError).toContain('Queries cannot await');
-      expect(game.room.world.position('fee')).toBe('a:hand');
-      expect(game.room.history.facts('invalid.view-as.late')).toEqual([]);
-      expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(
-        game.room.world.snapshot,
-      );
-    }
-  }
 });
 
 it('武圣仅转换红色材料，牌名/距离/目标/响应复用普通杀管线', async () => {
@@ -268,7 +196,7 @@ it('装备区红色材料也能转换，不受固定手牌入口限制', async (
   expect(game.room.world.player('b').hp).toBe(3);
 });
 
-it('零材料固定配方隔离原始牌面，空手仍能完成用牌且不创建虚假实体牌', async () => {
+it('零材料固定配方直接使用声明，空手仍能完成用牌且不创建虚假实体牌', async () => {
   class Face {
     #name = 'standard:slash';
 
@@ -302,17 +230,7 @@ it('零材料固定配方隔离原始牌面，空手仍能完成用牌且不创�
     viewAs: [raw],
   } satisfies SkillDefinition;
   const game = cardGame({ hands: { a: [] }, skills: [zero] });
-  const normalized: readonly ReturnType<typeof viewAs>[] = game.skills
-    .definition(zero.id)
-    .viewAs!.map((entry) => entry);
-  const registered = normalized[0]!;
-  expect(registered.count).toEqual({ min: 0, max: 0 });
-  expect(viewAs(registered)).toBe(registered);
-  expect(registered).not.toBe(recipe);
-  face.name = 'standard:duel';
-  const fresh = viewAs(raw);
-  expect(fresh).not.toBe(recipe);
-  expect(fresh.make).toEqual({ name: 'standard:duel' });
+  expect(game.skills.definition(zero.id).viewAs![0]).toBe(raw);
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: zero.id, source }),
   );
@@ -366,7 +284,6 @@ it('自定义转换可同步拒绝或直接返回用牌 Promise，原方法与�
   }
   const raw = new Recipe();
   const recipe = viewAs(raw);
-  raw.use = () => ({ kind: 'unavailable', reason: 'replaced entry' });
   const skill = { id: 'probe:conditional', name: 'conditional', viewAs: [recipe] };
   const game = cardGame({ hands: { a: [] }, skills: [skill] });
   await game.room.run('grant', (ctx) =>
@@ -436,12 +353,6 @@ it('多材料与动态牌名按实际参数构造，同一配方无需固定牌�
     triggers: [],
     viewAs: [viewAs(recipe)],
   });
-  recipe.names = () => [];
-  recipe.materials = () => [];
-  recipe.count = () => ({ min: 0, max: 0 });
-  recipe.make = () => null;
-  recipe.available = () => false;
-  expect(Object.isFrozen(recipe)).toBe(false);
   const game = cardGame({ skills: [flexible] });
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: flexible.id, source }),

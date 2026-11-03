@@ -4,7 +4,6 @@ import { normalizeChoiceCount } from './count';
 import type { ChoiceCount } from './count';
 import { immutable, isStringArray } from '../model/value';
 import { assignGroups } from './assignment';
-import { syncQueryValue } from '../runtime/query';
 
 export interface ArrangementGroup extends ChoiceItem {
   readonly count: ChoiceCount;
@@ -48,7 +47,7 @@ export class ArrangementSelection {
     const groups = spec.groups;
     if (typeof groups === 'function') {
       const read = groups.bind(spec);
-      this.#groups = () => normalizeGroups(syncQueryValue(read(), 'arrangement.groups'));
+      this.#groups = () => normalizeGroups(read());
     } else {
       if (!groups.length) throw new Error('Arrangement requires distinct named groups.');
       const fixed = normalizeGroups(groups);
@@ -60,7 +59,7 @@ export class ArrangementSelection {
 
   #state(): ArrangementState {
     const items = immutable(
-      Array.from(syncQueryValue(this.#items(), 'arrangement.items'), ({ id, label }) => ({
+      Array.from(this.#items(), ({ id, label }) => ({
         id,
         label,
       })),
@@ -73,10 +72,7 @@ export class ArrangementSelection {
       throw new Error('Arrangement items require distinct stable IDs.');
     const allowed = items.map((item) =>
       groups.map((group) => {
-        const accepted = syncQueryValue(
-          this.#canPlace ? this.#canPlace(item.id, group.id) : true,
-          'arrangement.canPlace',
-        );
+        const accepted = this.#canPlace ? this.#canPlace(item.id, group.id) : true;
         if (typeof accepted !== 'boolean')
           throw new Error('Arrangement canPlace must return a boolean.');
         return accepted;

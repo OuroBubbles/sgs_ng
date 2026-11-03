@@ -4,7 +4,6 @@ import {
   activeOffers,
   cardQueries,
   defineSkill,
-  defineQuery,
   draw,
   invoke,
   modify,
@@ -595,16 +594,7 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     game.skills.addProvider({ collect: () => [{ self: new Source(), definition }] }, ctx);
     await ctx.window(window, null);
     const first = game.skills.binding(ctx.world, source.id)!;
-    const trigger = definition.triggers[0]!;
-    definition.name = '新定义';
-    definition.triggers.length = 0;
-    expect(first.definition.name).toBe(source.name);
-    expect(first.definition.triggers).toHaveLength(1);
-    const next = game.skills.binding(ctx.world, source.id)!;
-    expect(next.definition.name).toBe('新定义');
-    expect(next.definition.triggers).toEqual([]);
-    definition.triggers.push(trigger);
-    expect(Object.isFrozen(definition)).toBe(false);
+    expect(first.definition).toBe(definition);
     expect(
       game.book.build(
         ctx,
@@ -666,61 +656,3 @@ it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也
   expect(seen).toEqual([1, 1, 2, 3]);
   rebuilt(game);
 });
-
-it.each(['registered', 'effective', 'available', 'retain'] as const)(
-  '异步 %s 不能被布尔组合掩盖，先冻结再拒绝续体写入',
-  async (kind) => {
-    let active: Context;
-    let lateRejected = false;
-    let fired = 0;
-    // 模拟外部 JS 内容误返回 Promise；正常 TS 签名仍只允许同步布尔值。
-    const invalid = (async () => {
-      await Promise.resolve();
-      try {
-        active.commit('probe.late-query-write', [], null);
-      } catch {
-        lateRejected = true;
-      }
-      return false;
-    }) as unknown as () => boolean;
-    const query = defineQuery<null, number>('probe:source-sync', (a, b) => a + b);
-    const definition = defineSkill({
-      id: source.skill,
-      name: source.name,
-      triggers: [
-        on(window, {
-          locked: true,
-          id: 'sync-source',
-          when: () => true,
-          ...(kind === 'retain' ? { retain: invalid } : {}),
-          effect() {
-            fired++;
-          },
-        }),
-      ],
-      modifiers: [modify(query, () => 5)],
-    });
-    const self: SkillHandle = {
-      ...source,
-      effective: kind === 'effective' ? invalid : () => kind !== 'retain',
-      ...(kind === 'registered' ? { registered: invalid } : {}),
-      ...(kind === 'available' ? { available: invalid } : {}),
-    };
-    const game = cardGame();
-    await expect(
-      game.room.run('sync source', async (ctx) => {
-        active = ctx;
-        game.skills.addProvider({ collect: () => [{ self, definition }] }, ctx);
-        if (kind === 'registered' || kind === 'effective') game.skills.query(ctx, query, null, 0);
-        else await ctx.window(window, null);
-      }),
-    ).rejects.toThrow('Queries cannot await');
-    await Promise.resolve();
-    expect(game.room.status).toBe('faulted');
-    expect(fired).toBe(0);
-    expect(lateRejected).toBe(true);
-    expect(game.room.history.facts()).toEqual([]);
-    expect(game.room.history.entries.filter((entry) => entry.type === 'fault')).toHaveLength(1);
-    rebuilt(game);
-  },
-);

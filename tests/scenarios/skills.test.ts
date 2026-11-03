@@ -12,7 +12,7 @@ import {
   setState,
   Lifetime,
 } from '../../src/sdk';
-import type { Context, SkillHandle, Trigger, TriggerOccurrence } from '../../src/sdk';
+import '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed } from '../fixtures/room';
 
@@ -20,79 +20,6 @@ const general = { kind: 'general', id: 'general:a' } as const;
 const equipment = { kind: 'equipment', id: 'equipment:1' } as const;
 
 describe('技能实例与独立授予来源', () => {
-  it('自定义技能绑定保留原型身份和方法，有限次数及组序正常结算', async () => {
-    const game = room();
-    const window = testTiming<null>('test.bound-method', ['before', 'main']);
-    class Bound implements Trigger<unknown> {
-      #self: SkillHandle;
-      #count = 2;
-
-      constructor(self: SkillHandle) {
-        this.#self = self;
-      }
-
-      get id() {
-        return `${this.#self.id}:raw`;
-      }
-
-      get owner() {
-        return this.#self.owner;
-      }
-
-      get group() {
-        return 'before';
-      }
-
-      times() {
-        return this.#count;
-      }
-
-      eligible(ctx: Context) {
-        return this.#self.effective(ctx.world);
-      }
-
-      async run(ctx: Context, _payload: unknown, occurrence: TriggerOccurrence) {
-        await ctx.flow('bound', (child) =>
-          child.commit('probe.bound', [], {
-            owner: this.#self.owner,
-            index: occurrence.index,
-            total: occurrence.total,
-            count: this.#count++,
-          }),
-        );
-      }
-    }
-    const book = new SkillBook([
-      {
-        id: 'test:bound-method',
-        name: '绑定探针',
-        triggers: [{ id: 'raw', window, bind: (self) => new Bound(self) }],
-      },
-    ]);
-    book.attach(game);
-    game.on(window, {
-      id: 'main',
-      owner: null,
-      eligible: () => true,
-      run: (ctx) => ctx.commit('probe.main', [], null),
-    });
-    await game.run('bound-method', async (ctx) => {
-      await book.grant(ctx, { owner: 'a', skill: 'test:bound-method', source: general });
-      await ctx.window(window, null);
-    });
-    expect(game.history.facts('probe.bound').map((fact) => fact.data.detail)).toEqual([
-      { owner: 'a', index: 1, total: 2, count: 2 },
-      { owner: 'a', index: 2, total: 2, count: 3 },
-    ]);
-    expect(
-      game.history
-        .facts()
-        .slice(-3)
-        .map((fact) => fact.data.kind),
-    ).toEqual(['probe.bound', 'probe.bound', 'probe.main']);
-    expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
-  });
-
   it('失去最后来源再获得产生新实例，开窗候选不会借新身份复活', async () => {
     const game = room();
     const window = testTiming<null>('test.regain');

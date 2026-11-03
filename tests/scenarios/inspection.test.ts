@@ -1,8 +1,8 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import type { Context, StateKey, Decision } from '../../src/sdk';
-import { defineState, readState, setState, defineEffect, EffectBook } from '../../src/sdk';
-import { rebuildWorld } from '../../src/core/history/rebuild';
+import type { Context, Decision } from '../../src/sdk';
+import '../../src/sdk';
+import '../../src/core/history/rebuild';
 import { room, nextRequest, choose } from '../fixtures/room';
 
 it('决策的字段、方法与返回数据在同一纯查询边界读取，getter 不能重入规则操作', async () => {
@@ -170,85 +170,4 @@ it('结束后可检查最终只读状态；嵌套投影不消耗运行时资源�
   expect(game.inspect((outer) => game.inspect((inner) => inner.world === outer.world))).toBe(true);
   expect(game.status).toBe('ended');
   expect(game.history.entries).toEqual([]);
-});
-
-it('状态与独立效果的异步数据校验不能被布尔判断吞掉，执行侧止写而投影保持只读', async () => {
-  for (const kind of ['state', 'effect'] as const) {
-    for (const mode of ['execute', 'inspect'] as const) {
-      const game = room();
-      const initial = game.world.snapshot;
-      let active: Context | undefined;
-      let lateError = '';
-      // 模拟 JS 或错误断言绕过 TS：声明/写入时正常，查询已存数据时才错误返回 Promise。
-      const accepts = ((input: unknown) => {
-        if (!active) return typeof input === 'number';
-        const ctx = active;
-        return (async () => {
-          await Promise.resolve();
-          try {
-            ctx.commit('invalid.validator.late', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
-          } catch (error) {
-            lateError = (error as Error).message;
-          }
-          return true;
-        })();
-      }) as unknown as StateKey<number>['accepts'];
-      const key = defineState('probe:state', 0, accepts);
-      const target = { owner: 'a', source: null, lifetime: null };
-      const definition = defineEffect({
-        id: 'probe:effect',
-        name: '校验',
-        accepts,
-        create: () => ({}),
-      });
-      const effects = new EffectBook();
-      effects.register([definition]);
-      effects.attach(game);
-      await game.run('seed', async (ctx) => {
-        setState(ctx, key, target, 1);
-        await effects.add(ctx, definition, { owner: 'a', data: 1 });
-      });
-      const before = game.history.facts();
-      const read = (ctx: Context) =>
-        kind === 'state'
-          ? readState(ctx.world, key, target)
-          : effects.instances(ctx.world, definition);
-      let failure: unknown;
-      try {
-        if (mode === 'execute') {
-          await game.run('invalid.validator', async (ctx) => {
-            active = ctx;
-            ctx.query(() => read(ctx));
-            await Promise.resolve();
-          });
-        } else {
-          game.inspect((ctx) => {
-            active = ctx;
-            return read(ctx);
-          });
-        }
-      } catch (error) {
-        failure = error;
-      }
-      await Promise.resolve();
-      expect(game.world.player('b').hp).toBe(4);
-      expect(failure).toBeInstanceOf(Error);
-      expect((failure as Error).message).toContain(`Queries cannot await (probe:${kind}.accepts)`);
-      expect(lateError).not.toBe('');
-      expect(game.status).toBe(mode === 'execute' ? 'faulted' : 'ready');
-      expect(game.history.facts()).toEqual(before);
-      expect(rebuildWorld(initial, game.history.facts())).toEqual(game.world.snapshot);
-      if (mode === 'inspect') {
-        active = undefined;
-        await game.run('after.inspection', (ctx) => ctx.commit('after.inspection', [], null));
-        expect(game.history.facts('after.inspection')).toHaveLength(1);
-      }
-    }
-  }
-  expect(() =>
-    defineState('probe:initial', 0, (async () => {
-      await Promise.resolve();
-      return true;
-    }) as unknown as StateKey<number>['accepts']),
-  ).toThrow('Queries cannot await (probe:initial.accepts)');
 });

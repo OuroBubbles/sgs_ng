@@ -2,8 +2,7 @@ import type { Change, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
-import { syncQueryValue } from '../../core/runtime/query';
-import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
+import { defineEvent, timing } from '../../core/runtime/event';
 import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import type { QueryType } from '../skills/query';
@@ -80,26 +79,12 @@ export const Effect = defineEvent('effect', {
   ended: timing<EffectEnd>(),
 });
 
-const definedEffects = new WeakSet<object>();
-// 绑定保留接收者；登记核对仍使用绑定前的工厂身份，不把包装函数当作另一份实现。
-const factoryOrigins = new WeakMap<object, object>();
-
+/** 校验后直接使用声明本身：不复制、不冻结、不绑定方法。 */
 export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDefinition<Data> {
-  if (definedEffects.has(definition)) return definition;
-  const { id, name, accepts, create: factory, onEnd } = definition;
-  if (!id.trim() || !name.trim() || typeof accepts !== 'function' || typeof factory !== 'function')
+  const { id, name, accepts, create } = definition;
+  if (!id.trim() || !name.trim() || typeof accepts !== 'function' || typeof create !== 'function')
     throw new Error('Effect requires an ID, name, data validator and ordinary behavior factory.');
-  const create = factory.bind(definition);
-  const fixed = Object.freeze({
-    id,
-    name,
-    accepts: accepts.bind(definition),
-    create,
-    ...(onEnd === undefined ? {} : { onEnd: onEnd.bind(definition) }),
-  });
-  factoryOrigins.set(create, factoryOrigins.get(factory) ?? factory);
-  definedEffects.add(fixed);
-  return fixed;
+  return definition;
 }
 
 export function effectModify<Input, Value>(
@@ -162,9 +147,7 @@ export class EffectBook implements TriggerSource {
       )
     )
       throw new Error('Invalid stored effect record.');
-    if (
-      !syncQueryValue(this.#definition(record.type).accepts(record.data), `${record.type}.accepts`)
-    )
+    if (!this.#definition(record.type).accepts(record.data))
       throw new Error(`Invalid effect data: ${record.type}`);
     return record;
   }
@@ -221,9 +204,7 @@ export class EffectBook implements TriggerSource {
     this.#assertWriting(ctx);
     if (isGameOver(ctx.world)) throw new Error('Cannot add an effect after game end.');
     const registered = this.#definition(definition.id);
-    const expected = factoryOrigins.get(registered.create) ?? registered.create;
-    const proposed = factoryOrigins.get(definition.create) ?? definition.create;
-    if (expected !== proposed)
+    if (registered.create !== definition.create)
       throw new Error('Effect definition or data does not match the registered declaration.');
     const lifetime = ctx.query(() => input.lifetime ?? null);
     // 整份记录一次复制，保留 origin/data 的别名，并校验实际将提交的数据。
@@ -355,10 +336,7 @@ export class EffectBook implements TriggerSource {
   }
 
   #behavior(self: EffectHandle): EffectBehavior {
-    const behavior = syncQueryValue(
-      this.#definition(self.type).create(self),
-      `${self.type}.create`,
-    );
+    const behavior = this.#definition(self.type).create(self);
     if (
       new Set(behavior.triggers?.map((trigger) => trigger.id)).size !==
       (behavior.triggers?.length ?? 0)
@@ -385,13 +363,11 @@ export class EffectBook implements TriggerSource {
             const binding = this.#behavior(bindingSelf)
               .triggers?.find((item) => item.id === trigger.id && item.window === type)
               ?.bind(bindingSelf);
-            return syncQueryValue(binding, `${record.type}/${trigger.id}.bind`);
+            return binding;
           };
           return {
-            ...labelTrigger(
-              syncQueryValue(trigger.bind(self), `${record.type}/${trigger.id}.bind`),
-              this.#definition(record.type).name,
-            ),
+            ...trigger.bind(self),
+            label: this.#definition(record.type).name,
             eligible: (ctx, payload, occurrence) =>
               latest(ctx)?.eligible(ctx, payload, occurrence) ?? false,
             async run(ctx, payload, occurrence) {
@@ -416,7 +392,7 @@ export class EffectBook implements TriggerSource {
           .filter((modifier) => modifier.query === query)
           .flatMap((modifier) => {
             // 数组本身不会暴露其中的 Promise，须在装入结果前检查单项。
-            const value = syncQueryValue(modifier.contribution(ctx, input)) as Value | undefined;
+            const value = modifier.contribution(ctx, input) as Value | undefined;
             return value === undefined ? [] : [value];
           }),
       );

@@ -110,8 +110,6 @@ export type ViewAs = Omit<ViewAsSpec, 'materials' | 'count'> &
       }
   );
 
-// 内容声明允许省略空材料维度，执行侧统一取得完整配方。
-type DefinedViewAs = ViewAs & Pick<ViewAsSpec, 'materials' | 'count'>;
 
 export type UseTiming =
   | { readonly kind: 'play'; readonly owner: string; readonly phase: Lifetime }
@@ -417,53 +415,21 @@ export function timingSnapshot(timing: UseTiming): TimingSnapshot {
       });
   }
 }
-// 只标记本入口固定的配方，不记住调用者的可变输入或任何局内候选。
-const definedRecipes = new WeakSet<ViewAs>();
-
-export function viewAs(definition: ViewAs): DefinedViewAs {
-  if (definedRecipes.has(definition)) return definition as DefinedViewAs;
-  const { id, label, materials, count: declaredCount, available, use, names, make } = definition;
+/** 校验配方后直接使用声明本身；省略的材料维度在执行侧按空处理。 */
+export function viewAs(definition: ViewAs): ViewAs {
+  const { id, materials, count, names, make } = definition;
   if (!id) throw new Error('View-as recipe requires an ID.');
-  if ((materials === undefined) !== (declaredCount === undefined))
+  if ((materials === undefined) !== (count === undefined))
     throw new Error(`[${id}] View-as materials and count must be provided together.`);
-  const count =
-    typeof declaredCount === 'function'
-      ? declaredCount.bind(definition)
-      : normalizeChoiceCount(declaredCount ?? { min: 0, max: 0 }, `${id} material`);
-  const common = {
-    id,
-    label,
-    materials: materials?.bind(definition) ?? (() => []),
-    count,
-    ...(available === undefined ? {} : { available: available.bind(definition) }),
-    ...(use === undefined ? {} : { use: use.bind(definition) }),
-  };
-  let fixed: DefinedViewAs;
+  if (count !== undefined && typeof count !== 'function')
+    normalizeChoiceCount(count, `${id} material`);
   if (typeof make === 'function') {
     if (typeof names !== 'function') throw new Error(`[${id}] Dynamic view-as requires names.`);
-    fixed = Object.freeze({
-      ...common,
-      names: names.bind(definition),
-      make: make.bind(definition),
-    });
   } else {
-    if (!make) throw new Error(`[${id}] Fixed view-as requires a card face.`);
-    const { name, suit, rank, nature, color } = make;
-    if (typeof name !== 'string' || !name)
+    if (!make || typeof make.name !== 'string' || !make.name)
       throw new Error(`[${id}] Fixed view-as requires a card face.`);
     if (names !== undefined)
       throw new Error(`[${id}] Fixed view-as derives names from its card face.`);
-    fixed = Object.freeze({
-      ...common,
-      make: Object.freeze({
-        name,
-        ...(suit === undefined ? {} : { suit }),
-        ...(rank === undefined ? {} : { rank }),
-        ...(nature === undefined ? {} : { nature }),
-        ...(color === undefined ? {} : { color }),
-      }),
-    });
   }
-  definedRecipes.add(fixed);
-  return fixed;
+  return definition;
 }

@@ -42,70 +42,6 @@ import { legacyGenerals } from '../fixtures/generals';
 
 const source = { kind: 'general', id: 'fixture' } as const;
 
-it('主动候选、验证和执行均拒绝异步资格或选择工厂，不能发动或在续体中写入', async () => {
-  for (const field of ['available', 'selection'] as const) {
-    for (const entry of ['offers', 'available', 'inspect', 'validate', 'activate'] as const) {
-      let lateError = '';
-      const available = (async (ctx: Context) => {
-        await Promise.resolve();
-        try {
-          ctx.commit('invalid.active.late', [], null);
-        } catch (error) {
-          lateError = (error as Error).message;
-        }
-        return false;
-      }) as unknown as NonNullable<ActiveSkill['available']>;
-      const skill = defineSkill({
-        id: 'probe:async-active',
-        name: '异步资格',
-        triggers: [],
-        active: [
-          {
-            id: 'act',
-            label: '发动',
-            available: field === 'available' ? available : () => true,
-            ...(field === 'selection'
-              ? { selection: available as unknown as NonNullable<ActiveSkill['selection']> }
-              : {}),
-            run(ctx) {
-              ctx.commit('invalid.active.run', [], null);
-            },
-          },
-        ],
-      });
-      const game = cardGame({ skills: [skill] });
-      await game.room.run('grant', (ctx) =>
-        game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
-      );
-      const choice = {
-        instance: game.room.world.snapshot.skills[0]!.id,
-        action: 'act',
-        cards: [],
-        targets: [],
-      };
-      await expect(
-        game.room.run(entry, (ctx) =>
-          runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
-            if (entry === 'offers') activeOffers(at, game.book, phase);
-            else if (entry === 'available') activeAvailable(at, game.book, phase);
-            else if (entry === 'inspect') inspectActive(at, game.book, phase, choice);
-            else if (entry === 'validate') validateActive(at, game.book, phase, choice);
-            else return activate(at, game.book, phase, choice);
-          }),
-        ),
-      ).rejects.toThrow(`Queries cannot await (probe:async-active/act.${field})`);
-      await Promise.resolve();
-      expect(game.room.status).toBe('faulted');
-      expect(lateError).toContain('Queries cannot await');
-      expect(game.room.history.facts('invalid.active.run')).toEqual([]);
-      expect(game.room.history.facts('invalid.active.late')).toEqual([]);
-      expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(
-        game.room.world.snapshot,
-      );
-    }
-  }
-});
-
 it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候选校验', async () => {
   let latest: JointSelection | undefined;
   let preview: JointSelection | undefined;
@@ -158,31 +94,11 @@ it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候
     }
   }
   const action = new Action();
-  const actions = [action];
-  // 外部只冻结外层，子声明仍可变；不能拿 Object.isFrozen 代替规范化证明。
-  const raw = Object.freeze({
-    id: 'probe:live-selection',
-    name: '动态选择',
-    active: actions,
-  });
-  const skill = defineSkill(raw);
+  const skill = defineSkill({ id: 'probe:live-selection', name: '动态选择', active: [action] });
   expect(defineSkill(skill)).toBe(skill);
-  action.label = '外部修改';
-  actions.length = 0;
-  const fresh = defineSkill(raw);
-  expect(fresh).not.toBe(skill);
-  expect(fresh.active).toEqual([]);
   expect(() => defineSkill({ id: 'test:bad', name: '坏', active: [action, action] })).toThrow(
     '[test:bad] Duplicate active action ID: act.',
   );
-  action.available = () => false;
-  action.selection = () => {
-    throw new Error('Changed selection factory must not run.');
-  };
-  action.run = () => {
-    throw new Error('Changed action must not run.');
-  };
-  expect(Object.isFrozen(action)).toBe(false);
   const game = cardGame({ skills: [skill] });
   expect(game.skills.definition(skill.id)).toBe(skill);
   expect(game.skills.definition(skill.id).active![0]!.label).toBe('发动');
