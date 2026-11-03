@@ -1,8 +1,8 @@
+import { rulesOf } from '../skills/skills';
 import { JointSelection } from '../../core/decisions/selection';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
-import type { CardBook } from './book';
 import { delayedCards } from './delayed';
 import type { SemanticCard } from './types';
 
@@ -27,11 +27,8 @@ export type ChosenOwnedCard =
   | { readonly kind: 'unavailable' };
 
 /** 隐藏手牌只给本次选择的 opaque 选项；公开区显示牌名，最终再次验证持有区域。 */
-export function chooseOwnedCard(
-  ctx: Context,
-  book: CardBook,
-  request: OwnedCardChoice,
-): Promise<ChosenOwnedCard> {
+export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise<ChosenOwnedCard> {
+  const book = rulesOf(ctx);
   return ctx.flow('chooseOwnedCard', async (child) => {
     const input = immutable(request);
     if (

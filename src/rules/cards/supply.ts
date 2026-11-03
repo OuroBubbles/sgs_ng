@@ -1,9 +1,9 @@
+import { rulesOf } from '../skills/skills';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { pay } from '../costs/pay';
 import { isGameOver } from '../game/end';
 import { parseCardChoice } from './book';
-import type { CardBook } from './book';
 import { withProcessing } from './processing';
 import { responseFinished } from './played';
 import type { CardChoice, SemanticCard } from './types';
@@ -31,10 +31,10 @@ export type SupplyResult<T> =
 /** 实际供牌者打出一次，材料暂存到回调结束；未被后续流程接走的余牌统一善后。 */
 export function withCardSupply<T>(
   ctx: Context,
-  book: CardBook,
   input: CardSupplyInput,
   body: (ctx: Context, supply: SuppliedCard) => T | Promise<T>,
 ): Promise<SupplyResult<T>> {
+  const book = rulesOf(ctx);
   const isAvailable = input.available?.bind(input);
   const { actor, beneficiary, names, reason } = immutable({
     actor: input.actor,

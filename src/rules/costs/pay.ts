@@ -6,7 +6,7 @@ import { cardsMoved } from '../cards/move';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
-import { skillAvailable } from '../skills/skills';
+import { rulesOf, skillAvailable } from '../skills/skills';
 import { readState, stateChange, useCount } from '../state/state';
 import { isGameOver } from '../game/end';
 import type { CardBook } from '../cards/book';
@@ -88,13 +88,12 @@ export function pay(ctx: Context, spec: PaymentSpec): Promise<PaymentResult> {
 /** 弃牌费用直接进入同一支付流程；权限与原 legal 同步重查，保留原型字段及方法接收者。 */
 export function payDiscard(
   ctx: Context,
-  book: CardBook,
   spec: Omit<PaymentOptions, 'materialAllowed'> &
     PaymentSource & {
       readonly cards: readonly string[];
     },
 ): Promise<PaymentResult> {
-  return performPayment(ctx, spec, book);
+  return performPayment(ctx, spec, rulesOf(ctx));
 }
 
 /** 两个公开入口各自约束配置形状，实际检查、提交与后效只有一份实现。 */

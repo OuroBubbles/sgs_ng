@@ -16,7 +16,7 @@ export type EquipmentSlot = string;
 export interface EquipmentDefinition {
   readonly slot: EquipmentSlot;
   readonly range?: number;
-  readonly skill?: SkillDefinition | ((book: CardBook) => SkillDefinition);
+  readonly skill?: SkillDefinition;
 }
 
 /** 忽略只属于指定目标的这个效果；嵌套效果、代答者及普通技能来源各自判断。 */
@@ -128,9 +128,7 @@ export function equipmentCard(
   const equipment: EquipmentDefinition = {
     slot,
     ...(range === undefined ? {} : { range }),
-    ...(skill === undefined
-      ? {}
-      : { skill: typeof skill === 'function' ? skill.bind(input) : skill }),
+    ...(skill === undefined ? {} : { skill }),
   };
   const definition: CardDefinition = {
     id,
@@ -176,18 +174,21 @@ export function equipmentLost(world: WorldReader, moved: MoveResult, self: Skill
 }
 
 /** 装备实例以实体牌与持有者为身份。移动、支付、埋葬后查询立即反映权威位置。 */
-export function equipmentAbilities(
-  definitions: readonly CardDefinition[],
-  book: CardBook,
-): SkillProvider {
+export function equipmentAbilities(definitions: readonly CardDefinition[]): SkillProvider {
   const abilities = new Map(
     definitions
       .filter((card) => card.equipment)
       .map((card) => {
         const equipment = card.equipment!;
-        const base =
-          typeof equipment.skill === 'function' ? equipment.skill(book) : equipment.skill;
-        const { id, name, description, triggers = [], active, viewAs, modifiers = [] } = base ?? {};
+        const {
+          id,
+          name,
+          description,
+          triggers = [],
+          active,
+          viewAs,
+          modifiers = [],
+        } = equipment.skill ?? {};
         return [
           card.id,
           defineSkill({

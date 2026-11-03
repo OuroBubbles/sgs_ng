@@ -1,7 +1,7 @@
+import { rulesOf } from '../skills/skills';
 import type { Card, CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import type { CardBook } from './book';
 import { delayedCards } from './delayed';
 import { moveCards } from './move';
 
@@ -51,9 +51,9 @@ export interface DiscardResult {
 /** 明确的弃置效果：批内先完整重查，再一次提交实体移动与延时身份移除。普通移动不调用它。 */
 export function discardCards(
   ctx: Context,
-  book: CardBook,
   request: Omit<DiscardRequest, 'card'> & { readonly cards: readonly string[] },
 ): Promise<DiscardResult> {
+  const book = rulesOf(ctx);
   const input = immutable(request);
   return ctx.flow('discard', async (child) => {
     const unavailable: DiscardResult = { kind: 'unavailable', subjects: input.cards, cards: [] };

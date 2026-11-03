@@ -1,3 +1,4 @@
+import { rulesOf } from '../skills/skills';
 import type { Card, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
@@ -72,11 +73,8 @@ const currentCard = defineState<JudgmentCard | null>(
 );
 
 /** 判定牌面和材料位置分离：牌被获得不抹掉结果，改判则原子替换牌面与持有材料。 */
-export function judge(
-  ctx: Context,
-  book: CardBook,
-  request: JudgmentInput,
-): Promise<JudgmentResult> {
+export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentResult> {
+  const book = rulesOf(ctx);
   const input = immutable({ player: request.player, reason: request.reason });
   const match = request.match;
   const onResult = request.onResult;

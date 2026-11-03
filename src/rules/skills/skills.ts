@@ -20,6 +20,7 @@ import type { QueryType, SkillModifier } from './query';
 import type { ActiveSkill } from './active';
 import { playerBuried, deathFinished } from '../combat/life-events';
 import { EffectBook } from '../effects/effects';
+import type { CardBook } from '../cards/book';
 
 export interface SkillHandle {
   readonly id: string;
@@ -81,6 +82,33 @@ export interface SkillDefinition {
   readonly viewAs?: readonly ViewAs[];
   readonly modifiers?: readonly SkillModifier[];
   readonly active?: readonly ActiveSkill[];
+  /** 与技能同处一处的 AI 提示；规则从不读取。 */
+  readonly ai?: SkillAi;
+}
+
+/** AI 只看到观察者视角的简化局面；提示函数必须是纯函数。 */
+export interface AiSeat {
+  readonly id: string;
+  readonly alive: boolean;
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly gender: string;
+}
+export interface AiView {
+  readonly self: AiSeat;
+  readonly players: readonly AiSeat[];
+  readonly hand: readonly { readonly id: string }[];
+  readonly cards: readonly { readonly id: string }[];
+  /** 正值为敌意，负值为友方。 */
+  readonly hostility: (player: string) => number;
+  /** 牌的保留价值；越低越适合作为费用。 */
+  readonly cost: (card: string) => number;
+}
+export interface SkillAi {
+  /** 主动技能的发动意愿；不大于 0 时不发动。 */
+  readonly value?: (view: AiView) => number;
+  /** 选择目标时偏向友方还是敌方，默认敌方。 */
+  readonly targets?: 'ally' | 'enemy';
 }
 
 /** 目录保留完整的触发与转换声明；内容代码可省略未用能力和空材料维度。 */
@@ -207,6 +235,7 @@ export function defineSkill(definition: SkillDefinition): DefinedSkill {
     viewAs: recipes,
     active,
     modifiers,
+    ai,
   } = definition;
   if (!id) throw new Error(`Skill "${name}" requires an ID.`);
 
@@ -215,6 +244,7 @@ export function defineSkill(definition: SkillDefinition): DefinedSkill {
     name,
     ...(description === undefined ? {} : { description }),
     ...(lord === undefined ? {} : { lord }),
+    ...(ai === undefined ? {} : { ai }),
     triggers: Object.freeze(
       triggers.map((trigger) =>
         Object.freeze({
@@ -343,9 +373,21 @@ function checkSnapshots(value: unknown): void {
   if (!Array.isArray(value)) throw new Error('Skill snapshots must be an array.');
 }
 
+// 每局挂接时登记 World → 规则目录；作者代码由 ctx 取得 CardBook，不再写 (book) => skill 工厂。
+const attachedBooks = new WeakMap<WorldReader, SkillBook>();
+
+/** 当前对局的牌目录。只能在已挂接规则目录的 Room 中调用。 */
+export function rulesOf(ctx: Pick<Context, 'world'>): CardBook {
+  const cards = attachedBooks.get(ctx.world)?.cards;
+  if (!cards) throw new Error('No CardBook is attached to this room.');
+  return cards;
+}
+
 /** 不可变定义可共享；授予/失效/次数在 World，Provider 登记仅留在执行侧。 */
 export class SkillBook implements TriggerSource {
   readonly effects = new EffectBook();
+  /** 由 CardBook 构造时回填；同一 SkillBook 只服务一个牌目录。 */
+  cards: CardBook | null = null;
   readonly #definitions = new Map<string, DefinedSkill>();
   // 只共享不可变实例的身份描述；有效性仍逐次读取传入的 World。
   readonly #bindingsByInstance = new WeakMap<SkillInstance, DefinedBinding>();
@@ -388,6 +430,11 @@ export class SkillBook implements TriggerSource {
     for (const definition of prepared) this.#definitions.set(definition.id, definition);
   }
 
+  /** 技能旁声明的 AI 提示；未知技能或无提示时为 undefined。 */
+  hint(id: string): SkillAi | undefined {
+    return this.#definitions.get(id)?.ai;
+  }
+
   definition(id: string): DefinedSkill {
     const definition = this.#definitions.get(id);
     if (!definition) throw new Error(`Unknown skill definition: ${id}`);
@@ -410,9 +457,11 @@ export class SkillBook implements TriggerSource {
       removeEffects();
       cancelCleanup();
       if (this.#attachments.get(room.world) === registration) this.#attachments.delete(room.world);
+      if (attachedBooks.get(room.world) === this) attachedBooks.delete(room.world);
     };
     const cancelCleanup = room.onClose(detach);
     this.#attachments.set(room.world, registration);
+    attachedBooks.set(room.world, this);
     this.#sealed = true;
     return detach;
   }

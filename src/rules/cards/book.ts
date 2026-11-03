@@ -221,9 +221,7 @@ export function defineCard(definition: CardDefinition): CardDefinition {
     fixedEquipment = Object.freeze({
       slot,
       ...(range === undefined ? {} : { range }),
-      ...(skill === undefined
-        ? {}
-        : { skill: typeof skill === 'function' ? skill.bind(equipment) : defineSkill(skill) }),
+      ...(skill === undefined ? {} : { skill: defineSkill(skill) }),
     });
   }
   const fixed = Object.freeze({
@@ -273,7 +271,8 @@ export class CardBook {
       usage: policy.usage?.bind(policy) ?? defaults.usage,
       responseTimes: policy.responseTimes?.bind(policy) ?? defaults.responseTimes,
     });
-    this.skills.addProvider(equipmentAbilities([...this.#definitions.values()], this));
+    this.skills.cards = this;
+    this.skills.addProvider(equipmentAbilities([...this.#definitions.values()]));
   }
 
   definition(id: string): CardDefinition {

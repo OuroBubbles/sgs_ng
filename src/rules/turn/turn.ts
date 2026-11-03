@@ -349,7 +349,7 @@ export async function defaultPhaseBody(
       });
       const answer = await ctx.ask(model.decision(phase.owner, `弃置 ${count} 张手牌`));
       if (answer.kind === 'chosen')
-        await payDiscard(ctx, book, {
+        await payDiscard(ctx, {
           actor: phase.owner,
           cards: answer.value.cards,
           reason: 'discard-phase',
