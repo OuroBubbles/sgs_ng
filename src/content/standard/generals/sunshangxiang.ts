@@ -1,6 +1,5 @@
 import {
   action,
-  cardsMoved,
   draw,
   general,
   isMale,
@@ -9,6 +8,7 @@ import {
   skill,
   trigger,
   wounded,
+  Cards,
 } from '../../../sdk';
 import type { MoveResult } from '../../../sdk';
 
@@ -26,7 +26,7 @@ export const xiaoji = skill({
   name: '枭姬',
   description: '当你失去装备区里的一张牌后，你可以摸两张牌。一次失去多张时，逐张选择是否发动。',
   triggers: [
-    trigger(cardsMoved, {
+    trigger(Cards.moved, {
       times: (_ctx, moved, self) => lostEquipment(moved, self.owner).length,
       when: (_ctx, moved, self) => lostEquipment(moved, self.owner).length > 0,
       ask: (_ctx, _moved, _self, at) => `是否发动【枭姬】摸两张牌？${nth(at)}`,

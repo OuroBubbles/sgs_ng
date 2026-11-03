@@ -1,10 +1,5 @@
 import { expect, it } from 'vitest';
 import {
-  cardsMoved,
-  costPaid,
-  damageCausing,
-  damageInflicting,
-  damageReplacing,
   differentGender,
   defineSkill,
   modify,
@@ -13,10 +8,11 @@ import {
   kill,
   moveCards,
   setGender,
-  targetConfirming,
-  targetConfirmed,
-  targetSpecified,
-  useDeclared,
+  Use,
+  Target,
+  Cards,
+  Damage,
+  Cost,
 } from '../../src/sdk';
 import type { DamageDraft, Gender, UseIntent } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -111,7 +107,7 @@ it('雌雄由来源确认目标发动，对方只可交手牌，弃置后仍执�
   const game = create('double_swords');
   await genders(game);
   const order: string[] = [];
-  game.room.on(targetSpecified, {
+  game.room.on(Target.specified, {
     id: 'source',
     owner: null,
     eligible: () => true,
@@ -119,7 +115,7 @@ it('雌雄由来源确认目标发动，对方只可交手牌，弃置后仍执�
       order.push('source');
     },
   });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'target',
     owner: null,
     eligible: () => true,
@@ -174,7 +170,7 @@ it('雌雄不发动或不构成异性时没有弃牌/摸牌分支', async () => 
 it('目标确认前被取消，不再发动后续的雌雄剑指定后技能', async () => {
   const game = create('double_swords', 0);
   await genders(game);
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'cancel',
     owner: null,
     eligible: () => true,
@@ -189,7 +185,7 @@ it('目标确认前被取消，不再发动后续的雌雄剑指定后技能', a
 it.each(['weapon', 'source'])('雌雄已发动后 %s 离场，不撤销对方已承受的选择', async (lost) => {
   const game = create('double_swords');
   await genders(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'loss',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:double_swords-ability',
@@ -214,7 +210,7 @@ it.each(['weapon', 'source'])('雌雄已发动后 %s 离场，不撤销对方已
 it('指定后雌雄支付导致目标死亡，来源可摸牌，死亡目标不再进入确认后窗口', async () => {
   const game = create('double_swords');
   await genders(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'death',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:double_swords-ability',
@@ -223,7 +219,7 @@ it('指定后雌雄支付导致目标死亡，来源可摸牌，死亡目标不�
     },
   });
   let incoming = 0;
-  game.room.on(targetConfirmed, {
+  game.room.on(Target.confirmed, {
     id: 'incoming',
     owner: null,
     eligible: () => true,
@@ -241,7 +237,7 @@ it('指定后雌雄支付导致目标死亡，来源可摸牌，死亡目标不�
 it('重复目标各自指定与发动；确认前改变性别使用当前属性', async () => {
   const game = create('double_swords', 0);
   await genders(game);
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'repeat',
     owner: null,
     eligible: () => true,
@@ -257,7 +253,7 @@ it('重复目标各自指定与发动；确认前改变性别使用当前属性'
   expect(game.room.world.zone('a:hand').cards).toEqual(['top0', 'top1']);
   const changed = create('double_swords');
   await genders(changed);
-  changed.room.on(useDeclared, {
+  changed.room.on(Use.declared, {
     id: 'gender',
     owner: null,
     eligible: () => true,
@@ -269,7 +265,7 @@ it('重复目标各自指定与发动；确认前改变性别使用当前属性'
 
 it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标伤害处理', async () => {
   const game = create('ice_sword', 2);
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'boost',
     owner: null,
     eligible: () => true,
@@ -277,7 +273,7 @@ it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标�
   });
   let source = 0;
   let receiving = 0;
-  game.room.on(damageReplacing, {
+  game.room.on(Damage.replacing, {
     id: 'snapshot',
     owner: null,
     eligible: () => true,
@@ -285,7 +281,7 @@ it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标�
       source = draft.sourceSnapshot!.amount;
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'target',
     owner: null,
     eligible: () => true,
@@ -355,7 +351,7 @@ it('寒冰第二次重新生成选项，包括第一次移牌后效获得的新�
     equipment: { a: [card('weapon', 'ice_sword')], b: [card('bw', 'crossbow')] },
     draw: [card('bonus', 'peach')],
   });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'gain',
     owner: null,
     eligible: (_ctx, moved) =>
@@ -391,7 +387,7 @@ it.each(['weapon', 'source', 'target'])(
   async (lost) => {
     const game = create('ice_sword', 2);
     let done = false;
-    game.room.on(cardsMoved, {
+    game.room.on(Cards.moved, {
       id: 'loss',
       owner: null,
       eligible: (_ctx, moved) =>
@@ -426,14 +422,14 @@ it.each(['weapon', 'source', 'target'])(
 
 it.each(['zero', 'prevented'])('来源阶段已经 %s 不开放伤害替代', async (kind) => {
   const game = create('ice_sword', 2);
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'stop',
     owner: null,
     eligible: () => true,
     run: (_ctx, draft) => (kind === 'zero' ? draft.setAmount(0, 'probe') : draft.prevent('probe')),
   });
   let replacing = 0;
-  game.room.on(damageReplacing, {
+  game.room.on(Damage.replacing, {
     id: 'replace',
     owner: null,
     eligible: () => true,
@@ -450,7 +446,7 @@ it.each(['zero', 'prevented'])('来源阶段已经 %s 不开放伤害替代', as
 it('寒冰发动支付后出现其他防止时不覆盖原因，也不继续弃牌', async () => {
   const game = create('ice_sword', 2);
   let draft: DamageDraft;
-  game.room.on(damageReplacing, {
+  game.room.on(Damage.replacing, {
     id: 'capture',
     owner: null,
     eligible: () => true,
@@ -458,7 +454,7 @@ it('寒冰发动支付后出现其他防止时不覆盖原因，也不继续弃�
       draft = value;
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'prevent',
     owner: null,
     eligible: (_ctx, paid) => paid.skill === 'standard:ice_sword-ability',
@@ -499,7 +495,7 @@ it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已�
         source: { kind: 'general', id: 'test' },
       }),
     );
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after-first-choice',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:ice_sword-ability',

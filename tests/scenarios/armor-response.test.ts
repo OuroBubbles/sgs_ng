@@ -1,19 +1,17 @@
 import { expect, it } from 'vitest';
 import {
   blockSkill,
-  costPaid,
   defineSkill,
-  effectFinished,
-  effectStarting,
   equip,
-  judgmentFinished,
   kill,
   moveCards,
   on,
-  responseFinished,
-  responseRequested,
-  useFinished,
   withLifetime,
+  Resolve,
+  Use,
+  Judgment,
+  Response,
+  Cost,
 } from '../../src/sdk';
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
 import { eightDiagram } from '../../src/content/standard/armor';
@@ -45,7 +43,7 @@ const red = [card('red', 'peach', 'heart')];
 it('八卦阵无手牌也能判定供闪，抵消杀时零材料走一次使用与完成，历史可重建', async () => {
   const game = cardGame({ equipment: armor, draw: red });
   let finished = 0;
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, result) => result.card.name === 'standard:jink',
@@ -98,7 +96,7 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
     draw: red,
     policy: { prohibitUse: (_ctx, _actor, card) => card.name === 'standard:jink' && prohibited },
   });
-  after.room.on(judgmentFinished, {
+  after.room.on(Judgment.finished, {
     id: 'prohibit',
     owner: null,
     eligible: () => true,
@@ -116,7 +114,7 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
 
 it('八卦已经发动，判定期间失去防具不撤销本次技能；以后不再发动', async () => {
   const game = cardGame({ equipment: armor, draw: red });
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'lose',
     owner: null,
     eligible: () => true,
@@ -177,7 +175,7 @@ it.each(['nioh_shield', 'eight_diagram'])(
       equipment: { a: [card('sword', 'qinggang_sword')], b: [card('armor', name)] },
       draw: red,
     });
-    game.room.on(effectStarting, {
+    game.room.on(Resolve.starting, {
       id: 'lose-sword',
       owner: null,
       eligible: (ctx) => ctx.world.position('sword') === 'a:equipment',
@@ -212,7 +210,7 @@ it('青釭剑不污染同一目标上的嵌套杀；效果快照关闭后不能�
     hands: { c: [card('inner', 'slash')] },
     equipment: { a: [card('sword', 'qinggang_sword')], b: [card('shield', 'nioh_shield')] },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'nested',
     owner: null,
     eligible: (_ctx, { effect }) => effect.actor === 'a',
@@ -222,7 +220,7 @@ it('青釭剑不污染同一目标上的嵌套杀；效果快照关闭后不能�
   });
   let liveEffect: CardEffect;
   // 用真实窗口句柄检查封口，不伪造一个计划。
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'capture',
     owner: null,
     eligible: (_ctx, { effect }) => effect.actor === 'a',
@@ -243,7 +241,7 @@ it('青釭剑声明只属于已指定身份，失去武器后追加和重复目�
     hands: { b: [card('new', 'nioh_shield')] },
     equipment: { a: [card('sword', 'qinggang_sword')], d: [card('old', 'nioh_shield')] },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'equip-now',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -251,7 +249,7 @@ it('青釭剑声明只属于已指定身份，失去武器后追加和重复目�
       await equip(ctx, game.book, { card: 'new', from: 'b:hand', owner: 'b' });
     },
   });
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'extend',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -278,7 +276,7 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
   const game = cardGame();
   let request: ResponseOpportunity;
   let reentered = 0;
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'supply',
     owner: null,
     eligible: () => true,
@@ -289,7 +287,7 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
       expect(await payload.provide(ctx, generated())).toMatchObject({ kind: 'unavailable' });
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'reenter',
     owner: null,
     eligible: (_ctx, receipt) =>
@@ -319,7 +317,7 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
 
 it('跨角色委托只由实际供牌者支付，原受益者和 responseFinished 各保留一次', async () => {
   const game = cardGame({ hands: { c: [card('donor', 'jink')] } });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, r) => r.actor === 'b',
@@ -328,7 +326,7 @@ it('跨角色委托只由实际供牌者支付，原受益者和 responseFinishe
     },
   });
   let responders: string[] = [];
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'finished',
     owner: null,
     eligible: () => true,
@@ -351,7 +349,7 @@ it('跨角色委托只由实际供牌者支付，原受益者和 responseFinishe
 it('规则供牌入口不变成玩家伪造 generated 回复的入口，活跃请求也拒绝外部 World', async () => {
   const game = cardGame({ hands: { b: [card('j', 'jink')] } });
   const foreign = cardGame();
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'foreign',
     owner: null,
     eligible: () => true,
@@ -378,7 +376,7 @@ it('青釭剑作用于目标防具，受委托队友仍可发动自己的八卦�
     equipment: { a: [card('sword', 'qinggang_sword')], c: [card('armor', 'eight_diagram')] },
     draw: red,
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, r) => r.actor === 'b',
@@ -399,7 +397,7 @@ it('青釭剑作用于目标防具，受委托队友仍可发动自己的八卦�
 
 it('委托环被有界拒绝，失败委托仍可回退原角色供牌', async () => {
   const game = cardGame({ hands: { b: [card('own', 'jink')] } });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'cycle',
     owner: null,
     eligible: (_ctx, r) => r.actors.length < 3,
@@ -418,7 +416,7 @@ it('委托环被有界拒绝，失败委托仍可回退原角色供牌', async (
 
 it('原受益者在队友支付后死亡，已打出事实保留，父请求不再采纳或重复支付', async () => {
   const game = cardGame({ hands: { c: [card('donor', 'jink')] } });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, r) => r.actor === 'b',
@@ -426,7 +424,7 @@ it('原受益者在队友支付后死亡，已打出事实保留，父请求不�
       await r.delegate(ctx, 'c');
     },
   });
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'die',
     owner: null,
     eligible: () => true,
@@ -452,7 +450,7 @@ it('同一窗口可选择技能顺序，供牌后其余候选失效；选择说�
     id: 'probe:supplier',
     name: '直接供闪',
     triggers: [
-      on(responseRequested, {
+      on(Response.requested, {
         id: 'supply',
         order: 'choose',
         when: (ctx, { payload: r, self }) =>

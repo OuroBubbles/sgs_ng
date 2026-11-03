@@ -4,7 +4,6 @@ import type { ChoiceCount } from '../../core/decisions/count';
 import { immutable, isStringArray } from '../../core/model/value';
 import { syncQueryValue } from '../../core/runtime/query';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { pay, used } from '../costs/pay';
 import type { UsageLimit } from '../costs/pay';
 import type { SkillBook, SkillHandle } from '../skills/skills';
@@ -14,7 +13,6 @@ import * as queries from './queries';
 import { discardSubject } from './discard';
 import type { DiscardRequest } from './discard';
 import { withProcessing } from './processing';
-import { responseFinished } from './played';
 import { UsePlan } from './plan';
 import { withLifetime } from '../scopes/lifetime';
 import type { UsePlanView } from './plan';
@@ -43,8 +41,10 @@ import { ownedCards, timingSnapshot, colorOfSuit, isResponseBlocked } from './ty
 import { physicalCardFace } from './face';
 import type { PhysicalCardFace } from './face';
 import { isGameOver } from '../game/end';
-import { requestResponse } from './response';
+import { requestResponse, Response } from './response';
 import type { ResponseIntent, ResponseResult, ResponseConsumer } from './response';
+import { defineEvent, timing } from '../../core/runtime/event';
+
 export type { ResponseResult } from './response';
 
 export interface CardOffer {
@@ -85,35 +85,41 @@ export interface UseOfferRequest {
   readonly available?: (ctx: Context) => boolean;
 }
 export type AskedUseResult = UseResult | { readonly kind: 'declined' };
-export const useDeclared = defineWindow<UsePlanView>('use.declared');
-export const targetsConfirming = defineWindow<UsePlanView>('use.targets');
-export const targetSpecifying = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: CardEffect;
-}>('target.specifying');
-export const targetSpecified = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: CardEffect;
-}>('target.specified');
-export const targetConfirming = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: CardEffect;
-}>('target.confirming');
-export const targetConfirmed = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: CardEffect;
-}>('target.confirmed');
-export const effectStarting = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: CardEffect;
-  /** 本次实际结算的纯资格；嵌套机会复用它，不按牌名重建 canResolve。 */
-  readonly available: (ctx: Context) => boolean;
-}>('effect.starting', ['main', 'counter', 'after']);
-export const effectFinished = defineWindow<{
-  readonly use: UsePlanView;
-  readonly effect: EffectSnapshot;
-}>('effect.finished');
-export const useFinished = defineWindow<UseSnapshot>('use.finished');
+export const Use = defineEvent('use', {
+  declared: timing<UsePlanView>(),
+  targets: timing<UsePlanView>(),
+  finished: timing<UseSnapshot>(),
+});
+export const Target = defineEvent('target', {
+  specifying: timing<{
+    readonly use: UsePlanView;
+    readonly effect: CardEffect;
+  }>(),
+  specified: timing<{
+    readonly use: UsePlanView;
+    readonly effect: CardEffect;
+  }>(),
+  confirming: timing<{
+    readonly use: UsePlanView;
+    readonly effect: CardEffect;
+  }>(),
+  confirmed: timing<{
+    readonly use: UsePlanView;
+    readonly effect: CardEffect;
+  }>(),
+});
+export const Resolve = defineEvent('resolve', {
+  starting: timing<{
+    readonly use: UsePlanView;
+    readonly effect: CardEffect;
+    /** 本次实际结算的纯资格；嵌套机会复用它，不按牌名重建 canResolve。 */
+    readonly available: (ctx: Context) => boolean;
+  }>('main', 'counter', 'after'),
+  finished: timing<{
+    readonly use: UsePlanView;
+    readonly effect: EffectSnapshot;
+  }>(),
+});
 
 function invalid(reason: string): { readonly ok: false; readonly reason: string } {
   return { ok: false, reason };
@@ -765,8 +771,8 @@ export class CardBook {
         });
 
         if (paid.kind !== 'paid') return { kind: 'unavailable', reason: paid.reason };
-        await body.window(useDeclared, plan, { subject: intent.actor });
-        await body.window(targetsConfirming, plan, { subject: intent.actor });
+        await body.window(Use.declared, plan, { subject: intent.actor });
+        await body.window(Use.targets, plan, { subject: intent.actor });
         await this.#confirmTargets(body, plan);
         let dispatched = false;
         const resolveTargets = async (
@@ -797,7 +803,7 @@ export class CardBook {
           throw new Error('Card body left unresolved target effects.');
         const finished = plan.close(outcome);
         body.commit('card.finished', [], finished);
-        await body.window(useFinished, finished, { subject: intent.actor });
+        await body.window(Use.finished, finished, { subject: intent.actor });
         return { kind: 'used', use: finished };
       });
 
@@ -1022,7 +1028,7 @@ export class CardBook {
 
           if (paid.kind !== 'paid') return { kind: 'unavailable' };
           await body.window(
-            responseFinished,
+            Response.finished,
             immutable({ id, actor, card, subject: { kind: 'effect', effect: to } }),
             { subject: actor },
           );
@@ -1140,10 +1146,10 @@ export class CardBook {
   /** 分层排空四个目标时点；新增身份补齐此前各层，已有身份不重放。 */
   async #confirmTargets(ctx: Context, plan: UsePlan): Promise<void> {
     const windows = {
-      specifying: targetSpecifying,
-      confirming: targetConfirming,
-      specified: targetSpecified,
-      confirmed: targetConfirmed,
+      specifying: Target.specifying,
+      confirming: Target.confirming,
+      specified: Target.specified,
+      confirmed: Target.confirmed,
     };
     for (let next = plan.nextTarget(); next; next = plan.nextTarget()) {
       const { effect, stage } = next;
@@ -1203,7 +1209,7 @@ export class CardBook {
           available(at, effect);
         // 防具、反制或其他启动候选可取消本效果，后组不再对旧身份继续执行。
         await ctx.window(
-          effectStarting,
+          Resolve.starting,
           { use: plan, effect, available: pending },
           {
             subject: effect.target,
@@ -1230,7 +1236,11 @@ export class CardBook {
       }
       const snapshot = effect.snapshot();
       ctx.commit('card.effect', [], snapshot);
-      await ctx.window(effectFinished, { use: plan, effect: snapshot }, { subject: effect.target });
+      await ctx.window(
+        Resolve.finished,
+        { use: plan, effect: snapshot },
+        { subject: effect.target },
+      );
       // 实际效果及后效中新增的身份形成下一批目标时点，不重跑已访问身份。
       await prepare();
     }

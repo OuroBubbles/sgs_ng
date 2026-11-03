@@ -4,9 +4,9 @@ import {
   on,
   invoke,
   judge,
-  responseRequested,
-  targetSpecified,
-  effectStarting,
+  Target,
+  Resolve,
+  Response,
 } from '../../sdk';
 import type { CardChoice } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
@@ -26,7 +26,7 @@ export const eightDiagram = equipmentCard({
     id: 'standard:eight_diagram-ability',
     name: '八卦阵',
     triggers: [
-      on(responseRequested, {
+      on(Response.requested, {
         order: 'choose',
         when: (ctx, { payload: request, self }) =>
           request.actor === self.owner &&
@@ -64,7 +64,7 @@ export const qinggangSword = equipmentCard({
     id: 'standard:qinggang_sword-ability',
     name: '青釭剑',
     triggers: [
-      on(targetSpecified, {
+      on(Target.specified, {
         when: (_ctx, { payload: { effect }, self }) =>
           effect.actor === self.owner &&
           effect.card.name === 'standard:slash' &&
@@ -93,7 +93,7 @@ export const niohShield = equipmentCard({
     id: 'standard:nioh_shield-ability',
     name: '仁王盾',
     triggers: [
-      on(effectStarting, {
+      on(Resolve.starting, {
         when: (ctx, { payload: { effect }, self }) =>
           effect.target === self.owner &&
           effect.state === 'ready' &&

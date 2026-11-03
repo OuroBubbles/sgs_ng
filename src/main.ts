@@ -1,9 +1,5 @@
 import { mount } from 'svelte';
 import App from './app/App.svelte';
-import './client/style.css';
-import './client/refinements.css';
-import './client/table/surface.css';
-
 const target = document.getElementById('app');
 
 if (!target) {

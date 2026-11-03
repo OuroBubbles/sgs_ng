@@ -9,12 +9,6 @@ import { RoleMatch } from '../../src/app/offline/role-match';
 import { projectMatch } from '../../src/app/offline/projection';
 import { standardCards } from '../../src/content/standard/cards';
 import {
-  costPaid,
-  useDeclared,
-  targetSpecified,
-  targetConfirming,
-  effectStarting,
-  effectFinished,
   useDeclarations,
   defineSkill,
   modify,
@@ -24,6 +18,10 @@ import {
   kill,
   ownedCards,
   moveCards,
+  Use,
+  Target,
+  Resolve,
+  Cost,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
@@ -125,7 +123,7 @@ it('零材料虚拟普通锦囊仍能集智，接受后失去技能不撤销摸�
     draw: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')],
   });
   await grant(game, 'standard:jizhi');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'lose',
     owner: null,
     eligible: (_ctx, receipt) => receipt.reason === 'standard:jizhi',
@@ -262,7 +260,7 @@ it('无双的声明在技能失去后保留，但没有响应机会时不强开�
       ...(forbidden ? { policy: { responseTimes: () => 0 } } : {}),
     });
     await grant(game, 'standard:wushuang');
-    game.room.on(effectStarting, {
+    game.room.on(Resolve.starting, {
       id: 'lose',
       owner: null,
       eligible: () => true,
@@ -364,7 +362,7 @@ it('流离费用与目标替换原子提交，忽略出杀者距离，保留杀�
   const game = liuliGame();
   await grant(game, 'standard:liuli', 'b');
   let checked = false;
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'atomic',
     owner: null,
     eligible: (_ctx, receipt) => receipt.reason === 'standard:liuli',
@@ -430,7 +428,7 @@ it('流离不能给本人、出杀者、被禁止或已在本次杀内的目标'
     policy: { attackRange: () => 3, prohibitTarget: (_ctx, _actor, target) => target === 'd' },
   });
   await grant(game, 'standard:liuli', 'b');
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'extra',
     owner: null,
     eligible: () => true,
@@ -476,7 +474,7 @@ it('流离新目标的仁王盾仍生效，青釭剑规则仍随杀传递', asyn
       },
     });
     await grant(game, 'standard:liuli', 'b');
-    game.room.on(effectFinished, {
+    game.room.on(Resolve.finished, {
       id: 'target-is-still-declared',
       owner: null,
       eligible: (_ctx, { effect }) => effect.target === 'c',
@@ -495,7 +493,7 @@ it('流离新目标的仁王盾仍生效，青釭剑规则仍随杀传递', asyn
 it('支付后失去流离不撤销转移，目标死亡则跳过，不退费用', async () => {
   const game = liuliGame();
   await grant(game, 'standard:liuli', 'b');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'remove-and-kill',
     owner: null,
     eligible: (_ctx, receipt) => receipt.reason === 'standard:liuli',
@@ -573,7 +571,7 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
     expect(view.log.some((entry) => entry.text === 'a使用【杀】 → b')).toBe(true);
   };
   if (kind === 'cancel')
-    match.room.on(effectStarting, {
+    match.room.on(Resolve.starting, {
       id: 'cancel',
       owner: null,
       eligible: () => true,
@@ -583,7 +581,7 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
       },
     });
   else
-    match.room.on(costPaid, {
+    match.room.on(Cost.paid, {
       id: 'check-atomic-projection',
       owner: null,
       eligible: (_ctx, receipt) => receipt.reason === 'standard:liuli',
@@ -616,7 +614,7 @@ it('人类可以支付新的费用再次流离回旧目标，每次创建独立�
   await grant(game, 'standard:liuli', 'b');
   await grant(game, 'standard:liuli', 'c');
   const confirmed: string[] = [];
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'trace',
     owner: null,
     eligible: () => true,
@@ -648,7 +646,7 @@ it('目标声明只在本次生存期可改写，纯查询与关闭后调用不�
   const game = liuliGame();
   let retained: UsePlanView | undefined;
   let effect: CardEffect | undefined;
-  game.room.on(targetSpecified, {
+  game.room.on(Target.specified, {
     id: 'guard',
     owner: null,
     eligible: () => true,

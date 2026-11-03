@@ -11,18 +11,18 @@ import {
   currentPhase,
   activeOffers,
   setKingdom,
-  costPaid,
-  cardsMoved,
   moveCards,
   kill,
   loseHp,
   installRescue,
-  responseFinished,
   withCardSupply,
   defineSkill,
   viewAs,
   modify,
   cardQueries,
+  Cards,
+  Response,
+  Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
@@ -137,7 +137,7 @@ it('仁德分批交给不同角色，累计跨过两张时只回复一次，交�
   await grant(game, 'standard:rende');
   await wound(game);
   const counts: number[] = [];
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, m) => m.moves.some((x) => x.from === 'a:hand'),
@@ -202,7 +202,7 @@ it('仁德计数不因支付后失去并重获技能重置，重复出牌阶段�
   await grant(game, 'standard:rende');
   await wound(game);
   let changed = false;
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'regrant',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:rende' && !changed,
@@ -240,7 +240,7 @@ it('仁德转交不受弃置禁令约束，目标死亡后已转交牌照常埋�
   await grant(game, 'standard:rende');
   await grant(game, lock.id);
   await wound(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'death',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:rende',
@@ -309,7 +309,7 @@ it.each(['lost', 'source-dead', 'target-dead'] as const)(
     const game = scenario({ hands: { a: [card('fee', 'jink')] } });
     await grant(game, 'standard:qingnang');
     await wound(game, 'b');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after',
       owner: null,
       eligible: (_ctx, r) => r.skill === 'standard:qingnang',
@@ -421,7 +421,7 @@ it('急救不能选择黑色材料，回合外仍完整检查使用桃禁令', a
 it('激将由蜀角色打出、刘备使用：两种归属各一次，实际材料与来源可重建', async () => {
   const { game } = await setupJijiang({ hands: { c: [card('donor', 'slash', 'diamond', 9)] } });
   let played = 0;
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'played',
     owner: null,
     eligible: () => true,
@@ -592,7 +592,7 @@ it.each(['moved', 'donor-dead', 'lord-dead'] as const)(
     const { game } = await setupJijiang({
       hands: { c: [card('first', 'slash')], d: [card('next', 'slash')] },
     });
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after-supply',
       owner: null,
       eligible: (_ctx, r) => r.actor === 'c' && r.reason === 'standard:jijiang',
@@ -624,7 +624,7 @@ it.each(['moved', 'donor-dead', 'lord-dead'] as const)(
 );
 it('激将已宣告后失去技能仍完成本次供牌和用杀', async () => {
   const { game } = await setupJijiang({ hands: { c: [card('donor', 'slash')] } });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'lose',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:jijiang',

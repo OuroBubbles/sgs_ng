@@ -1,23 +1,12 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import {
-  defineWindow,
-  defineSkill,
-  on,
-  draw,
-  damage,
-  damageReceived,
-  kill,
-  invoke,
-} from '../../src/sdk';
-import type { Trigger, TriggerSource, WindowType, WindowRef } from '../../src/sdk';
+import { defineSkill, on, draw, damage, kill, invoke, Damage } from '../../src/sdk';
+import type { Trigger, TriggerSource, Timing, WindowRef } from '../../src/sdk';
 import { room, nextRequest, choose } from '../fixtures/room';
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
-function dynamic(
-  type: WindowType<unknown>,
-  read: () => readonly Trigger<unknown>[],
-): TriggerSource {
+function dynamic(type: Timing<unknown>, read: () => readonly Trigger<unknown>[]): TriggerSource {
   return { collect: (window) => (window === type ? read() : []) };
 }
 function effect(
@@ -32,7 +21,7 @@ const grantSource = { kind: 'general', id: 'test' } as const;
 
 it.each([false, true])('默认不自动发现新候选，显式加入=%s 时当前窗口才执行', async (include) => {
   const game = room();
-  const window = defineWindow<null>('admit.default');
+  const window = testTiming<null>('admit.default');
   const seen: string[] = [];
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
@@ -55,7 +44,7 @@ it.each([false, true])('默认不自动发现新候选，显式加入=%s 时当�
 
 it('最后一个旧候选补入当前席位，不因旧 pending 已空而丢失新队列', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.last');
+  const window = testTiming<null>('admit.last');
   const seen: string[] = [];
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
@@ -81,7 +70,7 @@ it('最后一个旧候选补入当前席位，不因旧 pending 已空而丢失�
 
 it.each([0, 2])('同一候选的 %s 次数只在首次入队读取，处理后再次加入也不刷新次数', async (total) => {
   const game = room();
-  const window = defineWindow<null>('admit.count');
+  const window = testTiming<null>('admit.count');
   const seen: number[] = [];
   let count = total,
     reads = 0;
@@ -115,7 +104,7 @@ it.each([0, 2])('同一候选的 %s 次数只在首次入队读取，处理后�
 
 it('当前组/席位可加入，过去的组/席位不倒转，后续组仍按固定座次执行', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.cursor', ['before', 'main', 'after']);
+  const window = testTiming<null>('admit.cursor', ['before', 'main', 'after']);
   const seen: string[] = [];
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
@@ -176,7 +165,7 @@ it('当前组/席位可加入，过去的组/席位不倒转，后续组仍按�
 
 it('显式锚点固定本次游标，后注册来源不会重排已经经过的行动序', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.anchor');
+  const window = testTiming<null>('admit.anchor');
   let current: Trigger<unknown>[] = [];
   const seen: string[] = [];
   const source = dynamic(window, () => current);
@@ -204,7 +193,7 @@ it('显式锚点固定本次游标，后注册来源不会重排已经经过的�
 
 it('新自动项先执行，新的可选项与既有可选项继续共用正式排序决策', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.order');
+  const window = testTiming<null>('admit.order');
   const seen: string[] = [];
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
@@ -243,7 +232,7 @@ it('新自动项先执行，新的可选项与既有可选项继续共用正式�
 
 it('同名嵌套窗口的最近引用正确，也可从子窗口显式加入捕获的外层窗口', async () => {
   const game = room();
-  const window = defineWindow<number>('admit.nested');
+  const window = testTiming<number>('admit.nested');
   let outer: WindowRef<number> | null = null;
   let born = false;
   const seen: string[] = [],
@@ -288,7 +277,7 @@ it('同名嵌套窗口的最近引用正确，也可从子窗口显式加入捕�
 it('原窗口关闭后的引用不能在新根流程、新窗口或另一局重用，伪造同 ID 也不行', async () => {
   const game = room(),
     other = room('other');
-  const window = defineWindow<null>('admit.closed');
+  const window = testTiming<null>('admit.closed');
   const source = dynamic(window, () => []);
   game.addTriggerSource(source);
   other.addTriggerSource(source);
@@ -315,7 +304,7 @@ it('原窗口关闭后的引用不能在新根流程、新窗口或另一局重�
 
 it('纯查询、投影和等待子流程的父 Context 不能改队列，合法子流程完成后可正常加入', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.context');
+  const window = testTiming<null>('admit.context');
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
   game.addTriggerSource(source);
@@ -342,7 +331,7 @@ it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
   '非法次数 %s 导致整批加入失败，先前合法项也未入队',
   async (count) => {
     const game = room();
-    const window = defineWindow<null>('admit.atomic');
+    const window = testTiming<null>('admit.atomic');
     const seen: string[] = [];
     let current: Trigger<unknown>[] = [];
     const source = dynamic(window, () => current);
@@ -374,7 +363,7 @@ it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
 
 it('未挂接来源不可加入；重复批内 ID、错误组/席位、非布尔筛选均不修改队列', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.validation');
+  const window = testTiming<null>('admit.validation');
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current),
     unattached = dynamic(window, () => []);
@@ -403,7 +392,7 @@ it('未挂接来源不可加入；重复批内 ID、错误组/席位、非布尔
 
 it('来源不同但候选 ID 冲突必须报错，同一来源已经处理的 ID 则明确跳过', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.collision');
+  const window = testTiming<null>('admit.collision');
   const first = dynamic(window, () => [{ ...effect('same', () => {}), times: () => 0 }]);
   let current: Trigger<unknown>[] = [];
   const second = dynamic(window, () => current);
@@ -424,7 +413,7 @@ it('来源不同但候选 ID 冲突必须报错，同一来源已经处理的 ID
 
 it('新选择 ID 不能复用已有 occurrence ID，即使旧项已经执行完成', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.occurrence');
+  const window = testTiming<null>('admit.occurrence');
   let current: Trigger<unknown>[] = [];
   const first = dynamic(window, () => [{ ...effect('A', () => {}), times: () => 1 }]);
   const second = dynamic(window, () => current);
@@ -444,7 +433,7 @@ it('新选择 ID 不能复用已有 occurrence ID，即使旧项已经执行完�
 
 it('加入后卸载/同对象重新登记不复活旧候选；同 ID 当前窗口不再接纳，下次窗口可执行', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.registration');
+  const window = testTiming<null>('admit.registration');
   let current: Trigger<unknown>[] = [],
     first = true;
   let seen = 0;
@@ -477,7 +466,7 @@ it('加入后卸载/同对象重新登记不复活旧候选；同 ID 当前窗�
 
 it('窗口 active 已为 false 时拒绝加入，不收集来源，也不读取新次数', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.stopped');
+  const window = testTiming<null>('admit.stopped');
   let active = true,
     collections = 0;
   const source = dynamic(window, () => {
@@ -505,7 +494,7 @@ it.each([false, true])(
       id: 'probe:learned',
       name: '新技能',
       triggers: [
-        on(damageReceived, {
+        on(Damage.received, {
           id: 'draw',
           when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
           async run(ctx, { self }) {
@@ -515,7 +504,7 @@ it.each([false, true])(
       ],
     });
     const game = cardGame({ skills: [learned], hands: { b: [] }, draw: [card('reward', 'jink')] });
-    game.room.on(damageReceived, {
+    game.room.on(Damage.received, {
       ...effect('0-learn', () => {}, 'b'),
       async run(ctx) {
         const change = await game.skills.grant(ctx, {
@@ -525,7 +514,7 @@ it.each([false, true])(
         });
         if (include)
           expect(
-            game.skills.include(ctx, ctx.windowOf(damageReceived)!, [change.after!.id]).added,
+            game.skills.include(ctx, ctx.windowOf(Damage.received)!, [change.after!.id]).added,
           ).toHaveLength(1);
       },
     });
@@ -539,7 +528,7 @@ it.each([false, true])(
 
 it('新候选的次数在加入时冻结，自己的后效再次 include 不追加剩余次数', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.new-times');
+  const window = testTiming<null>('admit.new-times');
   let current: Trigger<unknown>[] = [],
     total = 3,
     reads = 0;
@@ -572,7 +561,7 @@ it('新候选的次数在加入时冻结，自己的后效再次 include 不追�
 
 it('新增候选子流程正常中止只消费当前一次，剩余独立次数继续', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.abort');
+  const window = testTiming<null>('admit.abort');
   let current: Trigger<unknown>[] = [];
   const seen: number[] = [];
   const source = dynamic(window, () => current);
@@ -599,7 +588,7 @@ it('新增候选子流程正常中止只消费当前一次，剩余独立次数�
 
 it('筛选与次数函数均在纯查询内，拒绝写入后仍能完整加入同一批', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.pure');
+  const window = testTiming<null>('admit.pure');
   let current: Trigger<unknown>[] = [];
   const source = dynamic(window, () => current);
   game.addTriggerSource(source);
@@ -634,7 +623,7 @@ it('筛选与次数函数均在纯查询内，拒绝写入后仍能完整加入�
 
 it('新候选进入排序菜单后来源被卸载，旧选择不执行，其余既有候选继续', async () => {
   const game = room();
-  const window = defineWindow<null>('admit.stale-choice');
+  const window = testTiming<null>('admit.stale-choice');
   let current: Trigger<unknown>[] = [];
   const seen: string[] = [];
   const source = dynamic(window, () => current);
@@ -668,7 +657,7 @@ it('新候选进入排序菜单后来源被卸载，旧选择不执行，其余�
 });
 
 it('SkillBook 的窗口专用 Provider 可按实例加入，卸载/重装不绕过旧登记资格', async () => {
-  const window = defineWindow<null>('admit.provider');
+  const window = testTiming<null>('admit.provider');
   let seen = 0,
     first = true;
   const definition = defineSkill({
@@ -718,7 +707,7 @@ it('SkillBook 的窗口专用 Provider 可按实例加入，卸载/重装不绕�
 
 it('授予后在执行前死亡或失去技能，新候选与普通候选一样失效', async () => {
   for (const die of [false, true]) {
-    const window = defineWindow<null>('admit.skill-lost');
+    const window = testTiming<null>('admit.skill-lost');
     let seen = 0;
     const learned = defineSkill({
       id: 'probe:short',
@@ -759,7 +748,7 @@ it('授予后在执行前死亡或失去技能，新候选与普通候选一样�
 });
 
 it('同技能真正重新授予产生新实例，可显式加入；旧实例剩余次数不复活', async () => {
-  const window = defineWindow<null>('admit.new-instance');
+  const window = testTiming<null>('admit.new-instance');
   let replaced = false;
   const ids: string[] = [];
   const learned = defineSkill({
@@ -798,7 +787,7 @@ it('同技能真正重新授予产生新实例，可显式加入；旧实例剩�
 });
 
 it('技能选择只影响选定实例，新技能仍使用普通 invoke/pay 和同一窗口因果路径', async () => {
-  const window = defineWindow<null>('admit.selected');
+  const window = testTiming<null>('admit.selected');
   const seen: string[] = [];
   const definitions = ['one', 'two'].map((id) =>
     defineSkill({

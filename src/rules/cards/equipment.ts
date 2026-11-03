@@ -5,7 +5,7 @@ import { defineSkill, isSkillBlocked } from '../skills/skills';
 import type { SkillBinding, SkillDefinition, SkillHandle, SkillProvider } from '../skills/skills';
 import { modify } from '../skills/query';
 import { attackRange } from './queries';
-import { cardsMoved, moveCards } from './move';
+import { moveCards, Cards } from './move';
 import type { MoveResult } from './move';
 import type { CardBook } from './book';
 import type { CardDefinition, EffectRef } from './types';
@@ -254,7 +254,7 @@ export function equipmentAbilities(definitions: readonly CardDefinition[]): Skil
   return Object.freeze({
     collect(world: WorldReader, window?: { readonly type: object; readonly payload: unknown }) {
       const current = collectFrom(world, world.snapshot.zones);
-      if (window?.type !== cardsMoved) return current;
+      if (window?.type !== Cards.moved) return current;
       // 只有移动窗口需要合并历史来源，并按实体与持有者去重。
       const before = collectFrom(world, (window.payload as MoveResult).before);
       return [

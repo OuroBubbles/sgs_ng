@@ -1,15 +1,13 @@
 import { expect, it } from 'vitest';
 import {
-  cardsDrawn,
-  cardsMoved,
   draw,
-  drawing,
   finishGame,
   judge,
   kill,
   moveCards,
   withPrivateTopCards,
   withRevealedCards,
+  Cards,
 } from '../../src/sdk';
 import type { Context, DrawDraft } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -36,7 +34,7 @@ async function invalidate(ctx: Context, boundary: Boundary) {
     });
 }
 function atReshuffle(game: Game, run: (ctx: Context) => Promise<void>) {
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'reshuffle-aftereffect',
     owner: null,
     eligible: (_ctx, moved) =>
@@ -61,7 +59,7 @@ it.each(['dead', 'finished'] as const)(
     const game = create();
     atReshuffle(game, (ctx) => invalidate(ctx, boundary));
     let completed = 0;
-    game.room.on(cardsDrawn, {
+    game.room.on(Cards.drawn, {
       id: 'draw-aftereffect',
       owner: null,
       eligible: () => true,
@@ -91,7 +89,7 @@ it.each(['dead', 'finished'] as const)(
     const game = create();
     await game.room.run('invalidate', (ctx) => invalidate(ctx, boundary));
     let windows = 0;
-    game.room.on(drawing, {
+    game.room.on(Cards.drawing, {
       id: 'count-observer',
       owner: null,
       eligible: () => true,
@@ -117,7 +115,7 @@ it.each(['dead', 'finished'] as const)(
   async (boundary) => {
     const game = create();
     let later = false;
-    game.room.on(drawing, {
+    game.room.on(Cards.drawing, {
       id: 'a-invalidate',
       owner: null,
       eligible: () => true,
@@ -126,7 +124,7 @@ it.each(['dead', 'finished'] as const)(
         await invalidate(ctx, boundary);
       },
     });
-    game.room.on(drawing, {
+    game.room.on(Cards.drawing, {
       id: 'b-later',
       owner: null,
       eligible: () => true,
@@ -170,13 +168,13 @@ it.each(['dead', 'finished'] as const)(
   async (boundary) => {
     const game = create();
     let after = 0;
-    game.room.on(cardsMoved, {
+    game.room.on(Cards.moved, {
       id: 'after-commit',
       owner: null,
       eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:hand'),
       run: (ctx) => invalidate(ctx, boundary),
     });
-    game.room.on(cardsDrawn, {
+    game.room.on(Cards.drawn, {
       id: 'observe-committed',
       owner: null,
       eligible: () => true,
@@ -255,7 +253,7 @@ it.each(['dead', 'finished'] as const)(
 it('摸牌数草案在洗牌后效阶段已封口，不能迟改本次请求', async () => {
   const game = create();
   let draft: DrawDraft | undefined;
-  game.room.on(drawing, {
+  game.room.on(Cards.drawing, {
     id: 'capture',
     owner: null,
     eligible: () => true,

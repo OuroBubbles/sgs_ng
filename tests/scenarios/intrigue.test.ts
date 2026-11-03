@@ -13,18 +13,7 @@ import {
   runPhase,
   activeOffers,
   draw,
-  phaseBefore,
-  costPaid,
-  cardsMoved,
   moveCards,
-  damageDealt,
-  judgmentFinished,
-  useDeclared,
-  targetSpecified,
-  targetSpecifying,
-  effectStarting,
-  responseRequested,
-  counterOpening,
   defineSkill,
   modify,
   cardQueries,
@@ -35,6 +24,16 @@ import {
   resolveCounter,
   kill,
   useDeclarations,
+  Use,
+  Target,
+  Resolve,
+  Counter,
+  Judgment,
+  Cards,
+  Response,
+  Damage,
+  Cost,
+  Phase,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
@@ -215,7 +214,7 @@ it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受�
   });
   await grant(game, 'standard:tieqi');
   await grant(game, 'standard:guicai', 'c');
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'lose',
     owner: null,
     eligible: () => true,
@@ -243,7 +242,7 @@ it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数'
   });
   await grant(game, 'standard:tieqi');
   await grant(game, 'standard:wushuang');
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'extra',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:slash',
@@ -268,7 +267,7 @@ it('流离先于铁骑，只对新目标询问判定，旧身份的响应禁令�
   });
   await grant(game, 'standard:tieqi');
   await grant(game, 'standard:liuli', 'b');
-  game.room.on(targetSpecifying, {
+  game.room.on(Target.specifying, {
     id: 'early-block',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -294,7 +293,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
   await grant(game, 'standard:hujia', 'b');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'c', '魏'));
   let openings = 0;
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'trace',
     owner: null,
     eligible: () => true,
@@ -302,7 +301,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
       openings++;
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'block',
     owner: null,
     eligible: () => true,
@@ -322,7 +321,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
 it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async () => {
   const game = scenario({ hands: { a: [card('slash', 'slash')] } });
   let effect: CardEffect | undefined;
-  game.room.on(targetSpecified, {
+  game.room.on(Target.specified, {
     id: 'capture',
     owner: null,
     eligible: () => true,
@@ -377,7 +376,7 @@ it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', asyn
     const game = scenario({ draw: samples() });
     await grant(game, 'standard:biyue');
     if (skip)
-      game.room.on(phaseBefore, {
+      game.room.on(Phase.before, {
         id: 'skip',
         owner: null,
         eligible: () => true,
@@ -386,7 +385,7 @@ it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', asyn
         },
       });
     else
-      game.room.on(costPaid, {
+      game.room.on(Cost.paid, {
         id: 'lose',
         owner: null,
         eligible: (_ctx, receipt) => receipt.reason === 'standard:biyue',
@@ -407,7 +406,7 @@ it.each(['spade', 'heart', 'club', 'diamond'])(
     const game = scenario({ hands: { a: [card('gift', 'jink', 'club')] } });
     await grant(game, 'standard:fanjian');
     let moved = false;
-    game.room.on(cardsMoved, {
+    game.room.on(Cards.moved, {
       id: 'before-damage',
       owner: null,
       eligible: (_ctx, event) =>
@@ -488,7 +487,7 @@ it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', a
   await grant(game, 'standard:fanjian');
   await grant(game, 'standard:lianying');
   await grant(game, ban.id);
-  game.room.on(damageDealt, {
+  game.room.on(Damage.dealt, {
     id: 'after-lianying',
     owner: null,
     eligible: () => true,
@@ -507,7 +506,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
   for (const die of [false, true]) {
     const game = scenario({ hands: { a: [card('gift', 'jink', 'heart')] } });
     await grant(game, 'standard:fanjian');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'lose',
       owner: null,
       eligible: (_ctx, receipt) => receipt.reason === 'standard:fanjian',
@@ -516,7 +515,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
       },
     });
     if (die)
-      game.room.on(cardsMoved, {
+      game.room.on(Cards.moved, {
         id: 'death',
         owner: null,
         eligible: (_ctx, event) => event.moves.some((move) => move.to === 'b:hand'),
@@ -542,7 +541,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
 it('反间支付后手牌被取走，不生成假牌或多问一次花色，次数仍消耗', async () => {
   const game = scenario({ hands: { a: [card('gift', 'jink')] } });
   await grant(game, 'standard:fanjian');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'take',
     owner: null,
     eligible: (_ctx, receipt) => receipt.reason === 'standard:fanjian',
@@ -579,7 +578,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
   await grant(game, 'standard:lijian');
   installCounterspells(game.room, game.book);
   let counters = 0;
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'trace',
     owner: null,
     eligible: () => true,
@@ -757,7 +756,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
     });
     await genders(game);
     await grant(game, 'standard:lijian');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'change',
       owner: null,
       eligible: (_ctx, receipt) => receipt.reason === 'standard:lijian',
@@ -840,7 +839,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
     definitions: [custom],
   });
   installCounterspells(game.room, game.book, ['standard:nullification', custom.id]);
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'counter-purpose',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.subject.kind === 'effect',

@@ -1,16 +1,16 @@
 import { expect, it } from 'vitest';
 import {
   installCounterspells,
-  targetConfirming,
-  effectFinished,
-  cardsRevealed,
   withRevealedCards,
   moveCards,
   kill,
-  useDeclared,
   defineSkill,
   viewAs,
   chooseOwnedCard,
+  Use,
+  Target,
+  Resolve,
+  Cards,
 } from '../../src/sdk';
 import type { CardDefinition } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -94,7 +94,7 @@ it('无懈只取消南蛮当前目标，之后的目标继续响应或受伤', a
 
 it('自动目标在宣告时固定，前一目标效果中死亡的后续角色直接跳过', async () => {
   const game = cardGame({ hands: { a: [card('aoe', 'savage_assault')], b: [], c: [], d: [] } });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'kill-next',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -202,7 +202,7 @@ it('嵌套五谷的两个共享牌池由各自闭包拥有，内层不覆盖外�
   });
   let nested = false;
   const pools: string[] = [];
-  game.room.on(cardsRevealed, {
+  game.room.on(Cards.revealed, {
     id: 'nested-grace',
     owner: null,
     eligible: () => true,
@@ -325,7 +325,7 @@ it('目标在确认中失去全部可选牌，拆桥不再弹出空选择；来�
     const game = cardGame({
       hands: { a: [card('dismantle', 'dismantlement')], b: [card('b', 'peach')] },
     });
-    game.room.on(targetConfirming, {
+    game.room.on(Target.confirming, {
       id: 'unavailable',
       owner: null,
       eligible: () => true,
@@ -402,7 +402,7 @@ it('全部目标被取消仍须调度一次，保留每个效果的完成事实�
       hands: { a: [{ ...card('body', 'slash'), name: definition.id }] },
       definitions: [definition],
     });
-    game.room.on(effectFinished, {
+    game.room.on(Resolve.finished, {
       id: 'finished',
       owner: null,
       eligible: () => true,
@@ -428,7 +428,7 @@ it('全部目标被取消仍须调度一次，保留每个效果的完成事实�
 
 it('公开处理区的牌可被后效取走，善后只处置实时余牌', async () => {
   const game = cardGame({ hands: { a: [] }, draw: [card('x', 'slash'), card('y', 'jink')] });
-  game.room.on(cardsRevealed, {
+  game.room.on(Cards.revealed, {
     id: 'take',
     owner: null,
     eligible: () => true,
@@ -484,7 +484,7 @@ it('作者转换可借用五谷公开牌池材料反制当前目标，两个处�
     game.skills.grant(ctx, { owner: 'b', skill: skill.id, source: { kind: 'general', id: 'b' } }),
   );
   let processingCount = 0;
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'processing-count',
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:nullification',

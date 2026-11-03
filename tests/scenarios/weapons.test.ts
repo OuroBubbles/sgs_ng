@@ -1,20 +1,18 @@
 import { expect, it } from 'vitest';
 import {
-  attackDefended,
   blockSkill,
   cardQueries,
-  costPaid,
   damage,
-  damageCausing,
-  damageInflicting,
   defineSkill,
   kill,
   modify,
   moveCards,
   ownedCards,
-  useFinished,
-  useDeclared,
   withLifetime,
+  Use,
+  Attack,
+  Damage,
+  Cost,
 } from '../../src/sdk';
 import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -56,7 +54,7 @@ it.each([false, true])(
   async (prevent) => {
     const game = axeGame();
     if (prevent)
-      game.room.on(damageInflicting, {
+      game.room.on(Damage.inflicting, {
         id: 'prevent',
         owner: null,
         eligible: () => true,
@@ -104,7 +102,7 @@ it.each([1, 2])('贯石斧材料不足或取消不收费：其他牌 %s', async 
 
 it.each(['lost', 'dead'])('贯石斧已支付后来源 %s，已宣告突破仍生效', async (event) => {
   const game = axeGame();
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'source-leaves',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:axe-ability',
@@ -152,7 +150,7 @@ it('防御结果在全部闪满足后才开放；部分成功不会激活贯石�
 it('防御结果禁止纯查询修改，封口后迟到突破被拒绝', async () => {
   const game = cardGame({ hands: { b: [card('j', 'jink')] } });
   let draft: DefenseDraft;
-  game.room.on(attackDefended, {
+  game.room.on(Attack.defended, {
     id: 'capture',
     owner: null,
     eligible: () => true,
@@ -196,7 +194,7 @@ it('青龙追加杀具有独立身份与处理区，原杀仍是已防御', asyn
     equipment: { a: [card('weapon', 'blade')] },
   });
   let maxProcessing = 0;
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'processing',
     owner: null,
     eligible: () => true,
@@ -257,7 +255,7 @@ it.each([false, true])('青龙忽略变化后的距离，但仍受目标禁令�
       prohibitTarget: () => changed && prohibited,
     },
   });
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'change',
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:jink',
@@ -282,7 +280,7 @@ it('青龙在发动前离场不再追杀；主动拒绝追杀也不消耗杀', a
       equipment: { a: [card('weapon', 'blade')] },
     });
     if (lost)
-      game.room.on(useFinished, {
+      game.room.on(Use.finished, {
         id: 'lost',
         owner: null,
         eligible: (_ctx, use) => use.card.name === 'standard:jink',
@@ -457,7 +455,7 @@ it('麒麟弓只展示坐骑，选择一张后丢弃并继续原伤害', async (
 it('麒麟弓拒绝发动不丢坐骑；伤害前发动后才被防止时保留已完成的弃置', async () => {
   for (const discard of [false, true]) {
     const game = bowGame();
-    game.room.on(damageInflicting, {
+    game.room.on(Damage.inflicting, {
       id: 'prevent',
       owner: null,
       eligible: () => true,
@@ -479,7 +477,7 @@ it.each(['horse', 'bow'])(
   '麒麟弓发动后 %s 离场，重查选中坐骑位置并保留已发动效果',
   async (lost) => {
     const game = bowGame();
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'take',
       owner: null,
       eligible: (_ctx, paid) => paid.skill === 'standard:kylin_bow-ability',
@@ -505,7 +503,7 @@ it('麒麟弓不处理无牌伤害或已经防止的伤害', async () => {
   await game.room.run('plain', async (ctx) => {
     await damage(ctx, { from: 'a', to: 'b', amount: 1, nature: 'normal' });
   });
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'prevent-first',
     owner: null,
     eligible: () => true,

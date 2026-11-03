@@ -1,14 +1,14 @@
 import {
-  damageReceived,
   general,
   obtain,
   others,
   alive,
   kingdomOf,
   peers,
-  responseRequested,
   skill,
   trigger,
+  Response,
+  Damage,
 } from '../../../sdk';
 import type { Context, EffectRef, ResponseOpportunity } from '../../../sdk';
 
@@ -23,7 +23,7 @@ export const jianxiong = skill({
   description:
     '受到一次伤害后，你可以获得造成此伤害的牌。其全部实体材料须仍在此次用牌的处理区中；没有实体材料的牌无法获得。',
   triggers: [
-    trigger(damageReceived, {
+    trigger(Damage.received, {
       who: (hit) => hit.input.to,
       when: (ctx, hit) => materialsHere(ctx, hit.input.card),
       ask: '是否发动【奸雄】获得造成伤害的牌？',
@@ -58,7 +58,7 @@ export const hujia = skill({
   description:
     '主公技。当你需要使用或打出闪时，可以令其他魏势力角色按座次依次选择是否替你打出闪。供牌者支付并结算打出后效，需要使用时再由你使用。',
   triggers: [
-    trigger(responseRequested, {
+    trigger(Response.requested, {
       who: (request) => request.actor,
       when: (ctx, request, self) =>
         request.actor === request.beneficiary &&

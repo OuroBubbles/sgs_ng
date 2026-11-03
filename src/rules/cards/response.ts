@@ -1,7 +1,7 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { withLifetime } from '../scopes/lifetime';
+import type { CardResponse } from './played';
 import type { Lifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
 import { effectReference, isResponseBlocked } from './types';
@@ -15,6 +15,7 @@ import type {
 } from './types';
 import { parseCardChoice } from './book';
 import type { CardBook } from './book';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export type ResponseResult =
   | {
@@ -84,7 +85,10 @@ interface ParentResponse {
   readonly actors: readonly string[];
   readonly live: (ctx: Context) => boolean;
 }
-export const responseRequested = defineWindow<ResponseOpportunity>('response.requested');
+export const Response = defineEvent('response', {
+  finished: timing<CardResponse>(),
+  requested: timing<ResponseOpportunity>(),
+});
 
 /** 响应机会只拥有待决请求；使用、打出、材料交接由 CardBook 原有领域管线执行。 */
 export function requestResponse(
@@ -283,7 +287,7 @@ export function requestResponse(
     const offers = () => book.offers(child, actor, offerPurpose, names);
     child.commit('response.requested', [], snapshot);
     if (available(child))
-      await child.window(responseRequested, opportunity, { subject: actor, active: pending });
+      await child.window(Response.requested, opportunity, { subject: actor, active: pending });
     let result: ResponseResult;
     if (supplied) result = supplied;
     else if (!available(child)) result = { kind: 'unavailable' };

@@ -1,4 +1,4 @@
-import { damageReceived, draw, invoke, isGameOver, on, pay, rulesOf } from '../../sdk';
+import { draw, invoke, isGameOver, on, pay, rulesOf, Damage } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
 
 export const echo = {
@@ -6,7 +6,7 @@ export const echo = {
   name: '余响',
   description: '受到一次伤害后，你可以摸一张牌。每次伤害一次，不按伤害点数重复。',
   triggers: [
-    on(damageReceived, {
+    on(Damage.received, {
       order: 'choose',
       when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
       async run(ctx, { self }) {
@@ -24,14 +24,14 @@ export const insight = {
   description:
     '锁定技。受到伤害后，若你没有余响，获得余响，并将新实例加入本次受伤时点。仍可选择是否发动余响。',
   triggers: [
-    on(damageReceived, {
+    on(Damage.received, {
       when: (ctx, { payload: hit, self }) =>
         hit.input.to === self.owner &&
         !ctx.world.snapshot.skills.some(
           (skill) => skill.owner === self.owner && skill.skill === echo.id,
         ),
       async run(ctx, { self }) {
-        const window = ctx.windowOf(damageReceived);
+        const window = ctx.windowOf(Damage.received);
         if (!window) throw new Error('Insight requires its damage window.');
         const paid = await pay(ctx, {
           skill: self,

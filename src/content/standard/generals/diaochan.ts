@@ -8,11 +8,11 @@ import {
   isGameOver,
   isMale,
   ownedCards,
-  phaseStarted,
   rulesOf,
   selection,
   skill,
   trigger,
+  Phase,
 } from '../../../sdk';
 import type { ActiveInput, Context, JointChoice, UseIntent } from '../../../sdk';
 
@@ -91,7 +91,7 @@ export const biyue = skill({
   name: '闭月',
   description: '结束阶段，你可以摸一张牌。',
   triggers: [
-    trigger(phaseStarted, {
+    trigger(Phase.started, {
       who: (phase) => phase.owner,
       when: (_ctx, phase) => phase.kind === 'finish',
       ask: '是否发动【闭月】摸一张牌？',

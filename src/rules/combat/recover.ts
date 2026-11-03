@@ -1,9 +1,10 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import type { EffectRef } from '../cards/types';
 import { effectReference } from '../cards/types';
 import { isGameOver } from '../game/end';
+import { defineEvent, timing } from '../../core/runtime/event';
+import type { HpLossResult } from './lose-hp';
 
 export interface RecoveryInput {
   readonly from: string | null;
@@ -31,8 +32,11 @@ export interface RecoveryDraft {
   adjust(delta: number, reason: string): void;
   setAmount(amount: number, reason: string): void;
 }
-export const recovering = defineWindow<RecoveryDraft>('hp.recovering');
-export const recovered = defineWindow<RecoveryResult>('hp.recovered');
+export const Hp = defineEvent('hp', {
+  lost: timing<HpLossResult>(),
+  recovering: timing<RecoveryDraft>(),
+  recovered: timing<RecoveryResult>(),
+});
 
 export function recover(ctx: Context, request: RecoveryInput): Promise<RecoveryResult> {
   return ctx.flow('recover', async (child) => {
@@ -67,7 +71,7 @@ export function recover(ctx: Context, request: RecoveryInput): Promise<RecoveryR
     });
     // 待决回复失去目标便收束；零尝试值仍可由后续效果增加，不代表窗口失效。
     const active = (at: Context) => at.world.player(input.to).alive && !isGameOver(at.world);
-    if (active(child)) await child.window(recovering, draft, { subject: input.to, active });
+    if (active(child)) await child.window(Hp.recovering, draft, { subject: input.to, active });
     open = false;
     const target = child.world.player(input.to);
     const available = active(child);
@@ -87,7 +91,7 @@ export function recover(ctx: Context, request: RecoveryInput): Promise<RecoveryR
         [{ kind: 'vitality', player: input.to, hp: result.afterHp }],
         result,
       );
-      await child.window(recovered, result, { subject: input.to });
+      await child.window(Hp.recovered, result, { subject: input.to });
     }
     return result;
   });

@@ -1,25 +1,19 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import {
   blockSkill,
-  cardsMoved,
   defineSkill,
-  defineWindow,
   draw,
   equip,
   equipmentCard,
   equipmentLost,
   invoke,
   kill,
-  lifetimeEnded,
   moveCards,
   on,
   pay,
-  playerDied,
-  playerBuried,
-  deathFinished,
   skillAvailable,
   skillLost,
-  skillsChanged,
   withLifetime,
   activeOffers,
   runPhase,
@@ -27,6 +21,10 @@ import {
   cardQueries,
   viewAs,
   ownedCards,
+  Cards,
+  Death,
+  Lifetime,
+  Skill,
 } from '../../src/sdk';
 import type {
   Context,
@@ -85,7 +83,7 @@ function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void
     skill: defineSkill({
       id: 'probe:retained-armor-ability',
       name: '遗响',
-      triggers: [on(cardsMoved, new LostEffect())],
+      triggers: [on(Cards.moved, new LostEffect())],
     }),
   });
 }
@@ -142,13 +140,13 @@ it.each(['revoke', 'expiration'] as const)(
       id: 'probe:legacy',
       name: '遗响',
       triggers: [
-        on(skillsChanged, {
+        on(Skill.changed, {
           id: 'lost',
           retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
           when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
           run: (ctx, { self }) => respond(ctx, self),
         }),
-        on(lifetimeEnded, {
+        on(Lifetime.ended, {
           id: 'expired',
           retain: (ctx, { payload: ended, self }) =>
             ended.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
@@ -187,7 +185,7 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
     id: 'probe:no-retain',
     name: '不保留',
     triggers: [
-      on(skillsChanged, {
+      on(Skill.changed, {
         id: 'lost',
         when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
         run: (ctx) => {
@@ -262,7 +260,7 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 allowDead，�
     id: 'probe:death',
     name: '遗言',
     triggers: [
-      on(playerDied, {
+      on(Death.committed, {
         id: 'legacy',
         allowDead,
         when: (_ctx, { payload: event, self }) => event.player === self.owner,
@@ -292,7 +290,7 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
     id: 'probe:partial',
     name: '遗响',
     triggers: [
-      on(skillsChanged, {
+      on(Skill.changed, {
         id: 'lost',
         retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
         when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
@@ -343,8 +341,8 @@ it('当前失效仍能阻止历史来源', async () => {
 });
 
 for (const [window, group] of [
-  [playerBuried, 'main'],
-  [deathFinished, 'after'],
+  [Death.buried, 'main'],
+  [Death.finished, 'after'],
 ] as const) {
   it(`${window.id} 使用实际埋葬前的技能快照，死亡后新授予也能明确保留并自愿发动`, async () => {
     const legacy = defineSkill({
@@ -370,7 +368,7 @@ for (const [window, group] of [
       ],
     });
     const game = cardGame({ skills: [legacy] });
-    game.room.on(playerDied, {
+    game.room.on(Death.committed, {
       id: 'late-grant',
       owner: null,
       eligible: () => true,
@@ -397,7 +395,7 @@ for (const [window, group] of [
 
 it('已开始后效不重新套用 when；普通支付只重查来源与调用者明确的费用条件', async () => {
   let started = false;
-  const window = defineWindow<null>('probe.once-started');
+  const window = testTiming<null>('probe.once-started');
   const skill = defineSkill({
     id: 'probe:once-started',
     name: '起点',
@@ -495,12 +493,12 @@ it.each(['abort', 'fault'] as const)(
 );
 
 it('retain 和新的 available 都是纯查询，不允许它们提交状态', async () => {
-  const window = defineWindow<null>('probe.impure-retain');
+  const window = testTiming<null>('probe.impure-retain');
   const legacy = defineSkill({
     id: 'probe:impure',
     name: '错误来源',
     triggers: [
-      on(skillsChanged, {
+      on(Skill.changed, {
         id: 'lost',
         retain(ctx) {
           ctx.commit('probe.unexpected', [], null);
@@ -549,7 +547,7 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
       id: 'probe:twice-ability',
       name: '双响',
       triggers: [
-        on(cardsMoved, {
+        on(Cards.moved, {
           id: 'lost',
           times: () => 2,
           retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
@@ -585,7 +583,7 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
 });
 
 it('自定义窗口显式提供技能快照；目录不读取任意历史，登记在挂接后封口', async () => {
-  const window = defineWindow<{ readonly before: readonly SkillInstance[] }>('probe.snapshot');
+  const window = testTiming<{ readonly before: readonly SkillInstance[] }>('probe.snapshot');
   const legacy = defineSkill({
     id: 'probe:custom',
     name: '旧来源',
@@ -629,9 +627,7 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
 it.each(['invalid-array', 'conflicting-owner'] as const)(
   '历史快照的 %s 在执行效果前报作者错误',
   async (kind) => {
-    const window = defineWindow<{ readonly before: readonly SkillInstance[] }>(
-      'probe.bad-snapshot',
-    );
+    const window = testTiming<{ readonly before: readonly SkillInstance[] }>('probe.bad-snapshot');
     const legacy = defineSkill({
       id: 'probe:snapshot-error',
       name: '快照错误',
@@ -665,7 +661,7 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
 );
 
 it('同一历史身份重复出现在自定义快照中，不复制发动次数', async () => {
-  const window = defineWindow<{ readonly before: readonly SkillInstance[] }>(
+  const window = testTiming<{ readonly before: readonly SkillInstance[] }>(
     'probe.duplicate-snapshot',
   );
   const legacy = defineSkill({
@@ -724,7 +720,7 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
       modifiers: [modify(cardQueries.handLimitCorrection, () => 2)],
       active: [{ id: 'active', label: '主动', available: () => true, run: () => {} }],
       triggers: [
-        on(cardsMoved, {
+        on(Cards.moved, {
           id: 'lost',
           retain: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
           when: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
@@ -774,7 +770,7 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
 });
 
 it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展开复制方法', async () => {
-  const window = defineWindow<null>('probe.class-source');
+  const window = testTiming<null>('probe.class-source');
   class Source implements SkillHandle {
     readonly id = 'class-source';
     readonly owner = 'a';

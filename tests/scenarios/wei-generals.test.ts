@@ -9,22 +9,21 @@ import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import {
   damage,
-  damageCausing,
   judge,
-  judgmentRevealed,
-  judgmentFinished,
   draw,
-  cardsDrawn,
   runTurn,
   runPhase,
   defaultPhaseBody,
   moveCards,
   kill,
-  costPaid,
   defineSkill,
   modify,
   cardQueries,
   SkillBook,
+  Cards,
+  Judgment,
+  Damage,
+  Cost,
 } from '../../src/sdk';
 import type { Context, DamageResult, PhaseView } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
@@ -133,7 +132,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
     });
     await grant(game, 'standard:ganglie');
     if (branch === 'revoke')
-      game.room.on(costPaid, {
+      game.room.on(Cost.paid, {
         id: 'lose-skill',
         owner: 'a',
         eligible: (_ctx, paid) => paid.skill === 'standard:ganglie',
@@ -142,7 +141,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
         },
       });
     if (branch === 'retrial')
-      game.room.on(judgmentRevealed, {
+      game.room.on(Judgment.revealed, {
         id: 'retrial',
         owner: 'c',
         eligible: () => true,
@@ -151,7 +150,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
         },
       });
     if (branch === 'dead-source')
-      game.room.on(judgmentFinished, {
+      game.room.on(Judgment.finished, {
         id: 'kill-source',
         owner: 'c',
         eligible: () => true,
@@ -198,7 +197,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
   });
   await grant(game, 'standard:luoyi');
   let nested = false;
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'nested-draw',
     owner: 'a',
     eligible: (_ctx, paid) => paid.skill === 'standard:luoyi' && !nested,
@@ -351,7 +350,7 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
   });
   await grant(game, 'standard:luoyi');
   let suppress = false;
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'cancel-bonus',
     owner: null,
     eligible: () => suppress,
@@ -431,7 +430,7 @@ it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告�
   });
   const instance = await grant(game, 'standard:luoshen');
   let drawn = 0;
-  game.room.on(cardsDrawn, {
+  game.room.on(Cards.drawn, {
     id: 'count',
     owner: 'a',
     eligible: () => true,
@@ -486,7 +485,7 @@ it.each([true, false])('洛神按最终改判颜色取牌，不沿用首次公�
     draw: [card('original', 'slash', black ? 'heart' : 'spade')],
   });
   await grant(game, 'standard:luoshen');
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'retrial',
     owner: 'c',
     eligible: () => true,
@@ -511,7 +510,7 @@ it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不�
     draw: [card('first', 'slash'), card('second', 'jink'), card('red', 'peach', 'heart')],
   });
   await grant(game, 'standard:luoshen');
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'take-first-and-revoke',
     owner: 'c',
     eligible: (_ctx, result) => result.card?.id === 'first',
@@ -544,7 +543,7 @@ it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取�
   });
   await grant(game, 'standard:luoshen');
   let nested = false;
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'nested',
     owner: 'a',
     eligible: () => !nested,
@@ -569,7 +568,7 @@ it('判定后目标死亡时，洛神不取得牌也不再询问', async () => {
     draw: [card('judge', 'slash')],
   });
   await grant(game, 'standard:luoshen');
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'die',
     owner: 'b',
     eligible: () => true,

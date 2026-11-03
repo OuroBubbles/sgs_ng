@@ -1,9 +1,9 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import {
   defineSkill,
   rulesOf,
-  defineWindow,
   defineQuery,
   on,
   moveCards,
@@ -192,7 +192,7 @@ it('目录索引和重复检查使用最终声明，不重新读取原对象的�
 });
 
 it('普通源码直接组合无命名空间的定义，保留时点身份、本局目录和真实技能结算', async () => {
-  const window = defineWindow<{ player: string }>('plain.window');
+  const window = testTiming<{ player: string }>('plain.window');
   const catalog = createContent(
     {
       cards: [{ id: 'ink', label: '墨', type: 'basic' }],
@@ -347,7 +347,7 @@ it('普通定义与预装配目录共用牌组和效果装配，单机入口无�
 });
 
 it('组合固定卡牌和静态技能声明，后续修改原对象不改变新旧对局或牌堆引用', async () => {
-  const window = defineWindow<null>('plain.snapshot');
+  const window = testTiming<null>('plain.snapshot');
   const power = defineQuery<null, number>('plain.power', (sum, value) => sum + value);
   const count = { min: 1, max: 1 };
   const timings: UseTiming['kind'][] = ['effect'];
@@ -517,7 +517,7 @@ it('组合固定卡牌和静态技能声明，后续修改原对象不改变新�
   originalGeneral.maxHp = 0;
   originalGeneral.skills.length = 0;
   originalEffect.id = 'changed-effect';
-  originalEffect.window = defineWindow<null>('plain.changed');
+  originalEffect.window = testTiming<null>('plain.changed');
   originalEffect.bind = () => {
     throw new Error('Changed trigger factory must not run.');
   };

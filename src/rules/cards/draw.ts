@@ -1,7 +1,6 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
-import { cardsMoved, moveCards } from './move';
+import { moveCards, Cards } from './move';
 import { isGameOver } from '../game/end';
 import type { PhaseSnapshot, PhaseView } from '../turn/turn';
 import { assertLifetime } from '../scopes/lifetime';
@@ -36,8 +35,6 @@ export interface DrawResult {
   readonly cards: readonly string[];
   readonly edits: DrawDraft['edits'];
 }
-export const drawing = defineWindow<DrawDraft>('cards.drawing');
-export const cardsDrawn = defineWindow<DrawResult>('cards.drawn');
 
 class Draft implements DrawDraft {
   #count: number;
@@ -86,7 +83,7 @@ export function reshuffle(ctx: Context): Promise<readonly string[]> {
     const move = { cards, from: 'discard', to: 'draw', place: 'bottom' as const };
     child.commit('deck.reshuffled', [{ kind: 'move', ...move }], { cards });
     await child.window(
-      cardsMoved,
+      Cards.moved,
       immutable({
         kind: 'moved',
         moves: [move],
@@ -128,7 +125,7 @@ export function draw(ctx: Context, request: DrawRequest): Promise<DrawResult> {
           edits: draft.edits,
         });
       if (!live()) return unavailable();
-      await child.window(drawing, draft, { subject: input.player, active: live });
+      await child.window(Cards.drawing, draft, { subject: input.player, active: live });
       draft.seal();
       if (!live()) return unavailable();
       const hand = child.world.snapshot.zones.find(
@@ -158,7 +155,7 @@ export function draw(ctx: Context, request: DrawRequest): Promise<DrawResult> {
         edits: draft.edits,
       });
       child.commit('draw.completed', [], result);
-      if (cards.length) await child.window(cardsDrawn, result, { subject: input.player });
+      if (cards.length) await child.window(Cards.drawn, result, { subject: input.player });
       return result;
     },
     request.reason,

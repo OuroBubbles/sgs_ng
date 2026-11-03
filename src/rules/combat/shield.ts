@@ -1,9 +1,9 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 const shield = defineState(
   'combat:shield',
@@ -32,7 +32,9 @@ export type ShieldResult = ShieldChange & {
   readonly kind: 'changed' | 'unchanged' | 'unavailable';
   readonly attemptedAmount: number;
 };
-export const shieldChanged = defineWindow<ShieldChange>('shield.changed');
+export const Shield = defineEvent('shield', {
+  changed: timing<ShieldChange>(),
+});
 
 export function shieldOf(world: WorldReader, player: string): number {
   world.player(player);
@@ -65,7 +67,7 @@ export function changeShield(ctx: Context, request: ShieldInput): Promise<Shield
     });
     if (amount) {
       at.commit('shield.changed', [shieldChange(at, input.player, after)], result);
-      await at.window(shieldChanged, result, { subject: input.player });
+      await at.window(Shield.changed, result, { subject: input.player });
     }
     return result;
   });

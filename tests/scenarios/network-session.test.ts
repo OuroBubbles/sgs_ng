@@ -9,7 +9,6 @@ import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { inspectSelection } from '../../src/app/offline/selection';
-import { matchPrepared } from '../../src/app/offline/role-match';
 import { createRoomOptions, defaultRoomSetup, type RoomSetup } from '../../src/app/network/setup';
 import type { RoleMatch } from '../../src/app/offline/role-match';
 import { NetworkRoom } from '../../src/app/network/room';
@@ -20,6 +19,7 @@ import { WebSocketServer } from 'ws';
 import { networkBuild, buildMismatch } from '../../src/app/network/build';
 import { readFile } from 'node:fs/promises';
 import { defaultContent, practiceContent } from '../../src/app/offline/practice';
+import { Match } from '../../src/app/offline/role-match';
 
 const cleanup: (() => void | Promise<void>)[] = [];
 
@@ -212,7 +212,7 @@ it('主持端组合普通多文件源码，客户端收到二进制立绘与真�
       ...plan,
       createMatch: (players, seed) => {
         const match = plan.createMatch(players, seed);
-        match.room.on(matchPrepared, {
+        match.room.on(Match.prepared, {
           id: 'resource-looking-option',
           owner: null,
           eligible: () => true,
@@ -474,7 +474,7 @@ it.each([
 
 it('托管仅作用于绑定席位；拒绝迟到手动答案，隐藏期间可收回且原请求保持', async () => {
   const { clients, start } = await connect(500, (match) => {
-    match.room.on(matchPrepared, {
+    match.room.on(Match.prepared, {
       id: 'controller-choice',
       owner: null,
       eligible: () => true,
@@ -722,7 +722,7 @@ it('开局前和终局后可补位；新连接不能接管活跃局或上一连�
 
 it('作者校验异常向两端报告原始故障，不误报客户端消息格式错误', async () => {
   const { clients, start } = await connect(0, (match) => {
-    match.room.on(matchPrepared, {
+    match.room.on(Match.prepared, {
       id: 'author-validation',
       owner: null,
       eligible: () => true,
@@ -772,7 +772,7 @@ it('房间草稿在规则实例外；跨局号、重复内核决策 ID 与旧连
         const match = plan.createMatch(players, seed);
         seeds.push(seed);
         matches.push(match);
-        match.room.on(matchPrepared, {
+        match.room.on(Match.prepared, {
           id: 'round-gate',
           owner: null,
           eligible: () => true,

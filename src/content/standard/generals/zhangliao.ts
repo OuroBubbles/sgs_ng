@@ -5,12 +5,12 @@ import {
   isGameOver,
   others,
   ownedCards,
-  phaseStarted,
   select,
   selection,
   skill,
   takeCard,
   trigger,
+  Phase,
 } from '../../../sdk';
 import type { Context, PhaseView, SkillHandle } from '../../../sdk';
 
@@ -31,7 +31,7 @@ export const tuxi = skill({
   description:
     '摸牌阶段开始时，你可以放弃默认摸牌，改为获得至多两名其他角色的各一张手牌。选择一至两人，按座次结算；这不是跳过摸牌阶段。',
   triggers: [
-    trigger(phaseStarted, {
+    trigger(Phase.started, {
       who: (phase) => phase.owner,
       when: (ctx, phase, self) => phase.kind === 'draw' && victims(ctx, self, phase).available(),
       cost: (ctx, phase, self) =>

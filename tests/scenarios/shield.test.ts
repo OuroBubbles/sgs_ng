@@ -3,17 +3,15 @@ import { setImmediate } from 'node:timers/promises';
 import {
   changeShield,
   shieldOf,
-  shieldChanged,
   damage,
-  damageCausing,
-  damageInflicting,
-  damageReceived,
-  dyingStarted,
   isChained,
   setChained,
   loseHp,
   recover,
   finishGame,
+  Damage,
+  Dying,
+  Shield,
 } from '../../src/sdk';
 import type { Context, DamageDraft, DamageResult } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
@@ -36,7 +34,7 @@ function dealt(game: Game) {
 it('护盾增减有实际量与尝试量，减少至零，无变化不发事实/窗口', async () => {
   const game = cardGame();
   const changes: number[] = [];
-  game.room.on(shieldChanged, {
+  game.room.on(Shield.changed, {
     id: 'changed',
     owner: 'a',
     eligible: () => true,
@@ -77,7 +75,7 @@ it.each([0, 1, 2, 3])(
     const game = cardGame();
     await ward(game, 'b', shield);
     let received = 0;
-    game.room.on(damageReceived, {
+    game.room.on(Damage.received, {
       id: 'received',
       owner: 'b',
       eligible: () => true,
@@ -107,7 +105,7 @@ it('扣血、护盾消耗与解链同次提交，状态窗口看见同一个完�
   await ward(game, 'b', 1);
   await game.room.run('link', (ctx) => setChained(ctx, 'b', true, 'setup'));
   let observed = false;
-  game.room.on(shieldChanged, {
+  game.room.on(Shield.changed, {
     id: 'atomic',
     owner: 'b',
     eligible: (_ctx, event) => event.damage !== undefined,
@@ -134,7 +132,7 @@ it('扣血、护盾消耗与解链同次提交，状态窗口看见同一个完�
 it.each(['prevent', 'zero'])('%s 不消耗护盾，也不发护盾消耗窗口', async (kind) => {
   const game = cardGame();
   await ward(game, 'b', 3);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'stop',
     owner: 'b',
     eligible: () => true,
@@ -154,7 +152,7 @@ it.each(['prevent', 'zero'])('%s 不消耗护盾，也不发护盾消耗窗口',
 
 it('护盾读取窗口结算后的当前状态，来源快照与最终伤害不因吸收而改写', async () => {
   const game = cardGame();
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'plus',
     owner: 'a',
     eligible: () => true,
@@ -162,7 +160,7 @@ it('护盾读取窗口结算后的当前状态，来源快照与最终伤害不�
       draft.adjust(1, 'plus');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'defense',
     owner: 'b',
     eligible: () => true,
@@ -215,7 +213,7 @@ it('技能可通过普通伤害草案忽略护盾，纯查询与关闭后的草�
   const game = cardGame();
   await ward(game, 'b', 3);
   let captured: DamageDraft;
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'pierce',
     owner: 'a',
     eligible: (ctx, draft) => {
@@ -237,7 +235,7 @@ it('技能可通过普通伤害草案忽略护盾，纯查询与关闭后的草�
 it('消耗后新获得护盾不回写已提交伤害，实际 World 与事实快照分别准确', async () => {
   const game = cardGame();
   await ward(game, 'b', 1);
-  game.room.on(shieldChanged, {
+  game.room.on(Shield.changed, {
     id: 'refresh',
     owner: 'b',
     eligible: (_ctx, event) => event.damage !== undefined,
@@ -267,7 +265,7 @@ it('护盾全抵消时不新开濒死，即使角色已由外层规则处于零�
   const game = cardGame();
   await ward(game, 'b', 3);
   let dying = 0;
-  game.room.on(dyingStarted, {
+  game.room.on(Dying.started, {
     id: 'dying',
     owner: 'b',
     eligible: () => true,

@@ -7,10 +7,10 @@ import {
   isGameOver,
   modify,
   moveCards,
-  phaseStarted,
   skill,
   trigger,
   withPrivateTopCards,
+  Phase,
 } from '../../../sdk';
 import type { Context, Processing } from '../../../sdk';
 
@@ -31,7 +31,7 @@ export const guanxing = skill({
   description:
     '准备阶段，你可以观看牌堆顶 X 张牌（X 为存活角色数，至多 5），将任意张以任意顺序放回牌顶，其余以任意顺序置于牌底。',
   triggers: [
-    trigger(phaseStarted, {
+    trigger(Phase.started, {
       who: (phase) => phase.owner,
       when: (_ctx, phase) => phase.kind === 'prepare',
       ask: '观星：是否观看并整理牌堆顶？',

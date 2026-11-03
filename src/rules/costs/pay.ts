@@ -1,8 +1,6 @@
 import type { CardMove, Change, WorldReader, Zone } from '../../core/model/state';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
-import { cardsMoved } from '../cards/move';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
@@ -10,6 +8,8 @@ import { rulesOf, skillAvailable } from '../skills/skills';
 import { readState, stateChange, useCount } from '../state/state';
 import { isGameOver } from '../game/end';
 import type { CardBook } from '../cards/book';
+import { Cards } from '../cards/move';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface UsageLimit {
   readonly key: string;
@@ -78,7 +78,9 @@ export type PaymentResult =
   | { readonly kind: 'paid'; readonly receipt: PaymentReceipt; readonly seq: number }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
-export const costPaid = defineWindow<PaymentReceipt>('cost.paid');
+export const Cost = defineEvent('cost', {
+  paid: timing<PaymentReceipt>(),
+});
 
 /** 费用、次数和宣告同步提交；支付后效完整结束后返回，不承诺整条技能事务回滚。 */
 export function pay(ctx: Context, spec: PaymentSpec): Promise<PaymentResult> {
@@ -222,8 +224,8 @@ function performPayment(
       }
       // 提交/宣告必须直接同步执行，错误才能在排队续体之前冻结本局；只有后效可等待。
       const settle = async (): Promise<PaymentResult> => {
-        if (moved) await child.window(cardsMoved, moved, { subject: receipt.actor });
-        await child.window(costPaid, receipt, { subject: receipt.actor });
+        if (moved) await child.window(Cards.moved, moved, { subject: receipt.actor });
+        await child.window(Cost.paid, receipt, { subject: receipt.actor });
         return { kind: 'paid', receipt, seq: fact.seq };
       };
       return settle();

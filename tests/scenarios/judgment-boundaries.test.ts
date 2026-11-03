@@ -1,13 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import {
-  judge,
-  judgmentRevealed,
-  judgmentRetrial,
-  judgmentFinished,
-  kill,
-  finishGame,
-  draw,
-} from '../../src/sdk';
+import { judge, kill, finishGame, draw, Judgment } from '../../src/sdk';
 import type { Context, JudgmentResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -15,7 +7,7 @@ import { nextRequest } from '../fixtures/room';
 
 type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished';
-const stages = [judgmentRevealed, judgmentRetrial] as const;
+const stages = [Judgment.revealed, Judgment.retrial] as const;
 const boundaries = ['dead', 'finished'] as const;
 
 function create() {
@@ -200,7 +192,7 @@ for (const stage of stages) {
 
 it.each(boundaries)('结果已封口后 %s，保留真实判定及公共完成后效', async (boundary) => {
   const game = create();
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'a-invalidate',
     owner: null,
     eligible: () => true,
@@ -208,7 +200,7 @@ it.each(boundaries)('结果已封口后 %s，保留真实判定及公共完成�
   });
   let seen: JudgmentResult | undefined;
   let continuation: JudgmentResult | undefined;
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'z-observe-committed',
     owner: null,
     eligible: () => true,
@@ -239,14 +231,14 @@ it.each(boundaries)('真实八卦阵翻牌后 %s，不执行旧判定后效或�
     equipment: { b: [card('armor', 'eight_diagram')] },
     draw: [card('red', 'jink', 'heart')],
   });
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'a-invalidate',
     owner: null,
     eligible: () => true,
     run: (ctx) => invalidate(ctx, boundary, 'b'),
   });
   const later = vi.fn();
-  game.room.on(judgmentRevealed, { id: 'z-later', owner: null, eligible: () => true, run: later });
+  game.room.on(Judgment.revealed, { id: 'z-later', owner: null, eligible: () => true, run: later });
   const running = use(game, {
     actor: 'a',
     choice: { kind: 'physical', card: 'slash' },

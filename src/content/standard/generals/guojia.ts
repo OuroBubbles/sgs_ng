@@ -1,10 +1,8 @@
 import {
   alive,
-  damageReceived,
   general,
   give,
   isGameOver,
-  judgmentFinished,
   nth,
   obtainJudgment,
   select,
@@ -12,6 +10,8 @@ import {
   skill,
   trigger,
   withPrivateTopCards,
+  Judgment,
+  Damage,
 } from '../../../sdk';
 
 export const tiandu = skill({
@@ -19,7 +19,7 @@ export const tiandu = skill({
   name: '天妒',
   description: '你的判定结束后，你可以获得仍在处理区中的判定牌。',
   triggers: [
-    trigger(judgmentFinished, {
+    trigger(Judgment.finished, {
       who: (judgment) => judgment.player,
       when: (ctx, judgment) =>
         judgment.card !== null && ctx.world.position(judgment.card.id) === judgment.processing,
@@ -36,7 +36,7 @@ export const yiji = skill({
   description:
     '每受到 1 点伤害后，你可以观看牌堆顶两张牌，将它们以任意方式交给角色，也可留给自己。它们暂存于仅你可见的牌池，不视为摸牌。',
   triggers: [
-    trigger(damageReceived, {
+    trigger(Damage.received, {
       who: (hit) => hit.input.to,
       times: (_ctx, hit) => hit.amount,
       ask: (_ctx, _hit, _self, at) => `是否发动【遗计】观看并分配牌堆顶两张牌？${nth(at)}`,

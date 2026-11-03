@@ -6,7 +6,7 @@
  * - 动词：obtain / takeCard / give / askDiscard / select，自带存活与终局 no-op。
  */
 import type { Context } from '../core/runtime/room';
-import type { TriggerOccurrence, WindowType } from '../core/runtime/window';
+import type { TriggerOccurrence, Timing } from '../core/runtime/event';
 import { JointSelection } from '../core/decisions/selection';
 import type { JointChoice, JointSelectionSpec } from '../core/decisions/selection';
 import type { Decision } from '../core/decisions/hub';
@@ -277,7 +277,7 @@ export interface TriggerSpec<T, V> {
   ) => unknown;
 }
 
-export function trigger<T, V = true>(window: WindowType<T>, spec: TriggerSpec<T, V>): SkillTrigger {
+export function trigger<T, V = true>(window: Timing<T>, spec: TriggerSpec<T, V>): SkillTrigger {
   const { who, when, times, locked, ask, cost, keep, declare: extra, effect } = spec;
   const staged = ask !== undefined || cost !== undefined;
   return on(window, {

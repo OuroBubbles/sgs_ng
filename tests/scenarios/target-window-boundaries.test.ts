@@ -2,8 +2,6 @@ import { expect, it, vi } from 'vitest';
 import {
   cardQueries,
   defineSkill,
-  effectFinished,
-  effectStarting,
   finishGame,
   installCounterspells,
   kill,
@@ -12,12 +10,10 @@ import {
   moveCards,
   pay,
   recover,
-  targetConfirmed,
-  targetConfirming,
-  targetSpecified,
-  targetSpecifying,
-  useDeclared,
   useDeclarations,
+  Use,
+  Target,
+  Resolve,
 } from '../../src/sdk';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
@@ -36,11 +32,11 @@ const boundaries: readonly Boundary[] = [
   'prohibited',
 ];
 const points = [
-  ['指定前', targetSpecifying],
-  ['确认前', targetConfirming],
-  ['指定后', targetSpecified],
-  ['确认后', targetConfirmed],
-  ['效果启动', effectStarting],
+  ['指定前', Target.specifying],
+  ['确认前', Target.confirming],
+  ['指定后', Target.specified],
+  ['确认后', Target.confirmed],
+  ['效果启动', Resolve.starting],
 ] as const;
 const source = { kind: 'general', id: 'boundary-probe' } as const;
 const ban = defineSkill({
@@ -68,7 +64,7 @@ function create() {
     },
     skills: [ban],
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'other-target',
     owner: null,
     eligible: () => true,
@@ -219,7 +215,7 @@ it('真实流离支付并转移后，不再执行旧目标同窗的后席候选�
     game.skills.grant(ctx, { owner: 'b', skill: 'standard:liuli', source }),
   );
   const later = vi.fn();
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'old-target-later-seat',
     owner: 'd',
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -252,7 +248,7 @@ it('仁王盾取消黑杀后不进入效果启动后组，公共完成窗口仍�
     equipment: { b: [card('shield', 'nioh_shield')] },
   });
   const after = vi.fn();
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'after-block',
     owner: null,
     group: 'after',
@@ -260,7 +256,7 @@ it('仁王盾取消黑杀后不进入效果启动后组，公共完成窗口仍�
     run: after,
   });
   const completed = vi.fn();
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'public-completion',
     owner: null,
     eligible: () => true,
@@ -282,7 +278,7 @@ it('真实无懈取消决斗后，停止效果启动后组但保留完整反制�
   });
   installCounterspells(game.room, game.book);
   const after = vi.fn();
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'after-counter',
     owner: null,
     group: 'after',
@@ -306,7 +302,7 @@ it('桃园启动候选已令目标满体力，canResolve 失效立即收束同�
   await game.room.run('wound', async (ctx) => {
     await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'a-heal-first',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -315,7 +311,7 @@ it('桃园启动候选已令目标满体力，canResolve 失效立即收束同�
     },
   });
   const later = vi.fn();
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'z-later',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -331,7 +327,7 @@ it('桃园启动候选已令目标满体力，canResolve 失效立即收束同�
 
 it('canResolve 只约束实际效果，不提前跳过满体力桃园目标的四层声明窗口', async () => {
   const game = cardGame({ hands: { a: [card('salvation', 'god_salvation')] } });
-  game.room.on(targetSpecified, {
+  game.room.on(Target.specified, {
     id: 'wound-before-resolving',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -352,7 +348,7 @@ for (const name of ['snatch', 'dismantlement']) {
       const game = cardGame({
         hands: { a: [card('trick', name)], b: [card('held', 'jink')] },
       });
-      game.room.on(effectStarting, {
+      game.room.on(Resolve.starting, {
         id: 'a-close-card-body',
         owner: null,
         eligible: () => true,
@@ -367,7 +363,7 @@ for (const name of ['snatch', 'dismantlement']) {
         },
       });
       const later = vi.fn();
-      game.room.on(effectStarting, {
+      game.room.on(Resolve.starting, {
         id: 'z-later',
         owner: null,
         eligible: () => true,
@@ -392,7 +388,7 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
     hands: { a: [card('slash', 'slash')], c: [card('inner', 'slash')] },
   });
   const later: string[] = [];
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'a-inner-use',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -405,13 +401,13 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
       });
     },
   });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'b-stop-outer',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'd',
     run: (ctx) => die(ctx, 'b'),
   });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'z-later',
     owner: null,
     eligible: () => true,
@@ -428,7 +424,7 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
 
 it('公共效果完成后效中终局，后续完成候选仍看到同一已封口结果', async () => {
   const game = create();
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'a-finish-after-effect',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -437,7 +433,7 @@ it('公共效果完成后效中终局，后续完成候选仍看到同一已封�
     },
   });
   const later = vi.fn();
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'z-public-completion',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',

@@ -1,16 +1,15 @@
 import { expect, it } from 'vitest';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import {
-  effectStarting,
   effectReference,
-  responseRequested,
-  responseFinished,
   isResponseBlocked,
   pay,
   defineSkill,
   modify,
   cardQueries,
-  useDeclared,
+  Use,
+  Resolve,
+  Response,
 } from '../../src/sdk';
 import { qingguo } from '../../src/content/standard/generals/zhenji';
 import type { CardEffect, ResponseOpportunity, TriggerSource } from '../../src/sdk';
@@ -38,7 +37,7 @@ function replay(game: Game) {
 
 it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成立', async () => {
   const game = create();
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'provide-slash',
     owner: null,
     eligible: () => true,
@@ -51,7 +50,7 @@ it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成�
       );
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed-response',
     owner: null,
     eligible: () => true,
@@ -92,7 +91,7 @@ it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另�
       source: { kind: 'general', id: 'machao' },
     }),
   );
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'author-supply',
     owner: null,
     eligible: () => true,
@@ -100,7 +99,7 @@ it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另�
       await request.provide(ctx, { kind: 'physical', card: 'answer' });
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'author-asks-slash',
     owner: null,
     eligible: () => true,
@@ -129,7 +128,7 @@ it('响应次数按实际请求牌名查询，禁闪不把杀次数归零，政�
     hands: { a: [card('attack', 'slash')] },
     policy: { responseTimes: (_ctx, _effect, _actor, name) => (name === 'standard:slash' ? 2 : 1) },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'count',
     owner: null,
     eligible: () => true,
@@ -148,7 +147,7 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], b: [card('answer', 'slash')], c: [card('fee', 'jink')] },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'probe',
     owner: null,
     eligible: () => true,
@@ -159,7 +158,7 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
       );
     },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'a-supply',
     owner: null,
     eligible: () => true,
@@ -167,7 +166,7 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
       await request.provide(ctx, { kind: 'physical', card: 'answer' });
     },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'b-late-cost',
     owner: null,
     eligible: () => true,
@@ -189,7 +188,7 @@ it('混合请求的菜单和最终回复仅允许未被禁用的牌，八卦不�
     equipment: { b: [card('armor', 'eight_diagram')] },
     draw: [card('red', 'peach', 'heart')],
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed',
     owner: null,
     eligible: () => true,
@@ -234,7 +233,7 @@ it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未�
     }),
   );
   const instance = game.room.world.snapshot.skills[0]!.id;
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'semantic',
     owner: null,
     eligible: () => true,
@@ -252,7 +251,7 @@ it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未�
       );
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed',
     owner: null,
     eligible: () => true,
@@ -277,7 +276,7 @@ it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际�
     },
   });
   const seen: string[] = [];
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: () => true,
@@ -294,7 +293,7 @@ it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际�
       } else await request.provide(ctx, { kind: 'physical', card: 'supply' });
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed',
     owner: null,
     eligible: () => true,
@@ -342,7 +341,7 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
       source: { kind: 'general', id: 'probe' },
     }),
   );
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'a-delegate',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -351,7 +350,7 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
       expect(request.available(ctx)).toBe(true);
     },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'b-fallback',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -359,7 +358,7 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
       await request.provide(ctx, { kind: 'physical', card: 'answer' });
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed',
     owner: null,
     eligible: () => true,
@@ -380,7 +379,7 @@ it.each([undefined, null] as const)(
   async (names) => {
     const game = create();
     let opened = 0;
-    game.room.on(responseRequested, {
+    game.room.on(Response.requested, {
       id: 'spy',
       owner: null,
       eligible: () => true,
@@ -388,7 +387,7 @@ it.each([undefined, null] as const)(
         opened++;
       },
     });
-    game.room.on(effectStarting, {
+    game.room.on(Resolve.starting, {
       id: 'all',
       owner: null,
       eligible: () => true,
@@ -423,12 +422,12 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
   });
   game.room.addTriggerSource({
     collect(type) {
-      if (type === responseRequested) collections++;
+      if (type === Response.requested) collections++;
       return [];
     },
   });
   let opened = 0;
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'spy',
     owner: null,
     eligible: () => true,
@@ -436,7 +435,7 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
       opened++;
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'union',
     owner: null,
     eligible: () => true,
@@ -460,7 +459,7 @@ it.each([[], [''], ['  '], ['standard:jink', 'standard:jink'], [1]].map((names) 
   '非法具名禁令拒绝整次改写，不留下半条记录：$names',
   async ({ names }) => {
     const game = cardGame({ hands: { a: [card('attack', 'slash')] } });
-    game.room.on(effectStarting, {
+    game.room.on(Resolve.starting, {
       id: 'validate',
       owner: null,
       eligible: () => true,
@@ -482,7 +481,7 @@ it('具名列表在宣告时复制并冻结，纯查询/封口后不能改写，
   const game = create();
   const names = ['standard:jink'];
   let held: CardEffect | undefined;
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'snapshot',
     owner: null,
     eligible: () => true,
@@ -515,7 +514,7 @@ it('禁令只属于指定效果与响应角色，多目标的另一人仍可正�
     hands: { a: [card('attack', 'slash')], b: [card('bj', 'jink')], c: [card('cj', 'jink')] },
     policy: { attackRange: () => 3 },
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'extra-target',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:slash',
@@ -523,7 +522,7 @@ it('禁令只属于指定效果与响应角色，多目标的另一人仍可正�
       plan.addTarget(ctx, 'c', 'probe');
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'block-b',
     owner: null,
     eligible: (_ctx, event) => event.effect.target === 'b',
@@ -531,7 +530,7 @@ it('禁令只属于指定效果与响应角色，多目标的另一人仍可正�
       effect.blockResponses(ctx, 'b', 'b-only', ['standard:jink']);
     },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'provide',
     owner: null,
     eligible: () => true,
@@ -567,7 +566,7 @@ it('纯查询修正可按响应牌名计算次数，具名禁止仍优先于追�
       source: { kind: 'general', id: 'probe' },
     }),
   );
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'counts',
     owner: null,
     eligible: () => true,
@@ -591,7 +590,7 @@ it('供牌暂时忙碌只阻止并发支付，不假关闭窗口；新候选接�
   let held: ResponseOpportunity | undefined;
   const source: TriggerSource = {
     collect(type) {
-      return type === responseRequested && enabled
+      return type === Response.requested && enabled
         ? [
             {
               id: 'post-payment-new',
@@ -606,7 +605,7 @@ it('供牌暂时忙碌只阻止并发支付，不假关闭窗口；新候选接�
     },
   };
   game.room.addTriggerSource(source);
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'supply',
     owner: null,
     eligible: () => true,
@@ -615,14 +614,14 @@ it('供牌暂时忙碌只阻止并发支付，不假关闭窗口；新候选接�
       await request.provide(ctx, { kind: 'physical', card: 'answer' });
     },
   });
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'join-during-aftereffects',
     owner: null,
     eligible: () => true,
     run(ctx) {
       expect(held!.available(ctx)).toBe(false);
       enabled = true;
-      expect(ctx.include(ctx.windowOf(responseRequested)!, source)).toEqual({
+      expect(ctx.include(ctx.windowOf(Response.requested)!, source)).toEqual({
         state: 'open',
         added: ['post-payment-new'],
         skipped: [],
@@ -630,7 +629,7 @@ it('供牌暂时忙碌只阻止并发支付，不假关闭窗口；新候选接�
       added = true;
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'probe',
     owner: null,
     eligible: () => true,

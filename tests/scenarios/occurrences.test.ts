@@ -1,6 +1,6 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import {
-  defineWindow,
   defineSkill,
   on,
   SkillBook,
@@ -12,7 +12,7 @@ import {
   runTurn,
   useDeclarations,
 } from '../../src/sdk';
-import type { TriggerOccurrence, TriggerSource } from '../../src/core/runtime/window';
+import type { TriggerOccurrence, TriggerSource } from '../../src/core/runtime/event';
 import type { WorldSeed } from '../../src/core/model/state';
 import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose } from '../fixtures/room';
@@ -67,7 +67,7 @@ async function cancel(target: Room) {
 it('次数从开窗时的权威状态读取一次，后效不改变当前总数；下一窗口重新读取', async () => {
   const target = room();
   const initial = target.world.snapshot;
-  const window = defineWindow<null>('repeat.snapshot');
+  const window = testTiming<null>('repeat.snapshot');
   let reads = 0;
   const seen: TriggerOccurrence[] = [];
   target.on(window, {
@@ -104,7 +104,7 @@ it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, null, undefined, '
   async (times) => {
     const target = room();
     const initial = target.world.snapshot;
-    const window = defineWindow<null>('repeat.invalid');
+    const window = testTiming<null>('repeat.invalid');
     target.on(window, {
       id: 'bad',
       owner: 'a',
@@ -126,7 +126,7 @@ it.each(['commit', 'random', 'listen', 'unregister'] as const)(
   async (action) => {
     const target = room();
     const initial = target.world.snapshot;
-    const window = defineWindow<null>('repeat.pure');
+    const window = testTiming<null>('repeat.pure');
     const remove = target.on(window, {
       id: 'other',
       owner: 'a',
@@ -156,7 +156,7 @@ it.each(['commit', 'random', 'listen', 'unregister'] as const)(
 );
 it('零次不运行；同一效果十二次按数字顺序推进，不制造无意义的自选顺序', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.numeric');
+  const window = testTiming<null>('repeat.numeric');
   const seen: number[] = [];
   target.on(window, {
     id: 'none',
@@ -183,7 +183,7 @@ it('零次不运行；同一效果十二次按数字顺序推进，不制造无�
 });
 it('两个效果只开放各自最早未处理次数，可交错而不能跳选本效果的后续次数', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.interleave');
+  const window = testTiming<null>('repeat.interleave');
   const seen: string[] = [];
   for (const [id, total] of [
     ['A', 2],
@@ -217,7 +217,7 @@ it('两个效果只开放各自最早未处理次数，可交错而不能跳选�
 });
 it('每组与座次优先于跨效果选择，自动项仍优先，重复次数不改变锚点', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.seats', ['before', 'main', 'after']);
+  const window = testTiming<null>('repeat.seats', ['before', 'main', 'after']);
   const seen: string[] = [];
   for (const [id, owner, group, times, order] of [
     ['before', 'a', 'before', 2, 'automatic'],
@@ -256,7 +256,7 @@ it('每组与座次优先于跨效果选择，自动项仍优先，重复次数�
 it('后续次数只在轮到时检查资格，不在第一个后效改变状态之前提前跳过', async () => {
   const target = room();
   const initial = target.world.snapshot;
-  const window = defineWindow<null>('repeat.live');
+  const window = testTiming<null>('repeat.live');
   const seen: number[] = [];
   target.on(window, {
     id: 'repeat',
@@ -274,7 +274,7 @@ it('后续次数只在轮到时检查资格，不在第一个后效改变状态�
 });
 it('拒绝当前次数不取消下一次；选择没有退回或重复执行', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.decline');
+  const window = testTiming<null>('repeat.decline');
   const seen: number[] = [];
   target.on(window, {
     id: 'repeat',
@@ -297,7 +297,7 @@ it('拒绝当前次数不取消下一次；选择没有退回或重复执行', a
 it('一次效果的子流程中止只消费该次数，既有提交保留且后续次数继续', async () => {
   const target = room();
   const initial = target.world.snapshot;
-  const window = defineWindow<null>('repeat.abort');
+  const window = testTiming<null>('repeat.abort');
   target.on(window, {
     id: 'repeat',
     owner: 'a',
@@ -318,7 +318,7 @@ it('一次效果的子流程中止只消费该次数，既有提交保留且后�
 });
 it('直接注册在第一次后注销，剩余次数全部失效，其他效果仍继续', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.unregister');
+  const window = testTiming<null>('repeat.unregister');
   const seen: string[] = [];
   const remove = target.on(window, {
     id: 'A',
@@ -344,7 +344,7 @@ it('直接注册在第一次后注销，剩余次数全部失效，其他效果�
 });
 it('派生触发源被卸下后不再执行其剩余次数', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.source');
+  const window = testTiming<null>('repeat.source');
   let hits = 0;
   let detach = () => {};
   const provider: TriggerSource = {
@@ -368,7 +368,7 @@ it('派生触发源被卸下后不再执行其剩余次数', async () => {
 });
 it('开窗期间新注册的重复效果从下一窗口参与，不扩展正在运行的快照', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.add');
+  const window = testTiming<null>('repeat.add');
   const seen: string[] = [];
   let added = false;
   target.on(window, {
@@ -399,7 +399,7 @@ it('开窗期间新注册的重复效果从下一窗口参与，不扩展正在�
 });
 it('嵌套同名窗口有独立次数和全局唯一 occurrence 身份，恢复后父窗口继续', async () => {
   const target = room();
-  const window = defineWindow<number>('repeat.nested');
+  const window = testTiming<number>('repeat.nested');
   const seen: string[] = [];
   const ids: string[] = [];
   target.on(window, {
@@ -420,7 +420,7 @@ it('嵌套同名窗口有独立次数和全局唯一 occurrence 身份，恢复�
 it('SDK 次数携带同一来源但独立身份，失去再获得技能不借新实例复活旧次数', async () => {
   const target = room();
   const initial = target.world.snapshot;
-  const window = defineWindow<null>('repeat.regain');
+  const window = testTiming<null>('repeat.regain');
   const seen: { id: string; index: number }[] = [];
   let replaced = false;
   const book = new SkillBook([
@@ -453,7 +453,7 @@ it('SDK 次数携带同一来源但独立身份，失去再获得技能不借新
 });
 it('重复生成的选择 ID 与直接注册 ID 冲突时，开窗立即报错而非执行错误效果', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.collide');
+  const window = testTiming<null>('repeat.collide');
   for (const [id, times] of [
     ['A', () => 1],
     [JSON.stringify(['A', 1]), undefined],
@@ -474,7 +474,7 @@ it('重复生成的选择 ID 与直接注册 ID 冲突时，开窗立即报错�
 
 it('SDK when 能区分各次身份；跳过一次不会删除本效果的全部剩余次数', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.sdk-when');
+  const window = testTiming<null>('repeat.sdk-when');
   const seen: number[] = [];
   const book = new SkillBook([
     defineSkill({
@@ -499,7 +499,7 @@ it('SDK when 能区分各次身份；跳过一次不会删除本效果的全部�
   expect(candidates(target, 'ineligible').map((e) => e.occurrence.index)).toEqual([2]);
 });
 it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩余技能次数不复活', async () => {
-  const window = defineWindow<null>('repeat.death');
+  const window = testTiming<null>('repeat.death');
   const effect = defineSkill({
     id: 'test:death',
     name: '离场次数',
@@ -534,7 +534,7 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
 });
 it('作用域监听完成后注销整个来源，后续窗口不保留任何次数', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.scoped');
+  const window = testTiming<null>('repeat.scoped');
   let count = 0;
   await target.run('host', async (ctx) => {
     ctx.listen(window, {
@@ -553,7 +553,7 @@ it('作用域监听完成后注销整个来源，后续窗口不保留任何次�
 });
 it('选择返回后仍重查来源，已注销次数记录为跳过并继续其他效果', async () => {
   const target = room();
-  const window = defineWindow<null>('repeat.selection-stale');
+  const window = testTiming<null>('repeat.selection-stale');
   const seen: string[] = [];
   const remove = target.on(window, {
     id: 'A',
@@ -588,7 +588,7 @@ it('选择返回后仍重查来源，已注销次数记录为跳过并继续其�
 it('构造可选菜单不消费未选效果的失效前缀，其他效果可先令其较早次数合法', async () => {
   const target = room();
   const initial = target.world.snapshot;
-  const window = defineWindow<null>('repeat.defer');
+  const window = testTiming<null>('repeat.defer');
   const seen: string[] = [];
   target.on(window, {
     id: 'A',

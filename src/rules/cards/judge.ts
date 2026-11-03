@@ -2,21 +2,21 @@ import { rulesOf } from '../skills/skills';
 import type { Card, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { assertLifetime, withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
 import type { SemanticCard } from './types';
 import type { CardBook } from './book';
-import { responseFinished } from './played';
 import type { CardColor } from './types';
 import { withProcessing } from './processing';
 import { reshuffle } from './draw';
 import { moveCards } from './move';
 import type { SkillHandle } from '../skills/skills';
-import { costPaid } from '../costs/pay';
 import type { PaymentReceipt } from '../costs/pay';
+import { Response } from './response';
+import { Cost } from '../costs/pay';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface JudgmentCard extends Card {
   readonly color: CardColor;
@@ -57,9 +57,11 @@ export interface Judgment {
   replace(ctx: Context, input: RetrialInput): Promise<'replaced' | 'unavailable'>;
 }
 
-export const judgmentRevealed = defineWindow<Judgment>('judgment.revealed');
-export const judgmentRetrial = defineWindow<Judgment>('judgment.retrial');
-export const judgmentFinished = defineWindow<JudgmentResult>('judgment.finished');
+export const Judgment = defineEvent('judgment', {
+  revealed: timing<Judgment>(),
+  retrial: timing<Judgment>(),
+  finished: timing<JudgmentResult>(),
+});
 const currentCard = defineState<JudgmentCard | null>(
   'core:judgment-card',
   null,
@@ -127,9 +129,9 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
           // 这些仍是待决判定窗口：候选后效可能令判定者死亡或结束整局，
           // 必须在同一窗口内持续收束，不能只在两个窗口之间检查一次。
           if (live())
-            await at.window(judgmentRevealed, control, { subject: input.player, active: live });
+            await at.window(Judgment.revealed, control, { subject: input.player, active: live });
           if (live())
-            await at.window(judgmentRetrial, control, { subject: input.player, active: live });
+            await at.window(Judgment.retrial, control, { subject: input.player, active: live });
         }
       }
       open = false;
@@ -146,7 +148,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
         matched,
       });
       at.commit('judgment.finished', [], sealed);
-      await at.window(judgmentFinished, sealed, { subject: input.player });
+      await at.window(Judgment.finished, sealed, { subject: input.player });
       if (onResult) await onResult(at, sealed);
       return sealed;
     });
@@ -248,10 +250,10 @@ async function replaceJudgment(
       },
     );
 
-    if (invocation) await child.window(costPaid, invocation, { subject: invocation.actor });
+    if (invocation) await child.window(Cost.paid, invocation, { subject: invocation.actor });
     if (response && skill)
       await child.window(
-        responseFinished,
+        Response.finished,
         immutable({
           id: child.cause.flowId,
           actor: skill.owner,

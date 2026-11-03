@@ -5,8 +5,8 @@ import { pay } from '../costs/pay';
 import { isGameOver } from '../game/end';
 import { parseCardChoice } from './book';
 import { withProcessing } from './processing';
-import { responseFinished } from './played';
 import type { CardChoice, SemanticCard } from './types';
+import { Response } from './response';
 
 export interface CardSupplyInput {
   readonly actor: string;
@@ -117,7 +117,7 @@ export function withCardSupply<T>(
 
       if (paid.kind !== 'paid') return { kind: 'unavailable' };
       await at.window(
-        responseFinished,
+        Response.finished,
         {
           id: responseId,
           actor,

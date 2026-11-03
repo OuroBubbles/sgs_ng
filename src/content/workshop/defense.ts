@@ -1,12 +1,12 @@
 import {
   changeShield,
-  damageInflicting,
   isDirectDamage,
   JointSelection,
   on,
   ownedCards,
   payDiscard,
   rulesOf,
+  Damage,
 } from '../../sdk';
 import type { CardDefinition, Context, DamageDraft, SkillHandle } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
@@ -53,7 +53,7 @@ export const relay = {
   description:
     '你即将受到直接伤害时，可以弃置一张手牌，将当前伤害转移给一名其他角色。接收方重新结算防御；连环传播或已转移的伤害不能发动。',
   triggers: [
-    on(damageInflicting, {
+    on(Damage.inflicting, {
       order: 'choose',
       when: (ctx, { payload: draft, self }) =>
         draft.input.to === self.owner &&

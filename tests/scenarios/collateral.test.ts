@@ -9,8 +9,8 @@ import {
   installCounterspells,
   kill,
   moveCards,
-  useDeclared,
   withLifetime,
+  Use,
 } from '../../src/sdk';
 import type { CardOffer, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -41,7 +41,7 @@ async function answer(game: Game, value: unknown, kind = 'use-card') {
   expect(game.room.decisions.submit(request.id, request.token, value).kind).toBe('accepted');
 }
 function killPlayer(game: Game, target: string) {
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: `kill-${target}`,
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:collateral',
@@ -245,7 +245,7 @@ it.each([false, true])('拒绝用杀时只取结算当前的武器：替换 %s',
     hands: { a: [card('borrow', 'collateral')], b: replace ? [card('new', 'qinggang_sword')] : [] },
     equipment: { b: [card('weapon', 'crossbow')] },
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'change-weapon',
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:collateral',
@@ -322,7 +322,7 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
       equipment: { b: [card('bw', 'crossbow')], d: [card('dw', 'crossbow')] },
       skills: [extra],
     });
-    game.room.on(useDeclared, {
+    game.room.on(Use.declared, {
       id: 'edit',
       owner: null,
       eligible: (_ctx, use) => use.card.name === 'standard:collateral',

@@ -3,10 +3,10 @@ import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { draw } from '../cards/draw';
 import { moveCards } from '../cards/move';
-import { deathFinished } from '../combat/life';
 import { defineState, readState, stateChange } from '../state/state';
-import { finishGame, gameFinished, isGameOver } from './end';
+import { finishGame, isGameOver, Game } from './end';
 import type { GameResult } from './end';
+import { Death } from '../combat/life-events';
 
 export type Role = 'lord' | 'loyalist' | 'rebel' | 'renegade';
 export interface RoleSeat {
@@ -99,7 +99,7 @@ export function judgeRoles(world: WorldReader): GameResult | null {
 
 /** 本项目基线：死亡效果、埋葬完成后判胜；仍继续的对局才结算击杀奖惩。 */
 export function installRoleMode(room: Room): () => void {
-  const offDeath = room.on(deathFinished, {
+  const offDeath = room.on(Death.finished, {
     id: 'role:death',
     owner: null,
     group: 'mode',
@@ -133,7 +133,7 @@ export function installRoleMode(room: Room): () => void {
       }
     },
   });
-  const offFinish = room.on(gameFinished, {
+  const offFinish = room.on(Game.finished, {
     id: 'role:finish',
     owner: null,
     eligible: () => true,

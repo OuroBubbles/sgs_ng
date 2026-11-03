@@ -1,11 +1,6 @@
 import { expect, it } from 'vitest';
 import {
   damage,
-  damageCausing,
-  damageReplacing,
-  damageInflicting,
-  damageReceived,
-  damageSettled,
   changeShield,
   shieldOf,
   setChained,
@@ -13,9 +8,10 @@ import {
   isChainDamage,
   isDirectDamage,
   pay,
-  cardsMoved,
-  costPaid,
   finishGame,
+  Cards,
+  Damage,
+  Cost,
 } from '../../src/sdk';
 import type { DamageDraft, DamageResult, DamageTransferIntent, Context } from '../../src/sdk';
 import { cardGame, card } from '../fixtures/cards';
@@ -30,7 +26,7 @@ function rebuilt(game: Game) {
   expect(game.room.decisions.pending).toEqual([]);
 }
 function redirect(game: Game, to = 'c') {
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'redirect',
     owner: 'b',
     eligible: (ctx, draft) => draft.input.to === 'b' && draft.canTransfer(ctx, to),
@@ -52,7 +48,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
     await changeShield(ctx, { player: 'b', amount: 3, reason: 'setup' });
     await changeShield(ctx, { player: 'c', amount: 1, reason: 'setup' });
   });
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'source-plus',
     owner: 'a',
     eligible: () => true,
@@ -61,7 +57,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
       draft.adjust(1, 'source');
     },
   });
-  game.room.on(damageReplacing, {
+  game.room.on(Damage.replacing, {
     id: 'replace',
     owner: 'a',
     eligible: () => true,
@@ -69,7 +65,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
       steps.push('replace');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'redirect',
     owner: 'b',
     eligible: (_ctx, draft) => draft.input.to === 'b',
@@ -82,7 +78,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
       steps.push('after');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'stale-original',
     owner: 'd',
     eligible: (_ctx, draft) => draft.input.to === 'b',
@@ -90,7 +86,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
       throw new Error('Original target window must stop.');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'target-plus',
     owner: 'c',
     eligible: (_ctx, draft) => draft.input.to === 'c',
@@ -99,7 +95,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
       draft.adjust(1, 'defense');
     },
   });
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'received',
     owner: null,
     eligible: () => true,
@@ -132,7 +128,7 @@ it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', asy
   const game = cardGame();
   let count = 0;
   let sourceCalls = 0;
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'source',
     owner: 'a',
     eligible: () => true,
@@ -140,7 +136,7 @@ it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', asy
       sourceCalls++;
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'bounce',
     owner: null,
     eligible: () => count < 2,
@@ -164,7 +160,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
     await game.room.run('setup', (ctx) => {
       ctx.commit('death', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
     });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'invalid',
     owner: 'b',
     eligible: () => true,
@@ -187,7 +183,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
 it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消耗原护盾', async (kind) => {
   const game = cardGame();
   redirect(game);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'new-defense',
     owner: 'c',
     eligible: (_ctx, draft) => draft.input.to === 'c',
@@ -215,7 +211,7 @@ it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消
 
 it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防御中死亡不删除归属', async () => {
   const game = cardGame();
-  game.room.on(damageReplacing, {
+  game.room.on(Damage.replacing, {
     id: 'replacement',
     owner: 'a',
     eligible: () => true,
@@ -223,7 +219,7 @@ it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防�
       await draft.transfer(ctx, 'c', 'replacement');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'defense',
     owner: 'c',
     eligible: () => true,
@@ -242,7 +238,7 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
   const game = cardGame({ hands: { b: [card('fee', 'slash')] } });
   let plan!: DamageTransferIntent;
   let draft!: DamageDraft;
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'cost-aftermath',
     owner: 'd',
     eligible: (_ctx, event) => event.moves.some((move) => move.cards.includes('fee')),
@@ -257,7 +253,7 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
       );
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'pay-transfer',
     owner: 'b',
     eligible: (_ctx, event) => event.input.to === 'b',
@@ -292,7 +288,7 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
 
 it('费用同批状态令接收方死亡，仍完成已承诺转移；没有支付后存活重查恢复伤害', async () => {
   const game = cardGame({ hands: { b: [card('fee', 'slash')] } });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'cost-kills',
     owner: 'b',
     eligible: (_ctx, draft) => draft.input.to === 'b',
@@ -323,7 +319,7 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
   '未支付 %s 不确定转移意图',
   async (kind) => {
     const game = cardGame({ hands: { b: [card('fee', 'slash')] } });
-    game.room.on(damageInflicting, {
+    game.room.on(Damage.inflicting, {
       id: 'failed-payment',
       owner: 'b',
       eligible: () => true,
@@ -356,7 +352,7 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
 
 it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭包存入世界或事实', async () => {
   const game = cardGame({ hands: { b: [card('fee', 'slash')] } });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'paid',
     owner: 'b',
     eligible: () => true,
@@ -364,7 +360,7 @@ it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭�
       expect(receipt.declaration).toMatchObject({ target: 'c' });
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'prepare',
     owner: 'b',
     eligible: (_ctx, draft) => draft.input.to === 'b',
@@ -400,7 +396,7 @@ it.each(['source', 'query', 'foreign', 'stale'])(
     const game = cardGame();
     let saved!: DamageDraft;
     let context!: Context;
-    const type = kind === 'source' ? damageCausing : damageInflicting;
+    const type = kind === 'source' ? Damage.causing : Damage.inflicting;
     game.room.on(type, {
       id: 'guard',
       owner: 'b',
@@ -448,7 +444,7 @@ it('转移到未连环角色：原角色保留连环，其余角色不传播', a
 it('直接伤害转移到连环角色，在实际接收方冻结新计划；原目标可在计划中再次受伤', async () => {
   const game = cardGame();
   await link(game, ['b', 'c', 'd']);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'direct-only',
     owner: 'b',
     eligible: (_ctx, draft) => draft.input.to === 'b' && isDirectDamage(draft.input),
@@ -468,7 +464,7 @@ it('直接伤害转移到连环角色，在实际接收方冻结新计划；原�
 it('传播包被转移仍属于原连环，不重新扩张；已解链的新目标不再重复传播', async () => {
   const game = cardGame();
   await link(game, ['b', 'c', 'd']);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'chain-transfer',
     owner: 'c',
     eligible: (_ctx, draft) => draft.input.to === 'c',
@@ -507,7 +503,7 @@ it('忽略护盾随本次伤害转移，来源归属保持，后续连环各自�
 it('新目标后效结束整局，原结果仍为已转移并停止原防御候选', async () => {
   const game = cardGame();
   redirect(game);
-  game.room.on(damageSettled, {
+  game.room.on(Damage.settled, {
     id: 'finish',
     owner: 'c',
     eligible: (_ctx, result) => result.input.to === 'c',

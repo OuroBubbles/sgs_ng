@@ -1,3 +1,4 @@
+import { testTiming } from '../fixtures/timing';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Context } from '../../src/core/runtime/room';
 import type { Change } from '../../src/core/model/state';
@@ -5,14 +6,13 @@ import type { Decision, Validation } from '../../src/core/decisions/hub';
 import { Room } from '../../src/core/runtime/room';
 import { World } from '../../src/core/state/world';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { defineWindow } from '../../src/core/runtime/window';
-import { moveCards, cardsMoved } from '../../src/sdk';
+import { moveCards, Cards } from '../../src/sdk';
 import { choose, nextRequest, room, worldSeed } from '../fixtures/room';
 
 describe('串行结算、作用域和故障现场', () => {
   it('触发可直接返回规则结果，窗口等待完成；普通 false 返回值不表示中止', async () => {
     const game = room();
-    const tick = defineWindow<null>('test.returned-rule');
+    const tick = testTiming<null>('test.returned-rule');
     let resumed = false;
     let following = false;
     game.on(tick, {
@@ -420,7 +420,7 @@ describe('同步提交与批量移牌', () => {
     const game = room();
     const before = game.world.snapshot;
     const observed: unknown[] = [];
-    game.on(cardsMoved, {
+    game.on(Cards.moved, {
       id: 'observe',
       owner: 'a',
       eligible: () => true,
@@ -723,7 +723,7 @@ describe('同步提交与批量移牌', () => {
 describe('Window 候选、行动顺序与纯查询', () => {
   it('开窗快照不吸收新技能，失去的候选在轮到时失效', async () => {
     const game = room();
-    const window = defineWindow<null>('test.window');
+    const window = testTiming<null>('test.window');
     const order: string[] = [];
     const remove = game.on(window, {
       id: 'z-old',
@@ -777,7 +777,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
 
   it('具名组先于座次，座次从明确锚点开始，同组自动项按稳定 ID', async () => {
     const game = room();
-    const window = defineWindow<null>('order', ['before', 'after']);
+    const window = testTiming<null>('order', ['before', 'after']);
     const order: string[] = [];
     for (const [id, owner, group] of [
       ['b2', 'b', 'before'],
@@ -802,7 +802,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
 
   it('同一玩家多个可选顺序效果由决策选先后，一次 occurrence 不重复执行', async () => {
     const game = room();
-    const window = defineWindow<null>('choice-order');
+    const window = testTiming<null>('choice-order');
     const order: string[] = [];
     for (const id of ['first', 'second'])
       game.on(window, {
@@ -825,7 +825,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
 
   it('临时监听在作用域结束后自动注销', async () => {
     const game = room();
-    const window = defineWindow<null>('temporary');
+    const window = testTiming<null>('temporary');
     const hits: string[] = [];
     await game.run('phase', async (ctx) => {
       ctx.listen(window, {
@@ -846,7 +846,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
     '%s 返回异步值时先止写，并完整清理故障作用域',
     async (path) => {
       const game = room();
-      const window = defineWindow<null>('async.query.cleanup');
+      const window = testTiming<null>('async.query.cleanup');
       const detach = [
         game.on(window, { id: 'cleanup', owner: null, eligible: () => true, run: () => {} }),
         game.addTriggerSource({ collect: () => [] }),
@@ -894,7 +894,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
 
   it('资格查询中写状态会冻结本局', async () => {
     const game = room();
-    const window = defineWindow<null>('pure');
+    const window = testTiming<null>('pure');
     game.on(window, {
       id: 'bad-query',
       owner: 'a',
@@ -912,14 +912,14 @@ describe('Window 候选、行动顺序与纯查询', () => {
 
   it('同一 ID 的两个时点定义不能悄悄混用', () => {
     const game = room();
-    game.on(defineWindow<number>('same'), {
+    game.on(testTiming<number>('same'), {
       id: 'one',
       owner: 'a',
       eligible: () => true,
       run: () => undefined,
     });
     expect(() =>
-      game.on(defineWindow<string>('same'), {
+      game.on(testTiming<string>('same'), {
         id: 'two',
         owner: 'a',
         eligible: () => true,

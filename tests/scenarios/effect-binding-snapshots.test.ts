@@ -1,14 +1,15 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { defineEffect, defineWindow, effectOn, draw } from '../../src/sdk';
+import { defineEffect, effectOn, draw } from '../../src/sdk';
 import type { Context, EffectHandle, EffectBehavior, EffectRecord } from '../../src/sdk';
 
 interface Balance {
   readonly count: number;
 }
-const redeem = defineWindow<null>('capacity:redeem', ['before', 'main']);
-const nested = defineWindow<null>('capacity:nested-redeem');
+const redeem = testTiming<null>('capacity:redeem', ['before', 'main']);
+const nested = testTiming<null>('capacity:nested-redeem');
 
 function setup(create: (self: EffectHandle<Balance>) => EffectBehavior) {
   const ended: EffectRecord<Balance>[] = [];

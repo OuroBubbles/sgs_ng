@@ -1,13 +1,13 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import type { EffectRef, Nature } from '../cards/types';
 import { effectReference } from '../cards/types';
 import { enterDying } from './life';
 import { isGameOver } from '../game/end';
-import { chainChange, chainChanged, isChained } from './chain';
-import { shieldOf, shieldChange, shieldChanged } from './shield';
+import { chainChange, isChained, Chain } from './chain';
+import { shieldOf, shieldChange, Shield } from './shield';
 import type { PaymentIntent } from '../costs/pay';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export type DamageOrigin =
   | { readonly kind: 'chain'; readonly damage: string }
@@ -111,12 +111,14 @@ export function isChainDamage(input: DamageInput): boolean {
   return chainOrigin(input) !== undefined;
 }
 
-export const damageCausing = defineWindow<DamageDraft>('damage.causing');
-export const damageReplacing = defineWindow<DamageDraft>('damage.replacing');
-export const damageInflicting = defineWindow<DamageDraft>('damage.inflicting');
-export const damageDealt = defineWindow<DamageResult>('damage.dealt');
-export const damageReceived = defineWindow<DamageResult>('damage.received');
-export const damageSettled = defineWindow<DamageResult>('damage.settled');
+export const Damage = defineEvent('damage', {
+  causing: timing<DamageDraft>(),
+  replacing: timing<DamageDraft>(),
+  inflicting: timing<DamageDraft>(),
+  dealt: timing<DamageResult>(),
+  received: timing<DamageResult>(),
+  settled: timing<DamageResult>(),
+});
 
 class Draft implements DamageDraft {
   #amount: number;
@@ -352,7 +354,7 @@ function resolveDamage(
       const active = (at: Context) =>
         draft.pending && at.world.player(input.to).alive && !isGameOver(at.world);
       if (!continuation) {
-        await child.window(damageCausing, draft, {
+        await child.window(Damage.causing, draft, {
           ...(input.from === null ? {} : { subject: input.from }),
           active,
         });
@@ -365,11 +367,12 @@ function resolveDamage(
         child.world.player(input.to).alive &&
         !isGameOver(child.world)
       )
-        await child.window(damageReplacing, draft, {
+        await child.window(Damage.replacing, draft, {
           ...(input.from === null ? {} : { subject: input.from }),
           active,
         });
-      if (draft.pending) await child.window(damageInflicting, draft, { subject: input.to, active });
+      if (draft.pending)
+        await child.window(Damage.inflicting, draft, { subject: input.to, active });
     }
 
     const target = child.world.player(input.to);
@@ -415,7 +418,7 @@ function resolveDamage(
       );
       if (result.shieldLost)
         await child.window(
-          shieldChanged,
+          Shield.changed,
           immutable({
             player: input.to,
             before: result.beforeShield,
@@ -428,7 +431,7 @@ function resolveDamage(
         );
       if (unchained)
         await child.window(
-          chainChanged,
+          Chain.changed,
           immutable({
             player: input.to,
             before: true,
@@ -445,13 +448,17 @@ function resolveDamage(
         });
       }
       if (!isGameOver(child.world)) {
-        await child.window(damageDealt, result, input.from === null ? {} : { subject: input.from });
-        await child.window(damageReceived, result, { subject: input.to });
+        await child.window(
+          Damage.dealt,
+          result,
+          input.from === null ? {} : { subject: input.from },
+        );
+        await child.window(Damage.received, result, { subject: input.to });
       }
     } else {
       child.commit(`damage.${kind}`, [], result);
     }
-    await child.window(damageSettled, result, { subject: input.to });
+    await child.window(Damage.settled, result, { subject: input.to });
     for (const player of result.chainPlan) {
       if (isGameOver(child.world)) break;
       if (!child.world.player(player).alive || !isChained(child.world, player)) continue;

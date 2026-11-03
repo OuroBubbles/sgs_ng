@@ -1,22 +1,11 @@
 import { expect, it } from 'vitest';
 import {
   damage,
-  damageReceived,
-  damageDealt,
   recover,
-  recovered,
   loseHp,
-  hpLost,
   installRescue,
   isDying,
-  dyingStarted,
-  dyingFinished,
-  dyingFinishing,
-  beforeDeath,
-  playerDied,
-  playerBuried,
   kill,
-  cardsMoved,
   moveCards,
   defineSkill,
   on,
@@ -24,8 +13,13 @@ import {
   ownedCards,
   finishGame,
   installRoleMode,
-  useFinished,
-  targetConfirming,
+  Target,
+  Use,
+  Cards,
+  Damage,
+  Dying,
+  Death,
+  Hp,
 } from '../../src/sdk';
 import type { DeathDraft, DyingResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -39,7 +33,7 @@ it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 c
   const game = cardGame({ hands: { a: [card('p', 'peach', 'heart')], b: [] } });
   installRescue(game.room, game.book);
   const order: string[] = [];
-  game.room.on(recovered, {
+  game.room.on(Hp.recovered, {
     id: 'heal',
     owner: null,
     eligible: () => true,
@@ -47,7 +41,7 @@ it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 c
       order.push('heal');
     },
   });
-  game.room.on(dyingFinished, {
+  game.room.on(Dying.finished, {
     id: 'dying-cleared',
     owner: null,
     eligible: () => true,
@@ -55,7 +49,7 @@ it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 c
       expect(isDying(ctx.world, 'b')).toBe(false);
     },
   });
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'after',
     owner: null,
     eligible: () => true,
@@ -170,7 +164,7 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
     id: 'probe:legacy',
     name: '遗赠',
     triggers: [
-      on(playerDied, {
+      on(Death.committed, {
         id: 'gift',
         allowDead: true,
         when: (_ctx, { payload: event, self }) => event.player === self.owner,
@@ -198,7 +192,7 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'b', skill: legacy.id, source: { kind: 'general', id: 'b' } }),
   );
-  game.room.on(playerBuried, {
+  game.room.on(Death.buried, {
     id: 'buried',
     owner: null,
     eligible: () => true,
@@ -208,7 +202,7 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
       expect(ctx.world.zone('b:hand').cards).toEqual([]);
     },
   });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'burial-is-atomic',
     owner: null,
     eligible: (_ctx, event) => event.moves.some((move) => move.from === 'b:equipment'),
@@ -226,7 +220,7 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
 it('死亡前防止与濒死末尾回复均可阻止死亡，关闭后的草案不可修改', async () => {
   const game = cardGame({ hands: { a: [] } });
   let draft: DeathDraft | undefined;
-  game.room.on(beforeDeath, {
+  game.room.on(Death.before, {
     id: 'prevent',
     owner: null,
     eligible: () => true,
@@ -241,7 +235,7 @@ it('死亡前防止与濒死末尾回复均可阻止死亡，关闭后的草案�
   expect(isDying(game.room.world, 'b')).toBe(false);
   expect(() => draft?.prevent('late')).toThrow();
   const saved = cardGame({ hands: { a: [] } });
-  saved.room.on(dyingFinishing, {
+  saved.room.on(Dying.finishing, {
     id: 'last-heal',
     owner: null,
     eligible: () => true,
@@ -258,7 +252,7 @@ it('同角色嵌套濒死的内层退出不清掉外层身份；内层救回后�
   const game = cardGame({ hands: { a: [] } });
   let nested = false;
   const finished: DyingResult[] = [];
-  game.room.on(dyingStarted, {
+  game.room.on(Dying.started, {
     id: 'nested-loss',
     owner: null,
     eligible: () => !nested,
@@ -269,7 +263,7 @@ it('同角色嵌套濒死的内层退出不清掉外层身份；内层救回后�
       expect(isDying(ctx.world, 'b')).toBe(true);
     },
   });
-  game.room.on(dyingFinishing, {
+  game.room.on(Dying.finishing, {
     id: 'inner-heal',
     owner: null,
     eligible: (ctx) => ctx.world.player('b').hp <= 0,
@@ -277,7 +271,7 @@ it('同角色嵌套濒死的内层退出不清掉外层身份；内层救回后�
       await recover(ctx, { from: null, to: 'b', amount: 2 });
     },
   });
-  game.room.on(dyingFinished, {
+  game.room.on(Dying.finished, {
     id: 'record',
     owner: null,
     eligible: () => true,
@@ -294,7 +288,7 @@ it('同角色嵌套濒死的内层退出不清掉外层身份；内层救回后�
 it('失去体力独立于伤害，可进入濒死；没有伤害来源或伤害后窗口', async () => {
   const game = cardGame({ hands: { a: [] } });
   const seen: string[] = [];
-  game.room.on(damageDealt, {
+  game.room.on(Damage.dealt, {
     id: 'damage',
     owner: null,
     eligible: () => true,
@@ -302,7 +296,7 @@ it('失去体力独立于伤害，可进入濒死；没有伤害来源或伤害�
       seen.push('damage');
     },
   });
-  game.room.on(hpLost, {
+  game.room.on(Hp.lost, {
     id: 'loss',
     owner: null,
     eligible: () => true,
@@ -310,7 +304,7 @@ it('失去体力独立于伤害，可进入濒死；没有伤害来源或伤害�
       seen.push('loss');
     },
   });
-  game.room.on(playerDied, {
+  game.room.on(Death.committed, {
     id: 'cause',
     owner: null,
     eligible: () => true,
@@ -326,7 +320,7 @@ it('失去体力独立于伤害，可进入濒死；没有伤害来源或伤害�
 
 it('已宣告牌的来源死亡不会移走处理材料或取消已产生效果', async () => {
   const game = cardGame({ hands: { a: [card('s', 'slash'), card('left', 'jink')], b: [] } });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'source-dies',
     owner: null,
     eligible: () => true,
@@ -356,7 +350,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
     ctx.commit('setup', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
   });
   let finished: DyingResult | undefined;
-  game.room.on(dyingStarted, {
+  game.room.on(Dying.started, {
     id: 'terminal',
     owner: null,
     eligible: () => true,
@@ -364,7 +358,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
       await finishGame(ctx, { winners: ['a'], reason: 'probe' });
     },
   });
-  game.room.on(dyingFinished, {
+  game.room.on(Dying.finished, {
     id: 'result',
     owner: null,
     eligible: () => true,
@@ -372,7 +366,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
       finished = result;
     },
   });
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'no-after',
     owner: null,
     eligible: () => true,
@@ -381,7 +375,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
     },
   });
   let useClosed = false;
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'use-closes',
     owner: null,
     eligible: () => true,
@@ -406,7 +400,7 @@ it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束�
 
 it('死亡效果故障保留已提交死亡与未善后区域，不伪造完成/回滚', async () => {
   const game = cardGame({ hands: { a: [], b: [card('b', 'jink')] } });
-  game.room.on(playerDied, {
+  game.room.on(Death.committed, {
     id: 'fault',
     owner: null,
     eligible: () => true,

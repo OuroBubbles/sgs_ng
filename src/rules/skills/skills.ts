@@ -2,25 +2,24 @@ import type { SkillInstance, SkillSource, WorldReader } from '../../core/model/s
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
-import { defineWindow, labelTrigger } from '../../core/runtime/window';
+import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
 import type {
   Trigger,
   TriggerSource,
-  WindowType,
+  Timing,
   TriggerOccurrence,
   WindowRef,
   WindowAdmission,
-} from '../../core/runtime/window';
-import { assertLifetime, lifetimeEnded } from '../scopes/lifetime';
-import type { Lifetime } from '../scopes/lifetime';
+} from '../../core/runtime/event';
+import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import { defineState, setState } from '../state/state';
 import type { ViewAs } from '../cards/types';
 import { viewAs } from '../cards/types';
 import type { QueryType, SkillModifier } from './query';
 import type { ActiveSkill } from './active';
-import { playerBuried, deathFinished } from '../combat/life-events';
 import { EffectBook } from '../effects/effects';
 import type { CardBook } from '../cards/book';
+import { Death } from '../combat/life-events';
 
 export interface SkillHandle {
   readonly id: string;
@@ -152,7 +151,7 @@ export interface SkillTriggerDefinition<T> {
   readonly run: (ctx: Context, input: SkillTriggerOccurrenceInput<T>) => unknown;
 }
 
-export function on<T>(window: WindowType<T>, definition: SkillTriggerDefinition<T>): SkillTrigger {
+export function on<T>(window: Timing<T>, definition: SkillTriggerDefinition<T>): SkillTrigger {
   const { id = window.id } = definition;
   // 展开对象不会复制原型方法；固定入口时保留作者对象作为接收者。
   const handler = Object.freeze({
@@ -356,7 +355,9 @@ export interface SkillChange {
   readonly before: SkillInstance | null;
   readonly after: SkillInstance | null;
 }
-export const skillsChanged = defineWindow<SkillChange>('skills.changed');
+export const Skill = defineEvent('skill', {
+  changed: timing<SkillChange>(),
+});
 
 export interface GrantSkill {
   readonly owner: string;
@@ -399,17 +400,14 @@ export class SkillBook implements TriggerSource {
 
   constructor(definitions: readonly SkillDefinition[] = []) {
     this.register(definitions);
-    this.registerSnapshots(skillsChanged, (change) => (change.before ? [change.before] : []));
-    this.registerSnapshots(lifetimeEnded, (ended) => ended.skillsBefore);
-    this.registerSnapshots(playerBuried, (event) => event.burial.skillsBefore);
-    this.registerSnapshots(deathFinished, (event) => event.burial.skillsBefore);
+    this.registerSnapshots(Skill.changed, (change) => (change.before ? [change.before] : []));
+    this.registerSnapshots(Lifetime.ended, (ended) => ended.skillsBefore);
+    this.registerSnapshots(Death.buried, (event) => event.burial.skillsBefore);
+    this.registerSnapshots(Death.finished, (event) => event.burial.skillsBefore);
   }
 
   /** 装配期声明窗口中的历史来源。只有该窗口收集候选，不进入当前能力目录。 */
-  registerSnapshots<T>(
-    window: WindowType<T>,
-    read: (payload: T) => readonly SkillInstance[],
-  ): void {
+  registerSnapshots<T>(window: Timing<T>, read: (payload: T) => readonly SkillInstance[]): void {
     if (this.#sealed) throw new Error('Skill snapshots are sealed after attachment.');
     if (this.#snapshots.has(window)) throw new Error('Duplicate skill snapshot reader.');
     this.#snapshots.set(window, (payload) => read(payload as T));
@@ -603,7 +601,7 @@ export class SkillBook implements TriggerSource {
     });
   }
 
-  collect<T>(type: WindowType<T>, world: WorldReader, payload: T): readonly Trigger<T>[] {
+  collect<T>(type: Timing<T>, world: WorldReader, payload: T): readonly Trigger<T>[] {
     return this.bindings(world, { type, payload }).flatMap(({ self, definition }) => {
       return definition.triggers
         .filter((trigger) => trigger.window === type)
@@ -707,7 +705,7 @@ export class SkillBook implements TriggerSource {
     else if (before)
       ctx.commit('skill.changed', [{ kind: 'removeSkill', instance: before.id }], result);
     else throw new Error('Empty skill change.');
-    await ctx.window(skillsChanged, result, { subject: (after ?? before)!.owner });
+    await ctx.window(Skill.changed, result, { subject: (after ?? before)!.owner });
     return result;
   }
 }

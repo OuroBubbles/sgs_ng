@@ -1,13 +1,9 @@
 import { expect, it, vi } from 'vitest';
 import {
   cardQueries,
-  counterFinished,
-  counterOpening,
   defaultPhaseBody,
   defineSkill,
   delayedCard,
-  effectFinished,
-  effectStarting,
   installCounterspells,
   kill,
   loseHp,
@@ -16,6 +12,8 @@ import {
   recover,
   runPhase,
   useDeclarations,
+  Resolve,
+  Counter,
 } from '../../src/sdk';
 import type { Context, UseIntent } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -145,14 +143,14 @@ for (const [name, boundary] of cases) {
         await game.room.run('wound', async (ctx) => {
           await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
         });
-      game.room.on(counterOpening, {
+      game.room.on(Counter.opening, {
         id: 'a-change-root-eligibility',
         owner: null,
         eligible: (_ctx, opportunity) => opportunity.depth === depth,
         run: (ctx) => change(ctx, game, boundary),
       });
       const later = vi.fn();
-      game.room.on(counterOpening, {
+      game.room.on(Counter.opening, {
         id: 'z-later',
         owner: null,
         eligible: (_ctx, opportunity) => opportunity.depth === depth,
@@ -194,7 +192,7 @@ it.each(['healed', 'last-card-gone', 'source-dead'] as const)(
       await game.room.run('wound', async (ctx) => {
         await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
       });
-    game.room.on(counterOpening, {
+    game.room.on(Counter.opening, {
       id: 'change-unrelated-condition',
       owner: null,
       eligible: (_ctx, opportunity) => opportunity.depth === 0,
@@ -215,7 +213,7 @@ it('同一候选中桃园目标先治满再失去体力，不把中途的假值�
   await game.room.run('wound', async (ctx) => {
     await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'temporarily-inapplicable',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.depth === 0,
@@ -256,7 +254,7 @@ it('普通作者 canResolve 闭包没有修改 World，也能关闭嵌套反制�
     ],
   });
   installCounterspells(game.room, game.book);
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'change-author-predicate',
     owner: null,
     eligible: () => true,
@@ -311,7 +309,7 @@ it('反制结论封口后的公共后效治满桃园目标，不倒改已完成�
   await game.room.run('wound', async (ctx) => {
     await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
-  game.room.on(counterFinished, {
+  game.room.on(Counter.finished, {
     id: 'heal-after-sealed-result',
     owner: null,
     eligible: (_ctx, result) => result.subject.kind === 'effect' && result.kind === 'countered',
@@ -344,7 +342,7 @@ it('启动资格只适用于原 World 和未结束的待决效果，公共完成
   const game = create('duel', 1);
   const foreign = cardGame({ hands: { a: [] } });
   let available: ((ctx: Context) => boolean) | undefined;
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'capture-pending-effect',
     owner: null,
     eligible: () => true,
@@ -356,7 +354,7 @@ it('启动资格只适用于原 World 和未结束的待决效果，公共完成
       });
     },
   });
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'check-completed-effect',
     owner: null,
     eligible: () => true,

@@ -2,28 +2,21 @@ import { expect, it } from 'vitest';
 import {
   CardBook,
   SkillBook,
-  responseFinished,
-  responseRequested,
-  useFinished,
-  costPaid,
   judge,
   withCardSupply,
   loseHp,
-  rescueRequested,
   installRescue,
-  cardsMoved,
   defineSkill,
   modify,
   cardQueries,
   pay,
+  Use,
+  Cards,
+  Response,
+  Dying,
+  Cost,
 } from '../../src/sdk';
-import type {
-  Context,
-  EffectRef,
-  ResponseResult,
-  WindowType,
-  SkillDefinition,
-} from '../../src/sdk';
+import type { Context, EffectRef, ResponseResult, Timing, SkillDefinition } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
 import { standardCards } from '../../src/content/standard/cards';
 import { guicai } from '../../src/content/standard/generals/simayi';
@@ -33,7 +26,7 @@ import { card, cardGame, use } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
 
 const owners = ['a', 'b', 'c', 'd'];
-function watchOrder<T>(game: ReturnType<typeof cardGame>, window: WindowType<T>): string[] {
+function watchOrder<T>(game: ReturnType<typeof cardGame>, window: Timing<T>): string[] {
   const seen: string[] = [];
   // 所有席位均有被动观察者，令首席锚点错误成为可见的规则差异。
   for (const owner of owners)
@@ -56,7 +49,7 @@ for (const delegated of [false, true]) {
   it(`实际 c ${delegated ? '代 b 打出' : '自己使用'}闪：支付与各自完成窗口按实际角色起算`, async () => {
     const game = cardGame({ hands: { a: [card('s', 'slash')], c: [card('j', 'jink')] } });
     if (delegated)
-      game.room.on(responseRequested, {
+      game.room.on(Response.requested, {
         id: 'probe:delegate',
         owner: null,
         eligible: (_ctx, request) => request.actor === 'b',
@@ -64,12 +57,12 @@ for (const delegated of [false, true]) {
           await request.delegate(ctx, 'c');
         },
       });
-    const finished = watchOrder(game, responseFinished);
-    const used = watchOrder(game, useFinished);
-    const paid = watchOrder(game, costPaid);
+    const finished = watchOrder(game, Response.finished);
+    const used = watchOrder(game, Use.finished);
+    const paid = watchOrder(game, Cost.paid);
     const materialMoved: string[] = [];
     for (const owner of owners)
-      game.room.on(cardsMoved, {
+      game.room.on(Cards.moved, {
         id: `probe:payment-move:${owner}`,
         owner,
         eligible: (_ctx, move) =>
@@ -126,8 +119,8 @@ it('鬼才由 c 为 b 改判：实际打出者决定支付和打出完成窗口�
       source: { kind: 'general', id: 'probe' },
     }),
   );
-  const finished = watchOrder(game, responseFinished);
-  const paid = watchOrder(game, costPaid);
+  const finished = watchOrder(game, Response.finished);
+  const paid = watchOrder(game, Cost.paid);
   const running = game.room.run('judge', (ctx) =>
     judge(ctx, {
       player: 'b',
@@ -162,8 +155,8 @@ it('独立供牌保留原接收者与查询守卫，从实际 c 结算完成窗�
     }
   }
   const input = new Input();
-  const finished = watchOrder(game, responseFinished);
-  const paid = watchOrder(game, costPaid);
+  const finished = watchOrder(game, Response.finished);
+  const paid = watchOrder(game, Cost.paid);
   expect(
     await game.room.run('unavailable', (ctx) => withCardSupply(ctx, input, () => 'unexpected')),
   ).toMatchObject({ value: { kind: 'unavailable' } });
@@ -228,7 +221,7 @@ it('供牌支付后的异步资格不能被布尔组合掩盖，已提交费用�
 it('支付后窗口使用已提交 receipt 的实际支付者，不重读被后效修改的调用参数', async () => {
   const game = cardGame({ hands: { c: [card('fee', 'jink')] } });
   const spec = { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:fee' };
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'probe:change-input',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('fee')),
@@ -236,7 +229,7 @@ it('支付后窗口使用已提交 receipt 的实际支付者，不重读被后�
       spec.actor = 'a';
     },
   });
-  const paid = watchOrder(game, costPaid);
+  const paid = watchOrder(game, Cost.paid);
   expect(await game.room.run('pay', (ctx) => pay(ctx, spec))).toMatchObject({
     kind: 'resolved',
     value: { kind: 'paid', receipt: { actor: 'c' } },
@@ -249,7 +242,7 @@ it('支付后窗口使用已提交 receipt 的实际支付者，不重读被后�
 it('救援 b 时，受伤的 a 不能把这次桃改用于自己；合法救援仍经真实濒死流程', async () => {
   const game = cardGame({ hands: { a: [card('peach', 'peach', 'heart')] } });
   await game.room.run('wound-a', (ctx) => loseHp(ctx, { player: 'a', amount: 1, reason: 'probe' }));
-  game.room.on(rescueRequested, {
+  game.room.on(Dying.rescue, {
     id: 'probe:rescue',
     owner: null,
     group: 'rescue',

@@ -2,7 +2,6 @@ import type { Card, WorldSeed } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import { Room } from '../../core/runtime/room';
 import type { Context, FlowResult } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import type { CardBook } from '../../rules/cards/book';
 import { draw } from '../../rules/cards/draw';
 import { moveCards } from '../../rules/cards/move';
@@ -19,7 +18,7 @@ import { defineState, readState, stateChange } from '../../rules/state/state';
 import { runTurn, defaultPhaseBody } from '../../rules/turn/turn';
 import type { PhaseBody } from '../../rules/turn/turn';
 import { turnActionAnchor } from '../../rules/turn/order';
-import type { ActionAnchor } from '../../core/runtime/window';
+import type { ActionAnchor } from '../../core/runtime/event';
 import { takeExtraTurn } from '../../rules/turn/extra';
 import { genderChange } from '../../rules/characters/gender';
 import type { Gender } from '../../rules/characters/gender';
@@ -28,6 +27,7 @@ import { generalChange } from '../../rules/characters/general';
 import type { GeneralBook } from '../../rules/characters/general';
 import { createContent } from '../../content/catalog';
 import type { ContentCatalog, ContentDefinition } from '../../content/catalog';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface MatchPlayer {
   readonly id: string;
@@ -73,7 +73,9 @@ const matchState = defineState<MatchProgress | null>(
       typeof value.next === 'string'),
 );
 const matchTarget = Object.freeze({ owner: null, source: 'match', lifetime: null });
-export const matchPrepared = defineWindow<{ readonly first: string }>('match.prepared');
+export const Match = defineEvent('match', {
+  prepared: timing<{ readonly first: string }>(),
+});
 
 /** Fisher–Yates 只消耗 Context 随机源；最终身份/牌序都通过事实提交。 */
 function shuffled<T>(ctx: Context, values: readonly T[]): T[] {
@@ -272,7 +274,7 @@ export class RoleMatch {
         [stateChange(ctx, matchState, matchTarget, { stage: 'ready', turns: 0, next: lord })],
         { first: lord },
       );
-      if (!this.result) await ctx.window(matchPrepared, { first: lord }, { subject: lord });
+      if (!this.result) await ctx.window(Match.prepared, { first: lord }, { subject: lord });
     });
   }
 

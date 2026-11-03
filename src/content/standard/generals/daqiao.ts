@@ -8,8 +8,8 @@ import {
   select,
   selection,
   skill,
-  targetConfirming,
   trigger,
+  Target,
 } from '../../../sdk';
 import type {
   CardEffect,
@@ -84,7 +84,7 @@ export const liuli = skill({
   description:
     '当你成为杀的目标时，可以弃置一张手牌或装备，将此杀转移给你攻击范围内的一名其他角色（不能是出杀者）。弃置的装备不再提供范围。',
   triggers: [
-    trigger(targetConfirming, {
+    trigger(Target.confirming, {
       who: ({ effect }) => effect.target,
       when: (ctx, { use, effect }, self) =>
         effect.actor !== self.owner &&

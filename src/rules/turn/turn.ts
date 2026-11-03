@@ -2,7 +2,6 @@ import { JointSelection } from '../../core/decisions/selection';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Change } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { parseCardChoice } from '../cards/book';
 import type { CardBook } from '../cards/book';
 import { draw } from '../cards/draw';
@@ -24,6 +23,8 @@ import type { Lifetime } from '../scopes/lifetime';
 import { defineState, readState, stateChange } from '../state/state';
 import { activeTurn, activeTarget, validTurnOrigin } from './state';
 import type { TurnOrigin } from './state';
+import { defineEvent, timing } from '../../core/runtime/event';
+
 export { activeTurn, activeTarget, validTurnOrigin } from './state';
 export type { TurnOrigin } from './state';
 
@@ -92,11 +93,15 @@ export function currentPhase(ctx: Context): PhaseView | null {
   const phase = currentPhases.get(ctx.world);
   return phase?.lifetime.active && ctx.cause.scopePath.includes(phase.id) ? phase : null;
 }
-export const phaseBefore = defineWindow<PhaseView>('phase.before');
-export const phaseStarted = defineWindow<PhaseView>('phase.started');
-export const phaseEnding = defineWindow<PhaseView>('phase.ending');
-export const turnStarted = defineWindow<TurnView>('turn.started');
-export const turnEnding = defineWindow<TurnView>('turn.ending');
+export const Phase = defineEvent('phase', {
+  before: timing<PhaseView>(),
+  started: timing<PhaseView>(),
+  ending: timing<PhaseView>(),
+});
+export const Turn = defineEvent('turn', {
+  started: timing<TurnView>(),
+  ending: timing<TurnView>(),
+});
 
 interface ActivePhase {
   readonly id: string;
@@ -413,7 +418,7 @@ export function runPhase(
               { id: phase.id, owner, kind, reason },
             );
         }
-        await child.window(phaseBefore, phase, { subject: owner });
+        await child.window(Phase.before, phase, { subject: owner });
         if (
           !phase.skipped &&
           (!child.world.player(owner).alive || turn?.ended || isGameOver(child.world))
@@ -443,7 +448,7 @@ export function runPhase(
           ],
           phase.snapshot(),
         );
-        await child.window(phaseStarted, phase, { subject: owner });
+        await child.window(Phase.started, phase, { subject: owner });
         phase.finishStart();
         if (
           !phase.replaced &&
@@ -452,7 +457,7 @@ export function runPhase(
           !isGameOver(child.world)
         )
           await body(child, phase, book);
-        await child.window(phaseEnding, phase, { subject: owner });
+        await child.window(Phase.ending, phase, { subject: owner });
         return {
           phase: phase.snapshot(),
           exit: phase.replaced ? 'replaced' : 'completed',
@@ -531,7 +536,7 @@ export function runTurn(
           [stateChange(child, activeTurn, activeTarget, { id: turn.id, owner, origin })],
           { id: turn.id, owner, origin, phases },
         );
-        await child.window(turnStarted, turn, { subject: owner });
+        await child.window(Turn.started, turn, { subject: owner });
         const results: PhaseResult[] = [];
         for (const kind of phases) {
           if (turn.ended || !child.world.player(owner).alive || isGameOver(child.world)) break;
@@ -539,7 +544,7 @@ export function runTurn(
 
           results.push(phase);
         }
-        await child.window(turnEnding, turn, { subject: owner });
+        await child.window(Turn.ending, turn, { subject: owner });
         return immutable({
           id: turn.id,
           owner,

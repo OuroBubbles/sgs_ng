@@ -14,16 +14,16 @@ import {
   kill,
   damage,
   draw,
-  drawing,
   activePhase,
   activeTurn,
   activeTarget,
   readState,
   defineSkill,
   on,
-  playerDied,
   runTurn,
   installRescue,
+  Cards,
+  Death,
 } from '../../src/sdk';
 import type { Role, GameResult } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -112,7 +112,7 @@ it('死亡效果可以嵌套死亡；判胜只写一次，已完成的死亡区�
     hands: { a: [card('a', 'slash')], b: [], c: [card('c', 'jink')], d: [] },
   });
   await prepareMode(game);
-  game.room.on(playerDied, {
+  game.room.on(Death.committed, {
     id: 'rebel-legacy',
     owner: null,
     eligible: (_ctx, event) => event.player === 'c',
@@ -247,7 +247,7 @@ it('角色预设技能在起手前授予，可由普通代码改写摸牌', asyn
     id: 'probe:setup',
     name: '准备',
     triggers: [
-      on(drawing, {
+      on(Cards.drawing, {
         id: 'initial-hand',
         when: (_ctx, { payload: draft, self }) =>
           draft.input.player === self.owner && draft.input.reason === 'match:initial-hand',

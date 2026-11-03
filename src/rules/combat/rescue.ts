@@ -1,11 +1,11 @@
 import type { Room } from '../../core/runtime/room';
 import type { CardBook } from '../cards/book';
 import { isGameOver } from '../game/end';
-import { rescueRequested } from './life';
+import { Dying } from './life-events';
 
 /** 标准救援装配：从当前回合角色起按座次，每人可连续使用桃直到脱离濒死或放弃。 */
 export function installRescue(room: Room, book: CardBook): () => void {
-  return room.on(rescueRequested, {
+  return room.on(Dying.rescue, {
     id: 'core:rescue',
     owner: null,
     group: 'rescue',

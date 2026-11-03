@@ -1,8 +1,8 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface GameResult {
   readonly winners: readonly string[];
@@ -21,7 +21,9 @@ export const gameResult = defineState<GameResult | null>(
       typeof value.reason === 'string'),
 );
 export const gameTarget = Object.freeze({ owner: null, source: 'game', lifetime: null });
-export const gameFinished = defineWindow<GameResult>('game.finished');
+export const Game = defineEvent('game', {
+  finished: timing<GameResult>(),
+});
 export function resultOf(world: WorldReader): GameResult | null {
   return readState(world, gameResult, gameTarget);
 }
@@ -38,6 +40,6 @@ export async function finishGame(ctx: Context, input: GameResult): Promise<GameR
     throw new Error('Invalid game result.');
   for (const id of result.winners) ctx.world.player(id);
   ctx.commit('game.finished', [stateChange(ctx, gameResult, gameTarget, result)], result);
-  await ctx.window(gameFinished, result);
+  await ctx.window(Game.finished, result);
   return result;
 }

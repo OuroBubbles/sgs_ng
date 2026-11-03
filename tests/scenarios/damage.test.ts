@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  damage,
-  damageCausing,
-  damageInflicting,
-  damageReceived,
-  damageSettled,
-  moveCards,
-} from '../../src/sdk';
+import { damage, moveCards, Damage } from '../../src/sdk';
 import type { DamageDraft, DamageResult } from '../../src/sdk';
 import { room } from '../fixtures/room';
 
@@ -16,7 +9,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
   it('来源快照与目标草案分开，防御阶段仍可限伤再增伤', async () => {
     const game = room();
     const captured: { draft?: DamageDraft; result?: DamageResult } = {};
-    game.on(damageCausing, {
+    game.on(Damage.causing, {
       id: 'source-plus',
       owner: 'a',
       eligible: () => true,
@@ -24,7 +17,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
         draft.adjust(1, 'source');
       },
     });
-    game.on(damageInflicting, {
+    game.on(Damage.inflicting, {
       id: 'a-lion',
       owner: 'b',
       eligible: () => true,
@@ -33,7 +26,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
         draft.setAmount(Math.min(1, draft.amount), 'silver-lion-like cap');
       },
     });
-    game.on(damageInflicting, {
+    game.on(Damage.inflicting, {
       id: 'b-plus',
       owner: 'b',
       eligible: () => true,
@@ -41,7 +34,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
         draft.adjust(1, 'later effect');
       },
     });
-    game.on(damageSettled, {
+    game.on(Damage.settled, {
       id: 'settled',
       owner: 'b',
       eligible: () => true,
@@ -66,7 +59,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
   it('受伤后嵌套反击与移牌完整结束，外层 damage 才返回', async () => {
     const game = room();
     const order: string[] = [];
-    game.on(damageReceived, {
+    game.on(Damage.received, {
       id: 'counter',
       owner: 'b',
       eligible: (_ctx, result) => result.input.to === 'b',
@@ -105,7 +98,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
       const game = room();
       const received: DamageResult[] = [];
       const settled: DamageResult[] = [];
-      game.on(damageInflicting, {
+      game.on(Damage.inflicting, {
         id: 'defend',
         owner: 'b',
         eligible: () => true,
@@ -114,7 +107,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
           else draft.setAmount(0, 'reduce');
         },
       });
-      game.on(damageReceived, {
+      game.on(Damage.received, {
         id: 'receive',
         owner: 'b',
         eligible: () => true,
@@ -122,7 +115,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
           received.push(result);
         },
       });
-      game.on(damageSettled, {
+      game.on(Damage.settled, {
         id: 'settle',
         owner: 'b',
         eligible: () => true,
@@ -140,7 +133,7 @@ describe('伤害领域骨架与普通代码作者能力', () => {
 
   it('纯资格查询不能偷偷修改伤害草案', async () => {
     const game = room();
-    game.on(damageCausing, {
+    game.on(Damage.causing, {
       id: 'bad',
       owner: 'a',
       eligible: (_ctx, draft) => {

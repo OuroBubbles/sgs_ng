@@ -1,25 +1,22 @@
 import { expect, it } from 'vitest';
 import {
   draw,
-  drawing,
-  cardsDrawn,
   withProcessing,
   moveCards,
   runTurn,
   runPhase,
-  phaseBefore,
-  phaseStarted,
-  phaseEnding,
   defaultPhaseBody,
   activePhase,
   activeTurn,
   activeTarget,
   readState,
-  costPaid,
   pay,
   used,
-  turnStarted,
   runPhase as phase,
+  Cards,
+  Cost,
+  Phase,
+  Turn,
 } from '../../src/sdk';
 import type { TurnView } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
@@ -32,7 +29,7 @@ it('摸牌数可在提交前修改，洗牌只补牌堆并保持已有牌堆顶�
     draw: [card('top', 'slash')],
     discard: [card('x', 'jink'), card('y', 'peach'), card('z', 'duel')],
   });
-  game.room.on(drawing, {
+  game.room.on(Cards.drawing, {
     id: 'draw-more',
     owner: 'a',
     eligible: () => true,
@@ -74,7 +71,7 @@ it('相同种子洗牌结果一致，不从其他处理区取牌', async () => {
 
 it('摸牌后效完整结束后返回，牌被后效取走也保留真实摸牌事实', async () => {
   const game = cardGame({ hands: { a: [] }, draw: [card('top', 'slash')] });
-  game.room.on(cardsDrawn, {
+  game.room.on(Cards.drawn, {
     id: 'give-away',
     owner: 'b',
     eligible: () => true,
@@ -102,7 +99,7 @@ it('一次回合以真实决策走过摸牌、出牌、响应、弃牌和结束'
     draw: [card('d1', 'jink'), card('d2', 'slash')],
   });
   const started: string[] = [];
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'record',
     owner: 'a',
     eligible: () => true,
@@ -154,7 +151,7 @@ it('一次回合以真实决策走过摸牌、出牌、响应、弃牌和结束'
 it('跳过阶段不执行阶段本体或开始/结束窗口，其他阶段继续', async () => {
   const game = cardGame({ hands: { a: [] }, draw: [card('d1', 'jink'), card('d2', 'slash')] });
   const stages: string[] = [];
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'skip-draw',
     owner: 'a',
     eligible: (_ctx, current) => current.kind === 'draw',
@@ -162,7 +159,7 @@ it('跳过阶段不执行阶段本体或开始/结束窗口，其他阶段继续
       current.skip(ctx, 'skip draw');
     },
   });
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'started',
     owner: 'a',
     eligible: () => true,
@@ -170,7 +167,7 @@ it('跳过阶段不执行阶段本体或开始/结束窗口，其他阶段继续
       stages.push(`start:${current.kind}`);
     },
   });
-  game.room.on(phaseEnding, {
+  game.room.on(Phase.ending, {
     id: 'ended',
     owner: 'a',
     eligible: () => true,
@@ -196,7 +193,7 @@ it('弃牌阶段结束时按显式阶段身份查询本阶段弃牌', async () =
   await game.room.run('wound', (ctx) =>
     ctx.commit('hp', [{ kind: 'vitality', player: 'a', hp: 2 }], {}),
   );
-  game.room.on(phaseEnding, {
+  game.room.on(Phase.ending, {
     id: 'query',
     owner: 'b',
     eligible: (_ctx, current) => current.kind === 'discard',
@@ -237,7 +234,7 @@ it('模式可以用普通函数扩展阶段本体，不依赖一个技能模板�
 it('阶段开始时结束回合可停止本体与后续阶段', async () => {
   const game = cardGame();
   const phases: string[] = [];
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'record',
     owner: 'b',
     eligible: () => true,
@@ -245,7 +242,7 @@ it('阶段开始时结束回合可停止本体与后续阶段', async () => {
       phases.push(current.kind);
     },
   });
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'end-turn',
     owner: 'a',
     eligible: (_ctx, current) => current.kind === 'play',
@@ -261,7 +258,7 @@ it('阶段开始时结束回合可停止本体与后续阶段', async () => {
 
 it('支付后死亡会停止后续阶段，正常结束会恢复对局阶段状态', async () => {
   const game = cardGame();
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'die',
     owner: 'b',
     eligible: (_ctx, receipt) => receipt.cards.includes('slash1'),
@@ -304,7 +301,7 @@ it('独立额外出牌阶段拥有新身份，可重新使用杀', async () => {
 it('用牌费用后效结束回合，已宣告牌仍完整结算，再停止后续阶段', async () => {
   const game = cardGame();
   const captured: { turn?: TurnView } = {};
-  game.room.on(turnStarted, {
+  game.room.on(Turn.started, {
     id: 'capture',
     owner: 'a',
     eligible: () => true,
@@ -312,7 +309,7 @@ it('用牌费用后效结束回合，已宣告牌仍完整结算，再停止后�
       captured.turn = current;
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'end-turn',
     owner: 'b',
     eligible: (_ctx, receipt) => receipt.cards.includes('slash1'),
@@ -368,13 +365,13 @@ it('手牌上限通过具名纯查询修正，不必复制弃牌阶段实现', a
 it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完成状态', async () => {
   const game = cardGame({ draw: [card('d1', 'jink')] });
   const observations: boolean[] = [];
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'paid-skip',
     owner: 'a',
     eligible: (_ctx, current) => current.kind === 'draw',
     run: async (ctx, current) => {
       const limit = { key: 'skip-draw', source: 'test:skip', lifetime: current.lifetime, max: 1 };
-      ctx.listen(costPaid, {
+      ctx.listen(Cost.paid, {
         id: 'observe-skip',
         owner: 'b',
         eligible: () => true,
@@ -406,7 +403,7 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
 
 it('费用失效时不提交跳过意图，阶段照常执行', async () => {
   const game = cardGame({ hands: { b: [card('other', 'jink')] }, draw: [card('d1', 'jink')] });
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'bad-cost',
     owner: 'a',
     eligible: (_ctx, current) => current.kind === 'draw',

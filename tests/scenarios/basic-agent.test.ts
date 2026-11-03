@@ -1,13 +1,13 @@
 import { expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { RoleMatch, matchPrepared } from '../../src/app/offline/role-match';
+import { Match, RoleMatch } from '../../src/app/offline/role-match';
 import { LocalSession } from '../../src/app/offline/session';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { standardCards } from '../../src/content/standard/cards';
-import { chooseOwnedCard, moveCards, useDeclared } from '../../src/sdk';
+import { chooseOwnedCard, moveCards, Use } from '../../src/sdk';
 import { nextRequest } from '../fixtures/room';
 import type { Card, FlowResult } from '../../src/sdk';
 import { card } from '../fixtures/cards';
@@ -28,7 +28,7 @@ function fixture() {
       ...Array.from({ length: 24 }, (_, i) => card(`deck-${i}`, 'jink')),
     ],
   });
-  match.room.on(matchPrepared, {
+  match.room.on(Match.prepared, {
     id: 'fixture',
     owner: null,
     eligible: () => true,
@@ -83,7 +83,7 @@ it('本人托管后拒绝旧输入，收回和暂停立即撤销未执行的 AI�
 
 it('本人托管遇到未支持的必选请求时交还原决策，作者可以继续回答', async () => {
   const match = fixture();
-  match.room.on(matchPrepared, {
+  match.room.on(Match.prepared, {
     id: 'author-choice',
     owner: null,
     eligible: () => true,
@@ -216,7 +216,7 @@ it('连续三层无懈使用公开根效果和深度决策，支付三张牌并�
     c: [card('counter-c', 'nullification')],
   });
   const depths: number[] = [];
-  match.room.on(useDeclared, {
+  match.room.on(Use.declared, {
     id: 'depths',
     owner: null,
     eligible: (_ctx, use) => use.timing.kind === 'counter',

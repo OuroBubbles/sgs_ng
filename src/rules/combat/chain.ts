@@ -1,9 +1,9 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 const chained = defineState(
   'combat:chained',
@@ -19,7 +19,9 @@ export interface ChainChange {
   readonly reason: string;
 }
 export type ChainResult = ChainChange & { readonly kind: 'changed' | 'unchanged' | 'unavailable' };
-export const chainChanged = defineWindow<ChainChange>('chain.changed');
+export const Chain = defineEvent('chain', {
+  changed: timing<ChainChange>(),
+});
 
 export function isChained(world: WorldReader, player: string): boolean {
   world.player(player);
@@ -57,7 +59,7 @@ export function setChained(
     });
     if (kind === 'changed') {
       at.commit('chain.changed', [chainChange(at, player, value)], result);
-      await at.window(chainChanged, result, { subject: player });
+      await at.window(Chain.changed, result, { subject: player });
     }
     return result;
   });

@@ -6,15 +6,8 @@ import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
 import {
   judge,
-  judgmentRevealed,
-  judgmentRetrial,
-  responseFinished,
   damage,
-  damageDealt,
-  cardsMoved,
-  cardsDrawn,
   moveCards,
-  costPaid,
   kill,
   defineSkill,
   modify,
@@ -22,8 +15,13 @@ import {
   privateCardPools,
   withPrivateTopCards,
   runPhase,
+  Cards,
+  Judgment,
+  Response,
+  Damage,
+  Cost,
 } from '../../src/sdk';
-import type { Context, Judgment } from '../../src/sdk';
+import type { Context } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
@@ -72,7 +70,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
   });
   const skill = await grant(game, 'standard:guicai');
   let judgment: Judgment;
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'hold',
     owner: null,
     eligible: () => true,
@@ -82,7 +80,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
   });
   let paid = 0;
   let played = 0;
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'played',
     owner: null,
     eligible: () => true,
@@ -95,7 +93,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
       });
     },
   });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('new')),
@@ -107,7 +105,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
       });
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'cost',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === skill.skill,
@@ -226,7 +224,7 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
       draw: [card('old', 'slash')],
     });
     await grant(game, 'standard:guicai');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'lose-source',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:guicai',
@@ -260,7 +258,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
       skills: [...standardGeneralSkills, probe],
     });
     const self = await grant(game, probe.id);
-    game.room.on(judgmentRetrial, {
+    game.room.on(Judgment.retrial, {
       id: 'guard-probe',
       owner: null,
       eligible: () => true,
@@ -353,7 +351,7 @@ it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；�
     const game = scenario({ hands: { a: [card('mine', 'peach')], b: [card('theirs', 'peach')] } });
     await grant(game, 'standard:fankui');
     if (branch === 'dead')
-      game.room.on(damageDealt, {
+      game.room.on(Damage.dealt, {
         id: 'die',
         owner: null,
         eligible: () => true,
@@ -392,7 +390,7 @@ it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取'
           'probe',
         );
     };
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after-declaration',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:fankui',
@@ -438,7 +436,7 @@ it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则�
   for (const branch of ['revoke', 'taken', 'dead'] as const) {
     const game = scenario({ draw: [card('top', 'slash')] });
     await grant(game, tiandu.id);
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'change',
       owner: null,
       eligible: (_ctx, paid) => paid.skill === tiandu.id,
@@ -496,7 +494,7 @@ it('遗计私有牌池不算手牌、不触发摸牌，只有本人投影和 AI 
   const match = privateMatch();
   await grant(match, yiji.id);
   let draws = 0;
-  match.room.on(cardsDrawn, {
+  match.room.on(Cards.drawn, {
     id: 'count',
     owner: null,
     eligible: () => true,
@@ -566,7 +564,7 @@ it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence �
     draw: [card('one', 'slash'), card('two', 'jink'), card('unused', 'peach')],
   });
   await grant(game, yiji.id);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'revoke',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === yiji.id,
@@ -588,7 +586,7 @@ it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence �
 it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌弃置且元数据关闭', async () => {
   const game = scenario({ draw: [card('one', 'slash'), card('two', 'jink')] });
   await grant(game, yiji.id);
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'die-after-give',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'b:hand'),
@@ -611,7 +609,7 @@ it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌�
 it('私有牌池只洗弃牌补足，不借用外层处理区；牌被先取走后按实时余牌选择', async () => {
   const game = scenario({ draw: [card('first', 'slash')], discard: [card('second', 'jink')] });
   await grant(game, yiji.id);
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'take-first',
     owner: null,
     eligible: (_ctx, moved) =>
@@ -773,8 +771,11 @@ it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗
   expect(
     match.room.history
       .facts('card.taken')
-      .some((fact) => (fact.data.detail as { declaration?: { reason?: string } }).declaration?.reason ===
-          'standard:fankui'),
+      .some(
+        (fact) =>
+          (fact.data.detail as { declaration?: { reason?: string } }).declaration?.reason ===
+          'standard:fankui',
+      ),
   ).toBe(true);
   expect(match.room.history.facts('cards.peeked').length).toBeGreaterThan(0);
   expect(match.room.history.facts('cards.given').length).toBeGreaterThan(0);

@@ -1,13 +1,7 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import type { Context, StateKey, Decision } from '../../src/sdk';
-import {
-  defineWindow,
-  defineState,
-  readState,
-  setState,
-  defineEffect,
-  EffectBook,
-} from '../../src/sdk';
+import { defineState, readState, setState, defineEffect, EffectBook } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, nextRequest, choose } from '../fixtures/room';
 
@@ -23,7 +17,7 @@ it('决策的字段、方法与返回数据在同一纯查询边界读取，gett
   ] as const) {
     const game = room();
     const before = game.world.snapshot;
-    const window = defineWindow<null>('probe.decision-snapshot');
+    const window = testTiming<null>('probe.decision-snapshot');
     let detach: (() => void) | undefined;
     let refresh = false;
     const write = () => {
@@ -128,7 +122,7 @@ it('投影上下文返回后立即关闭，不能缓存它作为后续查询或�
 
 it('投影拒绝提交、随机、监听、清理登记、中止和子流程，且不改变 Room 状态', () => {
   const game = room();
-  const window = defineWindow<null>('inspect.probe');
+  const window = testTiming<null>('inspect.probe');
   game.inspect((ctx) => {
     expect(() => ctx.commit('bad', [], {})).toThrow('read-only');
     expect(() => ctx.randomInt(2)).toThrow('read-only');

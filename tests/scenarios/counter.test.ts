@@ -2,18 +2,16 @@ import type { Context } from '../../src/sdk';
 import { expect, it } from 'vitest';
 import {
   installCounterspells,
-  useDeclared,
   resolveCounter,
-  useFinished,
-  targetConfirming,
-  effectStarting,
-  counterOpening,
-  counterFinished,
   defineSkill,
   viewAs,
   ownedCards,
   kill,
   finishGame,
+  Use,
+  Target,
+  Resolve,
+  Counter,
 } from '../../src/sdk';
 import type { CounterOpportunity, UseTiming } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -43,7 +41,7 @@ it.each([1, 2, 3])('%s 层无懈嵌套为真正用牌：顺序、处理区和结
   const game = create(count);
   const order: string[] = [];
   let maxProcessing = 0;
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'stack',
     owner: null,
     eligible: () => true,
@@ -54,7 +52,7 @@ it.each([1, 2, 3])('%s 层无懈嵌套为真正用牌：顺序、处理区和结
       );
     },
   });
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'finished',
     owner: null,
     eligible: () => true,
@@ -114,7 +112,7 @@ it('拒绝无懈后按座次继续；下一层可以重新参加，不能伪造�
 it('无懈不能主动打出，过期机会或同文本 ID 的其他局也不能复用', async () => {
   const game = create();
   const captured: { opportunity?: CounterOpportunity } = {};
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'capture',
     owner: null,
     eligible: () => true,
@@ -149,7 +147,7 @@ it('目标效果在主组取消后不再征询无懈；机会中失去意义也�
   for (const duringOpening of [false, true]) {
     const game = create();
     let cancel: (ctx: Context) => void = () => {};
-    game.room.on(targetConfirming, {
+    game.room.on(Target.confirming, {
       id: 'capture-target',
       owner: null,
       eligible: () => true,
@@ -158,14 +156,14 @@ it('目标效果在主组取消后不再征询无懈；机会中失去意义也�
       },
     });
     if (duringOpening)
-      game.room.on(counterOpening, {
+      game.room.on(Counter.opening, {
         id: 'cancel-in-counter',
         owner: null,
         eligible: () => true,
         run: (ctx) => cancel(ctx),
       });
     else
-      game.room.on(effectStarting, {
+      game.room.on(Resolve.starting, {
         id: 'cancel-before',
         owner: null,
         eligible: () => true,
@@ -204,7 +202,7 @@ it('转换无懈走同一用牌管线，失去来源不吞掉已经宣告的反�
     game.skills.grant(ctx, { owner: 'b', skill: skill.id, source }),
   );
   const instance = game.room.world.snapshot.skills[0]!.id;
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'lose-skill',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:nullification',
@@ -228,7 +226,7 @@ it('转换无懈走同一用牌管线，失去来源不吞掉已经宣告的反�
 it('链中来源死亡仍完成已宣告无懈，终局则停止新机会并清理全部材料', async () => {
   for (const terminal of [false, true]) {
     const game = create();
-    game.room.on(useDeclared, {
+    game.room.on(Use.declared, {
       id: 'after-payment',
       owner: null,
       eligible: (_ctx, use) => use.card.name === 'standard:nullification',
@@ -257,7 +255,7 @@ it('链中来源死亡仍完成已宣告无懈，终局则停止新机会并清�
 it('反制提交记录明确关联原效果与每层用牌，结果不包含生命周期闭包', async () => {
   const game = create(2);
   const subjects: string[] = [];
-  game.room.on(counterFinished, {
+  game.room.on(Counter.finished, {
     id: 'subjects',
     owner: null,
     eligible: () => true,

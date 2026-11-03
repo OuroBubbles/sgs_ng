@@ -1,22 +1,18 @@
 import { expect, it } from 'vitest';
 import {
-  damageDealt,
   cardQueries,
   defaultPhaseBody,
   defineSkill,
-  effectFinished,
-  effectStarting,
   finishGame,
   kill,
   moveCards,
   modify,
   runPhase,
-  targetConfirmed,
-  targetConfirming,
-  targetSpecified,
-  targetSpecifying,
   useDeclarations,
-  useDeclared,
+  Use,
+  Target,
+  Resolve,
+  Damage,
 } from '../../src/sdk';
 import type {
   CardDefinition,
@@ -33,10 +29,10 @@ import { nextRequest } from '../fixtures/room';
 
 type Game = ReturnType<typeof cardGame>;
 const stages = [
-  ['specifying', targetSpecifying],
-  ['confirming', targetConfirming],
-  ['specified', targetSpecified],
-  ['confirmed', targetConfirmed],
+  ['specifying', Target.specifying],
+  ['confirming', Target.confirming],
+  ['specified', Target.specified],
+  ['confirmed', Target.confirmed],
 ] as const;
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const source = { kind: 'general', id: 'probe' } as const;
@@ -223,7 +219,7 @@ it.each(stages)('在 %s 转移目标封闭旧身份，新身份重新完成四�
 
 it('补入较早座次不倒退已访问目标，各层仍各自排序', async () => {
   const game = scenario();
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'earlier',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'c',
@@ -291,7 +287,7 @@ it('生效前窗口补入较早目标，先补齐时点但不抢占当前生效�
     },
   });
   trace(game, log);
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'append',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'c',
@@ -333,7 +329,7 @@ it.each(['resolver', 'aftereffect'] as const)(
       },
     });
     trace(game, log);
-    game.room.on(useDeclared, {
+    game.room.on(Use.declared, {
       id: 'retain',
       owner: null,
       eligible: () => true,
@@ -342,7 +338,7 @@ it.each(['resolver', 'aftereffect'] as const)(
       },
     });
     if (point === 'aftereffect')
-      game.room.on(effectFinished, {
+      game.room.on(Resolve.finished, {
         id: 'append',
         owner: null,
         eligible: () => true,
@@ -373,7 +369,7 @@ it('后席目标确认后可以取消已准备的前席效果，取消身份仍�
   const game = scenario();
   let earlier: CardEffect;
   const started: string[] = [];
-  game.room.on(targetConfirmed, {
+  game.room.on(Target.confirmed, {
     id: 'cancel-ready',
     owner: null,
     eligible: () => true,
@@ -385,7 +381,7 @@ it('后席目标确认后可以取消已准备的前席效果，取消身份仍�
       }
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'started',
     owner: null,
     eligible: () => true,
@@ -410,7 +406,7 @@ it('首个伤害后来源死亡并失去武器/无双，后席已声明的无双
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: 'standard:wushuang', source }),
   );
-  game.room.on(damageDealt, {
+  game.room.on(Damage.dealt, {
     id: 'lose-source',
     owner: null,
     eligible: (_ctx, event) => event.input.to === 'b',
@@ -419,7 +415,7 @@ it('首个伤害后来源死亡并失去武器/无双，后席已声明的无双
       await kill(ctx, { player: 'a', killer: null, reason: 'rule', cause });
     },
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'second-target',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:slash',
@@ -463,7 +459,7 @@ it('铁骑对全部初始目标先判定，再执行首个伤害，来源随后�
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: 'standard:tieqi', source }),
   );
-  game.room.on(damageDealt, {
+  game.room.on(Damage.dealt, {
     id: 'death',
     owner: null,
     eligible: (_ctx, event) => event.input.to === 'b',
@@ -471,7 +467,7 @@ it('铁骑对全部初始目标先判定，再执行首个伤害，来源随后�
       await kill(ctx, { player: 'a', killer: null, reason: 'rule', cause });
     },
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'second-target',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:slash',
@@ -502,7 +498,7 @@ it('目标确认时失去青釭，后续指定后不宣告无视防具', async (
     hands: { a: [card('slash', 'slash')] },
     equipment: { a: [card('sword', 'qinggang_sword')], b: [card('shield', 'nioh_shield')] },
   });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'lose-weapon',
     owner: null,
     eligible: () => true,
@@ -525,7 +521,7 @@ it('作者显式声明整次用牌无视防具时，后续追加目标仍继承�
     hands: { a: [card('slash', 'slash')] },
     equipment: { c: [card('shield', 'nioh_shield')] },
   });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'whole-use-rule',
     owner: null,
     eligible: () => true,
@@ -533,7 +529,7 @@ it('作者显式声明整次用牌无视防具时，后续追加目标仍继承�
       plan.ignoreEquipment(ctx, 'armor', 'author:whole-use');
     },
   });
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'append',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
@@ -547,9 +543,9 @@ it('作者显式声明整次用牌无视防具时，后续追加目标仍继承�
 });
 
 it.each([
-  ['尚未确认的目标死亡', targetConfirming, 'b'],
-  ['已经确认的目标死亡', targetConfirmed, 'd'],
-  ['已经确认的目标被禁止', targetConfirmed, 'd'],
+  ['尚未确认的目标死亡', Target.confirming, 'b'],
+  ['已经确认的目标死亡', Target.confirmed, 'd'],
+  ['已经确认的目标被禁止', Target.confirmed, 'd'],
 ] as const)('五谷在全部目标确认后建立牌池，%s不占额外牌', async (_label, window, actor) => {
   const ban = defineSkill({
     id: 'test:grace-ban',
@@ -603,7 +599,7 @@ it('延时牌放置经过四层，后续判定生效使用新效果身份且不�
     draw: [card('top', 'slash', 'heart')],
   });
   const starts: { stage: string; state: string; targetStage: TargetStage | null }[] = [];
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'starts',
     owner: null,
     eligible: () => true,

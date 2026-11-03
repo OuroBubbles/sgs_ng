@@ -1,4 +1,4 @@
-import { askDiscard, damage, damageReceived, general, judge, skill, trigger } from '../../../sdk';
+import { askDiscard, damage, general, judge, skill, trigger, Damage } from '../../../sdk';
 
 export const ganglie = skill({
   id: 'standard:ganglie',
@@ -6,7 +6,7 @@ export const ganglie = skill({
   description:
     '受到一次伤害后，你可以判定。若不为红桃，伤害来源须弃置两张手牌，否则受到你造成的 1 点伤害。',
   triggers: [
-    trigger(damageReceived, {
+    trigger(Damage.received, {
       who: (hit) => hit.input.to,
       ask: '是否发动【刚烈】进行判定？',
       async effect(ctx, hit, self) {

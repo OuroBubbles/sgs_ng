@@ -1,5 +1,5 @@
 import type { Player, SkillInstance, Zone } from '../../core/model/state';
-import { defineWindow } from '../../core/runtime/window';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface HealthCause {
   readonly kind: 'damage' | 'hp-loss' | 'rule';
@@ -45,15 +45,15 @@ export interface DyingResult {
   readonly event: DyingEvent;
 }
 
-export const dyingStarted = defineWindow<DyingEvent>('dying.started');
-export const rescueRequested = defineWindow<DyingEvent>('dying.rescue', [
-  'before',
-  'rescue',
-  'after',
-]);
-export const dyingFinishing = defineWindow<DyingEvent>('dying.finishing');
-export const dyingFinished = defineWindow<DyingResult>('dying.finished');
-export const beforeDeath = defineWindow<DeathDraft>('death.before');
-export const playerDied = defineWindow<DeathEvent>('death.committed');
-export const playerBuried = defineWindow<BurialEvent>('death.buried');
-export const deathFinished = defineWindow<BurialEvent>('death.finished', ['mode', 'after']);
+export const Dying = defineEvent('dying', {
+  started: timing<DyingEvent>(),
+  rescue: timing<DyingEvent>('before', 'rescue', 'after'),
+  finishing: timing<DyingEvent>(),
+  finished: timing<DyingResult>(),
+});
+export const Death = defineEvent('death', {
+  before: timing<DeathDraft>(),
+  committed: timing<DeathEvent>(),
+  buried: timing<BurialEvent>(),
+  finished: timing<BurialEvent>('mode', 'after'),
+});

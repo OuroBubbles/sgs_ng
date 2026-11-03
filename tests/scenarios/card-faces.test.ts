@@ -1,19 +1,18 @@
 import { expect, it } from 'vitest';
 import {
   cardQueries,
-  costPaid,
   defineSkill,
   rulesOf,
   modify,
   moveCards,
   judge,
-  judgmentRetrial,
-  judgmentFinished,
-  responseFinished,
   runPhase,
   activeOffers,
   withRevealedCards,
   chooseOwnedCard,
+  Judgment,
+  Response,
+  Cost,
 } from '../../src/sdk';
 import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -200,7 +199,7 @@ it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从�
     equipment: { b: [card('shield', 'nioh_shield')] },
   });
   await grant(game, vermilion.id);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'lose-filter',
     owner: null,
     eligible: (_ctx, paid) => paid.cards.includes('s'),
@@ -227,7 +226,7 @@ it.each(['grant', 'revoke'] as const)(
   async (action) => {
     const game = cardGame({ skills: [vermilion], draw: [card('top', 'jink')] });
     if (action === 'revoke') await grant(game, vermilion.id);
-    game.room.on(judgmentRetrial, {
+    game.room.on(Judgment.retrial, {
       id: 'change-filter',
       owner: null,
       eligible: () => true,
@@ -258,7 +257,7 @@ it.each(['grant', 'revoke'] as const)(
 it('判定结束后失去过滤或将牌交给他人，不改变封口结果；接收手牌按新角色查询', async () => {
   const game = cardGame({ skills: [vermilion], draw: [card('top', 'slash')] });
   await grant(game, vermilion.id);
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'after-seal',
     owner: null,
     eligible: () => true,
@@ -295,7 +294,7 @@ it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则�
   await grant(game, vermilion.id);
   await grant(game, 'standard:guicai');
   const seen: string[] = [];
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'played',
     owner: null,
     eligible: () => true,

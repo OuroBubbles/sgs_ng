@@ -1,7 +1,7 @@
 import type { Change, SkillInstance, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 /** 只有显式领域 lifetime 才管理状态/授予到期，普通子 Flow 不自动冒充阶段或回合。 */
 export interface Lifetime {
@@ -20,7 +20,9 @@ export interface LifetimeEnd {
   readonly skillsBefore: readonly SkillInstance[];
 }
 
-export const lifetimeEnded = defineWindow<LifetimeEnd>('lifetime.ended');
+export const Lifetime = defineEvent('lifetime', {
+  ended: timing<LifetimeEnd>(),
+});
 
 export function assertLifetime(ctx: Context, lifetime: Lifetime | null): void {
   ctx.assertActive();
@@ -76,7 +78,7 @@ export async function withLifetime<T>(
       skillsBefore: skills,
     });
     owner.commit('lifetime.ended', changes, ended);
-    await owner.window(lifetimeEnded, ended);
+    await owner.window(Lifetime.ended, ended);
     if (result.kind === 'aborted') return owner.abort(result.reason);
     return result.value;
   });

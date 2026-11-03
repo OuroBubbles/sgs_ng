@@ -1,4 +1,4 @@
-import { cardDef, draw, general, skill, trigger, useDeclared } from '../../src/sdk';
+import { cardDef, draw, general, skill, trigger, Use } from '../../src/sdk';
 import type { ContentDefinition } from '../../src/sdk';
 
 const study = skill({
@@ -6,7 +6,7 @@ const study = skill({
   name: '研习',
   description: '当你使用锦囊牌时，你可以摸一张牌。',
   triggers: [
-    trigger(useDeclared, {
+    trigger(Use.declared, {
       who: (use) => use.actor,
       when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
       ask: '是否发动【研习】摸一张牌？',

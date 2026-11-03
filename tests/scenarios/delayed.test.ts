@@ -5,19 +5,19 @@ import {
   runTurn,
   runPhase,
   defaultPhaseBody,
-  phaseBefore,
-  turnStarted,
   moveCards,
-  cardsMoved,
   installCounterspells,
   kill,
-  costPaid,
   defineSkill,
   viewAs,
   ownedCards,
-  targetConfirming,
-  judgmentFinished,
   finishGame,
+  Target,
+  Judgment,
+  Cards,
+  Cost,
+  Phase,
+  Turn,
 } from '../../src/sdk';
 import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -191,7 +191,7 @@ it('判定区后放先结算，只快照已有实例，新安装的牌留到下�
   });
   const game = cardGame({ hands: { a: [] }, definitions: [first, second, third] });
   let confirmations = 0;
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'count',
     owner: null,
     eligible: () => true,
@@ -272,7 +272,7 @@ it('多材料实例被直接拆走部分时关闭身份，剩余材料善后，�
     timing: { kind: 'effect' },
   });
   const entry = delayedCards(game.room.world, 'b')[0]!;
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('x')),
@@ -323,7 +323,7 @@ it('跳过判定阶段不消耗判定区实例，下一回合仍可结算', asyn
     draw: [card('top', 'slash', 'heart')],
   });
   await use(game, play('delay'));
-  const release = game.room.on(phaseBefore, {
+  const release = game.room.on(Phase.before, {
     id: 'skip',
     owner: null,
     eligible: (_ctx, phase) => phase.kind === 'judge',
@@ -341,7 +341,7 @@ it('跳过判定阶段不消耗判定区实例，下一回合仍可结算', asyn
 
 it('skipNext 消耗下一次对应阶段，额外同名阶段之后不会重复跳过', async () => {
   const game = cardGame({ hands: { a: [] } });
-  game.room.on(turnStarted, {
+  game.room.on(Turn.started, {
     id: 'plan',
     owner: null,
     eligible: () => true,
@@ -388,7 +388,7 @@ it('转化来源在宣告后消失仍保留延时牌名，原使用者死亡也�
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: skill.id, source: { kind: 'general', id: 'g' } }),
   );
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'lose',
     owner: null,
     eligible: () => true,
@@ -422,7 +422,7 @@ it('判定完成后效结束整局，乐不思蜀不再产生新的阶段跳过�
     hands: { a: [card('delay', 'indulgence')] },
     draw: [card('top', 'slash')],
   });
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'finish',
     owner: null,
     eligible: () => true,

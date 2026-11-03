@@ -1,5 +1,5 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import { defineWindow } from '../../src/sdk';
 import { room, nextRequest } from '../fixtures/room';
 
 class WindowGuard {
@@ -23,7 +23,7 @@ class WindowGuard {
 
 it('窗口进入时不再继续，则不收集来源、计算次数或执行效果', async () => {
   const target = room();
-  const window = defineWindow<null>('guard.closed');
+  const window = testTiming<null>('guard.closed');
   let collections = 0;
   target.addTriggerSource({
     collect: () => {
@@ -47,7 +47,7 @@ it('窗口进入时不再继续，则不收集来源、计算次数或执行效�
 
 it('一次效果后收束整个窗口，其他角色和后续组都不再执行', async () => {
   const target = room();
-  const window = defineWindow<null>('guard.stop', ['first', 'last']);
+  const window = testTiming<null>('guard.stop', ['first', 'last']);
   const options = new WindowGuard();
   const seen: string[] = [];
   for (const [id, owner, group] of [
@@ -80,7 +80,7 @@ it('一次效果后收束整个窗口，其他角色和后续组都不再执行'
 
 it('顺序选择返回后再次检查窗口，不执行已经收束的旧选项', async () => {
   const target = room();
-  const window = defineWindow<null>('guard.selection');
+  const window = testTiming<null>('guard.selection');
   const options = new WindowGuard();
   const seen: string[] = [];
   for (const id of ['A', 'B'])
@@ -105,7 +105,7 @@ it('顺序选择返回后再次检查窗口，不执行已经收束的旧选项'
 
 it('窗口继续条件在纯查询中执行，不能偷偷提交状态', async () => {
   const target = room();
-  const window = defineWindow<null>('guard.pure');
+  const window = testTiming<null>('guard.pure');
   await expect(
     target.run('window', (ctx) =>
       ctx.window(window, null, {

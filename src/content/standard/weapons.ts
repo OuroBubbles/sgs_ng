@@ -1,7 +1,5 @@
 import {
-  attackDefended,
   cardQueries,
-  damageCausing,
   equipmentCard,
   equipmentInSlot,
   isGameOver,
@@ -15,6 +13,8 @@ import {
   payDiscard,
   rulesOf,
   cardLabel,
+  Attack,
+  Damage,
 } from '../../sdk';
 import type { CardDefinition, Context, SkillHandle } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
@@ -41,7 +41,7 @@ const blade = equipmentCard({
     id: 'standard:blade-ability',
     name: '青龙偃月刀',
     triggers: [
-      on(attackDefended, {
+      on(Attack.defended, {
         order: 'choose',
         when: (ctx, { payload: draft, self }) =>
           !draft.broken &&
@@ -82,7 +82,7 @@ const axe = equipmentCard({
     id: 'standard:axe-ability',
     name: '贯石斧',
     triggers: [
-      on(attackDefended, {
+      on(Attack.defended, {
         order: 'choose',
         when: (ctx, { payload: draft, self }) =>
           !draft.broken &&
@@ -156,7 +156,7 @@ const kylinBow = equipmentCard({
     id: 'standard:kylin_bow-ability',
     name: '麒麟弓',
     triggers: [
-      on(damageCausing, {
+      on(Damage.causing, {
         order: 'choose',
         when: (ctx, { payload: draft, self }) =>
           isDirectDamage(draft.input) &&

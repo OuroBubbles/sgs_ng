@@ -1,6 +1,5 @@
 import {
   chooseOwnedCard,
-  damageReplacing,
   differentGender,
   draw,
   equipmentCard,
@@ -12,9 +11,10 @@ import {
   on,
   ownedCards,
   pay,
-  targetSpecified,
   rulesOf,
   cardLabel,
+  Target,
+  Damage,
 } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
@@ -28,7 +28,7 @@ const doubleSwords = equipmentCard({
     id: 'standard:double_swords-ability',
     name: '雌雄双股剑',
     triggers: [
-      on(targetSpecified, {
+      on(Target.specified, {
         order: 'choose',
         when: (ctx, { payload: { effect }, self }) =>
           effect.actor === self.owner &&
@@ -113,7 +113,7 @@ const iceSword = equipmentCard({
     id: 'standard:ice_sword-ability',
     name: '寒冰剑',
     triggers: [
-      on(damageReplacing, {
+      on(Damage.replacing, {
         order: 'choose',
         when: (ctx, { payload: draft, self }) =>
           isDirectDamage(draft.input) &&

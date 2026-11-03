@@ -1,6 +1,6 @@
+import { testTiming } from '../fixtures/timing';
 import { describe, expect, it } from 'vitest';
 import {
-  defineWindow,
   defineSkill,
   on,
   SkillBook,
@@ -10,9 +10,9 @@ import {
   defineState,
   readState,
   setState,
-  lifetimeEnded,
+  Lifetime,
 } from '../../src/sdk';
-import type { Context, Lifetime, SkillHandle, Trigger, TriggerOccurrence } from '../../src/sdk';
+import type { Context, SkillHandle, Trigger, TriggerOccurrence } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed } from '../fixtures/room';
 
@@ -22,7 +22,7 @@ const equipment = { kind: 'equipment', id: 'equipment:1' } as const;
 describe('技能实例与独立授予来源', () => {
   it('自定义技能绑定保留原型身份和方法，有限次数及组序正常结算', async () => {
     const game = room();
-    const window = defineWindow<null>('test.bound-method', ['before', 'main']);
+    const window = testTiming<null>('test.bound-method', ['before', 'main']);
     class Bound implements Trigger<unknown> {
       #self: SkillHandle;
       #count = 2;
@@ -95,7 +95,7 @@ describe('技能实例与独立授予来源', () => {
 
   it('失去最后来源再获得产生新实例，开窗候选不会借新身份复活', async () => {
     const game = room();
-    const window = defineWindow<null>('test.regain');
+    const window = testTiming<null>('test.regain');
     const hits: string[] = [];
     const book = new SkillBook([
       defineSkill({
@@ -137,7 +137,7 @@ describe('技能实例与独立授予来源', () => {
 
   it('开窗期间新获得的技能从下一窗口参与', async () => {
     const game = room();
-    const window = defineWindow<null>('test.gain');
+    const window = testTiming<null>('test.gain');
     const hits: string[] = [];
     const book = new SkillBook([
       defineSkill({
@@ -171,7 +171,7 @@ describe('技能实例与独立授予来源', () => {
   it('多来源授予、开关和撤销保持同一实例与单次触发，句柄按实际 World 查询', async () => {
     const game = room();
     const other = room();
-    const window = defineWindow<null>('test.skill');
+    const window = testTiming<null>('test.skill');
     const hits: string[] = [];
     const trigger = on(window, {
       run: (_ctx, { self }) => {
@@ -254,7 +254,7 @@ describe('技能实例与独立授予来源', () => {
 
   it('死亡角色的常规效果不参与，显式死亡后效果仍可运行', async () => {
     const game = room();
-    const window = defineWindow<null>('death');
+    const window = testTiming<null>('death');
     const hits: string[] = [];
     const book = new SkillBook([
       defineSkill({
@@ -368,7 +368,7 @@ describe('显式生存期、状态与授予到期', () => {
 
   it('临时技能失效到期恢复；已经执行的技能不会被隐式倒放', async () => {
     const game = room();
-    const window = defineWindow<null>('blocked');
+    const window = testTiming<null>('blocked');
     const hits: string[] = [];
     const book = new SkillBook([
       defineSkill({
@@ -435,7 +435,7 @@ describe('显式生存期、状态与授予到期', () => {
   it('到期后效不能重新将状态绑定到刚结束的生存期', async () => {
     const game = room();
     let lifetime: Lifetime | undefined;
-    game.on(lifetimeEnded, {
+    game.on(Lifetime.ended, {
       id: 'late',
       owner: 'a',
       eligible: () => true,
@@ -457,7 +457,7 @@ describe('显式生存期、状态与授予到期', () => {
 
   it('资格查询不能写入临时状态', async () => {
     const game = room();
-    const window = defineWindow<null>('pure-state');
+    const window = testTiming<null>('pure-state');
     await expect(
       game.run('turn', (ctx) =>
         withLifetime(ctx, 'turn', async (turn, lifetime) => {

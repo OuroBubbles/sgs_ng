@@ -1,4 +1,4 @@
-import type { ActionAnchor } from '../../core/runtime/window';
+import type { ActionAnchor } from '../../core/runtime/event';
 import { readState } from '../state/state';
 import { activeTurn, activeTarget } from './state';
 

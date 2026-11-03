@@ -1,11 +1,10 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import { isGameOver } from '../game/end';
 import { reshuffle } from './draw';
-import { cardsMoved } from './move';
 import { withProcessing } from './processing';
 import type { Processing } from './processing';
+import { Cards } from './move';
 
 export interface RevealInput {
   readonly count: number;
@@ -16,7 +15,6 @@ export interface RevealedCards {
   readonly cards: readonly string[];
   readonly reason: string;
 }
-export const cardsRevealed = defineWindow<RevealedCards>('cards.revealed');
 
 /** 牌堆顶公开牌与拥有它们的处理区共同生存，普通闭包可管理共享牌池，不借用角色手牌。 */
 export function withRevealedCards<T>(
@@ -48,7 +46,7 @@ export function withRevealedCards<T>(
       );
       if (moves.length)
         await at.window(
-          cardsMoved,
+          Cards.moved,
           immutable({
             kind: 'moved',
             moves,
@@ -56,7 +54,7 @@ export function withRevealedCards<T>(
             after: [at.world.zone('draw'), at.world.zone(pool.zone)],
           }),
         );
-      await at.window(cardsRevealed, event);
+      await at.window(Cards.revealed, event);
     }
     return body(at, pool);
   });

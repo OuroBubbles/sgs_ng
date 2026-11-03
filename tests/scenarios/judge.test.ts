@@ -1,16 +1,5 @@
 import { expect, it } from 'vitest';
-import {
-  judge,
-  judgmentRevealed,
-  judgmentRetrial,
-  judgmentFinished,
-  moveCards,
-  cardsMoved,
-  withProcessing,
-  finishGame,
-  kill,
-} from '../../src/sdk';
-import type { Judgment } from '../../src/sdk';
+import { judge, moveCards, withProcessing, finishGame, kill, Judgment, Cards } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
@@ -43,7 +32,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
     draw: [card('old', 'slash')],
   });
   let held: Judgment | undefined;
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'hold',
     owner: null,
     eligible: () => true,
@@ -51,7 +40,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
       held = judgment;
     },
   });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('new')),
@@ -61,7 +50,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
       expect(game.room.history.facts('judgment.replaced')).toHaveLength(1);
     },
   });
-  game.room.on(judgmentRetrial, {
+  game.room.on(Judgment.retrial, {
     id: 'replace',
     owner: 'a',
     eligible: () => true,
@@ -98,7 +87,7 @@ it('连续改判按行动顺序结算，前一个改判不会封闭后一个', a
     ['a', 'first'],
     ['b', 'last'],
   ] as const)
-    game.room.on(judgmentRetrial, {
+    game.room.on(Judgment.retrial, {
       id: owner,
       owner,
       eligible: () => true,
@@ -126,7 +115,7 @@ it.each([false, true])(
       hands: { a: [card('new', 'peach', 'diamond')] },
       draw: [card('old', 'slash', 'heart')],
     });
-    game.room.on(judgmentRevealed, {
+    game.room.on(Judgment.revealed, {
       id: 'take',
       owner: null,
       eligible: () => true,
@@ -139,7 +128,7 @@ it.each([false, true])(
       },
     });
     if (replace)
-      game.room.on(judgmentRetrial, {
+      game.room.on(Judgment.retrial, {
         id: 'replace',
         owner: null,
         eligible: () => true,
@@ -167,7 +156,7 @@ it('判定完成后可取得牌，结果已封口，不能再次改判', async (
     draw: [card('old', 'slash', 'heart')],
   });
   let held: Judgment | undefined;
-  game.room.on(judgmentRevealed, {
+  game.room.on(Judgment.revealed, {
     id: 'hold',
     owner: null,
     eligible: () => true,
@@ -175,7 +164,7 @@ it('判定完成后可取得牌，结果已封口，不能再次改判', async (
       held = judgment;
     },
   });
-  game.room.on(judgmentFinished, {
+  game.room.on(Judgment.finished, {
     id: 'take',
     owner: null,
     eligible: () => true,
@@ -232,7 +221,7 @@ it('嵌套判定拥有独立牌面和处理区，内层完成不覆盖外层', a
     hands: { a: [] },
     draw: [card('outer', 'slash', 'heart'), card('inner', 'jink')],
   });
-  game.room.on(judgmentRetrial, {
+  game.room.on(Judgment.retrial, {
     id: 'nested',
     owner: null,
     eligible: (_ctx, judgment) => judgment.reason === 'outer',
@@ -263,7 +252,7 @@ it.each(['death', 'finish'] as const)(
   '判定中发生 %s，停止判定规则和后续改判，但已公开牌仍善后',
   async (kind) => {
     const game = cardGame({ hands: { a: [] }, draw: [card('old', 'slash')] });
-    game.room.on(judgmentRevealed, {
+    game.room.on(Judgment.revealed, {
       id: 'stop',
       owner: null,
       eligible: () => true,
@@ -298,7 +287,7 @@ it.each(['death', 'finish'] as const)(
 
 it('改判原区域已失效不支付；非法目的区域拒绝整批且不更新牌面', async () => {
   const game = cardGame({ hands: { a: [card('new', 'peach')] }, draw: [card('old', 'slash')] });
-  game.room.on(judgmentRetrial, {
+  game.room.on(Judgment.retrial, {
     id: 'replace',
     owner: null,
     eligible: () => true,

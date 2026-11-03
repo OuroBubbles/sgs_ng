@@ -1,16 +1,14 @@
 import { expect, it } from 'vitest';
 import {
   moveCards,
-  damageReceived,
-  useDeclared,
-  targetConfirming,
-  targetsConfirming,
-  effectFinished,
-  useFinished,
   withLifetime,
   used,
-  costPaid,
   runPhase,
+  Use,
+  Target,
+  Resolve,
+  Damage,
+  Cost,
 } from '../../src/sdk';
 import type { CardDefinition, CardEffect, Context, UsePlanView, UseSnapshot } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -259,7 +257,7 @@ it('技能添加的目标各自响应，防止一个目标不防止整张牌', a
     if (!built.ok) throw new Error(built.reason);
     expect(game.book.attackRange(ctx, 'a', built.value)).toBe(3);
   });
-  game.room.on(targetsConfirming, {
+  game.room.on(Use.targets, {
     id: 'extra',
     owner: 'a',
     eligible: (_ctx, plan) => plan.card.name === 'standard:slash',
@@ -281,7 +279,7 @@ it('技能添加的目标各自响应，防止一个目标不防止整张牌', a
 
 it('转移目标创建新的效果身份，旧效果取消且不退材料', async () => {
   const game = cardGame({ policy: { attackRange: () => 3 } });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'redirect',
     owner: 'a',
     eligible: (_ctx, event) => event.effect.target === 'b',
@@ -311,7 +309,7 @@ it('转移目标创建新的效果身份，旧效果取消且不退材料', asyn
 
 it('显式再次结算创建新 EffectId，已结算目标不会隐式重跑', async () => {
   const game = cardGame();
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'repeat',
     owner: 'a',
     eligible: (_ctx, event) => event.effect.effectId.endsWith(':1'),
@@ -332,7 +330,7 @@ it('显式再次结算创建新 EffectId，已结算目标不会隐式重跑', a
 
 it('多材料中的一张被伤害后技能获得，结尾只清理余牌', async () => {
   const game = cardGame();
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'take-material',
     owner: 'b',
     eligible: (_ctx, hit) => hit.input.card !== undefined,
@@ -362,7 +360,7 @@ it('多材料中的一张被伤害后技能获得，结尾只清理余牌', asyn
 
 it('来源在宣告后死亡，已产生的牌效果仍结算', async () => {
   const game = cardGame();
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'source-dies',
     owner: 'b',
     eligible: (_ctx, cost) => cost.cards.includes('slash1'),
@@ -377,7 +375,7 @@ it('来源在宣告后死亡，已产生的牌效果仍结算', async () => {
 it('关闭的计划/已结算效果不能继续改写，事实快照保持冻结', async () => {
   const game = cardGame();
   const captured: { plan?: UsePlanView; effect?: CardEffect; snapshot?: UseSnapshot } = {};
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'plan',
     owner: 'a',
     eligible: () => true,
@@ -385,7 +383,7 @@ it('关闭的计划/已结算效果不能继续改写，事实快照保持冻结
       captured.plan = plan;
     },
   });
-  game.room.on(targetConfirming, {
+  game.room.on(Target.confirming, {
     id: 'effect',
     owner: 'a',
     eligible: () => true,
@@ -393,7 +391,7 @@ it('关闭的计划/已结算效果不能继续改写，事实快照保持冻结
       captured.effect = event.effect;
     },
   });
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'snapshot',
     owner: 'a',
     eligible: () => true,
@@ -511,7 +509,7 @@ it('决斗轮流响应杀，不消耗出牌阶段杀次数', async () => {
 it('响应中使用闪的后效与处理区关闭完成后，上层用牌才返回', async () => {
   const game = cardGame({ hands: { b: [card('jink', 'jink')] } });
   const order: string[] = [];
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'after-response',
     owner: 'a',
     eligible: (_ctx, use) => use.card.name === 'standard:jink',
@@ -534,7 +532,7 @@ it('响应中使用闪的后效与处理区关闭完成后，上层用牌才返�
 it('多个效果重复取消同一目标是幂等的，不导致已付费对局崩溃', async () => {
   const game = cardGame();
   for (const id of ['one', 'two'])
-    game.room.on(targetConfirming, {
+    game.room.on(Target.confirming, {
       id,
       owner: 'b',
       eligible: () => true,

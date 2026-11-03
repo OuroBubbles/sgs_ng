@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { withProcessing, moveCards, cardsMoved } from '../../src/sdk';
+import { withProcessing, moveCards, Cards } from '../../src/sdk';
 import type { Processing } from '../../src/sdk';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -7,7 +7,7 @@ import { worldSeed } from '../fixtures/room';
 
 it('材料被后效取走一部分，结尾只弃置仍在本次处理区的牌', async () => {
   const game = room();
-  game.on(cardsMoved, {
+  game.on(Cards.moved, {
     id: 'obtain',
     owner: 'b',
     eligible: (_ctx, batch) =>

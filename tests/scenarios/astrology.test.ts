@@ -3,17 +3,17 @@ import { playMatch } from '../fixtures/match';
 import {
   ArrangementSelection,
   runPhase,
-  phaseBefore,
-  cardsMoved,
   moveCards,
   draw,
   kill,
   finishGame,
   privateCardPools,
-  targetConfirmed,
   withPrivateTopCards,
   useDeclarations,
   roleOf,
+  Target,
+  Cards,
+  Phase,
 } from '../../src/sdk';
 import type { WorldSeed } from '../../src/core/model/state';
 import type { ArrangementGroup, ArrangementSpec } from '../../src/core/decisions/arrangement';
@@ -348,7 +348,7 @@ it('拒绝发动不取牌；跳过准备阶段与他人准备阶段均不询问'
   await running;
   expect(game.room.history.facts('cards.peeked')).toEqual([]);
   await prepare(game, 'b');
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'skip',
     owner: null,
     eligible: () => true,
@@ -382,7 +382,7 @@ it.each(['lost', 'dead', 'finished', 'taken'] as const)(
     const game = scenario();
     await grant(game);
     let peeked = false;
-    game.room.on(cardsMoved, {
+    game.room.on(Cards.moved, {
       id: 'change',
       owner: null,
       eligible: (_ctx, moved) =>
@@ -615,7 +615,7 @@ it('空城目标确认后失去最后手牌，实际效果重查跳过；决斗�
   replay(game);
   const skipped = scenario({ hands: { a: [card('s', 'slash')], b: [card('last', 'peach')] } });
   await grant(skipped, 'standard:kongcheng', 'b');
-  skipped.room.on(targetConfirmed, {
+  skipped.room.on(Target.confirmed, {
     id: 'remove-last',
     owner: null,
     eligible: () => true,

@@ -1,3 +1,4 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { cardGame, card } from '../fixtures/cards';
 import { covenant } from '../../examples/effects/covenant';
@@ -7,16 +8,15 @@ import {
   effectOn,
   effectModify,
   defineQuery,
-  defineWindow,
   withLifetime,
   kill,
-  effectEnded,
-  costPaid,
   pay,
   runTurn,
   defineSkill,
   damage,
   EffectBook,
+  Cost,
+  Effect,
 } from '../../src/sdk';
 import type {
   EffectHandle,
@@ -34,7 +34,7 @@ import type {
 } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
 
-const tick = defineWindow<null>('probe:effect-tick', ['before', 'main', 'after']);
+const tick = testTiming<null>('probe:effect-tick', ['before', 'main', 'after']);
 const strength = defineQuery<null, number>('probe:effect-strength', (a, b) => a + b);
 interface Data {
   readonly amount: number;
@@ -314,7 +314,7 @@ it('相同定义的多个实例独立叠加、更新与移除，不共享技能�
 });
 it('领域结束先清除所有实例的查询资格，再发结束后效，重建不会复活', async () => {
   const game = create();
-  game.room.on(effectEnded, {
+  game.room.on(Effect.ended, {
     id: 'observe',
     owner: null,
     eligible: () => true,
@@ -444,7 +444,7 @@ it('来源与效果归属角色死亡不隐含撤销，规则可在死亡后继�
 });
 it('实例声明可与费用同次提交，支付后效立即看到效果，未支付不添加', async () => {
   const game = create();
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'observe',
     owner: null,
     eligible: () => true,

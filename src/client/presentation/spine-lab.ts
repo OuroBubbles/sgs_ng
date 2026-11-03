@@ -1,5 +1,4 @@
 // 动画可从大厅独立打开，不依赖战场先安装 CSP 适配。
-import 'pixi.js/unsafe-eval';
 import { Application, Assets, Cache } from 'pixi.js';
 import { Spine } from '@esotericsoftware/spine-pixi-v8';
 

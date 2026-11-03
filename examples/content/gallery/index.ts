@@ -1,6 +1,6 @@
 import type { ContentDefinition } from '../../../src/content/catalog';
 import { modify, on, invoke, recover } from '../../../src/sdk';
-import { provisionFinished, provisionBy, tideDrawBonus } from '../harbor';
+import { Provision, provisionBy, tideDrawBonus } from '../harbor';
 import portrait from '../harbor/guest.jpg';
 import type { SkillDefinition } from '../../../src/sdk';
 
@@ -12,7 +12,7 @@ const ink = {
     modify(tideDrawBonus, (_ctx, { input, self }) => (input.actor === self.owner ? 1 : undefined)),
   ],
   triggers: [
-    on(provisionFinished, {
+    on(Provision.finished, {
       order: 'choose',
       when: (ctx, { payload: event, self }) =>
         provisionBy(event, self.owner) &&

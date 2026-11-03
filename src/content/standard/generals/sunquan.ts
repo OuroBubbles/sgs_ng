@@ -1,4 +1,4 @@
-import { action, draw, general, HE, kingdomOf, recovering, skill, trigger } from '../../../sdk';
+import { action, draw, general, HE, kingdomOf, skill, trigger, Hp } from '../../../sdk';
 
 export const zhiheng = skill({
   id: 'standard:zhiheng',
@@ -26,7 +26,7 @@ export const jiuyuan = skill({
   description:
     '主公技，锁定技。其他吴势力角色对你使用桃时，额外回复 1 点体力；按当前势力判断，仍受体力上限限制。',
   triggers: [
-    trigger(recovering, {
+    trigger(Hp.recovering, {
       locked: true,
       who: (recovery) => recovery.input.to,
       when: (ctx, { input }, self) =>

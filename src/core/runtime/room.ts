@@ -11,12 +11,12 @@ import type {
   Trigger,
   TriggerSource,
   WindowOptions,
-  WindowType,
+  Timing,
   TriggerOccurrence,
   ActionAnchor,
   WindowRef,
   WindowAdmission,
-} from './window';
+} from './event';
 
 export type FlowBody<T> = (ctx: Context) => T | Promise<T>;
 
@@ -30,7 +30,7 @@ interface Operations {
   readonly query: <T>(body: () => T) => T;
   readonly flow: <T>(kind: string, body: FlowBody<T>, reason: string) => Promise<FlowResult<T>>;
   readonly window: <T>(
-    type: WindowType<T>,
+    type: Timing<T>,
     payload: T,
     options: WindowOptions,
   ) => Promise<FlowResult<void>>;
@@ -38,8 +38,8 @@ interface Operations {
   readonly commit: <T>(kind: string, changes: readonly Change[], detail: T) => Fact<T>;
   readonly random: (bound: number) => number;
   readonly actionOrder: (subject?: string) => readonly string[];
-  readonly listen: <T>(type: WindowType<T>, trigger: Trigger<T>) => () => void;
-  readonly windowOf: <T>(type: WindowType<T>) => WindowRef<T> | null;
+  readonly listen: <T>(type: Timing<T>, trigger: Trigger<T>) => () => void;
+  readonly windowOf: <T>(type: Timing<T>) => WindowRef<T> | null;
   readonly include: <T>(
     window: WindowRef<T>,
     source: TriggerSource,
@@ -81,7 +81,7 @@ export class Context {
     return this.#wait(kind, () => this.operations.flow(kind, body, reason));
   }
 
-  window<T>(type: WindowType<T>, payload: T, options: WindowOptions = {}): Promise<void> {
+  window<T>(type: Timing<T>, payload: T, options: WindowOptions = {}): Promise<void> {
     const { subject, anchor, active } = options;
     const selection: WindowOptions = Object.freeze({
       ...(subject === undefined ? {} : { subject }),
@@ -94,7 +94,7 @@ export class Context {
   }
 
   /** 最近的同类型祖先窗口；可在进入同名嵌套窗口前捕获明确的外层引用。 */
-  windowOf<T>(type: WindowType<T>): WindowRef<T> | null {
+  windowOf<T>(type: Timing<T>): WindowRef<T> | null {
     return this.query(() => this.operations.windowOf(type));
   }
 
@@ -133,7 +133,7 @@ export class Context {
     return this.operations.query(body);
   }
 
-  listen<T>(type: WindowType<T>, trigger: Trigger<T>): void {
+  listen<T>(type: Timing<T>, trigger: Trigger<T>): void {
     this.#assertIdle();
     const unregister = this.operations.listen(type, trigger);
     this.lifetime.onClose(unregister);
@@ -368,7 +368,7 @@ export class Room {
     }
   }
 
-  on<T>(type: WindowType<T>, trigger: Trigger<T>): () => void {
+  on<T>(type: Timing<T>, trigger: Trigger<T>): () => void {
     this.#assertWriting();
     this.#checkWindow(type);
     if (!trigger.id || this.#triggers.has(trigger.id))
@@ -558,13 +558,13 @@ export class Room {
     return result;
   }
 
-  #checkWindow<T>(type: WindowType<T>): void {
+  #checkWindow<T>(type: Timing<T>): void {
     const known = this.#windows.get(type.id);
     if (known && known !== type) throw new Error(`Two window definitions share ID: ${type.id}`);
     this.#windows.set(type.id, type);
   }
 
-  #windowOf<T>(ctx: Context, type: WindowType<T>): WindowRef<T> | null {
+  #windowOf<T>(ctx: Context, type: Timing<T>): WindowRef<T> | null {
     for (const active of [...this.#openWindows.values()].reverse()) {
       if (active.ref.type === type && ctx.cause.scopePath.includes(active.scopeId))
         return active.ref as WindowRef<T>;
@@ -591,7 +591,7 @@ export class Room {
 
   #collectSource<T>(
     ctx: Context,
-    type: WindowType<T>,
+    type: Timing<T>,
     payload: T,
     source: TriggerSource,
     select?: (trigger: unknown) => boolean,
@@ -652,7 +652,7 @@ export class Room {
 
   async #openWindow<T>(
     ctx: Context,
-    type: WindowType<T>,
+    type: Timing<T>,
     payload: T,
     options: WindowOptions,
   ): Promise<void> {

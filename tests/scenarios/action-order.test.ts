@@ -1,21 +1,13 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { Room } from '../../src/core/runtime/room';
 import {
-  defineWindow,
   runTurn,
   runPhase,
   activeTurn,
   activeTarget,
   stateChange,
   kill,
-  useDeclared,
-  targetSpecifying,
-  targetConfirming,
-  targetSpecified,
-  targetConfirmed,
-  responseFinished,
-  useFinished,
-  judgmentFinished,
   judge,
   installRescue,
   loseHp,
@@ -23,8 +15,12 @@ import {
   installCounterspells,
   scheduleExtraTurn,
   finishGame,
+  Use,
+  Target,
+  Judgment,
+  Response,
 } from '../../src/sdk';
-import type { Context, WindowType, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
+import type { Context, Timing, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { guicai } from '../../src/content/standard/generals/simayi';
@@ -35,7 +31,7 @@ import { card, cardGame } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
 
 const seats = ['a', 'b', 'c', 'd'];
-const probe = defineWindow<string>('probe.action-order');
+const probe = testTiming<string>('probe.action-order');
 function generic(actionAnchor?: ActionAnchor) {
   const seed = worldSeed();
   return new Room({
@@ -47,7 +43,7 @@ function generic(actionAnchor?: ActionAnchor) {
 }
 function observe<T>(
   room: Room,
-  window: WindowType<T>,
+  window: Timing<T>,
   seen: string[],
   describe?: (owner: string, data: T) => string,
 ) {
@@ -145,7 +141,7 @@ it('每个窗口只取一次政策快照，嵌套窗口可以使用新的政策�
     calls++;
     return anchor;
   });
-  const inner = defineWindow<string>('probe.inner-order');
+  const inner = testTiming<string>('probe.inner-order');
   const seen: string[] = [];
   observe(room, inner, seen, (owner) => `inner:${owner}`);
   for (const owner of seats)
@@ -228,11 +224,11 @@ it('组优先级与无主系统规则保留；模式只决定各组内部玩家�
   Object.defineProperty(groups, '0', {
     get: () => (++groupReads === 1 ? 'before' : 'main'),
   });
-  const window = defineWindow<null>('probe.groups-order', groups);
+  const window = testTiming<null>('probe.groups-order', groups);
   expect(groupReads).toBe(1);
   groups[1] = 'before';
-  expect(() => defineWindow('bad.groups', new Array<string>(1))).toThrow(
-    'Window requires an ID and distinct named groups.',
+  expect(() => testTiming('bad.groups', new Array<string>(1))).toThrow(
+    'Timing requires distinct named groups.',
   );
   const seen: string[] = [];
   room.on(window, {
@@ -467,7 +463,7 @@ it('b 回合由 d 用多目标牌：四层遍历与实际生效按模式排序�
       },
     ],
   });
-  for (const window of [targetSpecifying, targetConfirming, targetSpecified, targetConfirmed])
+  for (const window of [Target.specifying, Target.confirming, Target.specified, Target.confirmed])
     game.room.on(window, {
       id: window.id,
       owner: null,
@@ -496,7 +492,7 @@ it('b 回合由 d 用多目标牌：四层遍历与实际生效按模式排序�
   );
   expect(resolved).toEqual(['c', 'd', 'a']);
   expect(stages).toEqual(
-    [targetSpecifying, targetConfirming, targetSpecified, targetConfirmed].flatMap((window) =>
+    [Target.specifying, Target.confirming, Target.specified, Target.confirmed].flatMap((window) =>
       ['c', 'd', 'a'].map((target) => `${window.id}:${target}`),
     ),
   );
@@ -519,14 +515,14 @@ it('确认中追加更早的 b 身份：按冻结行动序补齐时点，不重�
       },
     ],
   });
-  for (const window of [targetSpecifying, targetConfirming, targetSpecified, targetConfirmed])
+  for (const window of [Target.specifying, Target.confirming, Target.specified, Target.confirmed])
     game.room.on(window, {
       id: window.id,
       owner: null,
       eligible: () => true,
       run(ctx, { use, effect }) {
         stages.push(`${window.id}:${effect.target}`);
-        if (window === targetConfirming && effect.target === 'c') use.addTarget(ctx, 'b', 'probe');
+        if (window === Target.confirming && effect.target === 'c') use.addTarget(ctx, 'b', 'probe');
       },
     });
   await game.room.run('turn', (ctx) =>
@@ -591,7 +587,7 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     },
   };
   const game = cardGame({ definitions: [outerCard, innerCard] });
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'capture',
     owner: null,
     eligible: (_ctx, use) => use.card.name === orderCard.id,
@@ -615,7 +611,7 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
 it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际使用者仍记录为 c', async () => {
   const game = cardGame({ hands: { a: [card('s', 'slash')], c: [card('j', 'jink')] } });
   const seen: string[] = [];
-  observe(game.room, useFinished, seen);
+  observe(game.room, Use.finished, seen);
   const running = game.room.run('turn', (ctx) =>
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
@@ -639,7 +635,8 @@ it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际
   });
   const trace = game.room.history.entries.find(
     (entry) =>
-      entry.type === 'window.order' && (entry.data as { window: string }).window === useFinished.id,
+      entry.type === 'window.order' &&
+      (entry.data as { window: string }).window === Use.finished.id,
   );
   expect(trace?.data).toMatchObject({ subject: 'c', anchor: 'b' });
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -656,8 +653,8 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
   );
   const responses: string[] = [],
     judgments: string[] = [];
-  observe(game.room, responseFinished, responses);
-  observe(game.room, judgmentFinished, judgments);
+  observe(game.room, Response.finished, responses);
+  observe(game.room, Judgment.finished, judgments);
   const running = game.room.run('turn', (ctx) =>
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
@@ -680,8 +677,8 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
     .map((entry) => entry.data);
   expect(traces).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ window: responseFinished.id, subject: 'c', anchor: 'b' }),
-      expect.objectContaining({ window: judgmentFinished.id, subject: 'd', anchor: 'b' }),
+      expect.objectContaining({ window: Response.finished.id, subject: 'c', anchor: 'b' }),
+      expect.objectContaining({ window: Judgment.finished.id, subject: 'd', anchor: 'b' }),
     ]),
   );
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);

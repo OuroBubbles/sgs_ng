@@ -2,11 +2,11 @@ import {
   effectOn,
   effectModify,
   cardQueries,
-  damageInflicting,
-  turnEnding,
-  deathFinished,
   draw,
   isGameOver,
+  Damage,
+  Death,
+  Turn,
 } from '../../src/sdk';
 import type { EffectDefinition } from '../../src/sdk';
 
@@ -38,7 +38,7 @@ export const covenant = {
         ),
       ],
       triggers: [
-        effectOn(damageInflicting, {
+        effectOn(Damage.inflicting, {
           when: (_ctx, { payload: hit }) =>
             hit.input.to === self.data.target &&
             hit.amount > 0 &&
@@ -49,11 +49,11 @@ export const covenant = {
             await self.update(ctx, { ...self.data, remaining: self.data.remaining - 1 });
           },
         }),
-        effectOn(turnEnding, {
+        effectOn(Turn.ending, {
           when: (_ctx, { payload: turn }) => turn.owner === self.data.target,
           run: (ctx) => self.end(ctx, 'covenant:fulfilled'),
         }),
-        effectOn(deathFinished, {
+        effectOn(Death.finished, {
           group: 'after',
           when: (_ctx, { payload: death }) => death.player === self.data.target,
           run: (ctx) => self.end(ctx, 'covenant:target-died'),

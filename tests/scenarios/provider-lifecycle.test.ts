@@ -1,9 +1,9 @@
+import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import {
   activeOffers,
   cardQueries,
   defineSkill,
-  defineWindow,
   defineQuery,
   draw,
   invoke,
@@ -22,12 +22,12 @@ import type {
   SkillProvider,
   WorldReader,
 } from '../../src/sdk';
-import type { TriggerSource } from '../../src/core/runtime/window';
+import type { TriggerSource } from '../../src/core/runtime/event';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
-const window = defineWindow<null>('probe.provider-lifecycle');
+const window = testTiming<null>('probe.provider-lifecycle');
 const source: SkillHandle = {
   id: 'probe:provider-source',
   owner: 'a',

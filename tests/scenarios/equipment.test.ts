@@ -1,7 +1,5 @@
 import { expect, it } from 'vitest';
 import {
-  cardsMoved,
-  costPaid,
   defineSkill,
   on,
   equipmentCard,
@@ -19,6 +17,8 @@ import {
   pay,
   CardBook,
   SkillBook,
+  Cards,
+  Cost,
 } from '../../src/sdk';
 import type {
   CardDefinition,
@@ -74,7 +74,7 @@ it('装备自动以自己为目标，同槽替换一次提交，移牌后效立�
   });
   expect(rangeReads).toBe(1);
   const observations: number[] = [];
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:equipment'),
@@ -324,7 +324,7 @@ function lossDefinition(allowDead = false): CardDefinition {
       id: 'probe:loss-ability',
       name: '离场探针',
       triggers: [
-        on(cardsMoved, {
+        on(Cards.moved, {
           id: 'lost',
           allowDead,
           retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
@@ -392,7 +392,7 @@ it('装备材料宣告后被取走，不安装新装备，也不弃置原装备�
     hands: { a: [card('new', 'spear')] },
     equipment: { a: [card('old', 'crossbow')] },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'take',
     owner: null,
     eligible: (_ctx, receipt) => receipt.cards.includes('new'),
@@ -412,7 +412,7 @@ it('装备材料宣告后被取走，不安装新装备，也不弃置原装备�
 
 it('新装备在移牌后效中被取走，装备事实仍在真实安装的提交处，查询立即停止', async () => {
   const game = cardGame({ hands: { a: [card('weapon', 'spear')] } });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'take-installed',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:equipment'),

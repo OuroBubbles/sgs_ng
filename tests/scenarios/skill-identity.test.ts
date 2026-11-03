@@ -1,13 +1,13 @@
 import { expect, it } from 'vitest';
 import {
   activeOffers,
-  costPaid,
   ownedCards,
   runPhase,
   runTurn,
   setGender,
-  skillsChanged,
   validateActive,
+  Cost,
+  Skill,
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
@@ -86,7 +86,7 @@ for (const rule of cases) {
       await prepare(game, skill);
       const firstInstance = currentInstance(game, skill);
       let replaced = false;
-      game.room.on(costPaid, {
+      game.room.on(Cost.paid, {
         id: 'change-source-after-payment',
         owner: null,
         eligible: (_ctx, receipt) => receipt.skill === skill && !replaced,
@@ -218,7 +218,7 @@ it.each([false, true])(
     const game = scenario();
     const seen: string[] = [];
     for (const owner of ['a', 'b', 'c', 'd'])
-      game.room.on(skillsChanged, {
+      game.room.on(Skill.changed, {
         id: `changed:${owner}`,
         owner,
         eligible: () => true,
@@ -241,11 +241,11 @@ it.each([false, true])(
     const orders = game.room.history.entries.filter(
       (entry) =>
         entry.type === 'window.order' &&
-        (entry.data as { window: string }).window === skillsChanged.id,
+        (entry.data as { window: string }).window === Skill.changed.id,
     );
     expect(orders.map((entry) => entry.data)).toEqual(
       Array.from({ length: 4 }, () => ({
-        window: skillsChanged.id,
+        window: Skill.changed.id,
         subject: 'c',
         anchor: inTurn ? 'b' : 'c',
         override: false,

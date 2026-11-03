@@ -10,7 +10,6 @@ import {
   peers,
   readState,
   recover,
-  responseRequested,
   rulesOf,
   setState,
   skill,
@@ -18,6 +17,7 @@ import {
   trigger,
   declare,
   withCardSupply,
+  Response,
 } from '../../../sdk';
 import type {
   CardChoice,
@@ -115,7 +115,7 @@ export const jijiang = skill({
   description:
     '主公技。当你需要使用或打出杀时，可以请求其他蜀势力角色依次替你打出杀。实际供牌者打出，使用杀时由你承担目标、距离和次数；本阶段请求失败后，不能再主动以激将使用杀。',
   triggers: [
-    trigger(responseRequested, {
+    trigger(Response.requested, {
       who: (request) => request.actor,
       when: (ctx, request, self) =>
         request.actor === request.beneficiary &&

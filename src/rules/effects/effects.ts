@@ -3,17 +3,16 @@ import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
-import { defineWindow, labelTrigger } from '../../core/runtime/window';
+import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
 import type {
   Trigger,
   TriggerSource,
   TriggerOccurrence,
-  WindowType,
+  Timing,
   WindowRef,
   WindowAdmission,
-} from '../../core/runtime/window';
-import { assertLifetime, lifetimeEnded } from '../scopes/lifetime';
-import type { Lifetime } from '../scopes/lifetime';
+} from '../../core/runtime/event';
+import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import type { QueryType } from '../skills/query';
 import { isGameOver } from '../game/end';
 
@@ -96,12 +95,14 @@ export interface EffectEnd<Data = unknown> {
   readonly before: EffectRecord<Data>;
   readonly reason: string;
 }
-export const effectAdded = defineWindow<EffectRecord>('effect.added');
-export const effectChanged = defineWindow<{
-  readonly before: EffectRecord;
-  readonly after: EffectRecord;
-}>('effect.changed');
-export const effectEnded = defineWindow<EffectEnd>('effect.ended');
+export const Effect = defineEvent('effect', {
+  added: timing<EffectRecord>(),
+  changed: timing<{
+    readonly before: EffectRecord;
+    readonly after: EffectRecord;
+  }>(),
+  ended: timing<EffectEnd>(),
+});
 
 const definedEffects = new WeakSet<object>();
 // 绑定保留接收者；登记核对仍使用绑定前的工厂身份，不把包装函数当作另一份实现。
@@ -127,7 +128,7 @@ export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDe
 
 /** 只描述一个普通触发；身份、生存资格、行动序与有限次数仍走原有 Window。 */
 export function effectOn<Payload>(
-  window: WindowType<Payload>,
+  window: Timing<Payload>,
   input: EffectTriggerDefinition<Payload>,
 ): EffectTrigger {
   const { id = window.id } = input;
@@ -232,7 +233,7 @@ export class EffectBook implements TriggerSource {
     this.instances(room.world);
     const registration = {};
     const removeSource = room.addTriggerSource(this);
-    const removeExpiry = room.on(lifetimeEnded, {
+    const removeExpiry = room.on(Lifetime.ended, {
       id: 'effects:lifetime',
       owner: null,
       eligible: (_ctx, ended) => ended.statesBefore.some((state) => state.key === stateKey),
@@ -330,7 +331,7 @@ export class EffectBook implements TriggerSource {
       const prepared = this.#prepare(at, definition, input);
       at.commit('effect.added', [prepared.change], prepared.record);
       await at.window(
-        effectAdded,
+        Effect.added,
         prepared.record,
         prepared.record.owner === null ? {} : { subject: prepared.record.owner },
       );
@@ -352,7 +353,7 @@ export class EffectBook implements TriggerSource {
         after,
       });
       await at.window(
-        effectChanged,
+        Effect.changed,
         { before, after },
         after.owner === null ? {} : { subject: after.owner },
       );
@@ -376,7 +377,7 @@ export class EffectBook implements TriggerSource {
   async #finished(ctx: Context, before: EffectRecord, reason: string): Promise<void> {
     const ended = immutable({ before, reason });
     ctx.commit('effect.ended', [], ended);
-    await ctx.window(effectEnded, ended, before.owner === null ? {} : { subject: before.owner });
+    await ctx.window(Effect.ended, ended, before.owner === null ? {} : { subject: before.owner });
     const onEnd = this.#definition(before.type).onEnd;
     if (onEnd) await ctx.flow('effect.after-end', (at) => onEnd(at, ended));
   }
@@ -424,7 +425,7 @@ export class EffectBook implements TriggerSource {
     return behavior;
   }
 
-  collect<Payload>(type: WindowType<Payload>, world: WorldReader): readonly Trigger<Payload>[] {
+  collect<Payload>(type: Timing<Payload>, world: WorldReader): readonly Trigger<Payload>[] {
     if (!this.#attachments.has(world)) return [];
     return this.instances(world).flatMap((record) => {
       const self = this.#handle(world, record);

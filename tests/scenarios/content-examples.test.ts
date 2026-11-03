@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import definition from '../../examples/content/study';
-import harbor, { provisionFinished, tideDrawBonus } from '../../examples/content/harbor';
+import harbor, { Provision, tideDrawBonus } from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
 import standard from '../../src/content/standard';
-import { createContent, damage, costPaid, cardsDrawn } from '../../src/sdk';
+import { createContent, damage, Cards, Cost } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -23,7 +23,7 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
       game.skills.grant(ctx, { owner: 'a', skill: 'study', source }),
     );
     const draws: string[] = [];
-    game.room.on(cardsDrawn, {
+    game.room.on(Cards.drawn, {
       id: 'observe-guide-draw',
       owner: null,
       eligible: () => true,
@@ -31,7 +31,7 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
         draws.push(result.input.reason);
       },
     });
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'revoke-after-declaration',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'study',
@@ -63,7 +63,7 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
 });
 
 it('真实备航和潮声经跨模块查询多摸一张，完成窗口触发墨韵回复，状态可由事实重建', async () => {
-  expect(gallery.skills[0]!.triggers[0]!.window).toBe(provisionFinished);
+  expect(gallery.skills[0]!.triggers[0]!.window).toBe(Provision.finished);
   expect(gallery.skills[0]!.modifiers[0]!.query).toBe(tideDrawBonus);
   const content = createContent(standard, harbor, gallery);
   const match = createOfflineMatch({

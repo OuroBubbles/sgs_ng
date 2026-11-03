@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest';
-import { damage, damageCausing, draw, drawing } from '../../src/sdk';
+import { damage, draw, Cards, Damage } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { choose, nextRequest } from '../fixtures/room';
 
 it('伤害开窗后调用方修改输入，不改变本次目标、数量和来源快照', async () => {
   const game = cardGame();
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'ask',
     owner: 'a',
     eligible: () => true,
@@ -31,7 +31,7 @@ it('伤害开窗后调用方修改输入，不改变本次目标、数量和来�
 
 it('摸牌开窗后外部修改输入，不改变已开始流程的接收者与请求', async () => {
   const game = cardGame({ hands: { a: [] }, draw: [card('top', 'slash')] });
-  game.room.on(drawing, {
+  game.room.on(Cards.drawing, {
     id: 'ask',
     owner: 'a',
     eligible: () => true,

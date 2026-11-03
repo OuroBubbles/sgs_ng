@@ -2,13 +2,7 @@ import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import {
-  chainChanged,
   damage,
-  damageCausing,
-  damageInflicting,
-  damageReceived,
-  damageSettled,
-  dyingStarted,
   isChained,
   isDirectDamage,
   kill,
@@ -26,6 +20,9 @@ import {
   CardBook,
   SkillBook,
   resolveAttack,
+  Chain,
+  Damage,
+  Dying,
 } from '../../src/sdk';
 import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
@@ -53,7 +50,7 @@ function rebuilt(game: Game) {
 it('连环是公开权威状态，实际变化才提交并开放只读窗口', async () => {
   const game = cardGame();
   const changed: boolean[] = [];
-  game.room.on(chainChanged, {
+  game.room.on(Chain.changed, {
     id: 'changed',
     owner: 'a',
     eligible: () => true,
@@ -125,7 +122,7 @@ it.each([
 it('传播以起点最终伤害为基数，每个目标独立防御，不污染其他草案或来源快照', async () => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'source',
     owner: 'a',
     eligible: (_ctx, draft) => isDirectDamage(draft.input),
@@ -133,7 +130,7 @@ it('传播以起点最终伤害为基数，每个目标独立防御，不污染�
       draft.adjust(1, 'source');
     },
   });
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'defense',
     owner: 'b',
     eligible: () => true,
@@ -154,7 +151,7 @@ it('传播以起点最终伤害为基数，每个目标独立防御，不污染�
 it.each(['prevent', 'zero'])('起点 %s 时不解链、不传播，仍正常收束', async (kind) => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'prevent',
     owner: 'b',
     eligible: () => true,
@@ -177,7 +174,7 @@ it.each(['prevent', 'zero'])('起点 %s 时不解链、不传播，仍正常收�
 it('传播中的防止只影响该名角色，它保留连环，后续角色继续结算', async () => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageInflicting, {
+  game.room.on(Damage.inflicting, {
     id: 'prevent-c',
     owner: 'c',
     eligible: (_ctx, draft) => draft.input.to === 'c',
@@ -197,7 +194,7 @@ it.each(['unlink', 'kill'])(
   async (kind) => {
     const game = cardGame();
     await link(game);
-    game.room.on(damageReceived, {
+    game.room.on(Damage.received, {
       id: 'change-plan',
       owner: 'b',
       eligible: (_ctx, result) => result.input.to === 'b',
@@ -226,7 +223,7 @@ it('传播顺序在提交时按模式冻结，包含来源本人，不随后效�
   let anchor = 'c';
   const game = cardGame({ actionAnchor: () => anchor });
   await link(game, ['a', 'b', 'c', 'd']);
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'anchor',
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
@@ -244,7 +241,7 @@ it('起点收束与各传播子流程完整结束后 damage 才返回', async ()
   const game = cardGame();
   await link(game);
   const order: string[] = [];
-  game.room.on(damageSettled, {
+  game.room.on(Damage.settled, {
     id: 'settled',
     owner: 'a',
     eligible: () => true,
@@ -263,7 +260,7 @@ it('起点收束与各传播子流程完整结束后 damage 才返回', async ()
 it('嵌套新起点独立传播，外层计划重查已解除状态，不重复击中', async () => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'nested',
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
@@ -283,7 +280,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
   const game = cardGame();
   await link(game);
   const order: string[] = [];
-  game.room.on(dyingStarted, {
+  game.room.on(Dying.started, {
     id: 'save',
     owner: 'a',
     eligible: (_ctx, event) => event.player === 'b',
@@ -294,7 +291,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
       order.push('saved');
     },
   });
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'chain-start',
     owner: 'a',
     eligible: (_ctx, draft) => !isDirectDamage(draft.input),
@@ -315,7 +312,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
 it('来源在起点后效死亡，已经产生的传播仍保留来源身份', async () => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'source-dies',
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
@@ -348,7 +345,7 @@ it('纯查询不能改变连环，关闭 Context 也不能继续调用状态操�
 it('终局确定后保留起点事实与计划，但不再执行后续传播', async () => {
   const game = cardGame();
   await link(game);
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'end',
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
@@ -506,7 +503,7 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
       id: 'probe:cap-skill',
       name: '限伤',
       triggers: [
-        on(damageInflicting, {
+        on(Damage.inflicting, {
           id: 'cap',
           when: (ctx, { payload: draft, self }) =>
             draft.input.to === self.owner &&
@@ -529,7 +526,7 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
   });
   await grantFire(game);
   await link(game);
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'plus',
     owner: 'a',
     eligible: (_ctx, draft) => isDirectDamage(draft.input),

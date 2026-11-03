@@ -1,7 +1,7 @@
 import type { CardMove } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { moveCards, cardsMoved } from './move';
+import { moveCards, Cards } from './move';
 import { withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 
@@ -58,7 +58,7 @@ export async function withProcessing<T>(
     );
     if (moves.length)
       await owner.window(
-        cardsMoved,
+        Cards.moved,
         immutable({
           kind: 'moved',
           moves,

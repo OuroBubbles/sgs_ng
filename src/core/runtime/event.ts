@@ -1,23 +1,45 @@
 import type { Context } from './room';
 import type { WorldReader } from '../model/state';
 
-export interface WindowType<T> {
+/**
+ * 事件的一个具名时点。同一个对象既是触发时机（ctx.window / on），也是历史记录的种类
+ * （ctx.commit / history.facts）；id 统一由「事件.时点」推导。
+ */
+export interface Timing<T> {
   readonly id: string;
   readonly groups: readonly string[];
   /** 只参与类型推导，不存运行时 payload。 */
   readonly payload?: T;
 }
 
-export function defineWindow<T>(id: string, groups: readonly string[] = ['main']): WindowType<T> {
-  const fixedGroups = [...groups];
-  if (
-    !id ||
-    !fixedGroups.length ||
-    fixedGroups.some((group) => !group) ||
-    new Set(fixedGroups).size !== fixedGroups.length
-  )
-    throw new Error('Window requires an ID and distinct named groups.');
-  return Object.freeze({ id, groups: Object.freeze(fixedGroups) });
+/** 时点声明：载荷类型与可选的结算分组（默认单组 main）。 */
+export interface TimingSpec<T> {
+  readonly groups: readonly string[];
+  readonly payload?: T;
+}
+export function timing<T>(...groups: string[]): TimingSpec<T> {
+  const fixed = groups.length ? [...groups] : ['main'];
+  if (fixed.some((group) => !group) || new Set(fixed).size !== fixed.length)
+    throw new Error('Timing requires distinct named groups.');
+  return Object.freeze({ groups: Object.freeze(fixed) });
+}
+
+export type EventTimings<S> = {
+  readonly [K in keyof S]: S[K] extends TimingSpec<infer T> ? Timing<T> : never;
+};
+
+/** 声明一个事件及其全部时点：defineEvent('damage', { received: timing<DamageResult>() }) → Damage.received。 */
+export function defineEvent<const S extends Record<string, TimingSpec<unknown>>>(
+  id: string,
+  timings: S,
+): EventTimings<S> {
+  const kebab = (key: string) => key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+  return Object.fromEntries(
+    Object.entries(timings).map(([key, spec]) => [
+      key,
+      Object.freeze({ id: `${id}.${kebab(key)}`, groups: spec.groups }),
+    ]),
+  ) as EventTimings<S>;
 }
 
 /** 本窗口内的一次独立结算；index 从 1 开始，total 在该候选入队时固定。 */
@@ -69,13 +91,13 @@ export type ActionAnchor = (ctx: Context, subject: string | null) => string | nu
 
 /** 开窗时从权威状态生成候选，核心不需要导入技能定义或内容包。 */
 export interface TriggerSource {
-  collect<T>(type: WindowType<T>, world: WorldReader, payload: T): readonly Trigger<T>[];
+  collect<T>(type: Timing<T>, world: WorldReader, payload: T): readonly Trigger<T>[];
 }
 
 /** 执行中的具体窗口；不是存档数据。相同 type 的嵌套窗口有不同引用和 ID。 */
 export interface WindowRef<T> {
   readonly id: string;
-  readonly type: WindowType<T>;
+  readonly type: Timing<T>;
   readonly payload: T;
 }
 

@@ -1,15 +1,14 @@
 import { expect, it, vi } from 'vitest';
 import {
   contestCounter,
-  counterFinished,
-  counterOpening,
-  effectStarting,
   finishGame,
   installCounterspells,
   kill,
   pay,
   resolveCounter,
-  useDeclared,
+  Use,
+  Resolve,
+  Counter,
 } from '../../src/sdk';
 import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -64,7 +63,7 @@ async function die(ctx: Context, player: string) {
 
 function captureEffect(game: Game) {
   const captured: { effect?: CardEffect } = {};
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'capture-root',
     owner: null,
     eligible: () => true,
@@ -97,7 +96,7 @@ it.each(boundaries)(
   async (boundary) => {
     const game = create();
     const captured = captureEffect(game);
-    game.room.on(counterOpening, {
+    game.room.on(Counter.opening, {
       id: 'a-invalidate',
       owner: null,
       eligible: () => true,
@@ -106,9 +105,9 @@ it.each(boundaries)(
     const later = vi.fn(async (ctx: Context) => {
       await pay(ctx, { actor: 'c', cards: ['cost'], to: 'discard', reason: 'stale counter' });
     });
-    game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
+    game.room.on(Counter.opening, { id: 'z-later', owner: null, eligible: () => true, run: later });
     const finished: CounterResult[] = [];
-    game.room.on(counterFinished, {
+    game.room.on(Counter.finished, {
       id: 'completed',
       owner: null,
       eligible: () => true,
@@ -132,7 +131,7 @@ it.each(boundaries)(
 it.each(boundaries)('同窗候选已支付再令反制 %s，保留真实费用但不运行其后候选', async (boundary) => {
   const game = create();
   const captured = captureEffect(game);
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'a-pay-and-stop',
     owner: null,
     eligible: () => true,
@@ -151,7 +150,7 @@ it.each(boundaries)('同窗候选已支付再令反制 %s，保留真实费用�
     },
   });
   const later = vi.fn();
-  game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
+  game.room.on(Counter.opening, { id: 'z-later', owner: null, eligible: () => true, run: later });
 
   await use(game, intent);
   expect(later.mock.calls.length).toBe(0);
@@ -163,14 +162,14 @@ it.each(boundaries)('同窗候选已支付再令反制 %s，保留真实费用�
 
 it.each(['a', 'd'])('开窗中 %s 死亡不撤销已宣告决斗对存活目标的反制机会', async (player) => {
   const game = create();
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'a-other-dies',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.depth === 0,
     run: (ctx) => die(ctx, player),
   });
   const later = vi.fn();
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'z-later',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.depth === 0,
@@ -198,7 +197,7 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
   });
   installCounterspells(game.room, game.book);
   const later: string[] = [];
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'a-nested-use',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.root.target === 'b',
@@ -213,13 +212,13 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
       ).toMatchObject({ kind: 'used', use: { effects: [{ state: 'resolved' }] } });
     },
   });
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'b-stop-outer',
     owner: null,
     eligible: (_ctx, opportunity) => opportunity.root.target === 'd',
     run: (ctx) => die(ctx, 'b'),
   });
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'z-later',
     owner: null,
     eligible: () => true,
@@ -242,14 +241,14 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
 
 it('候选局部中止不等于取消反制机会，后续候选和正常决斗仍执行', async () => {
   const game = create();
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'a-abort-candidate',
     owner: null,
     eligible: () => true,
     run: (ctx) => ctx.abort('only this candidate'),
   });
   const later = vi.fn();
-  game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
+  game.room.on(Counter.opening, { id: 'z-later', owner: null, eligible: () => true, run: later });
   const running = use(game, intent);
   const request = await nextRequest(game.room);
   game.room.decisions.cancel(request.id, request.token);
@@ -264,7 +263,7 @@ it('候选局部中止不等于取消反制机会，后续候选和正常决斗�
 it('反制完成是已封口公共事实，完成后效终局不重写结果或吞掉后续完成候选', async () => {
   const game = cardGame({ hands: { a: [card('duel', 'duel')] } });
   installCounterspells(game.room, game.book);
-  game.room.on(counterFinished, {
+  game.room.on(Counter.finished, {
     id: 'a-finish-game',
     owner: null,
     eligible: () => true,
@@ -273,7 +272,7 @@ it('反制完成是已封口公共事实，完成后效终局不重写结果或�
     },
   });
   const later = vi.fn();
-  game.room.on(counterFinished, {
+  game.room.on(Counter.finished, {
     id: 'z-completed',
     owner: null,
     eligible: () => true,
@@ -309,7 +308,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
   }
   const input = new Input();
   const later = vi.fn();
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'a-change-draft',
     owner: null,
     eligible: () => true,
@@ -321,7 +320,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
       input.relevant = () => true;
     },
   });
-  game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
+  game.room.on(Counter.opening, { id: 'z-later', owner: null, eligible: () => true, run: later });
   await game.room.run('counter', async (ctx) => {
     expect(await contestCounter(ctx, game.book, input)).toMatchObject({
       kind: 'unavailable',
@@ -336,7 +335,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
 it('反制机会在普通后效中检查相关性也拒绝异步结果，不提交越过资格的事实', async () => {
   const game = cardGame({ hands: { a: [] } });
   let asynchronous = false;
-  game.room.on(counterOpening, {
+  game.room.on(Counter.opening, {
     id: 'probe:read-availability',
     owner: null,
     eligible: () => true,
@@ -370,7 +369,7 @@ it.each(boundaries)(
   async (boundary) => {
     const game = create();
     const captured = captureEffect(game);
-    game.room.on(useDeclared, {
+    game.room.on(Use.declared, {
       id: 'after-counter-commit',
       owner: null,
       eligible: (_ctx, plan) => plan.card.name === 'standard:nullification',

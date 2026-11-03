@@ -1,13 +1,13 @@
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import type { CardBook } from './book';
-import { effectStarting } from './book';
 import { effectReference, useReference } from './types';
 import type { CounterOpportunity, CounterSubject, EffectRef, CardUseRef } from './types';
 import type { UsePlanView } from './plan';
 import { withLifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
+import { Resolve } from './book';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface CounterResult {
   /** 本机会封口时的结论；原效果已失效时不能将无效反制误报为未受反制。 */
@@ -29,8 +29,10 @@ export interface CounterRequest {
   /** 同步纯相关性；普通后效可直接查询机会，回调内部仍受只读守卫约束。 */
   readonly relevant?: (ctx: Context) => boolean;
 }
-export const counterOpening = defineWindow<CounterOpportunity>('counter.opening');
-export const counterFinished = defineWindow<CounterResult>('counter.finished');
+export const Counter = defineEvent('counter', {
+  opening: timing<CounterOpportunity>(),
+  finished: timing<CounterResult>(),
+});
 
 /** 一个机会对应一个具体效果或用牌。每张反制牌在自身用牌本体中嵌套下一机会，材料不提前离场。 */
 export function contestCounter(
@@ -57,7 +59,7 @@ export function contestCounter(
         by: null,
       };
       child.commit('counter.finished', [], result);
-      await child.window(counterFinished, immutable(result), { subject: root.target });
+      await child.window(Counter.finished, immutable(result), { subject: root.target });
       return immutable(result);
     }
     const opportunity: CounterOpportunity = Object.freeze({
@@ -76,7 +78,7 @@ export function contestCounter(
     const live = () => child.query(() => opportunity.available(child));
     // 开窗后效也可能令原效果失效；持续收束本次机会，不撤销已经提交的费用。
     if (live())
-      await child.window(counterOpening, opportunity, {
+      await child.window(Counter.opening, opportunity, {
         subject: root.actor,
         active: opportunity.available,
       });
@@ -119,7 +121,7 @@ export function contestCounter(
     // 最后一席准备失败或嵌套用牌也可能关闭原机会，此后不一定还有下一轮循环。
     if (!live()) result = { ...result, kind: 'unavailable' };
     child.commit('counter.finished', [], result);
-    await child.window(counterFinished, immutable(result), { subject: root.target });
+    await child.window(Counter.finished, immutable(result), { subject: root.target });
     return immutable(result);
   });
 }
@@ -152,7 +154,7 @@ export function installCounterspells(
   names: readonly string[] = ['standard:nullification'],
 ): () => void {
   const counterNames = immutable(names);
-  return room.on(effectStarting, {
+  return room.on(Resolve.starting, {
     id: 'standard:counterspell',
     owner: null,
     group: 'counter',

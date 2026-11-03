@@ -4,14 +4,14 @@ import {
   invoke,
   on,
   recover,
-  useDeclared,
-  cardsMoved,
   equipmentCard,
   equipmentLost,
   damage,
   isChained,
   setChained,
   rulesOf,
+  Use,
+  Cards,
 } from '../../sdk';
 import type { Card, CardDefinition, ContentDefinition } from '../../sdk';
 import { relay, ward } from './defense';
@@ -90,7 +90,7 @@ export const hearing = {
   name: '闻策',
   description: '当你使用锦囊牌时，你可以摸一张牌。',
   triggers: [
-    on(useDeclared, {
+    on(Use.declared, {
       order: 'choose',
       when: (ctx, { payload: use, self }) =>
         use.actor === self.owner && rulesOf(ctx).definition(use.card.name).type === 'trick',
@@ -112,7 +112,7 @@ export const relicJade = equipmentCard({
     name: '玉碎',
     description: '遗玉离开你的装备区后，你可以摸一张牌。不是装备时被弃置不会发动。',
     triggers: [
-      on(cardsMoved, {
+      on(Cards.moved, {
         order: 'choose',
         retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
         when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),

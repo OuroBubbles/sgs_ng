@@ -2,17 +2,15 @@ import { expect, it } from 'vitest';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import {
-  responseRequested,
-  useFinished,
-  responseFinished,
-  useDeclared,
   moveCards,
   setKingdom,
   kill,
   runPhase,
   defineSkill,
   viewAs,
-  costPaid,
+  Use,
+  Response,
+  Cost,
 } from '../../src/sdk';
 import type { UseTiming } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
@@ -49,7 +47,7 @@ async function dodge(game: ReturnType<typeof create>, running: Promise<unknown>)
 it('抵消杀的闪是完整使用，提交使用事实和完成时点，不伪造打出', async () => {
   const game = create();
   const completed: string[] = [];
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'used',
     owner: null,
     eligible: () => true,
@@ -57,7 +55,7 @@ it('抵消杀的闪是完整使用，提交使用事实和完成时点，不伪�
       if (result.card.name === 'standard:jink') completed.push('use');
     },
   });
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'responded',
     owner: null,
     eligible: () => true,
@@ -74,7 +72,7 @@ it('抵消杀的闪是完整使用，提交使用事实和完成时点，不伪�
 });
 it('禁止打出闪不禁止抵消杀时使用闪', async () => {
   const game = create('slash', true);
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'provide',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -162,7 +160,7 @@ it.each(['effect', 'play'] as const)(
 it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 World 不能复用', async () => {
   const game = create();
   let timing: UseTiming | undefined;
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'capture',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:jink',
@@ -284,7 +282,7 @@ it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种�
       prohibitUse: (_ctx, actor) => actor === 'c',
     },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -303,7 +301,7 @@ it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', a
     hands: { a: [card('attack', 'slash')], b: [card('dodge', 'jink')], c: [card('other', 'jink')] },
     policy: { prohibitResponse: (_ctx, actor) => actor === 'c' },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -328,7 +326,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
           prohibited && actor === 'b' && card.name === 'standard:jink',
       },
     });
-    game.room.on(responseRequested, {
+    game.room.on(Response.requested, {
       id: 'delegate',
       owner: null,
       eligible: (_ctx, request) => request.actor === 'b',
@@ -336,7 +334,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
         await request.delegate(ctx, 'c');
       },
     });
-    game.room.on(responseFinished, {
+    game.room.on(Response.finished, {
       id: 'change',
       owner: null,
       eligible: () => true,
@@ -375,7 +373,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
 );
 it('两层委托仍只有末端 d 打出与原请求者 b 使用，候选不重复收费', async () => {
   const game = cardGame({ hands: { a: [card('attack', 'slash')], d: [card('dodge', 'jink')] } });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b' || request.actor === 'c',
@@ -436,7 +434,7 @@ it('连续两闪各有独立使用身份、完成和处理区，不合并为一�
 });
 it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，不重开请求', async () => {
   const game = cardGame({ hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] } });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'delegate',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
@@ -444,7 +442,7 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
       expect((await request.delegate(ctx, 'c')).kind).toBe('used');
     },
   });
-  game.room.on(useFinished, {
+  game.room.on(Use.finished, {
     id: 'death',
     owner: null,
     eligible: (_ctx, result) => result.card.name === 'standard:jink',
@@ -527,7 +525,7 @@ it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留�
   });
   await grant(game, 'b', 'standard:hujia');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'c', '魏'));
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'prohibit',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:hujia',
@@ -547,7 +545,7 @@ it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留�
 });
 it('响应中的使用局部中止向上延续，不伪造缺闪伤害或撤销已提交材料', async () => {
   const game = create();
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'interrupt',
     owner: null,
     eligible: (_ctx, plan) => plan.card.name === 'standard:jink',

@@ -1,13 +1,5 @@
 import { expect, it } from 'vitest';
-import {
-  defineSkill,
-  viewAs,
-  ownedCards,
-  useDeclared,
-  effectStarting,
-  effectFinished,
-  damageReceived,
-} from '../../src/sdk';
+import { defineSkill, viewAs, ownedCards, Use, Resolve, Damage } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import type {
   CardChoice,
@@ -588,7 +580,7 @@ it('宣告后失去转换技能不会改变本次冻结牌面或吞掉已经产�
     game.skills.grant(ctx, { owner: 'a', skill: wusheng.id, source }),
   );
   const instance = game.room.world.snapshot.skills[0]?.id ?? '';
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'lose',
     owner: 'b',
     eligible: () => true,
@@ -644,7 +636,7 @@ it('零材料配方也可响应，同一个目标效果保存完整关联', asyn
 
 it('处理区材料可被子用牌借走，子结算结束后父善后不会重复处理', async () => {
   const game = cardGame();
-  game.room.on(damageReceived, {
+  game.room.on(Damage.received, {
     id: 'reuse-material',
     owner: 'b',
     eligible: (_ctx, hit) => hit.input.to === 'b',
@@ -673,7 +665,7 @@ it('处理区材料可被子用牌借走，子结算结束后父善后不会重�
 
 it('具名查询和计划修改均受纯查询守卫约束', async () => {
   const game = cardGame();
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'bad-query',
     owner: 'a',
     eligible: (ctx, plan) => {
@@ -692,7 +684,7 @@ it('具名查询和计划修改均受纯查询守卫约束', async () => {
 it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
   const game = cardGame({ policy: { attackRange: () => 3 } });
   const started: string[] = [];
-  game.room.on(useDeclared, {
+  game.room.on(Use.declared, {
     id: 'extra',
     owner: 'a',
     eligible: () => true,
@@ -700,7 +692,7 @@ it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
       plan.addTarget(ctx, 'c', 'extra');
     },
   });
-  game.room.on(effectFinished, {
+  game.room.on(Resolve.finished, {
     id: 'kill-next',
     owner: 'a',
     eligible: (_ctx, event) => event.effect.target === 'b',
@@ -708,7 +700,7 @@ it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
       ctx.commit('c.died', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
     },
   });
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'observe',
     owner: 'a',
     eligible: () => true,

@@ -15,7 +15,6 @@ import {
   validateActive,
   runPhase,
   playPhase,
-  phaseBefore,
   defineSkill,
   SkillBook,
   GeneralBook,
@@ -24,9 +23,6 @@ import {
   genderOf,
   setGender,
   moveCards,
-  cardsMoved,
-  cardsDrawn,
-  costPaid,
   installRescue,
   used,
   kill,
@@ -36,6 +32,9 @@ import {
   JointSelection,
   ownedCards,
   pay,
+  Cards,
+  Cost,
+  Phase,
 } from '../../src/sdk';
 import { inspectActive, activeAvailable } from '../../src/rules/skills/active';
 import type { ActiveSkill, ActiveRunInput, Context, PhaseView } from '../../src/sdk';
@@ -381,7 +380,7 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
   const game = cardGame({ skills: [kurou] });
   const instance = await grant(game, kurou.id);
   let saved: PhaseView;
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'before',
     owner: null,
     eligible: () => true,
@@ -504,7 +503,7 @@ it('结姻费用、次数和宣告同次提交；回复先目标后本人，一�
   const game = supportGame(true);
   const instance = await setupSupport(game);
   let current: PhaseView;
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'cost-observer',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('one')),
@@ -565,7 +564,7 @@ it('结姻不要求本人受伤，下一独立出牌阶段重新获得次数', a
 it('结姻支付后目标死亡仍消耗次数，本人按当前状态回复；技能失去不撤销已宣告效果', async () => {
   const game = supportGame();
   const instance = await setupSupport(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'cost-aftereffect',
     owner: null,
     eligible: (_ctx, paid) => paid.skill === jieyin.id,
@@ -634,7 +633,7 @@ it('枭姬不会把装备区内部重排当作失去，首轮摸牌后失去技�
     ),
   );
   expect(game.room.decisions.pending).toEqual([]);
-  game.room.on(cardsDrawn, {
+  game.room.on(Cards.drawn, {
     id: 'lose-skill',
     owner: null,
     eligible: () => true,

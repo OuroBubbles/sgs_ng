@@ -7,13 +7,10 @@ import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   recover,
-  recovering,
-  recovered,
   kill,
   runPhase,
   runTurn,
   activeOffers,
-  costPaid,
   moveCards,
   defineSkill,
   modify,
@@ -23,6 +20,8 @@ import {
   loseHp,
   cardActivities,
   judge,
+  Hp,
+  Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
@@ -89,7 +88,7 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
   const game = scenario();
   await wound(game, 1);
   let held: RecoveryDraft;
-  game.room.on(recovering, {
+  game.room.on(Hp.recovering, {
     id: 'edit',
     owner: null,
     eligible: () => true,
@@ -102,7 +101,7 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
       ctx.commit('test.hp', [{ kind: 'vitality', player: 'a', hp: 3 }], null);
     },
   });
-  game.room.on(recovered, {
+  game.room.on(Hp.recovered, {
     id: 'sealed',
     owner: null,
     eligible: () => true,
@@ -133,7 +132,7 @@ it.each(['zero', 'dead', 'already-dead'] as const)(
     if (kind === 'already-dead')
       await game.room.run('kill', (ctx) => kill(ctx, { ...death, player: 'a' }));
     let opened = 0;
-    game.room.on(recovering, {
+    game.room.on(Hp.recovering, {
       id: 'change',
       owner: null,
       eligible: () => true,
@@ -242,7 +241,7 @@ it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
 it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死亡则停止：%s', async (kind) => {
   const game = scenario({ hands: { a: [card('fee', 'slash')] }, draw: [card('new', 'peach')] });
   await grant(game, 'standard:zhiheng');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'after',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:zhiheng',
@@ -262,7 +261,7 @@ it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死�
 it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () => {
   const game = scenario({ hands: { a: handCards() } });
   await grant(game, 'standard:keji');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'atomic',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:keji',
@@ -461,7 +460,7 @@ it('连营宣告后收到手牌仍摸一张，失去技能也不撤销已宣告�
     draw: [card('new', 'slash')],
   });
   await grant(game, 'standard:lianying');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'after',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:lianying',
@@ -485,7 +484,7 @@ it('连营宣告后收到手牌仍摸一张，失去技能也不撤销已宣告�
 it('连营支付后死亡不再摸牌，批量埋葬也不向死亡角色询问', async () => {
   const game = scenario({ hands: { a: [card('last', 'jink')] }, draw: [card('new', 'slash')] });
   await grant(game, 'standard:lianying');
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'death',
     owner: null,
     eligible: (_ctx, r) => r.skill === 'standard:lianying',
@@ -608,7 +607,7 @@ it('救援同样识别急救转换的桃，并保留真实使用者', async () =
 it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试量结果', async () => {
   const game = scenario();
   let after = 0;
-  game.room.on(recovered, {
+  game.room.on(Hp.recovered, {
     id: 'after',
     owner: null,
     eligible: () => true,

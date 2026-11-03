@@ -1,16 +1,16 @@
 import { expect, it, vi } from 'vitest';
 import { LocalSession } from '../../src/app/offline/session';
-import { RoleMatch, matchPrepared } from '../../src/app/offline/role-match';
+import { Match, RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import {
   moveCards,
   finishGame,
-  useDeclared,
   defineQuery,
   defineSkill,
   modify,
   cardQueries,
+  Use,
 } from '../../src/sdk';
 import type { SkillHandle } from '../../src/sdk';
 import type { GameSelection, GameView } from '../../src/core/view/game';
@@ -109,7 +109,7 @@ function game(options: { wounded?: boolean; response?: boolean } = {}) {
       ...Array.from({ length: 20 }, (_, i) => card(`hidden-deck-${i}`, 'jink')),
     ],
   });
-  match.room.on(matchPrepared, {
+  match.room.on(Match.prepared, {
     id: 'fixture',
     owner: null,
     eligible: () => true,
@@ -205,7 +205,7 @@ it.each([false, true])(
     await match.room.run('provider', (ctx) => {
       match.skills.addProvider({ collect: () => [{ self, definition }] }, ctx);
     });
-    match.room.on(matchPrepared, {
+    match.room.on(Match.prepared, {
       id: 'arm',
       owner: null,
       eligible: () => true,
@@ -371,7 +371,7 @@ it('终局揭示身份，关闭后不再发布私有请求；释放订阅后没�
   // 单独准备后提交终局，投影不依赖 UI 猜测身份。
   const ended = game();
   try {
-    ended.match.room.on(useDeclared, {
+    ended.match.room.on(Use.declared, {
       id: 'terminal',
       owner: null,
       eligible: () => true,
@@ -438,7 +438,7 @@ it('执行侧中止不被界面误报为仍在结算或正常胜负', async () =
 it('胜负提交后清理失败保留事实，并将原始作者故障传给主持视图', async () => {
   const { session, match } = game();
   try {
-    match.room.on(useDeclared, {
+    match.room.on(Use.declared, {
       id: 'terminal-cleanup-fault',
       owner: null,
       eligible: () => true,

@@ -2,12 +2,10 @@ import {
   alive,
   cardLabel,
   chooseOwnedCard,
-  damageReceived,
   face,
   general,
   HE,
   isGameOver,
-  judgmentRetrial,
   ownedCards,
   rulesOf,
   select,
@@ -15,8 +13,10 @@ import {
   skill,
   takeCard,
   trigger,
+  Judgment,
+  Damage,
 } from '../../../sdk';
-import type { Context, Judgment, SkillHandle } from '../../../sdk';
+import type { Context, SkillHandle } from '../../../sdk';
 
 function retrialCards(ctx: Context, self: SkillHandle, judgment: Judgment): readonly string[] {
   if (
@@ -37,7 +37,7 @@ export const guicai = skill({
   name: '鬼才',
   description: '一名角色的判定牌生效前，你可以打出一张手牌代替之。任意牌型均可，但须满足打出禁令。',
   triggers: [
-    trigger(judgmentRetrial, {
+    trigger(Judgment.retrial, {
       when: (ctx, judgment, self) =>
         judgment.card !== null && retrialCards(ctx, self, judgment).length > 0,
       async effect(ctx, judgment, self) {
@@ -84,7 +84,7 @@ export const fankui = skill({
   name: '反馈',
   description: '受到一次伤害后，你可以获得伤害来源的一张手牌或装备。若伤害来源是你，只能选择装备。',
   triggers: [
-    trigger(damageReceived, {
+    trigger(Damage.received, {
       who: (hit) => hit.input.to,
       when: (ctx, hit, self) => {
         const source = hit.input.from;

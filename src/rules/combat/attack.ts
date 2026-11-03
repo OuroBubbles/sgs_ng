@@ -1,6 +1,5 @@
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
 import type { CardBook } from '../cards/book';
 import type { EffectRef, Purpose } from '../cards/types';
 import { effectReference } from '../cards/types';
@@ -9,6 +8,7 @@ import { isResponseSatisfied } from '../cards/response';
 import { damage } from './damage';
 import type { DamageResult } from './damage';
 import { isGameOver } from '../game/end';
+import { defineEvent, timing } from '../../core/runtime/event';
 
 type Answered = Extract<ResponseResult, { kind: 'responded' | 'used' }>;
 export interface DefenseDraft {
@@ -25,7 +25,9 @@ export interface AttackResult {
   readonly brokenBy: string | null;
   readonly damage: DamageResult | null;
 }
-export const attackDefended = defineWindow<DefenseDraft>('attack.defended');
+export const Attack = defineEvent('attack', {
+  defended: timing<DefenseDraft>(),
+});
 
 /** 作者可保留完整响应/突破管线，仅以普通函数指定命中后的伤害。 */
 export type AttackDamage = (ctx: Context, effect: EffectRef) => Promise<DamageResult>;
@@ -81,7 +83,7 @@ export async function resolveAttack(
     });
     if (defended && live()) {
       at.commit('attack.defended', [], { effect, responses });
-      await at.window(attackDefended, draft, { subject: effect.actor });
+      await at.window(Attack.defended, draft, { subject: effect.actor });
     }
     open = false;
     if (brokenBy) at.commit('attack.defense-broken', [], { effect, reason: brokenBy });

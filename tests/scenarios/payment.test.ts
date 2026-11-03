@@ -2,14 +2,14 @@ import { expect, it } from 'vitest';
 import {
   pay,
   used,
-  costPaid,
-  cardsMoved,
   moveCards,
   withLifetime,
   JointSelection,
   defineSkill,
   SkillBook,
   skillEffective,
+  Cards,
+  Cost,
 } from '../../src/sdk';
 import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
 import { lianying } from '../../src/content/standard/generals/luxun';
@@ -70,7 +70,7 @@ it('技能支付只声明来源即可确定付款人，费用原因仍由调用�
 it('支付移牌包含接收区的提交前后快照，同步宣告的另一次变更不改写该批次', async () => {
   const game = room();
   const batches: MoveResult[] = [];
-  game.on(cardsMoved, {
+  game.on(Cards.moved, {
     id: 'observe-gift',
     owner: 'b',
     eligible: () => true,
@@ -143,7 +143,7 @@ it('意图在费用提交后、所有支付后效之前同步确定；失效意�
   const game = room();
   const seen: string[] = [];
   let declared = false;
-  game.on(cardsMoved, {
+  game.on(Cards.moved, {
     id: 'moved',
     owner: 'b',
     eligible: () => true,
@@ -152,7 +152,7 @@ it('意图在费用提交后、所有支付后效之前同步确定；失效意�
       seen.push('moved');
     },
   });
-  game.on(costPaid, {
+  game.on(Cost.paid, {
     id: 'paid',
     owner: 'b',
     eligible: () => true,
@@ -193,7 +193,7 @@ it.each(['throw', 'async'])(
         ctx.commit('late.intent', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
       },
     };
-    game.on(cardsMoved, {
+    game.on(Cards.moved, {
       id: 'after',
       owner: 'b',
       eligible: () => true,
@@ -235,7 +235,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
   await game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
       const limit: UsageLimit = { key: 'activation', source: 'test:skill', lifetime, max: 1 };
-      phase.listen(cardsMoved, {
+      phase.listen(Cards.moved, {
         id: 'observe-payment',
         owner: 'b',
         eligible: (_child, event) => event.moves.some((move) => move.cards.includes('a1')),
@@ -361,7 +361,7 @@ it.each([
 
 it('支付后效令发动者死亡，已付材料与次数不会回滚', async () => {
   const game = room();
-  game.on(cardsMoved, {
+  game.on(Cards.moved, {
     id: 'after-cost',
     owner: 'b',
     eligible: (_ctx, event) => event.moves.some((move) => move.to === 'discard'),
@@ -391,7 +391,7 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
 it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚构实体移动', async () => {
   const game = room();
   const paid: unknown[] = [];
-  game.on(costPaid, {
+  game.on(Cost.paid, {
     id: 'observe',
     owner: 'a',
     eligible: () => true,

@@ -9,11 +9,11 @@ import {
   cardActivities,
   judge,
   readState,
-  lifetimeEnded,
-  phaseBefore,
   runPhase,
   runTurn,
-  turnStarted,
+  Lifetime,
+  Phase,
+  Turn,
 } from '../../src/sdk';
 import type { CardActivity, Context, PhaseView } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -127,7 +127,7 @@ it.each(['a', 'b'])('外层克己不计入嵌套 %s 的额外回合中的真实�
 
 it('出牌阶段开始前由规则使用的杀不计入该出牌阶段，之后仍可克己', async () => {
   const game = await create();
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'pre-phase-slash',
     owner: null,
     eligible: (_ctx, phase) => phase.kind === 'play',
@@ -153,7 +153,7 @@ it('外层出牌阶段内嵌的判定阶段中用杀，不算实际出牌阶段�
 
 it('出牌阶段生存期已结束后的后效用杀，不再计入已关闭的阶段', async () => {
   const game = await create();
-  game.room.on(lifetimeEnded, {
+  game.room.on(Lifetime.ended, {
     id: 'after-phase-slash',
     owner: null,
     eligible: (_ctx, ended) => ended.kind === 'play',
@@ -168,7 +168,7 @@ it('出牌阶段生存期已结束后的后效用杀，不再计入已关闭的�
 
 it('空嵌套回合的开始效果用杀，不借尚在因果路径中的外层出牌阶段', async () => {
   const game = await create();
-  game.room.on(turnStarted, {
+  game.room.on(Turn.started, {
     id: 'nested-start-slash',
     owner: null,
     eligible: (_ctx, turn) => turn.origin.kind === 'extra',
@@ -398,7 +398,7 @@ it('同一回合嵌套的真实出牌阶段仍属于本回合，不能误排除�
 
 it('内层阶段开始前的用牌不穿透到暂停的外层出牌阶段', async () => {
   const game = await create();
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'inner-before',
     owner: null,
     eligible: (_ctx, phase) => phase.kind === 'draw',
@@ -439,7 +439,7 @@ it('嵌套回合生存期结束后的后效不穿透到外层回合/阶段，因
   const game = await create();
   let once = false;
   let outerId = '';
-  game.room.on(lifetimeEnded, {
+  game.room.on(Lifetime.ended, {
     id: 'after-inner-turn',
     owner: null,
     eligible: (_ctx, ended) => ended.kind === 'turn' && !once,

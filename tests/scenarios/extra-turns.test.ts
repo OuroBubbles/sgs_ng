@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { RoleMatch, matchPrepared } from '../../src/app/offline/role-match';
+import { Match, RoleMatch } from '../../src/app/offline/role-match';
 import { LocalSession } from '../../src/app/offline/session';
 import { standardCards } from '../../src/content/standard/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -18,8 +18,7 @@ import {
   scheduleExtraTurn,
   setState,
   takeExtraTurn,
-  turnEnding,
-  turnStarted,
+  Turn,
 } from '../../src/sdk';
 import type { Context, PhaseBody, PhaseKind, TurnOrigin, TurnView } from '../../src/sdk';
 import { cardGame } from '../fixtures/cards';
@@ -130,7 +129,7 @@ it('普通回合和额外回合共用执行器，自定义阶段可重复，skip
   const ran: string[] = [];
   const ids: string[] = [];
   const plan: PhaseKind[] = ['play', 'draw', 'play'];
-  game.room.on(turnStarted, {
+  game.room.on(Turn.started, {
     id: 'skip-once',
     owner: null,
     eligible: () => true,
@@ -345,7 +344,7 @@ it('开局技能可在主公前插入回合，之后仍从主公开始正常轮�
     phase.turn!.end(ctx, 'probe');
     if (++count === 2) await stop(ctx);
   });
-  game.room.on(matchPrepared, {
+  game.room.on(Match.prepared, {
     id: 'opening',
     owner: null,
     eligible: () => true,
@@ -382,7 +381,7 @@ it('结束窗口排入额外回合，旧回合状态到期后才进入新回合'
     }
     phase.turn!.end(ctx, 'probe');
   });
-  game.room.on(turnEnding, {
+  game.room.on(Turn.ending, {
     id: 'queue-after-turn',
     owner: null,
     eligible: (_ctx, turn) => turn.owner === 'a' && turn.origin.kind === 'normal',

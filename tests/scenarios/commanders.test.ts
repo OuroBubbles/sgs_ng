@@ -15,24 +15,18 @@ import {
   roleOf,
   runPhase,
   runTurn,
-  phaseBefore,
-  phaseStarted,
-  phaseEnding,
-  costPaid,
-  cardsMoved,
-  cardsDrawn,
-  drawing,
-  damageCausing,
-  damageDealt,
   moveCards,
-  responseRequested,
-  responseFinished,
   kill,
   withProcessing,
   defineSkill,
   modify,
   cardQueries,
-  effectStarting,
+  Resolve,
+  Cards,
+  Response,
+  Damage,
+  Cost,
+  Phase,
 } from '../../src/sdk';
 import type { PhaseView, UseIntent } from '../../src/sdk';
 import { legacyGenerals } from '../fixtures/generals';
@@ -154,7 +148,7 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
   const game = scenario();
   const events: string[] = [];
   let first = true;
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'before',
     owner: null,
     eligible: () => true,
@@ -162,7 +156,7 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
       expect(() => phase.replace(ctx, 'early')).toThrow(/at its start/);
     },
   });
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'replace',
     owner: null,
     eligible: () => true,
@@ -176,7 +170,7 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
       }
     },
   });
-  game.room.on(phaseEnding, {
+  game.room.on(Phase.ending, {
     id: 'end',
     owner: null,
     eligible: () => true,
@@ -210,7 +204,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
   const game = scenario();
   const foreign = scenario();
   let retained: PhaseView;
-  game.room.on(phaseStarted, {
+  game.room.on(Phase.started, {
     id: 'capture',
     owner: null,
     eligible: () => true,
@@ -225,7 +219,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
   await game.room.run('closed', (ctx) =>
     expect(() => retained.replace(ctx, 'closed')).toThrow(/Lifetime/),
   );
-  game.room.on(phaseBefore, {
+  game.room.on(Phase.before, {
     id: 'skip',
     owner: null,
     eligible: () => true,
@@ -241,7 +235,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
 it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；实牌不再被用牌清理弃置', async () => {
   const game = scenario({ hands: { b: [card('hit', 'slash')] } });
   await grant(game, 'standard:jianxiong');
-  game.room.on(damageCausing, {
+  game.room.on(Damage.causing, {
     id: 'two',
     owner: null,
     eligible: () => true,
@@ -249,7 +243,7 @@ it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；�
       hit.setAmount(2, 'test');
     },
   });
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:hand'),
@@ -271,7 +265,7 @@ it.each(['full', 'partial', 'empty'] as const)(
     const game = scenario({ hands: { b: [card('one', 'peach'), card('two', 'jink')] } });
     await grant(game, 'standard:jianxiong');
     if (kind === 'partial')
-      game.room.on(damageDealt, {
+      game.room.on(Damage.dealt, {
         id: 'remove',
         owner: null,
         eligible: () => true,
@@ -306,7 +300,7 @@ it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理'
   const game = scenario({ hands: { b: [card('hit', 'slash')] } });
   await grant(game, 'standard:jianxiong');
   let elsewhere = '';
-  game.room.on(damageDealt, {
+  game.room.on(Damage.dealt, {
     id: 'elsewhere',
     owner: null,
     eligible: () => true,
@@ -332,7 +326,7 @@ it.each(['lost', 'moved', 'dead'] as const)(
   async (kind) => {
     const game = scenario({ hands: { b: [card('hit', 'slash')] } });
     await grant(game, 'standard:jianxiong');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:jianxiong',
@@ -379,7 +373,7 @@ it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由�
   await grant(game, 'standard:hujia');
   await factions(game);
   let finished = 0;
-  game.room.on(responseFinished, {
+  game.room.on(Response.finished, {
     id: 'played',
     owner: null,
     eligible: () => true,
@@ -454,7 +448,7 @@ it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供�
   });
   await grant(game, 'standard:hujia');
   await factions(game);
-  game.room.on(effectStarting, {
+  game.room.on(Resolve.starting, {
     id: 'mixed',
     owner: null,
     eligible: () => true,
@@ -484,7 +478,7 @@ it('委托名称不能扩张原请求、为空或重复；失败不会支付或�
   const game = scenario({
     hands: { a: [card('own', 'jink')], b: [card('hit', 'slash')], c: [card('wrong', 'slash')] },
   });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'invalid-delegation',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'a',
@@ -557,7 +551,7 @@ it('护驾委托不会再次发动供牌者的护驾；动态势力按每次委�
   await grant(game, 'standard:hujia');
   await grant(game, 'standard:hujia', 'c');
   await factions(game, { a: '魏', b: '吴', c: '魏', d: '蜀' });
-  game.room.on(responseRequested, {
+  game.room.on(Response.requested, {
     id: 'new-faction',
     owner: null,
     eligible: (_ctx, request) => request.actor === 'c',
@@ -578,7 +572,7 @@ it.each(['lost', 'dead', 'faction'] as const)(
     const game = scenario({ hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] } });
     await grant(game, 'standard:hujia');
     await factions(game);
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:hujia',
@@ -605,7 +599,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
   });
   await grant(game, 'standard:tuxi');
   let drawn = 0;
-  game.room.on(drawing, {
+  game.room.on(Cards.drawing, {
     id: 'drawing-observer',
     owner: null,
     eligible: () => true,
@@ -613,7 +607,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
       drawn++;
     },
   });
-  game.room.on(cardsDrawn, {
+  game.room.on(Cards.drawn, {
     id: 'drawn-observer',
     owner: null,
     eligible: () => true,
@@ -621,7 +615,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
       drawn++;
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'atomic',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:tuxi',
@@ -674,7 +668,7 @@ it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
       draw: [card('draw1', 'jink'), card('draw2', 'slash')],
     });
     await grant(game, 'standard:tuxi');
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'after',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'standard:tuxi',

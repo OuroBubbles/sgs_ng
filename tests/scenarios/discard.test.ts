@@ -9,7 +9,6 @@ import {
   discardCards,
   withLifetime,
   used,
-  cardsMoved,
   blockSkill,
   runPhase,
   playPhase,
@@ -17,7 +16,8 @@ import {
   delayedCards,
   moveCards,
   kill,
-  costPaid,
+  Cards,
+  Cost,
 } from '../../src/sdk';
 import type { DiscardQuery, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
@@ -96,7 +96,7 @@ it('弃置查询包含操作者/持有者/原因/区域/牌面，否决不可被
 
 it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣告走同一支付流程', async () => {
   const game = cardGame({ hands: { a: [card('fee', 'jink')], b: [] } });
-  class Cost {
+  class TestCost {
     #enabled = false;
     #reason = 'prototype.discard';
 
@@ -130,14 +130,14 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
   await game.room.run('cost', (ctx) =>
     withLifetime(ctx, 'phase', async (at, lifetime) => {
       const limit = { key: 'once', source: 'prototype', max: 1, lifetime };
-      const spec = new Cost(limit);
+      const spec = new TestCost(limit);
       expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(at.world.position('fee')).toBe('a:hand');
       expect(used(at.world, 'a', limit)).toBe(0);
       expect(game.room.history.facts(spec.factKind)).toEqual([]);
 
       const order: string[] = [];
-      at.listen(cardsMoved, {
+      at.listen(Cards.moved, {
         id: 'prototype-move',
         owner: null,
         eligible: () => true,
@@ -147,7 +147,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
           order.push('moved');
         },
       });
-      at.listen(costPaid, {
+      at.listen(Cost.paid, {
         id: 'prototype-paid',
         owner: null,
         eligible: () => true,
@@ -200,7 +200,7 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
       expect(at.world.zone('a:hand').cards).toEqual(['guarded', 'free']);
       expect(used(at.world, 'a', limit)).toBe(0);
       await game.skills.revoke(at, 'a', skill.id, source);
-      at.listen(cardsMoved, {
+      at.listen(Cards.moved, {
         id: 'atomic',
         owner: null,
         eligible: () => true,
@@ -362,7 +362,7 @@ for (const count of [0, 2]) {
       }
       const remaining = delayedCards(ctx.world, 'b', true)[0]!.cards;
       await game.skills.revoke(ctx, 'b', 'test:protection', source);
-      ctx.listen(cardsMoved, {
+      ctx.listen(Cards.moved, {
         id: 'atomic-removal',
         owner: null,
         eligible: () => true,
@@ -475,7 +475,7 @@ it('寒冰剑目标没有可弃牌时不提供防伤替代；麒麟弓宣告后�
     equipment: { a: [card('w', 'kylin_bow')], b: [card('horse', 'chitu')] },
     skills: [protection(() => true)],
   });
-  bow.room.on(costPaid, {
+  bow.room.on(Cost.paid, {
     id: 'new-protection',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:kylin_bow-ability',
@@ -499,7 +499,7 @@ it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续�
       b: [card('horse', 'chitu')],
     },
   });
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'source-death',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:kylin_bow-ability',

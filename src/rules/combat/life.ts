@@ -1,20 +1,9 @@
 import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { cardsMoved } from '../cards/move';
 import { isGameOver } from '../game/end';
 import { withLifetime } from '../scopes/lifetime';
 import { defineState, stateChange } from '../state/state';
-import {
-  beforeDeath,
-  deathFinished,
-  dyingFinished,
-  dyingFinishing,
-  dyingStarted,
-  playerBuried,
-  playerDied,
-  rescueRequested,
-} from './life-events';
 import type {
   BurialEvent,
   DeathDraft,
@@ -25,17 +14,9 @@ import type {
   DyingInput,
   DyingResult,
 } from './life-events';
+import { Cards } from '../cards/move';
+import { Dying, Death } from './life-events';
 
-export {
-  beforeDeath,
-  deathFinished,
-  dyingFinished,
-  dyingFinishing,
-  dyingStarted,
-  playerBuried,
-  playerDied,
-  rescueRequested,
-} from './life-events';
 export type {
   BurialEvent,
   DeathDraft,
@@ -91,7 +72,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
     const draft = new Draft(input, child);
     // 只约束尚未提交的死亡；已死亡/获救/被防止后，不再执行其他候选或索取费用。
     // 规则直接死亡不要求体力非正；死亡完成和埋葬则必须保留自己的后效与善后。
-    await child.window(beforeDeath, draft, {
+    await child.window(Death.before, draft, {
       subject: input.player,
       active: (at) =>
         at.world.player(input.player).alive &&
@@ -120,7 +101,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
       [{ kind: 'vitality', player: input.player, hp: event.before.hp, alive: false }],
       event,
     );
-    await child.window(playerDied, event, { subject: input.player });
+    await child.window(Death.committed, event, { subject: input.player });
 
     const before = child.world.snapshot.zones.filter((zone) => zone.owner === input.player);
     const discardBefore = child.world.zone('discard');
@@ -147,7 +128,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
     });
     if (moves.length)
       await child.window(
-        cardsMoved,
+        Cards.moved,
         immutable({
           kind: 'moved',
           moves,
@@ -157,8 +138,8 @@ export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
           ),
         }),
       );
-    await child.window(playerBuried, buried, { subject: input.player });
-    await child.window(deathFinished, buried, { subject: input.player });
+    await child.window(Death.buried, buried, { subject: input.player });
+    await child.window(Death.finished, buried, { subject: input.player });
     return { kind: 'dead', event, reason: null };
   });
 }
@@ -175,14 +156,14 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
       [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, true)],
       event,
     );
-    await child.window(dyingStarted, event, { subject: event.player });
+    await child.window(Dying.started, event, { subject: event.player });
     if (
       child.world.player(event.player).alive &&
       child.world.player(event.player).hp <= 0 &&
       !isGameOver(child.world)
     )
-      await child.window(rescueRequested, event, { subject: event.player });
-    await child.window(dyingFinishing, event, { subject: event.player });
+      await child.window(Dying.rescue, event, { subject: event.player });
+    await child.window(Dying.finishing, event, { subject: event.player });
     let kind: DyingResult['kind'] = !child.world.player(event.player).alive
       ? 'dead'
       : child.world.player(event.player).hp > 0
@@ -208,7 +189,10 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
       [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, false)],
       result,
     );
-    await child.window(dyingFinished, result, { subject: event.player });
+    await child.window(Dying.finished, result, { subject: event.player });
     return result;
   });
 }
+
+export { Death } from './life-events';
+export { Dying } from './life-events';

@@ -4,7 +4,6 @@ import {
   chooseOne,
   chooseOwnedCard,
   damage,
-  drawing,
   face,
   general,
   give,
@@ -12,6 +11,7 @@ import {
   ownedCards,
   skill,
   trigger,
+  Cards,
 } from '../../../sdk';
 
 export const yingzi = skill({
@@ -19,7 +19,7 @@ export const yingzi = skill({
   name: '英姿',
   description: '摸牌阶段，你可以多摸一张牌。',
   triggers: [
-    trigger(drawing, {
+    trigger(Cards.drawing, {
       who: (draft) => draft.input.player,
       when: (_ctx, draft) => draft.phase?.kind === 'draw',
       ask: '是否发动【英姿】多摸一张牌？',

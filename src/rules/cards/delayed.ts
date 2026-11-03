@@ -3,7 +3,6 @@ import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import type { PhaseView } from '../turn/turn';
 import { defineState, stateChange } from '../state/state';
-import { playerBuried } from '../combat/life';
 import { isGameOver } from '../game/end';
 import type { CardBook } from './book';
 import type {
@@ -14,8 +13,9 @@ import type {
   EffectSnapshot,
   SemanticCard,
 } from './types';
-import { moveCards, cardsMoved } from './move';
+import { moveCards, Cards } from './move';
 import { withProcessing } from './processing';
+import { Death } from '../combat/life-events';
 
 /** 判定阶段的具名输入；正常生效保留可操作效果，取消后效使用已封口快照。 */
 export interface DelayedInput<Effect extends EffectRef = CardEffect> {
@@ -238,7 +238,7 @@ export async function resolveJudgmentPhase(
 
 /** 材料被直接拆走时关闭破损实例；不靠另一份技能授予列表维持有效性。 */
 export function installDelayedCards(room: Room): () => void {
-  const releaseMoved = room.on(cardsMoved, {
+  const releaseMoved = room.on(Cards.moved, {
     id: 'core:delayed-cleanup',
     owner: null,
     group: 'attachments',
@@ -252,7 +252,7 @@ export function installDelayedCards(room: Room): () => void {
           await moveDelayed(ctx, entry.id, 'discard');
     },
   });
-  const releaseBuried = room.on(playerBuried, {
+  const releaseBuried = room.on(Death.buried, {
     id: 'core:delayed-burial',
     owner: null,
     eligible: (ctx, death) => delayedCards(ctx.world, death.player, true).length > 0,

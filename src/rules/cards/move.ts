@@ -1,7 +1,9 @@
 import type { CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
+import { defineEvent, timing } from '../../core/runtime/event';
+import type { DrawDraft, DrawResult } from './draw';
+import type { RevealedCards } from './reveal';
 
 export interface MoveResult {
   readonly kind: 'moved' | 'unchanged';
@@ -12,7 +14,12 @@ export interface MoveResult {
   readonly after: readonly Zone[];
 }
 
-export const cardsMoved = defineWindow<MoveResult>('cards.moved', ['attachments', 'main']);
+export const Cards = defineEvent('cards', {
+  drawing: timing<DrawDraft>(),
+  drawn: timing<DrawResult>(),
+  moved: timing<MoveResult>('attachments', 'main'),
+  revealed: timing<RevealedCards>(),
+});
 
 export interface MoveDeclaration {
   readonly kind: string;
@@ -52,7 +59,7 @@ export function moveCards(
         before,
         after,
       });
-      if (effective.length) await child.window(cardsMoved, result);
+      if (effective.length) await child.window(Cards.moved, result);
       return result;
     },
     reason,

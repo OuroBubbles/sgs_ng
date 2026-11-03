@@ -1,13 +1,14 @@
 import type { ContentDefinition } from '../../../src/content/catalog';
 import {
   cardDef,
-  defineWindow,
+  defineEvent,
+  timing,
   defineQuery,
   draw,
   rulesOf,
   skill,
   trigger,
-  useDeclared,
+  Use,
 } from '../../../src/sdk';
 import type { Card, CardDefinition } from '../../../src/sdk';
 import portrait from './guest.jpg';
@@ -18,7 +19,7 @@ export interface ProvisionResult {
   readonly cards: readonly string[];
 }
 /** 真实备航摸牌完成后的公共后效；导出对象供其他模块直接订阅。 */
-export const provisionFinished = defineWindow<ProvisionResult>('harbor.provisionFinished');
+export const Provision = defineEvent('provision', { finished: timing<ProvisionResult>() });
 export const tideDrawBonus = defineQuery<{ readonly actor: string }, number>(
   'harbor.tideDrawBonus',
   (a, b) => a + b,
@@ -39,7 +40,7 @@ const provision: CardDefinition = {
     async resolve(ctx, { effect }) {
       const result = await draw(ctx, { player: effect.target, count: 2, reason: provision.id });
       await ctx.window(
-        provisionFinished,
+        Provision.finished,
         Object.freeze({ actor: effect.actor, target: effect.target, cards: result.cards }),
         { subject: effect.target },
       );
@@ -51,7 +52,7 @@ const tide = skill({
   name: '潮声',
   description: '当你使用锦囊牌时，你可以摸一张牌。',
   triggers: [
-    trigger(useDeclared, {
+    trigger(Use.declared, {
       who: (use) => use.actor,
       when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
       ask: '是否发动【潮声】摸一张牌？',

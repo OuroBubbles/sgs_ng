@@ -1,6 +1,6 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { cardsMoved, costPaid, kill, finishGame, privateCardPools, runPhase } from '../../src/sdk';
+import { kill, finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
 import { allotment } from '../../src/content/workshop/allotment';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -65,7 +65,7 @@ it('红牌接收条件与每人额度共用最终校验，全部分配同次提�
     ctx.commit('wound', [{ kind: 'vitality', player: 'b', hp: 2 }], {}),
   );
   let observed = 0;
-  game.room.on(cardsMoved, {
+  game.room.on(Cards.moved, {
     id: 'observe-all',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'b:hand'),
@@ -118,7 +118,7 @@ it('红牌接收条件与每人额度共用最终校验，全部分配同次提�
 it('发动支付后某接收者死亡，候选组从当前存活角色派生，余牌仍可合法留给自己', async () => {
   const game = create();
   await grant(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'kill-recipient',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
@@ -150,7 +150,7 @@ it.each(['dead', 'finished'] as const)(
   async (boundary) => {
     const game = create();
     await grant(game);
-    game.room.on(costPaid, {
+    game.room.on(Cost.paid, {
       id: 'stop-actor',
       owner: null,
       eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
@@ -178,7 +178,7 @@ it.each(['dead', 'finished'] as const)(
 it('发动后失去技能不撤回已宣告的分配', async () => {
   const game = create();
   await grant(game);
-  game.room.on(costPaid, {
+  game.room.on(Cost.paid, {
     id: 'revoke',
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
