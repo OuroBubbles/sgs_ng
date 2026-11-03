@@ -23,7 +23,8 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
@@ -499,7 +500,7 @@ it.each(['mixed', 'all-liuli'])(
   async (kind) => {
     const lineup =
       kind === 'mixed'
-        ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => legacyGenerals[i]!.id)
+        ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => standardGenerals[i]!.id)
         : Array<string>(4).fill('standard:daqiao');
     const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
     await playMatch(match, { steps: 9000 });

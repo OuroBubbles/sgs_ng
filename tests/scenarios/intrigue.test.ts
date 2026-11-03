@@ -41,7 +41,8 @@ import {
   Phase,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Fanjian } from '../../src/content/standard/generals/zhouyu';
 import { Skill } from '../../src/sdk';
@@ -881,7 +882,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
 });
 it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
   const seed = 27;
-  const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => legacyGenerals[i]!.id);
+  const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
   const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 12000 });
 

@@ -30,7 +30,8 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Phase } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
@@ -611,7 +612,7 @@ it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试�
   expect(after).toBe(0);
 });
 it('三名新吴将八人局由基础 AI 经正式决策走到胜负', async () => {
-  const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => legacyGenerals[i]!.id);
+  const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => standardGenerals[i]!.id);
   const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 7000 });
 

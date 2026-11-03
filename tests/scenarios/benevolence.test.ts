@@ -31,7 +31,8 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -706,7 +707,7 @@ it('本人出牌阶段激将打出失败后仍可自己响应，但本阶段不�
   settled(game);
 });
 it('刘备、华佗八人标准局以基础 AI 走过供牌与治疗，最终正常结束', async () => {
-  const lineup = [13, 14, 0, 3, 2, 11, 9, 12].map((i) => legacyGenerals[i]!.id);
+  const lineup = [13, 14, 0, 3, 2, 11, 9, 12].map((i) => standardGenerals[i]!.id);
   const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 7000 });
 

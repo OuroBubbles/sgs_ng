@@ -29,7 +29,7 @@ import {
   Phase,
 } from '../../src/sdk';
 import type { PhaseView, UseIntent } from '../../src/sdk';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { Use } from '../../src/sdk';
@@ -66,7 +66,7 @@ async function factions(
 }
 
 it('曹操、张辽初始化当前势力，身份模式只为主公授予主公技；非主公仍能查看说明', async () => {
-  for (const general of legacyGenerals.slice(11, 13)) {
+  for (const general of standardGenerals.slice(11, 13)) {
     const match = createOfflineMatch({
       seed: 42,
       preset: 'standard:identity',
@@ -696,7 +696,7 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
 });
 
 it('含曹操、张辽的八人局，基础 AI 通过正式委托、替代摸牌和取得材料走到胜负', async () => {
-  const lineup = [11, 12, 8, 9, 10, 0, 2, 5].map((index) => legacyGenerals[index]!.id);
+  const lineup = [11, 12, 8, 9, 10, 0, 2, 5].map((index) => standardGenerals[index]!.id);
   const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 6000 });
 

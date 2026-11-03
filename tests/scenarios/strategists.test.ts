@@ -29,7 +29,8 @@ import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { legacyGenerals, generalGame } from '../fixtures/generals';
+import { generalGame } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Lifetime } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
@@ -741,7 +742,7 @@ it('基础 AI 用本人真实红桃手牌改善自己的乐不思蜀，仍经过
 });
 
 it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗选和分牌走到身份胜负', async () => {
-  const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => legacyGenerals[index]!.id);
+  const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => standardGenerals[index]!.id);
   const match = createOfflineMatch({ seed: 3, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 5000 });
 

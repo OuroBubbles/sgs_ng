@@ -26,7 +26,7 @@ import {
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { legacyGenerals } from '../fixtures/generals';
+import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
@@ -672,7 +672,7 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
 );
 
 it('含三名新魏将的八人局，由基础 AI 经公开决策走到真实身份胜负', async () => {
-  const lineup = [...legacyGenerals.slice(6, 9), ...legacyGenerals.slice(0, 5)].map(
+  const lineup = [...standardGenerals.slice(6, 9), ...standardGenerals.slice(0, 5)].map(
     (general) => general.id,
   );
   const match = createOfflineMatch({ seed: 42, preset: 'standard:identity', lineup });
