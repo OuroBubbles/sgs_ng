@@ -10,6 +10,7 @@ import { kingdomOf } from '../../rules/characters/kingdom';
 import { isChained } from '../../rules/combat/chain';
 import { shieldOf } from '../../rules/combat/shield';
 import type { CardColor } from '../../rules/cards/types';
+import type { SkillAi } from '../../rules/skills/skills';
 
 export interface AgentCard extends Card {
   readonly color: CardColor;
@@ -30,6 +31,8 @@ export interface AgentObservation {
   readonly hand: readonly AgentCard[];
   readonly pools: readonly AgentCard[];
   readonly players: readonly AgentSeat[];
+  /** 技能旁声明的 AI 提示（纯函数，不读 World）。 */
+  readonly skills?: (id: string) => SkillAi | undefined;
 }
 
 /** 与画面投影分离：AI 只收到本人手牌/私有池、公开装备/体力和有权知道的身份。 */
@@ -41,7 +44,7 @@ export function observeAgent(match: RoleMatch, actor: string): AgentObservation 
       const equipment = match.book.definition(value.name).equipment;
       return { ...value, slot: equipment?.slot ?? null, range: equipment?.range ?? 0 };
     };
-    return immutable({
+    const observation = immutable({
       actor,
       hand: world.zone(`${actor}:hand`).cards.map(card),
       pools: privateCardPools(world, actor).flatMap((pool) => pool.cards.map(card)),
@@ -56,5 +59,11 @@ export function observeAgent(match: RoleMatch, actor: string): AgentObservation 
         equipment: world.zone(`${player.id}:equipment`).cards.map(card),
       })),
     });
+    // 不可枚举：观察的可比较内容仍只有局面数据。
+    return Object.freeze(
+      Object.defineProperty({ ...observation }, 'skills', {
+        value: (id: string) => match.book.skills.hint(id),
+      }),
+    );
   });
 }

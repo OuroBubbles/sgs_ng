@@ -212,7 +212,7 @@ export function decideBasic(
             .sort((a, b) =>
               key === 'cards'
                 ? cost(String(a.id)) - cost(String(b.id))
-                : ['standard:jieyin', 'standard:yiji', 'standard:qingnang'].includes(String(reason))
+                : observation.skills?.(String(reason))?.targets === 'ally'
                   ? hostility(String(a.id)) - hostility(String(b.id))
                   : hostility(String(b.id)) - hostility(String(a.id)),
             );
@@ -324,55 +324,17 @@ export function decideBasic(
       }, 0) - expense
     );
   };
-  const activeScore = (skill: unknown): number => {
-    switch (skill) {
-      case 'standard:lijian':
-        return ownCards.some((card) => cost(card.id) <= 5) &&
-          observation.players.filter(
-            (player) =>
-              player.alive && player.id !== self.id && ['male', 'dual'].includes(player.gender),
-          ).length >= 2
-          ? 16
-          : -1;
-      case 'standard:fanjian':
-        return observation.hand.some((card) => cost(card.id) <= 5) &&
-          observation.players.some((player) => player.alive && hostility(player.id) > 0)
-          ? 12
-          : -1;
-      case 'standard:zhiheng':
-        return observation.hand.some((card) => cost(card.id) <= 4) ? 14 : -1;
-      case 'standard:kurou':
-        return self.hp > 2 && observation.hand.length < 6 ? 15 : -1;
-      case 'standard:jieyin':
-        return self.hp < self.maxHp &&
-          observation.players.some(
-            (player) =>
-              player.alive &&
-              player.id !== self.id &&
-              player.hp < player.maxHp &&
-              ['male', 'dual'].includes(player.gender) &&
-              hostility(player.id) < 0,
-          )
-          ? 40
-          : -1;
-      case 'standard:qingnang':
-        return observation.players.some(
-          (player) => player.alive && player.hp < player.maxHp && hostility(player.id) < 0,
-        )
-          ? 42
-          : -1;
-      case 'standard:rende':
-        return self.hp < self.maxHp &&
-          observation.hand.length >= Math.max(2, self.hp + 1) &&
-          observation.players.some(
-            (player) => player.id !== self.id && player.alive && hostility(player.id) < 0,
-          )
-          ? 18
-          : -1;
-      default:
-        return -1;
-    }
+  // 主动技能的意愿与目标倾向由技能旁的 ai 提示给出，代理本身不认识具体技能。
+  const view = {
+    self,
+    players: observation.players,
+    hand: observation.hand,
+    cards: ownCards,
+    hostility,
+    cost,
   };
+  const activeScore = (skill: unknown): number =>
+    observation.skills?.(String(skill))?.value?.(view) ?? -1;
   let best: { value: unknown; score: number } | null = null;
   for (const raw of Array.isArray(data.offers) ? data.offers : []) {
     const offer = object(raw);
