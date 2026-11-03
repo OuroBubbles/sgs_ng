@@ -17,7 +17,6 @@ import {
   roleOf,
 } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { legacyGenerals } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'test' } as const;
@@ -219,16 +218,46 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
 });
 
+it('标准武将保持原包顺序：glob 文件名顺序不影响大厅列表与按种子抽将', () => {
+  expect(standardGenerals.map((general) => general.id.replace('standard:', ''))).toEqual([
+    'guanyu',
+    'huanggai',
+    'sunshangxiang',
+    'zhaoyun',
+    'zhangfei',
+    'ganning',
+    'xiahoudun',
+    'xuchu',
+    'zhenji',
+    'simayi',
+    'guojia',
+    'caocao',
+    'zhangliao',
+    'liubei',
+    'huatuo',
+    'sunquan',
+    'lvmeng',
+    'luxun',
+    'huangyueying',
+    'lvbu',
+    'daqiao',
+    'machao',
+    'zhouyu',
+    'diaochan',
+    'zhugeliang',
+  ]);
+});
+
 it('首六武将完整初始化，主公奖励叠加目录体力，空武将引用不会被当作机制角色', async () => {
   expect(standardGenerals).toHaveLength(25);
   const match = createOfflineMatch({
     seed: 42,
     preset: 'standard:identity',
-    lineup: legacyGenerals.slice(0, 6).map((general) => general.id),
+    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
   });
   await match.prepare();
   for (const [index, player] of match.initial.players.entries()) {
-    const general = legacyGenerals[index]!;
+    const general = standardGenerals[index]!;
     expect(generalOf(match.room.world, player.id)).toBe(general.id);
     expect(match.room.world.player(player.id).maxHp).toBe(
       general.maxHp + (roleOf(match.room.world, player.id) === 'lord' ? 1 : 0),
@@ -244,7 +273,7 @@ it('六名真实武将全部由基础 AI 经正式决策走到身份胜负', asy
   const match = createOfflineMatch({
     seed: 42,
     preset: 'standard:identity',
-    lineup: legacyGenerals.slice(0, 6).map((general) => general.id),
+    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
   });
   await playMatch(match, { steps: 2000 });
 }, 60_000);
