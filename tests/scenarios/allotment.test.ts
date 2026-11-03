@@ -1,8 +1,8 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { kill, finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
+import { finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
 import { allotment } from '../../src/content/workshop/allotment';
-import { card, cardGame } from '../fixtures/cards';
+import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { createOfflineMatch } from '../../src/app/offline/practice';
@@ -120,12 +120,7 @@ it('发动支付后某接收者死亡，候选组从当前存活角色派生，�
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
     async run(ctx) {
-      await kill(ctx, {
-        player: 'b',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'b');
     },
   });
   const running = prepare(game);
@@ -153,13 +148,7 @@ it.each(['dead', 'finished'] as const)(
       eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
       async run(ctx) {
         if (boundary === 'finished') await finishGame(ctx, { winners: ['b'], reason: 'stop' });
-        else
-          await kill(ctx, {
-            player: 'a',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        else await die(ctx, 'a');
       },
     });
     const running = prepare(game);

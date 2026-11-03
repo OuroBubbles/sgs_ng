@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { kill, moveCards } from '../../src/sdk';
+import { moveCards } from '../../src/sdk';
 import type { CardDefinition } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 
 it('准备返回的参数仍经过牌定义的最终验证，未通过不支付', async () => {
@@ -84,12 +84,7 @@ it('准备期间自动目标集合变化时拒绝宣告，不悄悄用另一组�
       resolve: () => {},
       fixedTargets: (ctx) => ctx.world.snapshot.players.filter((p) => p.alive).map((p) => p.id),
       async prepare(ctx) {
-        await kill(ctx, {
-          player: 'b',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        });
+        await die(ctx, 'b');
         return { ok: true, value: null };
       },
     },

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import {
   defineSkill,
@@ -15,7 +15,6 @@ import {
   setGender,
   delayedCards,
   moveCards,
-  kill,
   Cards,
   Cost,
 } from '../../src/sdk';
@@ -415,14 +414,7 @@ it('效果弃置批内有一张禁止就整体失败；普通转移、用牌善�
     timing: { kind: 'effect' },
   });
   expect(game.room.world.position('old')).toBe('discard');
-  await game.room.run('death', (ctx) =>
-    kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('death', (ctx) => die(ctx, 'a'));
   expect(game.room.world.position('new')).toBe('discard');
   expect(game.room.world.position('guarded')).toBe('b:hand');
 });
@@ -507,12 +499,7 @@ it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续�
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'standard:kylin_bow-ability',
     async run(ctx) {
-      await kill(ctx, {
-        player: 'a',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'a');
     },
   });
   const running = use(game, strike);

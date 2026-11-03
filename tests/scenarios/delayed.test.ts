@@ -7,7 +7,6 @@ import {
   defaultPhaseBody,
   moveCards,
   installCounterspells,
-  kill,
   defineSkill,
   viewAs,
   ownedCards,
@@ -20,7 +19,7 @@ import {
   Turn,
 } from '../../src/sdk';
 import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -307,14 +306,7 @@ it.each([0, 2])('死亡埋葬会关闭 %s 材料延时牌，零材料也不留�
     targets: ['b'],
     timing: { kind: 'effect' },
   });
-  await game.room.run('kill', (ctx) =>
-    kill(ctx, {
-      player: 'b',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('kill', (ctx) => die(ctx, 'b'));
   expect(delayedCards(game.room.world, 'b', true)).toHaveLength(0);
   expect(
     game.room.world.snapshot.states.filter((state) => state.key === 'core:delayed-card'),
@@ -408,14 +400,7 @@ it('转化来源在宣告后消失仍保留延时牌名，原使用者死亡也�
     timing: { kind: 'effect' },
   });
   expect(delayedCards(game.room.world, 'b')[0]!.source.card.name).toBe('standard:indulgence');
-  await game.room.run('kill', (ctx) =>
-    kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('kill', (ctx) => die(ctx, 'a'));
   await turn(game, 'b');
   expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
   expect(game.room.world.position('red')).toBe('discard');

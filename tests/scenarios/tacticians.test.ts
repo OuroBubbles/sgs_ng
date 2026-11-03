@@ -23,18 +23,11 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
 const source = { kind: 'general', id: 'test' } as const;
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
   actor,
   choice: { kind: 'physical', card: id },
@@ -43,7 +36,7 @@ const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
 });
 
 it.each([true, false])('集智普通锦囊接受=%s，在锦囊效果之前摸牌，宣告仅一次', async (accepted) => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('trick', 'ex_nihilo')] },
     draw: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')],
   });
@@ -70,7 +63,7 @@ it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as 
           : kind === 'basic'
             ? 'slash'
             : 'jink';
-    const game = scenario({ hands: { a: [card('fee', name, 'diamond')] } });
+    const game = generalGame({ hands: { a: [card('fee', name, 'diamond')] } });
     await grant(game, 'standard:jizhi');
     let intent: UseIntent = physical('fee', 'a', kind === 'equipment' ? [] : ['b']);
     if (kind === 'converted') {
@@ -103,7 +96,7 @@ it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as 
   },
 );
 it('零材料虚拟普通锦囊仍能集智，接受后失去技能不撤销摸牌', async () => {
-  const game = scenario({
+  const game = generalGame({
     draw: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')],
   });
   await grant(game, 'standard:jizhi');
@@ -130,7 +123,7 @@ it('零材料虚拟普通锦囊仍能集智，接受后失去技能不撤销摸�
   settled(game);
 });
 it('真实无懈可击也是普通锦囊，集智摸牌发生在反制生效前', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('duel', 'duel')], b: [card('null', 'nullification')] },
     draw: [card('drawn', 'jink')],
   });
@@ -145,7 +138,7 @@ it('真实无懈可击也是普通锦囊，集智摸牌发生在反制生效前'
   settled(game);
 });
 it('奇才只豁免锦囊距离，不改变真实距离或杀的范围', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('trick', 'snatch'), card('slash', 'slash')], c: [card('loot', 'jink')] },
   });
   await grant(game, 'standard:qicai');
@@ -157,7 +150,7 @@ it('奇才只豁免锦囊距离，不改变真实距离或杀的范围', async (
   settled(game);
 });
 it('作者新建锦囊只需声明类别，集智和奇才无需增补牌名表', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [{ id: 'custom', name: 'author:trick', suit: 'club', rank: 8 }] },
     draw: [card('drawn', 'jink')],
     definitions: [
@@ -193,7 +186,7 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
       ),
     ],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('trick', 'snatch'), card('delay', 'indulgence'), card('delay2', 'indulgence')],
       c: [card('loot', 'jink')],
@@ -212,7 +205,7 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
 });
 
 it.each([0, 1, 2])('无双杀连续两闪，实际提供 %i 张', async (count) => {
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('slash', 'slash')],
       b: Array.from({ length: count }, (_, i) => card(`j${i}`, 'jink')),
@@ -239,7 +232,7 @@ it.each([0, 1, 2])('无双杀连续两闪，实际提供 %i 张', async (count) 
 });
 it('无双的声明在技能失去后保留，但没有响应机会时不强开两闪', async () => {
   for (const forbidden of [false, true]) {
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('slash', 'slash')], b: [card('j1', 'jink'), card('j2', 'jink')] },
       ...(forbidden ? { policy: { responseTimes: () => 0 } } : {}),
     });
@@ -262,7 +255,7 @@ it('无双的声明在技能失去后保留，但没有响应机会时不强开�
   }
 });
 it.each(['a', 'b', 'both'])('无双决斗按响应方记录要求，来源=%s', async (owner) => {
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('duel', 'duel'), card('a1', 'slash'), card('a2', 'slash')],
       b: [card('b1', 'slash'), card('b2', 'slash')],
@@ -284,7 +277,7 @@ it.each(['a', 'b', 'both'])('无双决斗按响应方记录要求，来源=%s', 
 it.each(['hand', 'equipment'])(
   '国色的方块 %s 进入持久延时区，保留牌面并防同名叠放',
   async (area) => {
-    const game = scenario({
+    const game = generalGame({
       hands: {
         a: [
           card('extra', 'jink', 'diamond'),
@@ -316,7 +309,7 @@ it.each(['hand', 'equipment'])(
   },
 );
 it('国色拒绝非方块和他人材料，不改变材料位置', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('black', 'jink')], b: [card('other', 'jink', 'diamond')] },
   });
   await grant(game, 'standard:guose');
@@ -337,7 +330,7 @@ it('国色拒绝非方块和他人材料，不改变材料位置', async () => {
 });
 
 function liuliGame(options: Parameters<typeof cardGame>[0] = {}) {
-  return scenario({
+  return generalGame({
     ...options,
     hands: { a: [card('slash', 'slash')], b: [card('fee', 'jink')], ...options.hands },
   });

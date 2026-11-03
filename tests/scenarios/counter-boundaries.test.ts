@@ -3,7 +3,6 @@ import {
   contestCounter,
   finishGame,
   installCounterspells,
-  kill,
   pay,
   resolveCounter,
   Use,
@@ -12,7 +11,7 @@ import {
 } from '../../src/sdk';
 import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use, conserved } from '../fixtures/cards';
+import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Cost } from '../../src/sdk';
@@ -53,15 +52,6 @@ function create() {
   });
   installCounterspells(game.room, game.book);
   return game;
-}
-
-async function die(ctx: Context, player: string) {
-  await kill(ctx, {
-    player,
-    killer: null,
-    reason: 'rule',
-    cause: { kind: 'rule', seq: null, data: null },
-  });
 }
 
 function captureEffect(game: Game) {

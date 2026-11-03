@@ -6,7 +6,6 @@ import {
   SkillBook,
   damage,
   draw,
-  kill,
   moveCards,
   runPhase,
   runTurn,
@@ -15,7 +14,7 @@ import type { TriggerOccurrence, TriggerSource } from '../../src/core/runtime/ev
 import type { WorldSeed } from '../../src/core/model/state';
 import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose, answer, cancel } from '../fixtures/room';
-import { card, cardGame, grant, settled } from '../fixtures/cards';
+import { card, cardGame, grant, settled, die } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -508,12 +507,7 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
         id: 'point',
         times: () => 3,
         async effect(ctx) {
-          await kill(ctx, {
-            player: 'a',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+          await die(ctx, 'a');
           ctx.commit(testTiming('entered-effect.finished'), [], {
             alive: ctx.world.player('a').alive,
           });

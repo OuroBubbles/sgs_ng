@@ -4,7 +4,7 @@ import type { Card, WorldSeed } from '../../src/core/model/state';
 import { expect } from 'vitest';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { useDeclarations } from '../../src/rules/cards/plan';
-import { createContent, installDelayedCards, activate, activeOffers } from '../../src/sdk';
+import { createContent, installDelayedCards, activate, activeOffers, kill } from '../../src/sdk';
 import type {
   ActiveChoice,
   CardDefinition,
@@ -159,6 +159,15 @@ export async function grant(
     .bindings(game.room.world)
     .find((binding) => binding.self.owner === owner && binding.self.skill === skill)!.self;
 }
+
+/** 规则原因令角色阵亡，无击杀者。 */
+export const die = (ctx: Context, player: string) =>
+  kill(ctx, {
+    player,
+    killer: null,
+    reason: 'rule',
+    cause: { kind: 'rule', seq: null, data: null },
+  });
 
 type Played = { readonly room: Room; readonly initial: WorldSeed };
 /** 局面已静止：历史可重建当前世界，无待决请求、处理区、用牌宣告、私有牌池或判定牌残留。 */

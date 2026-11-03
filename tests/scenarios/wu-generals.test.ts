@@ -30,7 +30,7 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Phase } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
@@ -42,13 +42,6 @@ const death = {
   reason: 'rule',
   cause: { kind: 'rule', seq: null, data: 'test' },
 } as const;
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 async function wound(game: Game, hp = 1, player = 'a') {
   await game.room.run('wound', (ctx) =>
     ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
@@ -79,7 +72,7 @@ const startKeji = (
   );
 
 it('回复草案修改尝试值，提交前重读当前体力并封口，实际值受上限裁剪', async () => {
-  const game = scenario();
+  const game = generalGame();
   await wound(game, 1);
   let held: RecoveryDraft;
   game.room.on(Hp.recovering, {
@@ -121,7 +114,7 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
 it.each(['zero', 'dead', 'already-dead'] as const)(
   '回复零值、窗口中死亡和已死亡均不产生虚假实际回复：%s',
   async (kind) => {
-    const game = scenario();
+    const game = generalGame();
     await wound(game);
     if (kind === 'already-dead')
       await game.room.run('kill', (ctx) => kill(ctx, { ...death, player: 'a' }));
@@ -148,7 +141,7 @@ it.each(['zero', 'dead', 'already-dead'] as const)(
 it.each(['wu', 'shu', 'self', 'changed'] as const)(
   '救援按实际桃使用者与当前势力增加回复：%s',
   async (kind) => {
-    const game = scenario({
+    const game = generalGame({
       hands: { [kind === 'self' ? 'a' : 'b']: [card('peach', 'peach', 'heart')] },
     });
     await grant(game, 'standard:jiuyuan');
@@ -170,7 +163,7 @@ it.each(['wu', 'shu', 'self', 'changed'] as const)(
   },
 );
 it('救援不奖励普通技能回复，也不超过体力上限', async () => {
-  const game = scenario();
+  const game = generalGame();
   await grant(game, 'standard:jiuyuan');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'b', '吴'));
   await wound(game, 3);
@@ -180,7 +173,7 @@ it('救援不奖励普通技能回复，也不超过体力上限', async () => {
   expect(result).toMatchObject({ value: { amount: 1, attemptedAmount: 5, edits: [] } });
 });
 it('制衡手牌/装备同批弃置，后效后按实际费用数量摸牌，一阶段一次', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'slash'), card('two', 'peach')] },
     equipment: { a: [card('gear', 'spear')] },
     draw: [card('d1', 'jink'), card('d2', 'slash'), card('d3', 'jink')],
@@ -212,7 +205,7 @@ it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
       ),
     ],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('locked', 'slash'), card('fee', 'jink')] },
     draw: [card('d', 'peach')],
     skills: [...standardGeneralSkills, lock],
@@ -233,7 +226,7 @@ it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
   expect(game.room.world.position('locked')).toBe('a:hand');
 });
 it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死亡则停止：%s', async (kind) => {
-  const game = scenario({ hands: { a: [card('fee', 'slash')] }, draw: [card('new', 'peach')] });
+  const game = generalGame({ hands: { a: [card('fee', 'slash')] }, draw: [card('new', 'peach')] });
   await grant(game, 'standard:zhiheng');
   game.room.on(Cost.paid, {
     id: 'after',
@@ -253,7 +246,7 @@ it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死�
   settled(game);
 });
 it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () => {
-  const game = scenario({ hands: { a: handCards() } });
+  const game = generalGame({ hands: { a: handCards() } });
   await grant(game, 'standard:keji');
   game.room.on(Cost.paid, {
     id: 'atomic',
@@ -276,7 +269,7 @@ it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () =
   settled(game);
 });
 it('克己可以拒绝；独立弃牌阶段无本回合出牌记录也可发动', async () => {
-  const game = scenario();
+  const game = generalGame();
   await grant(game, 'standard:keji');
   const first = startKeji(game);
   await answer(game, false);
@@ -290,7 +283,7 @@ it('克己可以拒绝；独立弃牌阶段无本回合出牌记录也可发动'
 it.each(['physical', 'converted', 'before-grant'] as const)(
   '出牌阶段真实使用杀后不能克己，包括获得技能前的活动：%s',
   async (kind) => {
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('hit', kind === 'converted' ? 'peach' : 'slash', 'heart')] },
     });
     if (kind !== 'before-grant') await grant(game, 'standard:keji');
@@ -317,7 +310,10 @@ it.each(['physical', 'converted', 'before-grant'] as const)(
   },
 );
 it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动查询', async () => {
-  const game = scenario({ hands: { a: [card('retrial', 'slash')] }, draw: [card('old', 'jink')] });
+  const game = generalGame({
+    hands: { a: [card('retrial', 'slash')] },
+    draw: [card('old', 'jink')],
+  });
   await grant(game, 'standard:keji');
   await grant(game, 'standard:guicai');
   const running = startKeji(game, (ctx) =>
@@ -332,7 +328,7 @@ it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动�
   expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
 });
 it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克己', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { b: [card('other', 'slash')], a: [card('retrial', 'slash')] },
     draw: [card('old', 'jink')],
   });
@@ -361,7 +357,7 @@ it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克�
   expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 it('重复出牌阶段的使用记录都属于本回合，不能只查看最后一段', async () => {
-  const game = scenario({ hands: { a: [card('hit', 'slash')] } });
+  const game = generalGame({ hands: { a: [card('hit', 'slash')] } });
   await grant(game, 'standard:keji');
   let index = 0;
   await game.room.run('turn', (ctx) =>
@@ -385,7 +381,7 @@ it('重复出牌阶段的使用记录都属于本回合，不能只查看最后�
 it.each(['snatch', 'indulgence'] as const)(
   '谦逊禁止%s成为目标，失去技能后恢复合法性',
   async (name) => {
-    const game = scenario({ hands: { b: [card('trick', name)], a: [card('hand', 'jink')] } });
+    const game = generalGame({ hands: { b: [card('trick', name)], a: [card('hand', 'jink')] } });
     await grant(game, 'standard:qianxun');
     await game.room.run('check', async (ctx) => {
       const intent = {
@@ -405,7 +401,7 @@ it.each(['snatch', 'indulgence'] as const)(
   },
 );
 it('连营一次失去多张最后手牌只询问一次，并且记录发生于原牌效果之前', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'peach')] },
     draw: [card('new', 'slash')],
   });
@@ -424,7 +420,7 @@ it('连营一次失去多张最后手牌只询问一次，并且记录发生于�
   settled(game);
 });
 it('连营不会因部分手牌或仅装备离场发动，拒绝发动不产生摸牌', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'peach')] },
     equipment: { a: [card('gear', 'spear')] },
     draw: [card('new', 'slash')],
@@ -449,7 +445,7 @@ it('连营不会因部分手牌或仅装备离场发动，拒绝发动不产生�
   expect(game.room.world.position('new')).toBe('draw');
 });
 it('连营宣告后收到手牌仍摸一张，失去技能也不撤销已宣告效果', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('last', 'jink')], b: [card('gift', 'peach')] },
     draw: [card('new', 'slash')],
   });
@@ -476,7 +472,7 @@ it('连营宣告后收到手牌仍摸一张，失去技能也不撤销已宣告�
   settled(game);
 });
 it('连营支付后死亡不再摸牌，批量埋葬也不向死亡角色询问', async () => {
-  const game = scenario({ hands: { a: [card('last', 'jink')] }, draw: [card('new', 'slash')] });
+  const game = generalGame({ hands: { a: [card('last', 'jink')] }, draw: [card('new', 'slash')] });
   await grant(game, 'standard:lianying');
   game.room.on(Cost.paid, {
     id: 'death',
@@ -496,7 +492,7 @@ it('连营支付后死亡不再摸牌，批量埋葬也不向死亡角色询问'
   settled(game);
 });
 it('连营嵌在最后手牌用牌费用中，摸牌不会追回或重建原用牌材料', async () => {
-  const game = scenario({ hands: { a: [card('hit', 'slash')] }, draw: [card('new', 'jink')] });
+  const game = generalGame({ hands: { a: [card('hit', 'slash')] }, draw: [card('new', 'jink')] });
   await grant(game, 'standard:lianying');
   const running = use(game, {
     actor: 'a',
@@ -515,7 +511,7 @@ it('连营嵌在最后手牌用牌费用中，摸牌不会追回或重建原用�
   settled(game);
 });
 it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('duel', 'duel'), card('own', 'slash')], b: [card('other', 'slash')] },
   });
   await grant(game, 'standard:keji');
@@ -538,7 +534,7 @@ it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
   expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
 });
 it('普通移走杀不算使用或打出，前一回合的杀也不阻止本回合克己', async () => {
-  const game = scenario({ hands: { a: [card('old', 'slash'), card('discarded', 'slash')] } });
+  const game = generalGame({ hands: { a: [card('old', 'slash'), card('discarded', 'slash')] } });
   await grant(game, 'standard:keji');
   await startKeji(game, async (ctx, phase) => {
     await game.book.use(ctx, {
@@ -560,7 +556,7 @@ it('普通移走杀不算使用或打出，前一回合的杀也不阻止本回�
   expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
 });
 it('连营重新得到手牌再失去，会得到新的独立发动机会', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('old', 'slash')] },
     draw: [card('first', 'jink'), card('second', 'peach')],
   });
@@ -577,7 +573,7 @@ it('连营重新得到手牌再失去，会得到新的独立发动机会', asyn
   settled(game);
 });
 it('救援同样识别急救转换的桃，并保留真实使用者', async () => {
-  const game = scenario({ hands: { b: [card('red', 'slash', 'heart')] } });
+  const game = generalGame({ hands: { b: [card('red', 'slash', 'heart')] } });
   await grant(game, 'standard:jiuyuan');
   await grant(game, 'standard:jijiu', 'b');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'b', '吴'));
@@ -599,7 +595,7 @@ it('救援同样识别急救转换的桃，并保留真实使用者', async () =
   settled(game);
 });
 it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试量结果', async () => {
-  const game = scenario();
+  const game = generalGame();
   let after = 0;
   game.room.on(Hp.recovered, {
     id: 'after',

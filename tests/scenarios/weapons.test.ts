@@ -4,7 +4,6 @@ import {
   cardQueries,
   damage,
   defineSkill,
-  kill,
   modify,
   moveCards,
   ownedCards,
@@ -16,7 +15,7 @@ import {
 } from '../../src/sdk';
 import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -109,13 +108,7 @@ it.each(['lost', 'dead'])('贯石斧已支付后来源 %s，已宣告突破仍�
           [{ cards: ['weapon'], from: 'a:equipment', to: 'c:hand', place: 'bottom' }],
           'probe',
         );
-      else
-        await kill(ctx, {
-          player: 'a',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        });
+      else await die(ctx, 'a');
     },
   });
   const running = use(game, strike());

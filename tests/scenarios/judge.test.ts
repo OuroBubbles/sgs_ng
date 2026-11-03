@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { judge, moveCards, withProcessing, finishGame, kill, Judgment, Cards } from '../../src/sdk';
-import { card, cardGame } from '../fixtures/cards';
+import { judge, moveCards, withProcessing, finishGame, Judgment, Cards } from '../../src/sdk';
+import { card, cardGame, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 it('判定公开实有牌，保留独立牌面、颜色和结果，并善后实时余牌', async () => {
@@ -257,13 +257,7 @@ it.each(['death', 'finish'] as const)(
       owner: null,
       eligible: () => true,
       async run(ctx) {
-        if (kind === 'death')
-          await kill(ctx, {
-            player: 'a',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        if (kind === 'death') await die(ctx, 'a');
         else await finishGame(ctx, { reason: 'probe', winners: [] });
       },
     });

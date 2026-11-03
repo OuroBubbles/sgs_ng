@@ -7,14 +7,13 @@ import {
   playPhase,
   runPhase,
   installCounterspells,
-  kill,
   moveCards,
   withLifetime,
   Use,
 } from '../../src/sdk';
 import type { CardOffer, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -44,12 +43,7 @@ function killPlayer(game: Game, target: string) {
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:collateral',
     async run(ctx) {
-      await kill(ctx, {
-        player: target,
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, target);
     },
   });
 }

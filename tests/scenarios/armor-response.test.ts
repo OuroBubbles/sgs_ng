@@ -3,7 +3,6 @@ import {
   blockSkill,
   defineSkill,
   equip,
-  kill,
   moveCards,
   on,
   withLifetime,
@@ -15,7 +14,7 @@ import {
 } from '../../src/sdk';
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
 import { eightDiagram } from '../../src/content/standard/armor';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -426,12 +425,7 @@ it('原受益者在队友支付后死亡，已打出事实保留，父请求不�
     owner: null,
     eligible: () => true,
     async run(ctx) {
-      await kill(ctx, {
-        player: 'b',
-        killer: null,
-        cause: { kind: 'rule', seq: null, data: null },
-        reason: 'rule',
-      });
+      await die(ctx, 'b');
     },
   });
   const running = use(game, slash());

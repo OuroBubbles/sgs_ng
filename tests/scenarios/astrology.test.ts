@@ -1,3 +1,4 @@
+import { generalGame } from '../fixtures/generals';
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import {
@@ -71,14 +72,8 @@ function model(ids = ['a', 'b', 'c']) {
   spec.canPlace = () => false;
   return selection;
 }
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    draw: options.draw ?? topCards(),
-    skills: standardGeneralSkills,
-  });
-}
+const scenario = (options: Parameters<typeof generalGame>[0] = {}) =>
+  generalGame({ ...options, draw: options.draw ?? topCards() });
 async function grant(
   game: Pick<Game, 'room' | 'skills'>,
   skill = 'standard:guanxing',

@@ -1,6 +1,6 @@
+import { generalGame } from '../fixtures/generals';
 import { setImmediate } from 'node:timers/promises';
 import { expect, it } from 'vitest';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { ownedCards, runPhase } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -10,14 +10,6 @@ import { Skill } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'trigger-baseline' } as const;
-
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: standardGeneralSkills,
-  });
-}
 
 async function grant(game: Game, name: string, owner = 'a') {
   await game.room.run('grant', (ctx) =>
@@ -59,7 +51,7 @@ async function acceptInvocations(game: Game, running: Promise<unknown>) {
 }
 
 it('无双不会把万箭齐发的一次打出闪扩张为连续两次', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('arrows', 'archery_attack')], b: [card('jink', 'jink')] },
   });
   await grant(game, 'wushuang');
@@ -86,7 +78,7 @@ it('无双不会把万箭齐发的一次打出闪扩张为连续两次', async (
 it.each(['qianxun', 'kongcheng'] as const)(
   '%s 只禁止本人的指定牌名目标，不扩张到其他牌、其他角色或来源用牌',
   async (skill) => {
-    const game = scenario({
+    const game = generalGame({
       equipment: { b: [card('b-eq', 'crossbow')], c: [card('c-eq', 'crossbow')] },
     });
     await grant(game, skill, 'b');
@@ -124,7 +116,7 @@ it.each(['qianxun', 'kongcheng'] as const)(
 );
 
 it('集智不响应他人使用的实体普通锦囊', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { b: [card('trick', 'ex_nihilo')] },
     draw: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')],
   });
@@ -147,7 +139,7 @@ it('集智不响应他人使用的实体普通锦囊', async () => {
 });
 
 it('集智不响应奇袭转换的有材料普通锦囊，实际拆牌仍完成', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('material', 'slash', 'club')] },
     equipment: { b: [card('victim', 'crossbow')] },
     draw: [card('untouched', 'peach')],
@@ -178,7 +170,9 @@ it('集智不响应奇袭转换的有材料普通锦囊，实际拆牌仍完成'
 it.each(['yingzi', 'biyue'] as const)(
   '%s 不响应他人的对应阶段，也不响应本人的其他阶段',
   async (skill) => {
-    const game = scenario({ draw: Array.from({ length: 6 }, (_, i) => card(`draw${i}`, 'peach')) });
+    const game = generalGame({
+      draw: Array.from({ length: 6 }, (_, i) => card(`draw${i}`, 'peach')),
+    });
     await grant(game, skill);
     const running = game.room.run('phases', async (ctx) => {
       await runPhase(ctx, game.book, 'b', skill === 'yingzi' ? 'draw' : 'finish');

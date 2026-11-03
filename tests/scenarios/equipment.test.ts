@@ -12,7 +12,6 @@ import {
   modify,
   defineQuery,
   cardQueries,
-  kill,
   pay,
   CardBook,
   SkillBook,
@@ -29,7 +28,7 @@ import type {
 } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { standardCards } from '../../src/content/standard/cards';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { World } from '../../src/core/state/world';
@@ -381,14 +380,7 @@ it.each([false, true])('埋葬移牌保留装备离场事实，是否允许死�
     equipment: { a: [{ ...card('armor', 'slash'), name: definition.id }] },
     definitions: [definition],
   });
-  await game.room.run('death', (ctx) =>
-    kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('death', (ctx) => die(ctx, 'a'));
   expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(
     allowDead ? 1 : 0,
   );

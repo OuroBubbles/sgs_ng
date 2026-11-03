@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { card, cardGame } from '../fixtures/cards';
+import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { kurou } from '../../src/content/standard/generals/huanggai';
 import { jieyin, xiaoji } from '../../src/content/standard/generals/sunshangxiang';
@@ -25,7 +25,6 @@ import {
   moveCards,
   installRescue,
   used,
-  kill,
   withLifetime,
   blockSkill,
   equipmentCard,
@@ -489,12 +488,7 @@ it('结姻支付后目标死亡仍消耗次数，本人按当前状态回复；�
     eligible: (_ctx, paid) => paid.skill === jieyin.id,
     async run(ctx) {
       await game.skills.revoke(ctx, 'a', jieyin.id, source);
-      await kill(ctx, {
-        player: 'b',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'b');
     },
   });
   const running = startPlay(game);

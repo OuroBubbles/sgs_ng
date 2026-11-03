@@ -3,7 +3,6 @@ import {
   installCounterspells,
   withRevealedCards,
   moveCards,
-  kill,
   defineSkill,
   viewAs,
   chooseOwnedCard,
@@ -13,7 +12,7 @@ import {
   Cards,
 } from '../../src/sdk';
 import type { CardDefinition } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -102,12 +101,7 @@ it('自动目标在宣告时固定，前一目标效果中死亡的后续角色�
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      await kill(ctx, {
-        player: 'c',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'c');
     },
   });
   expect(await use(game, automatic('aoe'))).toMatchObject({
@@ -333,13 +327,7 @@ it('目标在确认中失去全部可选牌，拆桥不再弹出空选择；来�
       owner: null,
       eligible: () => true,
       async run(ctx) {
-        if (dead)
-          await kill(ctx, {
-            player: 'a',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        if (dead) await die(ctx, 'a');
         else
           await moveCards(
             ctx,

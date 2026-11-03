@@ -3,14 +3,13 @@ import {
   draw,
   finishGame,
   judge,
-  kill,
   moveCards,
   withPrivateTopCards,
   withRevealedCards,
   Cards,
 } from '../../src/sdk';
 import type { Context, DrawDraft } from '../../src/sdk';
-import { card, cardGame, use, conserved } from '../fixtures/cards';
+import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 import { Deck } from '../../src/rules/cards/draw';
 import { Draw } from '../../src/rules/cards/draw';
@@ -28,13 +27,7 @@ function create() {
 }
 async function invalidate(ctx: Context, boundary: Boundary) {
   if (boundary === 'finished') await finishGame(ctx, { winners: ['b'], reason: 'deck boundary' });
-  else
-    await kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    });
+  else await die(ctx, 'a');
 }
 function atReshuffle(game: Game, run: (ctx: Context) => Promise<void>) {
   game.room.on(Cards.moved, {

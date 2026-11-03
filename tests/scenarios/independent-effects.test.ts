@@ -1,6 +1,6 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import { cardGame, card, settled } from '../fixtures/cards';
+import { cardGame, card, settled, die } from '../fixtures/cards';
 import { covenant } from '../../examples/effects/covenant';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -9,7 +9,6 @@ import {
   effectModify,
   defineQuery,
   withLifetime,
-  kill,
   pay,
   runTurn,
   defineSkill,
@@ -293,14 +292,7 @@ it('来源与效果归属角色死亡不隐含撤销，规则可在死亡后继�
       data: { amount: 3 },
     }),
   );
-  await game.room.run('death', (ctx) =>
-    kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('death', (ctx) => die(ctx, 'a'));
   expect(value(game)).toBe(3);
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(game.fired).toHaveLength(1);
@@ -742,14 +734,7 @@ it('真实守约跨回合与来源死亡：修改上限、仅减一次伤害、�
       },
     }),
   );
-  await game.room.run('source-death', (ctx) =>
-    kill(ctx, {
-      player: 'a',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('source-death', (ctx) => die(ctx, 'a'));
   expect(game.room.inspect((ctx) => game.book.handLimit(ctx, 'b'))).toBe(5);
   await game.room.run('first-hit', async (ctx) => {
     expect((await damage(ctx, { from: 'c', to: 'b', amount: 2, nature: 'normal' })).hpLoss).toBe(1);
@@ -777,14 +762,7 @@ it('守约受益者死亡按普通死亡时点撤销，已死来源与死者归�
   await game.room.run('add', (ctx) =>
     game.book.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
   );
-  await game.room.run('death', (ctx) =>
-    kill(ctx, {
-      player: 'b',
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await game.room.run('death', (ctx) => die(ctx, 'b'));
   expect(game.book.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.position('reward')).toBe('draw');
   expect(game.room.history.facts(Effect.ended)[0]?.data.detail).toMatchObject({

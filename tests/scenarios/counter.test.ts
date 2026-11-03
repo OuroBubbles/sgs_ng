@@ -6,7 +6,6 @@ import {
   defineSkill,
   viewAs,
   ownedCards,
-  kill,
   finishGame,
   Use,
   Target,
@@ -14,7 +13,7 @@ import {
   Counter,
 } from '../../src/sdk';
 import type { CounterOpportunity, UseTiming } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
@@ -233,13 +232,7 @@ it('链中来源死亡仍完成已宣告无懈，终局则停止新机会并清�
       eligible: (_ctx, use) => use.card.name === 'standard:nullification',
       async run(ctx) {
         if (terminal) await finishGame(ctx, { winners: ['a'], reason: 'probe' });
-        else
-          await kill(ctx, {
-            player: 'b',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        else await die(ctx, 'b');
       },
     });
     const running = use(game, { ...intent, targets: ['c'] });

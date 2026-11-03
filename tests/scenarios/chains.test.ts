@@ -5,7 +5,6 @@ import {
   damage,
   isChained,
   isDirectDamage,
-  kill,
   recover,
   setChained,
   defineSkill,
@@ -25,7 +24,7 @@ import {
   Dying,
 } from '../../src/sdk';
 import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
-import { card, cardGame, settled } from '../fixtures/cards';
+import { card, cardGame, settled, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
@@ -200,13 +199,7 @@ it.each(['unlink', 'kill'])(
       async run(ctx) {
         await setChained(ctx, 'a', true, 'new');
         if (kind === 'unlink') await setChained(ctx, 'd', false, 'reset');
-        else
-          await kill(ctx, {
-            player: 'd',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        else await die(ctx, 'd');
       },
     });
     await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -316,12 +309,7 @@ it('来源在起点后效死亡，已经产生的传播仍保留来源身份', a
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
     async run(ctx) {
-      await kill(ctx, {
-        player: 'a',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'a');
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));

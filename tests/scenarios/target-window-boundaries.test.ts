@@ -4,7 +4,6 @@ import {
   defineSkill,
   finishGame,
   installCounterspells,
-  kill,
   loseHp,
   modify,
   moveCards,
@@ -16,7 +15,7 @@ import {
 } from '../../src/sdk';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { card, cardGame, use, conserved } from '../fixtures/cards';
+import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Counter } from '../../src/sdk';
@@ -74,15 +73,6 @@ function create() {
     },
   });
   return game;
-}
-
-async function die(ctx: Context, player: string) {
-  await kill(ctx, {
-    player,
-    killer: null,
-    reason: 'rule',
-    cause: { kind: 'rule', seq: null, data: null },
-  });
 }
 
 async function invalidate(

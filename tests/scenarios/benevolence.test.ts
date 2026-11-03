@@ -31,7 +31,7 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -43,13 +43,6 @@ const death = {
   reason: 'rule',
   cause: { kind: 'rule', seq: null, data: 'test' },
 } as const;
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 async function wound(game: Game, player = 'a', hp = 2) {
   await game.room.run('wound', (ctx) =>
     ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
@@ -70,8 +63,8 @@ function startActive(game: Game, skill: string, count = 1) {
     }),
   );
 }
-async function setupJijiang(options: Parameters<typeof scenario>[0] = {}) {
-  const game = scenario(options);
+async function setupJijiang(options: Parameters<typeof generalGame>[0] = {}) {
+  const game = generalGame(options);
   const self = await grant(game, 'standard:jijiang');
   await game.room.run('factions', (ctx) => {
     for (const [id, kingdom] of Object.entries({ a: '蜀', b: '魏', c: '蜀', d: '蜀' }))
@@ -104,8 +97,8 @@ function startJijiang(
 }
 
 it('currentPhase 只返回局内当前祖先阶段，嵌套和规则中止后恢复，关闭后为空', async () => {
-  const game = scenario();
-  const foreign = scenario();
+  const game = generalGame();
+  const foreign = generalGame();
   await game.room.run('outer', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, outer) => {
       expect(currentPhase(at)).toBe(outer);
@@ -121,7 +114,7 @@ it('currentPhase 只返回局内当前祖先阶段，嵌套和规则中止后恢
   settled(game);
 });
 it('仁德分批交给不同角色，累计跨过两张时只回复一次，交牌和累计原子可见', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')] },
   });
   await grant(game, 'standard:rende');
@@ -148,7 +141,7 @@ it('仁德分批交给不同角色，累计跨过两张时只回复一次，交�
   settled(game);
 });
 it('仁德满体力跨过两张也消耗首次门槛，随后受伤再给牌不补发回复', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')] },
   });
   await grant(game, 'standard:rende');
@@ -165,7 +158,7 @@ it('仁德满体力跨过两张也消耗首次门槛，随后受伤再给牌不�
   expect(game.room.world.player('a').hp).toBe(2);
 });
 it('仁德取消不付费，装备/他人牌/自己目标均非法；重新选择可正常发动', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'slash')], b: [card('foreign', 'peach')] },
     equipment: { a: [card('gear', 'spear')] },
   });
@@ -186,7 +179,7 @@ it('仁德取消不付费，装备/他人牌/自己目标均非法；重新选�
   expect(game.room.world.player('a').hp).toBe(3);
 });
 it('仁德计数不因支付后失去并重获技能重置，重复出牌阶段各有独立门槛', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: ['one', 'two', 'three', 'four'].map((id) => card(id, 'jink')) },
   });
   await grant(game, 'standard:rende');
@@ -223,7 +216,7 @@ it('仁德转交不受弃置禁令约束，目标死亡后已转交牌照常埋�
     triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('one', 'jink'), card('two', 'slash')] },
     skills: [...standardGeneralSkills, lock],
   });
@@ -246,7 +239,7 @@ it('仁德转交不受弃置禁令约束，目标死亡后已转交牌照常埋�
   settled(game);
 });
 it('青囊可以治疗自己，取消不占次数，成功后本阶段不能再发动', async () => {
-  const game = scenario({ hands: { a: [card('fee', 'jink')] } });
+  const game = generalGame({ hands: { a: [card('fee', 'jink')] } });
   await grant(game, 'standard:qingnang');
   await wound(game);
   const running = game.room.run('phase', (ctx) =>
@@ -266,7 +259,7 @@ it('青囊可以治疗自己，取消不占次数，成功后本阶段不能再�
   settled(game);
 });
 it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动作', async () => {
-  const game = scenario({ equipment: { a: [card('gear', 'spear')] } });
+  const game = generalGame({ equipment: { a: [card('gear', 'spear')] } });
   await grant(game, 'standard:qingnang');
   await wound(game);
   await game.room.run('no-hand', (ctx) =>
@@ -280,7 +273,7 @@ it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动�
     triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
-  const blocked = scenario({
+  const blocked = generalGame({
     hands: { a: [card('fee', 'jink')] },
     skills: [...standardGeneralSkills, lock],
   });
@@ -296,7 +289,7 @@ it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动�
 it.each(['lost', 'source-dead', 'target-dead'] as const)(
   '青囊宣告后不撤销费用，按目标当前存活结算：%s',
   async (kind) => {
-    const game = scenario({ hands: { a: [card('fee', 'jink')] } });
+    const game = generalGame({ hands: { a: [card('fee', 'jink')] } });
     await grant(game, 'standard:qingnang');
     await wound(game, 'b');
     game.room.on(Cost.paid, {
@@ -320,7 +313,7 @@ it.each(['hand', 'equipment'] as const)(
   '急救回合外红色%s当桃，走真实救援和用牌，不能当普通打出',
   async (area) => {
     const red = card('red', area === 'hand' ? 'slash' : 'chitu', 'heart');
-    const game = scenario({
+    const game = generalGame({
       hands: { a: area === 'hand' ? [red] : [] },
       equipment: area === 'equipment' ? { a: [red] } : {},
     });
@@ -360,7 +353,7 @@ it.each(['hand', 'equipment'] as const)(
   },
 );
 it.each(['normal', 'extra'] as const)('急救在本人%s回合不可用，不能用红牌救别人', async (kind) => {
-  const game = scenario({ hands: { a: [card('red', 'slash', 'heart')] } });
+  const game = generalGame({ hands: { a: [card('red', 'slash', 'heart')] } });
   await grant(game, 'standard:jijiu');
   installRescue(game.room, game.book);
   await game.room.run('turn', (ctx) =>
@@ -379,7 +372,7 @@ it.each(['normal', 'extra'] as const)('急救在本人%s回合不可用，不能
   expect(game.room.world.position('red')).toBe('a:hand');
 });
 it('急救不能选择黑色材料，回合外仍完整检查使用桃禁令', async () => {
-  const game = scenario({ hands: { a: [card('black', 'slash')] } });
+  const game = generalGame({ hands: { a: [card('black', 'slash')] } });
   const self = await grant(game, 'standard:jijiu');
   await game.room.run('black', (ctx) =>
     expect(
@@ -391,7 +384,7 @@ it('急救不能选择黑色材料，回合外仍完整检查使用桃禁令', a
       ).ok,
     ).toBe(false),
   );
-  const blocked = scenario({
+  const blocked = generalGame({
     hands: { a: [card('red', 'slash', 'heart')] },
     policy: { prohibitUse: () => true },
   });
@@ -660,7 +653,7 @@ it.each(['physical', 'zero'] as const)('供牌回调中止遵守独立处理区�
       }),
     ],
   });
-  const game = scenario({
+  const game = generalGame({
     skills: [zero],
     hands: { c: kind === 'physical' ? [card('supply', 'slash')] : [] },
   });

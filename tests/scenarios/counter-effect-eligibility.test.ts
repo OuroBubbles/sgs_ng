@@ -5,7 +5,6 @@ import {
   defineSkill,
   delayedCard,
   installCounterspells,
-  kill,
   loseHp,
   modify,
   moveCards,
@@ -17,7 +16,7 @@ import {
 } from '../../src/sdk';
 import type { Context, UseIntent } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, die } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
 
@@ -82,12 +81,7 @@ async function change(ctx: Context, game: Game, boundary: Boundary) {
       await game.skills.grant(ctx, { owner: 'b', skill: ban.id, source });
       return;
     case 'source-dead':
-      await kill(ctx, {
-        player: 'a',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'a');
   }
 }
 

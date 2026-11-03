@@ -29,7 +29,7 @@ import {
   Phase,
 } from '../../src/sdk';
 import type { PhaseView, UseIntent } from '../../src/sdk';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { Use } from '../../src/sdk';
@@ -41,13 +41,6 @@ const death = {
   reason: 'rule',
   cause: { kind: 'rule', seq: null, data: 'test' },
 } as const;
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 async function takeHidden(game: Game, target: string) {
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('cards-targets');
@@ -130,7 +123,7 @@ it('势力可独立变更为自定义值或无势力，投影/AI/重放读取当
 });
 
 it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同；重复阶段各自独立', async () => {
-  const game = scenario();
+  const game = generalGame();
   const events: string[] = [];
   let first = true;
   game.room.on(Phase.before, {
@@ -186,8 +179,8 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
   settled(game);
 });
 it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳阶段无替代机会', async () => {
-  const game = scenario();
-  const foreign = scenario();
+  const game = generalGame();
+  const foreign = generalGame();
   let retained: PhaseView;
   game.room.on(Phase.started, {
     id: 'capture',
@@ -218,7 +211,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
 });
 
 it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；实牌不再被用牌清理弃置', async () => {
-  const game = scenario({ hands: { b: [card('hit', 'slash')] } });
+  const game = generalGame({ hands: { b: [card('hit', 'slash')] } });
   await grant(game, 'standard:jianxiong');
   game.room.on(Damage.causing, {
     id: 'two',
@@ -247,7 +240,7 @@ it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；�
 it.each(['full', 'partial', 'empty'] as const)(
   '奸雄只取得完整虚拟牌实体材料，不把语义牌名写回实体：%s',
   async (kind) => {
-    const game = scenario({ hands: { b: [card('one', 'peach'), card('two', 'jink')] } });
+    const game = generalGame({ hands: { b: [card('one', 'peach'), card('two', 'jink')] } });
     await grant(game, 'standard:jianxiong');
     if (kind === 'partial')
       game.room.on(Damage.dealt, {
@@ -282,7 +275,7 @@ it.each(['full', 'partial', 'empty'] as const)(
   },
 );
 it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理', async () => {
-  const game = scenario({ hands: { b: [card('hit', 'slash')] } });
+  const game = generalGame({ hands: { b: [card('hit', 'slash')] } });
   await grant(game, 'standard:jianxiong');
   let elsewhere = '';
   game.room.on(Damage.dealt, {
@@ -309,7 +302,7 @@ it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理'
 it.each(['lost', 'moved', 'dead'] as const)(
   '奸雄支付后效重查材料和存活，失去技能不撤销已宣告效果：%s',
   async (kind) => {
-    const game = scenario({ hands: { b: [card('hit', 'slash')] } });
+    const game = generalGame({ hands: { b: [card('hit', 'slash')] } });
     await grant(game, 'standard:jianxiong');
     game.room.on(Cost.paid, {
       id: 'after',
@@ -336,7 +329,7 @@ it.each(['lost', 'moved', 'dead'] as const)(
   },
 );
 it('奸雄取得群体牌后，后续目标依然结算，但不能重复取得已离开处理区的材料', async () => {
-  const game = scenario({ hands: { a: [card('aoe', 'savage_assault')] } });
+  const game = generalGame({ hands: { a: [card('aoe', 'savage_assault')] } });
   await grant(game, 'standard:jianxiong', 'b');
   await grant(game, 'standard:jianxiong', 'c');
   const running = use(game, {
@@ -354,7 +347,7 @@ it('奸雄取得群体牌后，后续目标依然结算，但不能重复取得�
 });
 
 it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由后一人支付；只结算一次打出', async () => {
-  const game = scenario({ hands: { b: [card('hit', 'slash')], d: [card('j', 'jink')] } });
+  const game = generalGame({ hands: { b: [card('hit', 'slash')], d: [card('j', 'jink')] } });
   await grant(game, 'standard:hujia');
   await factions(game);
   let finished = 0;
@@ -384,7 +377,7 @@ it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由�
   settled(game);
 });
 it.each(['cancel', 'none'] as const)('护驾失败或不发动，仍可自己打闪：%s', async (kind) => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('own', 'jink')], b: [card('hit', 'slash')], c: [card('other', 'jink')] },
   });
   await grant(game, 'standard:hujia');
@@ -399,7 +392,7 @@ it.each(['cancel', 'none'] as const)('护驾失败或不发动，仍可自己打
   expect(game.room.world.player('a').hp).toBe(4);
 });
 it('护驾按当前回合角色起算的行动顺序委托，不固定从曹操之后起算', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('hit', 'slash')], b: [card('first', 'jink')], d: [card('later', 'jink')] },
   });
   await grant(game, 'standard:hujia', 'c');
@@ -419,7 +412,7 @@ it('护驾按当前回合角色起算的行动顺序委托，不固定从曹操�
   expect(game.room.world.position('later')).toBe('d:hand');
 });
 it('没有其他存活魏角色时不询问护驾，也不会依静态武将势力猜测', async () => {
-  const game = scenario({ hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] } });
+  const game = generalGame({ hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] } });
   await grant(game, 'standard:hujia');
   await factions(game, { a: '魏', b: '吴', c: '蜀', d: '魏' });
   await game.room.run('dead', (ctx) => kill(ctx, { ...death, player: 'd' }));
@@ -428,7 +421,7 @@ it('没有其他存活魏角色时不询问护驾，也不会依静态武将势�
   expect(game.room.world.player('a').hp).toBe(3);
 });
 it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供牌者的杀', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { b: [card('hit', 'slash')], c: [card('wrong', 'slash'), card('right', 'jink')] },
   });
   await grant(game, 'standard:hujia');
@@ -460,7 +453,7 @@ it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供�
   settled(game);
 });
 it('委托名称不能扩张原请求、为空或重复；失败不会支付或打开子请求', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('own', 'jink')], b: [card('hit', 'slash')], c: [card('wrong', 'slash')] },
   });
   game.room.on(Response.requested, {
@@ -483,7 +476,7 @@ it('委托名称不能扩张原请求、为空或重复；失败不会支付或�
 it.each(['qingguo', 'longdan', 'armor'] as const)(
   '护驾供牌者复用自己的转换或装备能力：%s',
   async (kind) => {
-    const game = scenario({
+    const game = generalGame({
       hands: {
         b: [card('hit', 'slash')],
         c: kind === 'armor' ? [] : [card('material', kind === 'qingguo' ? 'peach' : 'slash')],
@@ -517,7 +510,7 @@ it.each(['qingguo', 'longdan', 'armor'] as const)(
 it.each(['provider', 'beneficiary'] as const)(
   '响应禁令检查实际供牌者；不把受益者的个人禁令当作全局禁止：%s',
   async (kind) => {
-    const game = scenario({
+    const game = generalGame({
       hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] },
       policy: { prohibitResponse: (_ctx, actor) => actor === (kind === 'provider' ? 'c' : 'a') },
     });
@@ -532,7 +525,7 @@ it.each(['provider', 'beneficiary'] as const)(
   },
 );
 it('护驾委托不会再次发动供牌者的护驾；动态势力按每次委托前的当前值判断', async () => {
-  const game = scenario({ hands: { b: [card('hit', 'slash')], d: [card('j', 'jink')] } });
+  const game = generalGame({ hands: { b: [card('hit', 'slash')], d: [card('j', 'jink')] } });
   await grant(game, 'standard:hujia');
   await grant(game, 'standard:hujia', 'c');
   await factions(game, { a: '魏', b: '吴', c: '魏', d: '蜀' });
@@ -554,7 +547,7 @@ it('护驾委托不会再次发动供牌者的护驾；动态势力按每次委�
 it.each(['lost', 'dead', 'faction'] as const)(
   '护驾支付后不重复检查技能持有，但重查本人和供牌者当前资格：%s',
   async (kind) => {
-    const game = scenario({ hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] } });
+    const game = generalGame({ hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] } });
     await grant(game, 'standard:hujia');
     await factions(game);
     game.room.on(Cost.paid, {
@@ -578,7 +571,7 @@ it.each(['lost', 'dead', 'faction'] as const)(
 );
 
 it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露实体身份且不经过摸牌', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { b: [card('secret-b', 'peach')], c: [card('secret-c', 'slash')] },
     draw: [card('draw1', 'jink'), card('draw2', 'slash')],
   });
@@ -634,7 +627,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
   settled(game);
 });
 it.each(['cancel', 'empty'] as const)('突袭取消或无合法目标，正常摸两张：%s', async (kind) => {
-  const game = scenario({
+  const game = generalGame({
     hands: { b: kind === 'cancel' ? [card('secret-b', 'peach')] : [] },
     draw: [card('draw1', 'jink'), card('draw2', 'slash')],
   });
@@ -648,7 +641,7 @@ it.each(['cancel', 'empty'] as const)('突袭取消或无合法目标，正常�
 it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
   '突袭宣告后目标或来源变化不会恢复默认摸牌：%s',
   async (kind) => {
-    const game = scenario({
+    const game = generalGame({
       hands: { b: [card('secret-b', 'peach')], c: [card('secret-c', 'slash')] },
       draw: [card('draw1', 'jink'), card('draw2', 'slash')],
     });
@@ -686,7 +679,7 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
     triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: { b: [card('secret-b', 'peach')] },
     equipment: { c: [card('weapon', 'spear')] },
     skills: [...standardGeneralSkills, lock],

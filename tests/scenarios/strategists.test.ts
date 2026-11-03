@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, grant, settled } from '../fixtures/cards';
+import { card, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
@@ -29,23 +29,16 @@ import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Lifetime } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 const source = { kind: 'general', id: 'test' } as const;
 const healthCause = { kind: 'rule', seq: null, data: 'test' } as const;
 
 it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与宣告同次提交', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('new', 'peach', 'heart')] },
     draw: [card('old', 'slash')],
   });
@@ -132,7 +125,7 @@ it.each(['response', 'use', 'discard'] as const)(
             : modify(cardQueries.prohibitDiscard, () => true),
       ],
     });
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('new', 'peach', 'heart')] },
       draw: [card('old', 'slash')],
       skills: [...standardGeneralSkills, locked],
@@ -153,7 +146,7 @@ it.each(['response', 'use', 'discard'] as const)(
 );
 
 it('鬼才取消不宣告；候选仅限本人手牌，拒绝装备、他人牌与多张材料', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('mine', 'peach')], b: [card('foreign', 'slash')] },
     equipment: { a: [card('weapon', 'spear')] },
     draw: [card('old', 'slash')],
@@ -172,7 +165,7 @@ it('鬼才取消不宣告；候选仅限本人手牌，拒绝装备、他人牌�
 });
 
 it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，每人只获得本次窗口的一次候选', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('last', 'jink', 'club')], b: [card('first', 'peach', 'heart')] },
     draw: [card('old', 'slash')],
   });
@@ -200,7 +193,7 @@ it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，�
 
 it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () => {
   for (const branch of ['dead', 'revoke'] as const) {
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('new', 'peach', 'heart')] },
       draw: [card('old', 'slash')],
     });
@@ -233,7 +226,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
   '带宣告的底层改判在提交前拒绝失效费用，不留下半改判：%s',
   async (branch) => {
     const probe = defineSkill({ id: 'test:retrial', name: '改判探针', triggers: [] });
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('new', 'peach', 'heart')], c: [card('other', 'jink')] },
       draw: [card('old', 'slash')],
       skills: [...standardGeneralSkills, probe],
@@ -265,7 +258,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
 );
 
 it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', async () => {
-  const game = scenario({ hands: { b: [card('secret', 'ex_nihilo')] } });
+  const game = generalGame({ hands: { b: [card('secret', 'ex_nihilo')] } });
   await grant(game, 'standard:fankui');
   const running = game.room.run('hit', (ctx) =>
     damage(ctx, { from: 'b', to: 'a', amount: 2, nature: 'normal' }),
@@ -304,7 +297,7 @@ it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不�
     triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('hand', 'peach')] },
     equipment: { a: [card('weapon', 'spear')] },
     skills: [...standardGeneralSkills, locked],
@@ -329,7 +322,9 @@ it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不�
 
 it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；可正常拒绝', async () => {
   for (const branch of ['null', 'dead', 'self-hand', 'decline'] as const) {
-    const game = scenario({ hands: { a: [card('mine', 'peach')], b: [card('theirs', 'peach')] } });
+    const game = generalGame({
+      hands: { a: [card('mine', 'peach')], b: [card('theirs', 'peach')] },
+    });
     await grant(game, 'standard:fankui');
     if (branch === 'dead')
       game.room.on(Damage.dealt, {
@@ -358,7 +353,7 @@ it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；�
 
 it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取', async () => {
   for (const branch of ['declared-card', 'declared-skill', 'dead'] as const) {
-    const game = scenario({ hands: { b: [card('chosen', 'peach')] } });
+    const game = generalGame({ hands: { b: [card('chosen', 'peach')] } });
     await grant(game, 'standard:fankui');
     const change = async (ctx: Context) => {
       if (branch.endsWith('skill')) await game.skills.revoke(ctx, 'a', 'standard:fankui', source);
@@ -398,7 +393,7 @@ it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取'
 });
 
 it('天妒取得最终改判牌，不受判定是否成功影响，旧判定牌仍弃置', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('new', 'peach', 'heart')] },
     draw: [card('old', 'slash')],
   });
@@ -417,7 +412,7 @@ it('天妒取得最终改判牌，不受判定是否成功影响，旧判定牌�
 
 it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则不强取', async () => {
   for (const branch of ['revoke', 'taken', 'dead'] as const) {
-    const game = scenario({ draw: [card('top', 'slash')] });
+    const game = generalGame({ draw: [card('top', 'slash')] });
     await grant(game, tiandu.id);
     game.room.on(Cost.paid, {
       id: 'change',
@@ -447,7 +442,7 @@ it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则�
 });
 
 it('天妒与洛神共享一次判定，不重复取得同一张牌，结果仍可继续判定', async () => {
-  const game = scenario({ draw: [card('top', 'slash'), card('next', 'jink')] });
+  const game = generalGame({ draw: [card('top', 'slash'), card('next', 'jink')] });
   await grant(game, tiandu.id);
   await grant(game, 'standard:luoshen');
   const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
@@ -525,7 +520,7 @@ it('遗计私有牌池不算手牌、不触发摸牌，只有本人投影和 AI 
 });
 
 it('遗计每点伤害独立征询，拒绝第一点不取消第二点，可一次分配全部两张牌', async () => {
-  const game = scenario({
+  const game = generalGame({
     draw: [card('one', 'slash'), card('two', 'jink'), card('unused', 'peach')],
   });
   await grant(game, yiji.id);
@@ -543,7 +538,7 @@ it('遗计每点伤害独立征询，拒绝第一点不取消第二点，可一�
 });
 
 it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence 不再发动', async () => {
-  const game = scenario({
+  const game = generalGame({
     draw: [card('one', 'slash'), card('two', 'jink'), card('unused', 'peach')],
   });
   await grant(game, yiji.id);
@@ -567,7 +562,7 @@ it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence �
 });
 
 it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌弃置且元数据关闭', async () => {
-  const game = scenario({ draw: [card('one', 'slash'), card('two', 'jink')] });
+  const game = generalGame({ draw: [card('one', 'slash'), card('two', 'jink')] });
   await grant(game, yiji.id);
   game.room.on(Cards.moved, {
     id: 'die-after-give',
@@ -590,7 +585,7 @@ it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌�
 });
 
 it('私有牌池只洗弃牌补足，不借用外层处理区；牌被先取走后按实时余牌选择', async () => {
-  const game = scenario({ draw: [card('first', 'slash')], discard: [card('second', 'jink')] });
+  const game = generalGame({ draw: [card('first', 'slash')], discard: [card('second', 'jink')] });
   await grant(game, yiji.id);
   game.room.on(Cards.moved, {
     id: 'take-first',
@@ -621,7 +616,7 @@ it('私有牌池只洗弃牌补足，不借用外层处理区；牌被先取走�
 });
 
 it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者状态', async () => {
-  const game = scenario({ draw: [card('outer', 'slash'), card('inner', 'jink')] });
+  const game = generalGame({ draw: [card('outer', 'slash'), card('inner', 'jink')] });
   const result = await game.room.run('pools', (ctx) =>
     withPrivateTopCards(ctx, { player: 'a', count: 1, reason: 'outer' }, async (at, outer) => {
       expect(privateCardPools(at.world, 'a')[0]!.cards).toEqual(['outer']);
@@ -667,7 +662,7 @@ it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者�
 
 it('遗计空牌堆或不足两张时正常结束，不制造必选死锁', async () => {
   for (const count of [0, 1]) {
-    const game = scenario({ draw: count ? [card('only', 'slash')] : [] });
+    const game = generalGame({ draw: count ? [card('only', 'slash')] : [] });
     await grant(game, yiji.id);
     const running = game.room.run('hit', (ctx) =>
       damage(ctx, { from: null, to: 'a', amount: 1, nature: 'normal' }),

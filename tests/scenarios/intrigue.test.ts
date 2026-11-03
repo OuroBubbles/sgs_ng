@@ -41,20 +41,13 @@ import {
   Phase,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
-import { legacyGenerals } from '../fixtures/generals';
+import { legacyGenerals, generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Fanjian } from '../../src/content/standard/generals/zhouyu';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
-function scenario(options: Parameters<typeof cardGame>[0] = {}) {
-  return cardGame({
-    ...options,
-    hands: { a: [], ...options.hands },
-    skills: options.skills ?? standardGeneralSkills,
-  });
-}
 const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
   actor,
   choice: { kind: 'physical', card: id },
@@ -91,7 +84,7 @@ async function genders(game: Game) {
 }
 
 it('具名选项固定描述快照、拒绝未知项与强制取消，结束后旧输入失效', async () => {
-  const game = scenario();
+  const game = generalGame();
   class Option {
     constructor(
       readonly value: string,
@@ -171,7 +164,7 @@ it('具名选项固定描述快照、拒绝未知项与强制取消，结束后�
   settled(game);
 });
 it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授予叠加', async () => {
-  const game = scenario({
+  const game = generalGame({
     equipment: { a: [card('horse', 'chitu')], c: [card('defense', 'dilu')] },
   });
   await grant(game, 'standard:mashu');
@@ -185,7 +178,7 @@ it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授�
   settled(game);
 });
 it.each(['red', 'black', 'decline', 'empty'])('铁骑 %s 判定只影响本次目标的响应', async (kind) => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('slash', 'slash')], b: [card('jink', 'jink')] },
     draw: kind === 'empty' ? [] : [card('judge', 'peach', kind === 'red' ? 'heart' : 'spade')],
   });
@@ -200,7 +193,7 @@ it.each(['red', 'black', 'decline', 'empty'])('铁骑 %s 判定只影响本次�
   settled(game);
 });
 it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受的判定效果', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('slash', 'slash')],
       b: [card('jink', 'jink')],
@@ -227,7 +220,7 @@ it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受�
   settled(game);
 });
 it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('slash', 'slash')],
       b: [card('bj', 'jink')],
@@ -257,7 +250,7 @@ it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数'
   settled(game);
 });
 it('流离先于铁骑，只对新目标询问判定，旧身份的响应禁令不泄漏', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('slash', 'slash')], b: [card('fee', 'jink')], c: [card('jink', 'jink')] },
     draw: [card('red', 'peach', 'heart')],
   });
@@ -281,7 +274,7 @@ it('流离先于铁骑，只对新目标询问判定，旧身份的响应禁令�
   settled(game);
 });
 it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不开启', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('slash', 'slash')], b: [card('jink', 'jink')], c: [card('supply', 'jink')] },
     equipment: { b: [card('armor', 'eight_diagram')] },
     draw: [card('red', 'peach', 'heart')],
@@ -315,7 +308,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
   settled(game);
 });
 it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async () => {
-  const game = scenario({ hands: { a: [card('slash', 'slash')] } });
+  const game = generalGame({ hands: { a: [card('slash', 'slash')] } });
   let effect: CardEffect | undefined;
   game.room.on(Target.specified, {
     id: 'capture',
@@ -338,7 +331,7 @@ it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async (
   settled(game);
 });
 it.each([true, false])('英姿接受=%s，只修改这次阶段摸牌', async (accepted) => {
-  const game = scenario({ draw: samples() });
+  const game = generalGame({ draw: samples() });
   await grant(game, 'standard:yingzi');
   const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
   await answer(game, accepted);
@@ -347,7 +340,7 @@ it.each([true, false])('英姿接受=%s，只修改这次阶段摸牌', async (a
   settled(game);
 });
 it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
-  const game = scenario({ draw: samples() });
+  const game = generalGame({ draw: samples() });
   await grant(game, 'standard:yingzi');
   await game.room.run('draw', (ctx) =>
     runPhase(ctx, game.book, 'a', 'draw', async (at) => {
@@ -359,7 +352,7 @@ it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
   settled(game);
 });
 it.each([true, false])('闭月接受=%s，结束阶段正常收束', async (accepted) => {
-  const game = scenario({ draw: samples() });
+  const game = generalGame({ draw: samples() });
   await grant(game, 'standard:biyue');
   const running = game.room.run('finish', (ctx) => runPhase(ctx, game.book, 'a', 'finish'));
   await answer(game, accepted);
@@ -369,7 +362,7 @@ it.each([true, false])('闭月接受=%s，结束阶段正常收束', async (acce
 });
 it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', async () => {
   for (const skip of [true, false]) {
-    const game = scenario({ draw: samples() });
+    const game = generalGame({ draw: samples() });
     await grant(game, 'standard:biyue');
     if (skip)
       game.room.on(Phase.before, {
@@ -399,7 +392,7 @@ it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', asyn
 it.each(['spade', 'heart', 'club', 'diamond'])(
   '反间猜 %s，目标暗选后公开获得手牌，先移牌再比较花色',
   async (guess) => {
-    const game = scenario({ hands: { a: [card('gift', 'jink', 'club')] } });
+    const game = generalGame({ hands: { a: [card('gift', 'jink', 'club')] } });
     await grant(game, 'standard:fanjian');
     let moved = false;
     game.room.on(Cards.moved, {
@@ -446,7 +439,7 @@ async function selectFanjianCard(game: Game, guess = 'spade') {
   ).toBe('accepted');
 }
 it('反间取消不消耗次数，空手或只有装备时不能发动', async () => {
-  const game = scenario({ hands: { a: [card('gift', 'jink')] } });
+  const game = generalGame({ hands: { a: [card('gift', 'jink')] } });
   await grant(game, 'standard:fanjian');
   const running = playSkill(game, 'fanjian', (ctx, phase) => {
     expect(activeOffers(ctx, game.book, phase).some((o) => o.skill === 'standard:fanjian')).toBe(
@@ -475,7 +468,7 @@ it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', a
     triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('gift', 'jink', 'heart')] },
     draw: samples(),
     skills: [...standardGeneralSkills, ban],
@@ -500,7 +493,7 @@ it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', a
 });
 it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜错伤害', async () => {
   for (const die of [false, true]) {
-    const game = scenario({ hands: { a: [card('gift', 'jink', 'heart')] } });
+    const game = generalGame({ hands: { a: [card('gift', 'jink', 'heart')] } });
     await grant(game, 'standard:fanjian');
     game.room.on(Cost.paid, {
       id: 'lose',
@@ -535,7 +528,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
   }
 });
 it('反间支付后手牌被取走，不生成假牌或多问一次花色，次数仍消耗', async () => {
-  const game = scenario({ hands: { a: [card('gift', 'jink')] } });
+  const game = generalGame({ hands: { a: [card('gift', 'jink')] } });
   await grant(game, 'standard:fanjian');
   game.room.on(Cost.paid, {
     id: 'take',
@@ -566,7 +559,7 @@ it('反间支付后手牌被取走，不生成假牌或多问一次花色，次�
   settled(game);
 });
 it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料决斗且禁止无懈', async (area) => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: area === 'hand' ? [card('fee', 'jink')] : [], b: [card('null', 'nullification')] },
     equipment: area === 'equipment' ? { a: [card('fee', 'crossbow')] } : {},
   });
@@ -605,7 +598,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
 });
 it('离间按有序目标验证禁止使用与目标禁令，不接受女性、本人和重复目标', async () => {
   let blocked = true;
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('fee', 'jink')] },
     policy: {
       prohibitTarget: (_ctx, actor, target, semantic) =>
@@ -642,7 +635,7 @@ it('离间按有序目标验证禁止使用与目标禁令，不接受女性、�
   settled(game);
 });
 it('离间取消不计次、同阶段只支付一次，下一阶段重新可用', async () => {
-  const game = scenario({ hands: { a: [card('fee1', 'jink'), card('fee2', 'jink')] } });
+  const game = generalGame({ hands: { a: [card('fee1', 'jink'), card('fee2', 'jink')] } });
   await genders(game);
   await grant(game, 'standard:lijian');
   const cancelled = playSkill(game, 'lijian', (ctx, phase) => {
@@ -723,7 +716,7 @@ it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确�
   expect(finished.log.some((line) => line.text.includes('公开：【闪】♥7'))).toBe(true);
 });
 it('单次反制禁令随持久延时牌保存到后续生效，不依赖原计划句柄', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('delay', 'indulgence')], b: [card('null', 'nullification')] },
     draw: [card('judgment', 'peach', 'heart')],
   });
@@ -746,7 +739,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
     ],
   });
   for (const blocked of [false, true]) {
-    const game = scenario({
+    const game = generalGame({
       hands: { a: [card('fee', 'jink')] },
       skills: [...standardGeneralSkills, ban],
     });
@@ -772,7 +765,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
   }
 });
 it('离间的实际决斗者可触发集智，无双要求对方两杀，伤害仍归赢得决斗者', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('fee', 'jink')], b: [card('b1', 'slash'), card('b2', 'slash')] },
     draw: [card('drawn', 'peach')],
   });
@@ -794,7 +787,7 @@ it('离间的实际决斗者可触发集智，无双要求对方两杀，伤害�
   settled(game);
 });
 it('本次用牌的反制禁令复制输入，不影响之后的普通决斗', async () => {
-  const game = scenario({
+  const game = generalGame({
     hands: { a: [card('duel', 'duel')], b: [card('null', 'nullification')] },
   });
   installCounterspells(game.room, game.book);
@@ -827,7 +820,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
       execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
     },
   };
-  const game = scenario({
+  const game = generalGame({
     hands: {
       a: [card('an', 'nullification')],
       b: [{ id: 'bc', name: custom.id, suit: 'club', rank: 2 }],

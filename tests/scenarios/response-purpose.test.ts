@@ -1,10 +1,9 @@
 import { expect, it } from 'vitest';
-import { card, cardGame, use, settled } from '../fixtures/cards';
+import { card, cardGame, use, settled, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import {
   moveCards,
   setKingdom,
-  kill,
   runPhase,
   defineSkill,
   viewAs,
@@ -351,13 +350,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
             ],
             'probe:take',
           );
-        else
-          await kill(ctx, {
-            player: 'b',
-            killer: null,
-            reason: 'rule',
-            cause: { kind: 'rule', seq: null, data: null },
-          });
+        else await die(ctx, 'b');
       },
     });
     await dodge(game, use(game, attack()));
@@ -447,12 +440,7 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
     owner: null,
     eligible: (_ctx, result) => result.card.name === 'standard:jink',
     async run(ctx) {
-      await kill(ctx, {
-        player: 'b',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      });
+      await die(ctx, 'b');
     },
   });
   await dodge(game, use(game, attack()));

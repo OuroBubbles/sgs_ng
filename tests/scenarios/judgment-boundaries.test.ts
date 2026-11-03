@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { judge, kill, finishGame, draw, Judgment } from '../../src/sdk';
+import { judge, finishGame, draw, Judgment } from '../../src/sdk';
 import type { Context, JudgmentResult } from '../../src/sdk';
-import { card, cardGame, use, conserved } from '../fixtures/cards';
+import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 
@@ -18,13 +18,7 @@ function create() {
 async function invalidate(ctx: Context, boundary: Boundary, player = 'a') {
   if (boundary === 'finished')
     await finishGame(ctx, { winners: ['c'], reason: 'judgment boundary' });
-  else
-    await kill(ctx, {
-      player,
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    });
+  else await die(ctx, player);
 }
 
 for (const stage of stages) {
