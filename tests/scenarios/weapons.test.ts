@@ -17,7 +17,7 @@ import {
   withLifetime,
 } from '../../src/sdk';
 import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/wusheng';
+import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

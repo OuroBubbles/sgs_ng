@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -26,6 +26,7 @@ import {
   moveCards,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
+import { legacyGenerals } from '../fixtures/generals';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -523,7 +524,7 @@ it.each(['mixed', 'all-liuli'])(
   async (kind) => {
     const lineup =
       kind === 'mixed'
-        ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => standardGenerals[i]!.id)
+        ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => legacyGenerals[i]!.id)
         : Array<string>(4).fill('standard:daqiao');
     const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
     await playMatch(match, { steps: 9000 });

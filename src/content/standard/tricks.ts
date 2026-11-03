@@ -10,13 +10,7 @@ import {
   moveDelayed,
   resolveAttack,
 } from '../../sdk';
-import type {
-  CardDefinition,
-  Context,
-  CardEffect,
-  CardBook,
-  CardFixedTargetsInput,
-} from '../../sdk';
+import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
 
 const otherLiving = (ctx: Context, { actor }: CardFixedTargetsInput) =>
   ctx.world.snapshot.players
@@ -28,13 +22,8 @@ const areas = ['hand', 'equipment', 'judgment'];
 const hasCards = (ctx: Context, player: string) =>
   ownedCards(ctx.world, player, areas).length > 0 || delayedCards(ctx.world, player).length > 0;
 
-async function takeOrDiscard(
-  ctx: Context,
-  effect: CardEffect,
-  book: CardBook,
-  take: boolean,
-): Promise<void> {
-  const chosen = await chooseOwnedCard(ctx, book, {
+async function takeOrDiscard(ctx: Context, effect: CardEffect, take: boolean): Promise<void> {
+  const chosen = await chooseOwnedCard(ctx, {
     actor: effect.actor,
     target: effect.target,
     areas,
@@ -46,7 +35,7 @@ async function takeOrDiscard(
   if (chosen.kind === 'delayed') {
     const moved = take
       ? await moveDelayed(ctx, chosen.id, `${effect.actor}:hand`)
-      : await discardCards(ctx, book, {
+      : await discardCards(ctx, {
           actor: effect.actor,
           owner: effect.target,
           cards: [chosen.id],
@@ -70,7 +59,7 @@ async function takeOrDiscard(
         [{ cards: [card], from, to: `${effect.actor}:hand`, place: 'bottom' }],
         effect.card.name,
       )
-    : await discardCards(ctx, book, {
+    : await discardCards(ctx, {
         actor: effect.actor,
         owner: effect.target,
         cards: [card],
@@ -140,7 +129,7 @@ export const trickCards: readonly CardDefinition[] = [
       target: (ctx, { request, target }) => target !== request.actor && hasCards(ctx, target),
       canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.actor).alive && hasCards(ctx, effect.target),
-      resolve: (ctx, { effect, book }) => takeOrDiscard(ctx, effect, book, false),
+      resolve: (ctx, { effect }) => takeOrDiscard(ctx, effect, false),
     },
   },
   {
@@ -156,7 +145,7 @@ export const trickCards: readonly CardDefinition[] = [
         book.withinDistance(ctx, request, target, 1),
       canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.actor).alive && hasCards(ctx, effect.target),
-      resolve: (ctx, { effect, book }) => takeOrDiscard(ctx, effect, book, true),
+      resolve: (ctx, { effect }) => takeOrDiscard(ctx, effect, true),
     },
   },
   {

@@ -2,8 +2,8 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
-import { tiandu, yiji } from '../../src/content/standard/strategists';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
 import {
   judge,
   judgmentRevealed,
@@ -31,6 +31,7 @@ import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
 import { createOfflineMatch } from '../../src/app/offline/practice';
+import { legacyGenerals } from '../fixtures/generals';
 
 type Game = ReturnType<typeof cardGame>;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -122,7 +123,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
     );
   });
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, {
+    judge(ctx, {
       player: 'b',
       reason: 'probe',
       match: (_at, card) => card.suit === 'heart',
@@ -160,7 +161,7 @@ it.each(['response', 'use', 'discard'] as const)(
     await grant(game, 'standard:guicai');
     await grant(game, locked.id);
     const running = game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'b',
         reason: 'probe',
         match: (_at, card) => card.suit === 'heart',
@@ -180,7 +181,7 @@ it('鬼才取消不宣告；候选仅限本人手牌，拒绝装备、他人牌�
   });
   await grant(game, 'standard:guicai');
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, { player: 'b', reason: 'probe', match: () => true }),
+    judge(ctx, { player: 'b', reason: 'probe', match: () => true }),
   );
   const request = await nextRequest(game.room);
   for (const cards of [['weapon'], ['foreign'], ['mine', 'foreign']])
@@ -199,7 +200,7 @@ it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，�
   await grant(game, 'standard:guicai', 'a');
   await grant(game, 'standard:guicai', 'b');
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, {
+    judge(ctx, {
       player: 'b',
       reason: 'probe',
       match: (_at, card) => card.color === 'red',
@@ -236,7 +237,7 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
       },
     });
     const running = game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'b',
         reason: 'probe',
         match: (_at, card) => card.suit === 'heart',
@@ -276,7 +277,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
       },
     });
     await game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, { player: 'b', reason: 'probe', match: () => true }),
+      judge(ctx, { player: 'b', reason: 'probe', match: () => true }),
     );
     expect(game.room.history.facts('judgment.replaced')).toEqual([]);
     expect(game.room.world.position('new')).toBe('a:hand');
@@ -311,7 +312,9 @@ it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', a
   expect(game.room.history.facts('card.taken')).toHaveLength(1);
   expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
   expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({ open: false });
+  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({
+    declaration: { open: false },
+  });
   replay(game);
 });
 
@@ -340,7 +343,9 @@ it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不�
   await answer(game, { cards: [choices[0]!.id], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['hand', 'weapon']);
-  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({ open: true });
+  expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({
+    declaration: { open: true },
+  });
 });
 
 it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；可正常拒绝', async () => {
@@ -419,7 +424,7 @@ it('天妒取得最终改判牌，不受判定是否成功影响，旧判定牌�
   await grant(game, 'standard:guicai');
   await grant(game, tiandu.id, 'b');
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, { player: 'b', reason: 'probe', match: () => false }),
+    judge(ctx, { player: 'b', reason: 'probe', match: () => false }),
   );
   await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
   await answer(game, true);
@@ -449,7 +454,7 @@ it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则�
       },
     });
     const running = game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
+      judge(ctx, { player: 'a', reason: 'probe', match: () => true }),
     );
     await answer(game, true);
     await running;
@@ -739,7 +744,7 @@ it('基础 AI 用本人真实红桃手牌改善自己的乐不思蜀，仍经过
     ),
   );
   const running = match.room.run('judge', (ctx) =>
-    judge(ctx, match.book, {
+    judge(ctx, {
       player: 'a',
       reason: 'standard:indulgence',
       match: (_at, card) => card.suit === 'heart',
@@ -760,7 +765,7 @@ it('基础 AI 用本人真实红桃手牌改善自己的乐不思蜀，仍经过
 });
 
 it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗选和分牌走到身份胜负', async () => {
-  const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => standardGenerals[index]!.id);
+  const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => legacyGenerals[index]!.id);
   const match = createOfflineMatch({ seed: 3, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 5000 });
 
@@ -768,7 +773,8 @@ it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗
   expect(
     match.room.history
       .facts('card.taken')
-      .some((fact) => (fact.data.detail as { reason?: string }).reason === 'standard:fankui'),
+      .some((fact) => (fact.data.detail as { declaration?: { reason?: string } }).declaration?.reason ===
+          'standard:fankui'),
   ).toBe(true);
   expect(match.room.history.facts('cards.peeked').length).toBeGreaterThan(0);
   expect(match.room.history.facts('cards.given').length).toBeGreaterThan(0);

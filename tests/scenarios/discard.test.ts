@@ -21,7 +21,7 @@ import {
 } from '../../src/sdk';
 import type { DiscardQuery, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
-import { jieyin } from '../../src/content/standard/generals';
+import { jieyin } from '../../src/content/standard/generals/sunshangxiang';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 type Game = ReturnType<typeof cardGame>;
@@ -131,7 +131,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
     withLifetime(ctx, 'phase', async (at, lifetime) => {
       const limit = { key: 'once', source: 'prototype', max: 1, lifetime };
       const spec = new Cost(limit);
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(at.world.position('fee')).toBe('a:hand');
       expect(used(at.world, 'a', limit)).toBe(0);
       expect(game.room.history.facts(spec.factKind)).toEqual([]);
@@ -156,7 +156,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
         },
       });
       spec.enable();
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({
+      expect(await payDiscard(at, spec)).toMatchObject({
         kind: 'paid',
         receipt: {
           actor: 'a',
@@ -166,7 +166,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
         },
       });
       expect(order).toEqual(['moved', 'paid']);
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(used(at.world, 'a', limit)).toBe(1);
       expect(game.room.history.facts(spec.factKind)).toHaveLength(1);
     }),
@@ -195,7 +195,7 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
         limit,
         legal: () => true,
       };
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(materialReads).toBe(1);
       expect(at.world.zone('a:hand').cards).toEqual(['guarded', 'free']);
       expect(used(at.world, 'a', limit)).toBe(0);
@@ -210,7 +210,7 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
         },
       });
       materialReads = 0;
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'paid' });
+      expect(await payDiscard(at, spec)).toMatchObject({ kind: 'paid' });
       expect(materialReads).toBe(1);
     }),
   );
@@ -345,7 +345,7 @@ for (const count of [0, 2]) {
     const entry = delayedCards(game.room.world, 'b')[0]!;
     await game.room.run('discard', async (ctx) => {
       const input = { actor: 'a', owner: 'b', cards: [entry.id], reason: 'effect' };
-      expect(await discardCards(ctx, game.book, input)).toMatchObject({ kind: 'unavailable' });
+      expect(await discardCards(ctx, input)).toMatchObject({ kind: 'unavailable' });
       if (count) {
         expect(
           game.book.canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm0', reason: 'effect' }),
@@ -370,7 +370,7 @@ for (const count of [0, 2]) {
           expect(delayedCards(child.world, 'b')).toEqual([]);
         },
       });
-      expect(await discardCards(ctx, game.book, input)).toMatchObject({
+      expect(await discardCards(ctx, input)).toMatchObject({
         kind: 'discarded',
         cards: remaining,
       });
@@ -390,7 +390,7 @@ it('效果弃置批内有一张禁止就整体失败；普通转移、用牌善�
   await grant(game, 'a');
   await game.room.run('reject', async (ctx) => {
     expect(
-      await discardCards(ctx, game.book, {
+      await discardCards(ctx, {
         actor: 'a',
         owner: 'a',
         cards: ['guarded', 's'],

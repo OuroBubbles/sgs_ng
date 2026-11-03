@@ -11,8 +11,9 @@ import {
   damage,
   isChained,
   setChained,
+  rulesOf,
 } from '../../sdk';
-import type { Card, CardBook, CardDefinition, ContentDefinition } from '../../sdk';
+import type { Card, CardDefinition, ContentDefinition } from '../../sdk';
 import { relay, ward } from './defense';
 import { vermilion, createFaceDeck } from './faces';
 import { insight, echo } from './learning';
@@ -84,24 +85,22 @@ export const ember: CardDefinition = {
 };
 
 /** 工厂拿到本局目录，因此其他内容与转换锦囊也按真实牌类型判定。 */
-export function hearing(book: CardBook) {
-  return {
-    id: 'workshop:hearing',
-    name: '闻策',
-    description: '当你使用锦囊牌时，你可以摸一张牌。',
-    triggers: [
-      on(useDeclared, {
-        order: 'choose',
-        when: (_ctx, { payload: use, self }) =>
-          use.actor === self.owner && book.definition(use.card.name).type === 'trick',
-        async run(ctx, { self }) {
-          const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
-          if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
-        },
-      }),
-    ],
-  } satisfies SkillDefinition;
-}
+export const hearing = {
+  id: 'workshop:hearing',
+  name: '闻策',
+  description: '当你使用锦囊牌时，你可以摸一张牌。',
+  triggers: [
+    on(useDeclared, {
+      order: 'choose',
+      when: (ctx, { payload: use, self }) =>
+        use.actor === self.owner && rulesOf(ctx).definition(use.card.name).type === 'trick',
+      async run(ctx, { self }) {
+        const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
+        if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
+      },
+    }),
+  ],
+} satisfies SkillDefinition;
 
 /** 历史来源仍可普通 invoke；当前装备、转换与查询目录不会重新获得这件牌。 */
 export const relicJade = equipmentCard({

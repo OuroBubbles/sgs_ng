@@ -10,13 +10,13 @@ import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣告后失去技能仍完成', async () => {
-  expect(definition.skills).toBeDefined();
+  expect(definition.generals[0]!.abilities).toHaveLength(1);
   createContent(standard, definition).createBooks();
   for (const accepted of [false, true]) {
     const game = cardGame({
       hands: { a: [card('trick', 'ex_nihilo')] },
       draw: [card('one', 'jink'), card('two', 'slash'), card('three', 'peach')],
-      skills: definition.skills,
+      skills: definition.generals[0]!.abilities,
     });
     const source = { kind: 'general', id: 'guide' } as const;
     await game.room.run('grant', (ctx) =>

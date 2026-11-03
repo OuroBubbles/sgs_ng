@@ -3,8 +3,10 @@ import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { ganglie, luoyiAftereffect, luoshen, qingguo } from '../../src/content/standard/wei';
-import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
+import { ganglie } from '../../src/content/standard/generals/xiahoudun';
+import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
+import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
 import {
   damage,
   damageCausing,
@@ -26,6 +28,7 @@ import {
 } from '../../src/sdk';
 import type { Context, DamageResult, PhaseView } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
+import { legacyGenerals } from '../fixtures/generals';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -547,7 +550,7 @@ it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取�
     eligible: () => !nested,
     run: async (ctx) => {
       nested = true;
-      await judge(ctx, game.book, { player: 'a', reason: 'standard:luoshen', match: () => true });
+      await judge(ctx, { player: 'a', reason: 'standard:luoshen', match: () => true });
     },
   });
   const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
@@ -640,14 +643,8 @@ it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得�
   const detach = skills.attach(room());
   detach();
   expect(() => skills.register([])).toThrow(/sealed/);
-  const game = cardGame({
-    skills: [
-      (book) => {
-        expect(book.skills).toBeInstanceOf(SkillBook);
-        return [ganglie(book)];
-      },
-    ],
-  });
+  const game = cardGame({ skills: [ganglie] });
+  expect(game.skills).toBeInstanceOf(SkillBook);
   expect(game.skills.definition('standard:ganglie').name).toBe('刚烈');
 });
 
@@ -693,7 +690,7 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
 );
 
 it('含三名新魏将的八人局，由基础 AI 经公开决策走到真实身份胜负', async () => {
-  const lineup = [...standardGenerals.slice(6, 9), ...standardGenerals.slice(0, 5)].map(
+  const lineup = [...legacyGenerals.slice(6, 9), ...legacyGenerals.slice(0, 5)].map(
     (general) => general.id,
   );
   const match = createOfflineMatch({ seed: 42, preset: 'standard:identity', lineup });

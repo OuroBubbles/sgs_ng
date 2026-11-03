@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { LocalSession } from '../../src/app/offline/session';
 import { RoleMatch, matchPrepared } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
-import { wusheng } from '../../src/content/standard/wusheng';
+import { wusheng } from '../../src/content/standard/generals/guanyu';
 import {
   moveCards,
   finishGame,

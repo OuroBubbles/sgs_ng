@@ -18,7 +18,7 @@ import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose } from '../fixtures/room';
 import { card, cardGame } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { luoyiAftereffect } from '../../src/content/standard/wei';
+import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 const source = { kind: 'general', id: 'test' } as const;

@@ -240,9 +240,11 @@ it.each(['dead', 'finished'] as const)(
     );
     atReshuffle(game, (ctx) => invalidate(ctx, boundary));
     await game.room.run('judge', async (ctx) => {
-      expect(
-        await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
-      ).toMatchObject({ kind: 'unavailable', card: null, matched: null });
+      expect(await judge(ctx, { player: 'a', reason: 'probe', match: () => true })).toMatchObject({
+        kind: 'unavailable',
+        card: null,
+        matched: null,
+      });
     });
     expect(game.room.history.facts('judgment.revealed')).toHaveLength(0);
     expect(game.room.world.zone('draw').cards).toHaveLength(2);

@@ -94,7 +94,7 @@ it('映绯真实判定：黑桃在绯衣客判定为红桃，另一角色判定�
       ['甲席', true],
       ['乙席', false],
     ] as const) {
-      const result = await judge(ctx, match.book, {
+      const result = await judge(ctx, {
         player,
         reason: 'workshop:vermilion',
         match: (_at, card) => card.color === 'red',

@@ -12,7 +12,7 @@ import {
   cardQueries,
   useDeclared,
 } from '../../src/sdk';
-import { qingguo } from '../../src/content/standard/wei';
+import { qingguo } from '../../src/content/standard/generals/zhenji';
 import type { CardEffect, ResponseOpportunity, TriggerSource } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';

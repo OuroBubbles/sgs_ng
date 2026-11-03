@@ -1,15 +1,14 @@
 import type { ContentDefinition } from '../catalog';
 import { standardCards } from './cards';
-import { standardGenerals, standardGeneralSkills } from './generals';
+import { standardGenerals } from './generals';
 import { createStandardDeck } from './deck';
 import { mechanicsDeck } from './practice-deck';
 import { standardCardViews } from './presentation';
 import { standardGeneralViews } from './portraits';
-import { luoyiAftereffect } from './wei';
+import { luoyiAftereffect } from './generals/xuchu';
 
 export default {
   cards: standardCards,
-  skills: standardGeneralSkills,
   effects: [luoyiAftereffect],
   generals: standardGenerals,
   cardViews: standardCardViews,

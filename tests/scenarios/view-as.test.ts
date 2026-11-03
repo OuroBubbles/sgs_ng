@@ -8,7 +8,7 @@ import {
   effectFinished,
   damageReceived,
 } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/wusheng';
+import { wusheng } from '../../src/content/standard/generals/guanyu';
 import type {
   CardChoice,
   Context,

@@ -24,12 +24,10 @@ function setup(create: (self: EffectHandle<Balance>) => EffectBehavior) {
   });
   const game = cardGame({
     draw: Array.from({ length: 12 }, (_, index) => card(`reward:${index}`, 'slash')),
-    skills: [
-      (book) => {
-        book.effects.register([effect]);
-        return [];
-      },
-    ],
+    skills: [],
+    setup: (book) => {
+      book.effects.register([effect]);
+    },
   });
   async function run() {
     await game.room.run('capacity', async (ctx) => {

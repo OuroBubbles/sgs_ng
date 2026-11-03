@@ -31,7 +31,7 @@ import type { Context, DamageInput, DamageResult, CardDefinition } from '../../s
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { luoyiAftereffect } from '../../src/content/standard/wei';
+import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
 

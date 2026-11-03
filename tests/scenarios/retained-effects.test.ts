@@ -603,15 +603,13 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
     ],
   });
   const game = cardGame({
-    skills: [
-      (book) => {
-        book.skills.registerSnapshots(window, (event) => event.before);
-        expect(() => book.skills.registerSnapshots(window, (event) => event.before)).toThrow(
-          'Duplicate',
-        );
-        return [legacy];
-      },
-    ],
+    skills: [legacy],
+    setup: (book) => {
+      book.skills.registerSnapshots(window, (event) => event.before);
+      expect(() => book.skills.registerSnapshots(window, (event) => event.before)).toThrow(
+        'Duplicate',
+      );
+    },
   });
   expect(() => game.skills.registerSnapshots(window, () => [])).toThrow('sealed');
   let before: readonly SkillInstance[];
@@ -647,16 +645,14 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
       ],
     });
     const game = cardGame({
-      skills: [
-        (book) => {
-          book.skills.registerSnapshots(window, (event) =>
-            kind === 'invalid-array'
-              ? (undefined as unknown as readonly SkillInstance[])
-              : event.before.map((skill) => ({ ...skill, owner: 'b' })),
-          );
-          return [legacy];
-        },
-      ],
+      skills: [legacy],
+      setup: (book) => {
+        book.skills.registerSnapshots(window, (event) =>
+          kind === 'invalid-array'
+            ? (undefined as unknown as readonly SkillInstance[])
+            : event.before.map((skill) => ({ ...skill, owner: 'b' })),
+        );
+      },
     });
     await expect(
       game.room.run('event', async (ctx) => {
@@ -689,12 +685,10 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
     ],
   });
   const game = cardGame({
-    skills: [
-      (book) => {
-        book.skills.registerSnapshots(window, (event) => [...event.before, ...event.before]);
-        return [legacy];
-      },
-    ],
+    skills: [legacy],
+    setup: (book) => {
+      book.skills.registerSnapshots(window, (event) => [...event.before, ...event.before]);
+    },
   });
   const running = game.room.run('event', async (ctx) => {
     await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
@@ -806,12 +800,10 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
     ],
   });
   const game = cardGame({
-    skills: [
-      (book) => {
-        book.skills.addProvider({ collect: () => [{ self: new Source(), definition }] });
-        return [];
-      },
-    ],
+    skills: [],
+    setup: (book) => {
+      book.skills.addProvider({ collect: () => [{ self: new Source(), definition }] });
+    },
   });
   const running = game.room.run('event', (ctx) => ctx.window(window, null));
   await answer(game);

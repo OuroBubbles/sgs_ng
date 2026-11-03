@@ -3,6 +3,7 @@ import {
   cardQueries,
   costPaid,
   defineSkill,
+  rulesOf,
   modify,
   moveCards,
   judge,
@@ -15,13 +16,14 @@ import {
   chooseOwnedCard,
 } from '../../src/sdk';
 import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/wusheng';
-import { qingguo } from '../../src/content/standard/wei';
-import { qixi, longdan } from '../../src/content/standard/martial';
-import { jijiu } from '../../src/content/standard/benevolence';
-import { guose } from '../../src/content/standard/tacticians';
-import { guicai } from '../../src/content/standard/strategists';
-import { fanjian } from '../../src/content/standard/intrigue';
+import { wusheng } from '../../src/content/standard/generals/guanyu';
+import { qingguo } from '../../src/content/standard/generals/zhenji';
+import { qixi } from '../../src/content/standard/generals/ganning';
+import { longdan } from '../../src/content/standard/generals/zhaoyun';
+import { jijiu } from '../../src/content/standard/generals/huatuo';
+import { guose } from '../../src/content/standard/generals/daqiao';
+import { guicai } from '../../src/content/standard/generals/simayi';
+import { fanjian } from '../../src/content/standard/generals/zhouyu';
 import { vermilion } from '../../src/content/workshop/faces';
 import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -239,7 +241,7 @@ it.each(['grant', 'revoke'] as const)(
     });
     await game.room.run('judge', async (ctx) =>
       expect(
-        await judge(ctx, game.book, {
+        await judge(ctx, {
           player: 'a',
           reason: 'probe',
           match: (_at, card) => card.color === 'red',
@@ -273,7 +275,7 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
   });
   await game.room.run('judge', async (ctx) =>
     expect(
-      await judge(ctx, game.book, {
+      await judge(ctx, {
         player: 'a',
         reason: 'probe',
         match: (_at, card) => card.color === 'red',
@@ -302,7 +304,7 @@ it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则�
     },
   });
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, {
+    judge(ctx, {
       player: 'b',
       reason: 'probe',
       match: (_at, card) => card.color === 'red',
@@ -416,19 +418,18 @@ it('递归牌面查询明确诊断，退出后不残留求值标记；不同实�
   let recursive = true;
   const game = cardGame({
     skills: [
-      (book) =>
-        defineSkill({
-          id: 'probe:recursive',
-          name: '组合读取',
-          triggers: [],
-          modifiers: [
-            modify(cardQueries.cardFace, (ctx, { input }) => {
-              if (input.card.id !== 'slash1') return undefined;
-              const other = book.face(ctx, recursive ? 'slash1' : 'peach');
-              return { suit: other.suit };
-            }),
-          ],
-        }),
+      defineSkill({
+        id: 'probe:recursive',
+        name: '组合读取',
+        triggers: [],
+        modifiers: [
+          modify(cardQueries.cardFace, (ctx, { input }) => {
+            if (input.card.id !== 'slash1') return undefined;
+            const other = rulesOf(ctx).face(ctx, recursive ? 'slash1' : 'peach');
+            return { suit: other.suit };
+          }),
+        ],
+      }),
     ],
   });
   await grant(game, 'probe:recursive');
@@ -490,7 +491,7 @@ it('基础 AI 改判使用接收者的判定候选面，不把自己黑色手牌
   });
   await match.prepare();
   const running = match.room.run('judge', (ctx) =>
-    judge(ctx, match.book, {
+    judge(ctx, {
       player: 'b',
       reason: 'standard:indulgence',
       match: (_at, face) => face.suit === 'heart',
@@ -542,7 +543,7 @@ it('角色选牌按区域投影：暗手牌无牌面，公开装备使用不透�
   );
   for (const actor of ['a', 'b']) {
     const running = match.room.run('choose', (ctx) =>
-      chooseOwnedCard(ctx, match.book, {
+      chooseOwnedCard(ctx, {
         actor,
         target: 'b',
         areas: ['hand', 'equipment'],

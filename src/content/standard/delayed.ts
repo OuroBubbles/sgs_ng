@@ -30,8 +30,8 @@ export const standardDelayed = [
   delayedCard({
     id: 'standard:indulgence',
     label: '乐不思蜀',
-    async resolve(ctx, { effect, book, phase }) {
-      const result = await judge(ctx, book, {
+    async resolve(ctx, { effect, phase }) {
+      const result = await judge(ctx, {
         player: effect.target,
         reason: effect.card.name,
         match: (_ctx, card) => card.suit === 'heart',
@@ -51,8 +51,8 @@ export const standardDelayed = [
     label: '闪电',
     self: true,
     async resolve(ctx, input) {
-      const { effect, book } = input;
-      const result = await judge(ctx, book, {
+      const { effect } = input;
+      const result = await judge(ctx, {
         player: effect.target,
         reason: effect.card.name,
         match: (_ctx, card) => card.suit === 'spade' && card.rank >= 2 && card.rank <= 9,

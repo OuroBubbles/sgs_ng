@@ -27,9 +27,9 @@ import {
 import type { Context, WindowType, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
-import { guicai } from '../../src/content/standard/strategists';
-import { hujia } from '../../src/content/standard/commanders';
-import { jijiang } from '../../src/content/standard/benevolence';
+import { guicai } from '../../src/content/standard/generals/simayi';
+import { hujia } from '../../src/content/standard/generals/caocao';
+import { jijiang } from '../../src/content/standard/generals/liubei';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
@@ -662,7 +662,7 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = await judge(at, game.book, {
+        const result = await judge(at, {
           player: 'd',
           reason: 'probe',
           match: (_at, card) => card.suit === 'heart',

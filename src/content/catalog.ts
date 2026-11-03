@@ -36,17 +36,15 @@ export interface DeckDefinition {
   create(): readonly Card[];
 }
 
-/** 按列表顺序登记；有目录依赖时用普通工厂，每局返回一个或一组定义。 */
-export type SkillEntry =
-  | SkillDefinition
-  | ((book: CardBook) => SkillDefinition | readonly SkillDefinition[]);
-
 /** 普通源码内容：直接组合定义，不要求包名、版本、依赖清单或命名空间。 */
 export interface ContentDefinition {
   readonly cards?: readonly CardDefinition[];
-  readonly skills?: readonly SkillEntry[];
+  /** 不属于任何武将的技能；武将引用的技能对象会自动登记。 */
+  readonly skills?: readonly SkillDefinition[];
   readonly effects?: readonly EffectDefinition[];
-  readonly generals?: readonly GeneralDefinition[];
+  readonly generals?: readonly (GeneralDefinition & {
+    readonly abilities?: readonly SkillDefinition[];
+  })[];
   readonly decks?: readonly DeckDefinition[];
   readonly cardViews?: readonly CardPresentation[];
   readonly generalViews?: readonly GeneralPresentation[];
@@ -96,10 +94,16 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
         }),
       ),
   );
+  // 同一技能对象可同时出现在 skills 与多个武将中，只登记一次；同 ID 不同对象仍报重复。
   const skills = Object.freeze(
-    definitions
-      .flatMap((entry) => entry.skills ?? [])
-      .map((skill) => (typeof skill === 'function' ? skill : defineSkill(skill))),
+    [
+      ...new Set(
+        definitions.flatMap((entry) => [
+          ...(entry.skills ?? []),
+          ...(entry.generals ?? []).flatMap((general) => general.abilities ?? []),
+        ]),
+      ),
+    ].map(defineSkill),
   );
   // 与规则定义一样，先固定公开字段，再校验与建索引；不重复读取作者 getter。
   const cardEntries = immutable(
@@ -154,10 +158,7 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
       const registry = new SkillBook();
       const book = new CardBook(cards, registry, policy);
       book.effects.register(effects);
-      for (const entry of skills) {
-        const definition = typeof entry === 'function' ? entry(book) : entry;
-        registry.register([definition].flat());
-      }
+      registry.register(skills);
       return { book, skills: registry, generals: new GeneralBook(generals, registry) };
     },
     createDeck(id: string) {

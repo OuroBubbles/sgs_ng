@@ -401,7 +401,7 @@ it('基础 AI 区分取牌用途与技能发动：突袭后续取牌可完成，
     ['standard:ice_sword-ability', false],
   ] as const) {
     const running = match.room.run('choose', (ctx) =>
-      chooseOwnedCard(ctx, match.book, {
+      chooseOwnedCard(ctx, {
         actor: 'a',
         target: 'b',
         areas: ['hand'],

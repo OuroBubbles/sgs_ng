@@ -1,8 +1,16 @@
 import type { ContentDefinition } from '../../../src/content/catalog';
-import { defineWindow, defineQuery, on, useDeclared, invoke, draw } from '../../../src/sdk';
-import type { Card, CardDefinition, CardBook } from '../../../src/sdk';
+import {
+  cardDef,
+  defineWindow,
+  defineQuery,
+  draw,
+  rulesOf,
+  skill,
+  trigger,
+  useDeclared,
+} from '../../../src/sdk';
+import type { Card, CardDefinition } from '../../../src/sdk';
 import portrait from './guest.jpg';
-import type { SkillDefinition } from '../../../src/sdk';
 
 export interface ProvisionResult {
   readonly actor: string;
@@ -38,28 +46,24 @@ const provision: CardDefinition = {
     },
   },
 };
-function tide(book: CardBook) {
-  return {
-    id: 'harbor:tide',
-    name: '潮声',
-    description: '当你使用锦囊牌时，你可以摸一张牌。',
-    triggers: [
-      on(useDeclared, {
-        order: 'choose',
-        when: (_ctx, { payload: use, self }) =>
-          use.actor === self.owner && book.definition(use.card.name).type === 'trick',
-        async run(ctx, { self }) {
-          if (await invoke(ctx, self, '是否发动【潮声】摸一张牌？'))
-            await draw(ctx, {
-              player: self.owner,
-              count: 1 + book.skills.query(ctx, tideDrawBonus, { actor: self.owner }, 0),
-              reason: self.skill,
-            });
-        },
-      }),
-    ],
-  } satisfies SkillDefinition;
-}
+const tide = skill({
+  id: 'harbor:tide',
+  name: '潮声',
+  description: '当你使用锦囊牌时，你可以摸一张牌。',
+  triggers: [
+    trigger(useDeclared, {
+      who: (use) => use.actor,
+      when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
+      ask: '是否发动【潮声】摸一张牌？',
+      effect: (ctx, _use, self) =>
+        draw(ctx, {
+          player: self.owner,
+          count: 1 + rulesOf(ctx).skills.query(ctx, tideDrawBonus, { actor: self.owner }, 0),
+          reason: self.skill,
+        }),
+    }),
+  ],
+});
 export default {
   cards: [provision],
   skills: [tide],

@@ -29,7 +29,7 @@ import type {
   Context,
   SkillModifier,
 } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/wusheng';
+import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { standardCards } from '../../src/content/standard/cards';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -316,36 +316,26 @@ it('丈八复用同一响应管线，装备失效后转换与范围一起关闭�
 });
 
 function lossDefinition(allowDead = false): CardDefinition {
-  class Configuration {
-    id = 'probe:loss';
-    label = '离场探针';
-    slot = 'armor';
-    #allowDead = allowDead;
-
-    skill() {
-      return defineSkill({
-        id: 'probe:loss-ability',
-        name: '离场探针',
-        triggers: [
-          on(cardsMoved, {
-            id: 'lost',
-            allowDead: this.#allowDead,
-            retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-            when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-            run(ctx, { self }) {
-              ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
-            },
-          }),
-        ],
-      });
-    }
-  }
-  const input = new Configuration();
-  const definition = equipmentCard(input);
-  input.skill = () => {
-    throw new Error('Changed equipment factory must not run.');
-  };
-  return definition;
+  return equipmentCard({
+    id: 'probe:loss',
+    label: '离场探针',
+    slot: 'armor',
+    skill: defineSkill({
+      id: 'probe:loss-ability',
+      name: '离场探针',
+      triggers: [
+        on(cardsMoved, {
+          id: 'lost',
+          allowDead,
+          retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+          when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+          run(ctx, { self }) {
+            ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
+          },
+        }),
+      ],
+    }),
+  });
 }
 
 it('离场能力从移动前快照补入，支付材料后也触发，普通手牌移动不触发', async () => {
@@ -573,12 +563,10 @@ it.each(['skill', 'effect', 'combine'] as const)(
       create: () => ({ modifiers: [{ query, contribution: late }] }),
     });
     const game = cardGame({
-      skills: [
-        (book) => {
-          book.skills.effects.register([effect]);
-          return [skill];
-        },
-      ],
+      skills: [skill],
+      setup: (book) => {
+        book.skills.effects.register([effect]);
+      },
     });
     await expect(
       game.room.run('query', async (ctx) => {

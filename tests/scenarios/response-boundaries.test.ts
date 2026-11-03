@@ -26,8 +26,8 @@ import type {
 } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
 import { standardCards } from '../../src/content/standard/cards';
-import { guicai } from '../../src/content/standard/strategists';
-import { wushuang } from '../../src/content/standard/tacticians';
+import { guicai } from '../../src/content/standard/generals/simayi';
+import { wushuang } from '../../src/content/standard/generals/lvbu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
@@ -129,7 +129,7 @@ it('鬼才由 c 为 b 改判：实际打出者决定支付和打出完成窗口�
   const finished = watchOrder(game, responseFinished);
   const paid = watchOrder(game, costPaid);
   const running = game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, {
+    judge(ctx, {
       player: 'b',
       reason: 'probe:judgment',
       match: (_at, card) => card.suit === 'heart',
@@ -165,14 +165,12 @@ it('独立供牌保留原接收者与查询守卫，从实际 c 结算完成窗�
   const finished = watchOrder(game, responseFinished);
   const paid = watchOrder(game, costPaid);
   expect(
-    await game.room.run('unavailable', (ctx) =>
-      withCardSupply(ctx, game.book, input, () => 'unexpected'),
-    ),
+    await game.room.run('unavailable', (ctx) => withCardSupply(ctx, input, () => 'unexpected')),
   ).toMatchObject({ value: { kind: 'unavailable' } });
   expect(game.room.world.position('supply')).toBe('c:hand');
   await game.room.run('wound', (ctx) => loseHp(ctx, { player: 'c', amount: 1, reason: 'probe' }));
   const running = game.room.run('supply', (ctx) =>
-    withCardSupply(ctx, game.book, input, (at, supply) => {
+    withCardSupply(ctx, input, (at, supply) => {
       input.write = true;
       expect(() => supply.available(at)).toThrow('Pure queries');
       input.write = false;
@@ -200,7 +198,6 @@ it('供牌支付后的异步资格不能被布尔组合掩盖，已提交费用�
   const running = game.room.run('supply', (ctx) =>
     withCardSupply(
       ctx,
-      game.book,
       {
         actor: 'c',
         beneficiary: 'b',

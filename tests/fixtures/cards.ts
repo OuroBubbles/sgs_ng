@@ -115,6 +115,8 @@ export function cardGame(
       readonly definitions?: readonly CardDefinition[];
       readonly policy?: Partial<CardPolicy>;
       readonly actionAnchor?: ActionAnchor;
+      /** 测试专用：在 attach 封存前装配快照读取器、能力提供者等。 */
+      readonly setup?: (book: CardBook) => void;
     } = {},
 ) {
   const world = cardSeed(options);
@@ -129,6 +131,7 @@ export function cardGame(
     { cards: [...baseCards, ...(options.definitions ?? [])] },
     options,
   ).createBooks(options.policy);
+  options.setup?.(book);
   skills.attach(room);
   return { room, book, skills, initial: world };
 }

@@ -12,7 +12,7 @@ import {
   skillEffective,
 } from '../../src/sdk';
 import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
-import { lianying } from '../../src/content/standard/wu';
+import { lianying } from '../../src/content/standard/generals/luxun';
 import { nextRequest, room, worldSeed } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 

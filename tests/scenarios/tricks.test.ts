@@ -530,7 +530,7 @@ it('扩展选择特殊私有区时默认仍暗选，选择与移动分离', asyn
     );
   });
   const running = game.room.run('choose', (ctx) =>
-    chooseOwnedCard(ctx, game.book, {
+    chooseOwnedCard(ctx, {
       actor: 'a',
       target: 'b',
       areas: ['special'],

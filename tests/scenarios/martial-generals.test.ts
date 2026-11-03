@@ -2,8 +2,11 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { longdan, paoxiao, qixi } from '../../src/content/standard/martial';
-import { xiaoji, standardGenerals } from '../../src/content/standard/generals';
+import { longdan } from '../../src/content/standard/generals/zhaoyun';
+import { paoxiao } from '../../src/content/standard/generals/zhangfei';
+import { qixi } from '../../src/content/standard/generals/ganning';
+import { xiaoji } from '../../src/content/standard/generals/sunshangxiang';
+import { standardGenerals } from '../../src/content/standard/generals';
 import {
   runPhase,
   defineSkill,
@@ -14,6 +17,7 @@ import {
   roleOf,
 } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
+import { legacyGenerals } from '../fixtures/generals';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -226,11 +230,11 @@ it('首六武将完整初始化，主公奖励叠加目录体力，空武将引�
   const match = createOfflineMatch({
     seed: 42,
     preset: 'standard:identity',
-    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
+    lineup: legacyGenerals.slice(0, 6).map((general) => general.id),
   });
   await match.prepare();
   for (const [index, player] of match.initial.players.entries()) {
-    const general = standardGenerals[index]!;
+    const general = legacyGenerals[index]!;
     expect(generalOf(match.room.world, player.id)).toBe(general.id);
     expect(match.room.world.player(player.id).maxHp).toBe(
       general.maxHp + (roleOf(match.room.world, player.id) === 'lord' ? 1 : 0),
@@ -246,7 +250,7 @@ it('六名真实武将全部由基础 AI 经正式决策走到身份胜负', asy
   const match = createOfflineMatch({
     seed: 42,
     preset: 'standard:identity',
-    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
+    lineup: legacyGenerals.slice(0, 6).map((general) => general.id),
   });
   await playMatch(match, { steps: 2000 });
 }, 60_000);

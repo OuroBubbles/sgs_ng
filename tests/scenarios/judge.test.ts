@@ -18,7 +18,7 @@ it('判定公开实有牌，保留独立牌面、颜色和结果，并善后实�
   const game = cardGame({ hands: { a: [] }, draw: [card('top', 'slash', 'heart', 4)] });
   expect(
     await game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'a',
         reason: 'probe',
         match: (_ctx, card) => card.color === 'red',
@@ -78,7 +78,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
   });
   expect(
     await game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'a',
         reason: 'probe',
         match: (_ctx, card) => card.suit === 'diamond',
@@ -108,7 +108,7 @@ it('连续改判按行动顺序结算，前一个改判不会封闭后一个', a
     });
   expect(
     await game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'a',
         reason: 'probe',
         match: (_ctx, card) => card.color === 'black',
@@ -149,7 +149,7 @@ it.each([false, true])(
       });
     expect(
       await game.room.run('judge', (ctx) =>
-        judge(ctx, game.book, {
+        judge(ctx, {
           player: 'a',
           reason: 'probe',
           match: (_ctx, card) => card.color === 'red',
@@ -191,7 +191,7 @@ it('判定完成后可取得牌，结果已封口，不能再次改判', async (
     },
   });
   await game.room.run('judge', (ctx) =>
-    judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
+    judge(ctx, { player: 'a', reason: 'probe', match: () => true }),
   );
   expect(held!.card?.id).toBe('old');
   expect(game.room.world.position('old')).toBe('a:hand');
@@ -209,17 +209,19 @@ it('牌堆空时只洗弃牌，其他判定/处理区的牌不被循环使用', 
   });
   await game.room.run('outer', (ctx) =>
     withProcessing(ctx, [{ cards: ['parked'], from: 'a:hand' }], async (at) => {
-      expect(
-        await judge(at, game.book, { player: 'a', reason: 'probe', match: () => true }),
-      ).toMatchObject({ card: { id: 'available' } });
+      expect(await judge(at, { player: 'a', reason: 'probe', match: () => true })).toMatchObject({
+        card: { id: 'available' },
+      });
       await moveCards(
         at,
         [{ cards: ['available'], from: 'discard', to: 'a:hand', place: 'bottom' }],
         'remove',
       );
-      expect(
-        await judge(at, game.book, { player: 'a', reason: 'empty', match: () => true }),
-      ).toMatchObject({ kind: 'unavailable', card: null, matched: null });
+      expect(await judge(at, { player: 'a', reason: 'empty', match: () => true })).toMatchObject({
+        kind: 'unavailable',
+        card: null,
+        matched: null,
+      });
     }),
   );
   expect(game.room.world.position('parked')).toBe('discard');
@@ -236,7 +238,7 @@ it('嵌套判定拥有独立牌面和处理区，内层完成不覆盖外层', a
     eligible: (_ctx, judgment) => judgment.reason === 'outer',
     async run(ctx, judgment) {
       expect(
-        await judge(ctx, game.book, {
+        await judge(ctx, {
           player: 'b',
           reason: 'inner',
           match: (_ctx, card) => card.color === 'black',
@@ -248,7 +250,7 @@ it('嵌套判定拥有独立牌面和处理区，内层完成不覆盖外层', a
   });
   expect(
     await game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, {
+      judge(ctx, {
         player: 'a',
         reason: 'outer',
         match: (_ctx, card) => card.color === 'red',
@@ -279,7 +281,7 @@ it.each(['death', 'finish'] as const)(
     let evaluated = false;
     expect(
       await game.room.run('judge', (ctx) =>
-        judge(ctx, game.book, {
+        judge(ctx, {
           player: 'a',
           reason: 'probe',
           match: () => {
@@ -319,7 +321,7 @@ it('改判原区域已失效不支付；非法目的区域拒绝整批且不更�
   });
   await expect(
     game.room.run('judge', (ctx) =>
-      judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
+      judge(ctx, { player: 'a', reason: 'probe', match: () => true }),
     ),
   ).rejects.toThrow();
 });

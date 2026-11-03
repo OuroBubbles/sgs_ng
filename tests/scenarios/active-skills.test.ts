@@ -2,13 +2,9 @@ import { expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import {
-  kurou,
-  jieyin,
-  xiaoji,
-  standardGenerals,
-  standardGeneralSkills,
-} from '../../src/content/standard/generals';
+import { kurou } from '../../src/content/standard/generals/huanggai';
+import { jieyin, xiaoji } from '../../src/content/standard/generals/sunshangxiang';
+import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { World } from '../../src/core/state/world';
@@ -43,6 +39,7 @@ import {
 } from '../../src/sdk';
 import { inspectActive, activeAvailable } from '../../src/rules/skills/active';
 import type { ActiveSkill, ActiveRunInput, Context, PhaseView } from '../../src/sdk';
+import { legacyGenerals } from '../fixtures/generals';
 
 const source = { kind: 'general', id: 'fixture' } as const;
 
@@ -674,11 +671,11 @@ it('武将初始化的体力、性别、技能来源和选将事实可重建；�
       .filter((skill) => skill.owner === '甲席')
       .map((skill) => skill.skill),
   ).toEqual([xiaoji.id, jieyin.id]);
-  expect(() => new GeneralBook([...standardGenerals, standardGenerals[0]], match.skills)).toThrow(
+  expect(() => new GeneralBook([...standardGenerals, legacyGenerals[0]!], match.skills)).toThrow(
     /Duplicate general/,
   );
   expect(() => new GeneralBook(standardGenerals, new SkillBook([]))).toThrow(/Unknown skill/);
-  expect(() => defineGeneral({ ...standardGenerals[0], maxHp: 0 })).toThrow(/Invalid general/);
+  expect(() => defineGeneral({ ...legacyGenerals[0]!, maxHp: 0 })).toThrow(/Invalid general/);
   const rebuilt = new World(rebuildWorld(match.initial, match.room.history.facts()));
   expect(generalOf(rebuilt.reader, '甲席')).toBe('standard:sunshangxiang');
   expect(

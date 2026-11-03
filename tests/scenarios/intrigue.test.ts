@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -37,6 +37,7 @@ import {
   useDeclarations,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
+import { legacyGenerals } from '../fixtures/generals';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
@@ -892,7 +893,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
 });
 it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
   const seed = 27;
-  const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
+  const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => legacyGenerals[i]!.id);
   const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 12000 });
 

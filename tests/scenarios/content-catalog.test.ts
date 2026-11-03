@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import {
   defineSkill,
+  rulesOf,
   defineWindow,
   defineQuery,
   on,
@@ -16,11 +17,9 @@ import {
 import type {
   Card,
   CardDefinition,
-  ContentDefinition,
   DeckDefinition,
   GeneralDefinition,
   SkillDefinition,
-  SkillEntry,
   SkillTrigger,
   SkillTriggerDefinition,
   SkillTriggerInput,
@@ -44,7 +43,7 @@ import { nextRequest } from '../fixtures/room';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import standard from '../../src/content/standard';
 import { room } from '../fixtures/room';
-import { luoyiAftereffect } from '../../src/content/standard/wei';
+import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 
 it('目录索引和重复检查使用最终声明，不重新读取原对象的身份', async () => {
   const changing = <T extends object>(prefix: string, fields: T) => {
@@ -194,7 +193,6 @@ it('目录索引和重复检查使用最终声明，不重新读取原对象的�
 
 it('普通源码直接组合无命名空间的定义，保留时点身份、本局目录和真实技能结算', async () => {
   const window = defineWindow<{ player: string }>('plain.window');
-  const seen: CardBook[] = [];
   const catalog = createContent(
     {
       cards: [{ id: 'ink', label: '墨', type: 'basic' }],
@@ -208,23 +206,18 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
     },
     {
       skills: [
-        (book) => {
-          seen.push(book);
-          return [
-            defineSkill({
-              id: 'study',
-              name: '研习',
-              triggers: [
-                on(window, {
-                  id: 'lose',
-                  when: (_ctx, { payload: event, self }) => event.player === self.owner,
-                  run: (ctx, { self }) =>
-                    loseHp(ctx, { player: self.owner, amount: 1, reason: self.skill }),
-                }),
-              ],
+        defineSkill({
+          id: 'study',
+          name: '研习',
+          triggers: [
+            on(window, {
+              id: 'lose',
+              when: (_ctx, { payload: event, self }) => event.player === self.owner,
+              run: (ctx, { self }) =>
+                loseHp(ctx, { player: self.owner, amount: 1, reason: self.skill }),
             }),
-          ];
-        },
+          ],
+        }),
       ],
       generals: [
         { id: 'scholar', name: '学士', kingdom: '群', gender: 'male', maxHp: 4, skills: ['study'] },
@@ -245,7 +238,7 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
       { id: 'b', general: 'scholar' },
     ],
   });
-  expect(seen.at(-1)).toBe(match.book);
+  match.room.inspect((ctx) => expect(rulesOf(ctx)).toBe(match.book));
   await match.prepare();
   const hp = match.room.world.player('a').hp;
   await match.room.run('plain', (ctx) => ctx.window(window, { player: 'a' }));
@@ -282,54 +275,18 @@ it('内置源码显式组合标准与演武牌、武将和牌组，不自动发�
     expect(practiceContent.createDeck('workshop:' + id)).toHaveLength(count);
 });
 
-it('声明列表固定外部引用，静态与工厂逐项登记且每局使用实际目录', () => {
-  const seen: CardBook[] = [];
-  const calls: string[] = [];
+it('声明列表在组合时固定，每局目录独立且技能经 rulesOf 读取本局目录', () => {
   const plain = { id: 'plain', name: '普通技能' };
-  const perGame = { id: 'single', name: '单个工厂' };
-  const skills: SkillEntry[] = [
-    plain,
-    (book) => {
-      calls.push('single');
-      seen.push(book);
-      expect(book.skills.definition('plain').name).toBe('普通技能');
-      return perGame;
-    },
-    (book) => {
-      calls.push('group');
-      seen.push(book);
-      return [{ ...book.skills.definition('single'), id: 'group', name: '分组工厂' }];
-    },
-  ];
-  const definition: ContentDefinition = { skills };
-  const content = createContent(definition, {
-    skills: [
-      (book) => {
-        calls.push('last');
-        seen.push(book);
-        expect(book.skills.definition('group').name).toBe('分组工厂');
-        return [];
-      },
-    ],
-  });
+  const skills: SkillDefinition[] = [plain];
+  const content = createContent({ skills });
   skills.length = 0;
   plain.name = '后续修改';
-  expect(calls).toEqual([]);
   const one = content.createBooks();
+  const two = content.createBooks();
   expect(one.skills.definition('plain').name).toBe('普通技能');
   expect(one.skills.definition('plain').triggers).toEqual([]);
-  expect(one.skills.definition('single').name).toBe('单个工厂');
-  expect(one.skills.definition('group').name).toBe('分组工厂');
-  expect(calls).toEqual(['single', 'group', 'last']);
-  expect(seen.every((book) => book === one.book && book.skills === one.skills)).toBe(true);
-  perGame.name = '第二局工厂';
-  const two = content.createBooks();
-  expect(one.skills.definition('single').name).toBe('单个工厂');
-  expect(two.skills.definition('single').name).toBe('第二局工厂');
   expect(two.book).not.toBe(one.book);
   expect(two.skills).not.toBe(one.skills);
-  expect(calls).toEqual(['single', 'group', 'last', 'single', 'group', 'last']);
-  expect(seen.slice(3).every((book) => book === two.book)).toBe(true);
 });
 
 it('组合拒绝重复定义和失效引用，另一局已经创建的目录保持独立', () => {
@@ -337,9 +294,7 @@ it('组合拒绝重复定义和失效引用，另一局已经创建的目录保�
   expect(() => createContent({ cards: [card] }, { cards: [card] })).toThrow(/Duplicate card/);
   const skill = defineSkill({ id: 'skill', name: '技' });
   const valid = createContent({ skills: [skill] }).createBooks();
-  expect(() => createContent({ skills: [() => [skill, skill]] }).createBooks()).toThrow(
-    /Duplicate/,
-  );
+  expect(() => createContent({ skills: [skill, { ...skill }] }).createBooks()).toThrow(/Duplicate/);
   expect(() =>
     createContent({
       generals: [

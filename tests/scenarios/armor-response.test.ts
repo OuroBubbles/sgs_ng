@@ -491,13 +491,7 @@ it('复用防具代码的普通角色技能不被误当成实际装备来源', a
   const game = cardGame({
     equipment: { a: [card('sword', 'qinggang_sword')] },
     draw: red,
-    skills: [
-      (book) => {
-        const skill = eightDiagram.equipment!.skill!;
-        const ability = typeof skill === 'function' ? skill(book) : skill;
-        return [defineSkill({ ...ability, id: borrowedId })];
-      },
-    ],
+    skills: [defineSkill({ ...eightDiagram.equipment!.skill!, id: borrowedId })],
   });
   await game.room.run('grant', async (ctx) => {
     await game.skills.grant(ctx, {

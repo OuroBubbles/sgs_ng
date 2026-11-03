@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -25,6 +25,7 @@ import {
   cardQueries,
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
+import { legacyGenerals } from '../fixtures/generals';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -678,7 +679,6 @@ it.each(['physical', 'zero'] as const)('供牌回调中止遵守独立处理区�
   const running = game.room.run('supply', (ctx) =>
     withCardSupply(
       ctx,
-      game.book,
       { actor: 'c', beneficiary: 'a', names: ['standard:slash'], reason: 'test' },
       (at, supply) => {
         held = supply;
@@ -723,7 +723,7 @@ it('本人出牌阶段激将打出失败后仍可自己响应，但本阶段不�
   replay(game);
 });
 it('刘备、华佗八人标准局以基础 AI 走过供牌与治疗，最终正常结束', async () => {
-  const lineup = [13, 14, 0, 3, 2, 11, 9, 12].map((i) => standardGenerals[i]!.id);
+  const lineup = [13, 14, 0, 3, 2, 11, 9, 12].map((i) => legacyGenerals[i]!.id);
   const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 7000 });
 

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { keji } from '../../src/content/standard/wu';
-import { guicai } from '../../src/content/standard/strategists';
+import { keji } from '../../src/content/standard/generals/lvmeng';
+import { guicai } from '../../src/content/standard/generals/simayi';
 import {
   activePhase,
   activeTarget,
@@ -270,7 +270,7 @@ it('嵌套判定阶段中鬼才打出的杀归属实际判定阶段，不漏打�
     outer(game, async (ctx) => {
       await runPhase(ctx, game.book, 'a', 'judge', async (at, phase) => {
         phaseId = phase.id;
-        await judge(at, game.book, { player: 'b', reason: 'probe', match: () => true });
+        await judge(at, { player: 'b', reason: 'probe', match: () => true });
       });
     }),
     1,

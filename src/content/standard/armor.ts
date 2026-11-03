@@ -22,38 +22,37 @@ export const eightDiagram = equipmentCard({
   id: 'standard:eight_diagram',
   label: '八卦阵',
   slot: 'armor',
-  skill: (book) =>
-    ({
-      id: 'standard:eight_diagram-ability',
-      name: '八卦阵',
-      triggers: [
-        on(responseRequested, {
-          order: 'choose',
-          when: (ctx, { payload: request, self }) =>
-            request.actor === self.owner &&
-            equipmentEffectiveFor(ctx.world, self, request.to, 'armor') &&
-            request.canProvide(ctx, jink),
-          async run(ctx, { payload: request, self }) {
-            const invoked = await invoke(
-              ctx,
-              self,
-              '是否发动【八卦阵】进行判定？',
-              (at) =>
-                equipmentEffectiveFor(at.world, self, request.to, 'armor') &&
-                request.canProvide(at, jink),
-            );
-            if (!invoked) return;
-            const result = await judge(ctx, book, {
-              player: self.owner,
-              reason: 'standard:eight_diagram',
-              match: (_at, card) => card.color === 'red',
-            });
-            // 发动已宣告，判定期间装备离场不撤销效果；供牌仍重查请求、禁令与材料。
-            if (result.matched && request.canProvide(ctx, jink)) await request.provide(ctx, jink);
-          },
-        }),
-      ],
-    }) satisfies SkillDefinition,
+  skill: {
+    id: 'standard:eight_diagram-ability',
+    name: '八卦阵',
+    triggers: [
+      on(responseRequested, {
+        order: 'choose',
+        when: (ctx, { payload: request, self }) =>
+          request.actor === self.owner &&
+          equipmentEffectiveFor(ctx.world, self, request.to, 'armor') &&
+          request.canProvide(ctx, jink),
+        async run(ctx, { payload: request, self }) {
+          const invoked = await invoke(
+            ctx,
+            self,
+            '是否发动【八卦阵】进行判定？',
+            (at) =>
+              equipmentEffectiveFor(at.world, self, request.to, 'armor') &&
+              request.canProvide(at, jink),
+          );
+          if (!invoked) return;
+          const result = await judge(ctx, {
+            player: self.owner,
+            reason: 'standard:eight_diagram',
+            match: (_at, card) => card.color === 'red',
+          });
+          // 发动已宣告，判定期间装备离场不撤销效果；供牌仍重查请求、禁令与材料。
+          if (result.matched && request.canProvide(ctx, jink)) await request.provide(ctx, jink);
+        },
+      }),
+    ],
+  } satisfies SkillDefinition,
 });
 
 export const qinggangSword = equipmentCard({

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -25,6 +25,7 @@ import {
   judge,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
+import { legacyGenerals } from '../fixtures/generals';
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 const death = {
@@ -327,7 +328,7 @@ it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动�
   await grant(game, 'standard:keji');
   await grant(game, 'standard:guicai');
   const running = startKeji(game, (ctx) =>
-    judge(ctx, game.book, { player: 'b', reason: 'test', match: () => true }).then(() => {}),
+    judge(ctx, { player: 'b', reason: 'test', match: () => true }).then(() => {}),
   );
   await answer(game, { cards: ['retrial'], targets: [] }, 'cards-targets');
   await running;
@@ -349,7 +350,7 @@ it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克�
       phases: ['judge', 'play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'judge')
-          await judge(at, game.book, { player: 'b', reason: 'test', match: () => true });
+          await judge(at, { player: 'b', reason: 'test', match: () => true });
         else if (phase.kind === 'play')
           await game.book.use(at, {
             actor: 'b',
@@ -621,7 +622,7 @@ it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试�
   expect(after).toBe(0);
 });
 it('三名新吴将八人局由基础 AI 经正式决策走到胜负', async () => {
-  const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => standardGenerals[i]!.id);
+  const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => legacyGenerals[i]!.id);
   const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 7000 });
 
