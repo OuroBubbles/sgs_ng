@@ -16,7 +16,7 @@ import {
 } from '../../src/sdk';
 import type { DamageDraft, Gender, UseIntent } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
@@ -41,11 +41,6 @@ function create(name: string, cards = 1) {
     equipment: { a: [card('weapon', name)] },
     draw: [card('top0', 'jink'), card('top1', 'peach')],
   });
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value).kind).toBe('accepted');
 }
 async function genders(game: Game, first: Gender = 'male', second: Gender = 'female') {
   await game.room.run('profiles', (ctx) => {

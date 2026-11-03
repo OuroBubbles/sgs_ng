@@ -10,8 +10,7 @@ import {
   Cards,
 } from '../../src/sdk';
 import type { Context, DrawDraft } from '../../src/sdk';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 import { Deck } from '../../src/rules/cards/draw';
 import { Draw } from '../../src/rules/cards/draw';
@@ -45,16 +44,6 @@ function atReshuffle(game: Game, run: (ctx: Context) => Promise<void>) {
       moved.moves.some((move) => move.from === 'discard' && move.to === 'draw'),
     run,
   });
-}
-function conserved(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.world.snapshot.states.some((state) => state.key === 'core:private-pool')).toBe(
-    false,
-  );
-  const located = game.room.world.snapshot.zones.flatMap((zone) => zone.cards).sort();
-  expect(located).toEqual(game.initial.cards.map((card) => card.id).sort());
-  expect(game.room.status).toBe('ready');
 }
 
 it.each(['dead', 'finished'] as const)(

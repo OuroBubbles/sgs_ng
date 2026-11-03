@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import {
   defineSkill,
   modify,
@@ -47,13 +47,6 @@ async function grant(game: Game, owner = 'b', skill = 'test:protection') {
   return game.room.world.snapshot.skills.find(
     (entry) => entry.owner === owner && entry.skill === skill,
   )!.id;
-}
-async function answer(game: Game, input: unknown, kind = 'cards-targets') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, input)).toEqual({
-    kind: 'accepted',
-  });
 }
 const options = (request: DecisionRequest) =>
   (request.data as { preview: { cards: { id: string; label: string }[] } }).preview.cards;
@@ -244,7 +237,7 @@ for (const free of [0, 1]) {
       expect(game.room.decisions.preview(request.id, { cards: ['h1'], targets: [] })?.valid).toBe(
         false,
       );
-      await answer(game, { cards: ['h0'], targets: [] });
+      await answer(game, { cards: ['h0'], targets: [] }, 'cards-targets');
     }
     await running;
     expect(game.room.world.zone('a:hand').cards).toHaveLength(4 - free);
@@ -304,7 +297,7 @@ it('拆桥只给合法的不透明手牌选项，真实牌 ID 无法代答；保
   expect(
     game.room.decisions.submit(request.id, request.token, { cards: ['free'], targets: [] }).kind,
   ).toBe('rejected');
-  await answer(game, { cards: [options(request)[0]!.id], targets: [] });
+  await answer(game, { cards: [options(request)[0]!.id], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.position('free')).toBe('discard');
   expect(game.room.world.position('guarded')).toBe('b:hand');
@@ -325,7 +318,7 @@ it('所有牌都禁止被弃置时拆桥正常空结算；顺手获得不受弃�
     });
     if (name === 'snatch') {
       const request = await nextRequest(game.room);
-      await answer(game, { cards: [options(request)[0]!.id], targets: [] });
+      await answer(game, { cards: [options(request)[0]!.id], targets: [] }, 'cards-targets');
     }
     await running;
     expect(game.room.world.position('guarded')).toBe(name === 'snatch' ? 'a:hand' : 'b:hand');
@@ -495,7 +488,7 @@ it('寒冰剑目标没有可弃牌时不提供防伤替代；麒麟弓宣告后�
     },
   });
   const running = use(bow, strike);
-  await answer(bow, { cards: ['horse'], targets: [] });
+  await answer(bow, { cards: ['horse'], targets: [] }, 'cards-targets');
   await running;
   expect(bow.room.world.position('horse')).toBe('b:equipment');
   expect(bow.room.world.player('b').hp).toBe(3);
@@ -524,7 +517,7 @@ it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续�
     },
   });
   const running = use(game, strike);
-  await answer(game, { cards: ['horse'], targets: [] });
+  await answer(game, { cards: ['horse'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.player('a').alive).toBe(false);
   expect(game.room.world.position('horse')).toBe('discard');

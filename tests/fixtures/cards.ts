@@ -1,6 +1,9 @@
 import { turnActionAnchor } from '../../src/rules/turn/order';
 import { Room } from '../../src/core/runtime/room';
-import type { Card } from '../../src/core/model/state';
+import type { Card, WorldSeed } from '../../src/core/model/state';
+import { expect } from 'vitest';
+import { rebuildWorld } from '../../src/core/history/rebuild';
+import { useDeclarations } from '../../src/rules/cards/plan';
 import { createContent, installDelayedCards, activate, activeOffers } from '../../src/sdk';
 import type {
   ActiveChoice,
@@ -141,4 +144,41 @@ export async function use(
   intent: UseIntent,
 ): Promise<FlowResult<UseResult>> {
   return game.room.run('action', (ctx) => game.book.use(ctx, intent));
+}
+
+/** 以测试武将来源授予技能，返回该技能实例。 */
+export async function grant(
+  game: Pick<ReturnType<typeof cardGame>, 'room' | 'skills'>,
+  skill: string,
+  owner = 'a',
+) {
+  await game.room.run('grant', (ctx) =>
+    game.skills.grant(ctx, { owner, skill, source: { kind: 'general', id: 'test' } }),
+  );
+  return game.skills
+    .bindings(game.room.world)
+    .find((binding) => binding.self.owner === owner && binding.self.skill === skill)!.self;
+}
+
+type Played = { readonly room: Room; readonly initial: WorldSeed };
+/** 局面已静止：历史可重建当前世界，无待决请求、处理区、用牌宣告、私有牌池或判定牌残留。 */
+export function settled(game: Played): void {
+  const { world } = game.room;
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(world.snapshot);
+  expect(game.room.decisions.pending).toEqual([]);
+  expect(world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
+  expect(useDeclarations(world)).toEqual([]);
+  expect(
+    world.snapshot.states.filter((state) =>
+      ['core:private-pool', 'core:judgment-card'].includes(state.key),
+    ),
+  ).toEqual([]);
+}
+/** settled，且房间就绪、初始牌全部仍在某个区域。 */
+export function conserved(game: Played): void {
+  settled(game);
+  expect(game.room.status).toBe('ready');
+  expect(game.room.world.snapshot.zones.flatMap((zone) => zone.cards).sort()).toEqual(
+    game.initial.cards.map((item) => item.id).sort(),
+  );
 }

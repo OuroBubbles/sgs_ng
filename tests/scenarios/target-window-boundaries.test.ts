@@ -10,15 +10,13 @@ import {
   moveCards,
   pay,
   recover,
-  useDeclarations,
   Use,
   Target,
   Resolve,
 } from '../../src/sdk';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Counter } from '../../src/sdk';
@@ -112,17 +110,6 @@ async function invalidate(
     case 'prohibited':
       await game.skills.grant(ctx, { owner: 'b', skill: ban.id, source });
   }
-}
-
-function conserved(game: Game) {
-  expect(game.room.status).toBe('ready');
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.world.snapshot.zones.flatMap((zone) => zone.cards).sort()).toEqual(
-    game.initial.cards.map((item) => item.id).sort(),
-  );
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 }
 
 for (const [label, window] of points) {

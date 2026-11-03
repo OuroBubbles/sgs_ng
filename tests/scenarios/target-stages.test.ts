@@ -8,7 +8,6 @@ import {
   moveCards,
   modify,
   runPhase,
-  useDeclarations,
   Use,
   Target,
   Resolve,
@@ -23,9 +22,8 @@ import type {
   UsePlanView,
 } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { card, cardGame, use, settled } from '../fixtures/cards';
+import { nextRequest, answer } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Equipment } from '../../src/sdk';
 import { Judgment } from '../../src/sdk';
@@ -77,19 +75,6 @@ function trace(game: Game, log: string[]) {
       },
     });
 }
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((z) => z.kind === 'processing')).toEqual([]);
-  expect(game.room.decisions.pending).toEqual([]);
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
 function targetFacts(game: Game) {
   return game.room.history.facts(CardEvent.targeting).map(
     (f) =>
@@ -139,7 +124,7 @@ it('四个目标时点分别按来源座次遍历，全部结束后才进入牌�
     'effect:a',
     'effect:b',
   ]);
-  replay(game);
+  settled(game);
 });
 
 it('指定前后以来源为技能行动序起点，确认前后以目标为起点', async () => {
@@ -164,7 +149,7 @@ it('指定前后以来源为技能行动序起点，确认前后以目标为起�
     specified: ['b', 'c', 'd', 'a'],
     confirmed: ['c', 'd', 'a', 'b'],
   });
-  replay(game);
+  settled(game);
 });
 
 it.each(stages)('在 %s 追加目标只补齐新身份，旧身份不重复进入时点', async (stage, window) => {
@@ -187,7 +172,7 @@ it.each(stages)('在 %s 追加目标只补齐新身份，旧身份不重复进�
     facts.findIndex((f) => f.target === 'c'),
   );
   expect(game.room.history.facts(CardEvent.effect)).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 
 it.each(stages)('在 %s 转移目标封闭旧身份，新身份重新完成四个时点', async (stage, window) => {
@@ -217,7 +202,7 @@ it.each(stages)('在 %s 转移目标封闭旧身份，新身份重新完成四�
   );
   expect(facts.filter((f) => f.target === 'c').map((f) => f.stage)).toEqual(stages.map(([s]) => s));
   expect(new Set(facts.map((f) => f.effectId)).size).toBe(2);
-  replay(game);
+  settled(game);
 });
 
 it('补入较早座次不倒退已访问目标，各层仍各自排序', async () => {
@@ -250,7 +235,7 @@ it('补入较早座次不倒退已访问目标，各层仍各自排序', async (
       .facts(CardEvent.effect)
       .map((f) => (f.data.detail as { target: string }).target),
   ).toEqual(['b', 'c', 'd']);
-  replay(game);
+  settled(game);
 });
 
 it('牌体追加的目标在实际效果前补齐四层，原目标不重开', async () => {
@@ -277,7 +262,7 @@ it('牌体追加的目标在实际效果前补齐四层，原目标不重开', a
     'effect:b',
     'effect:c',
   ]);
-  replay(game);
+  settled(game);
 });
 
 it('生效前窗口补入较早目标，先补齐时点但不抢占当前生效身份', async () => {
@@ -309,7 +294,7 @@ it('生效前窗口补入较早目标，先补齐时点但不抢占当前生效�
     'effect:c',
     'effect:b',
   ]);
-  replay(game);
+  settled(game);
 });
 
 it.each(['resolver', 'aftereffect'] as const)(
@@ -366,7 +351,7 @@ it.each(['resolver', 'aftereffect'] as const)(
       'effect:b',
       'effect:c',
     ]);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -399,7 +384,7 @@ it('后席目标确认后可以取消已准备的前席效果，取消身份仍�
   });
   expect(started).toEqual(['c']);
   expect(game.room.history.facts(CardEvent.effect)).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 
 it('首个伤害后来源死亡并失去武器/无双，后席已声明的无双与青釭仍然生效', async () => {
@@ -452,7 +437,7 @@ it('首个伤害后来源死亡并失去武器/无双，后席已声明的无双
   expect(game.room.world.position('slash')).toBe('discard');
   const targeting = game.room.history.facts(CardEvent.targeting);
   expect(targeting.at(-1)!.seq).toBeLessThan(game.room.history.facts(Damage.dealt)[0]!.seq);
-  replay(game);
+  settled(game);
 });
 
 it('铁骑对全部初始目标先判定，再执行首个伤害，来源随后死亡不跳过后席已声明结果', async () => {
@@ -495,7 +480,7 @@ it('铁骑对全部初始目标先判定，再执行首个伤害，来源随后�
   );
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.player('c').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 
 it('目标确认时失去青釭，后续指定后不宣告无视防具', async () => {
@@ -518,7 +503,7 @@ it('目标确认时失去青釭，后续指定后不宣告无视防具', async (
   await use(game, slash(['b']));
   expect(game.room.history.facts(Equipment.ignored)).toHaveLength(0);
   expect(game.room.world.player('b').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 
 it('作者显式声明整次用牌无视防具时，后续追加目标仍继承此整次声明', async () => {
@@ -544,7 +529,7 @@ it('作者显式声明整次用牌无视防具时，后续追加目标仍继承�
   });
   await use(game, slash(['b']));
   expect(game.room.world.player('c').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 
 it.each([
@@ -597,7 +582,7 @@ it.each([
       .facts(CardEvent.effect)
       .map((f) => (f.data.detail as { state: string }).state),
   ).toEqual(['resolved', 'resolved', 'skipped', 'resolved']);
-  replay(game);
+  settled(game);
 });
 
 it('延时牌放置经过四层，后续判定生效使用新效果身份且不重新指定目标', async () => {
@@ -627,7 +612,7 @@ it('延时牌放置经过四层，后续判定生效使用新效果身份且不�
   expect(effects).toHaveLength(2);
   expect(effects[0]!.useId).toBe(effects[1]!.useId);
   expect(effects[0]!.effectId).not.toBe(effects[1]!.effectId);
-  replay(game);
+  settled(game);
 });
 
 it('实际效果局部中止不会重放或撤销其他已确认目标，后续效果继续且清理处理区', async () => {
@@ -654,7 +639,7 @@ it('实际效果局部中止不会重放或撤销其他已确认目标，后续�
   });
   expect(resolved).toEqual(['c']);
   expect(targetFacts(game)).toHaveLength(8);
-  replay(game);
+  settled(game);
 });
 
 it('首个效果结束游戏，后续实际效果跳过而已经完成的目标时点不撤销', async () => {
@@ -678,7 +663,7 @@ it('首个效果结束游戏，后续实际效果跳过而已经完成的目标�
     },
   });
   expect(targetFacts(game)).toHaveLength(8);
-  replay(game);
+  settled(game);
 });
 
 it('已确认的后席目标在首个实际效果中死亡，只跳过生效且不重开时点', async () => {
@@ -698,5 +683,5 @@ it('已确认的后席目标在首个实际效果中死亡，只跳过生效且�
     },
   });
   expect(targetFacts(game)).toHaveLength(8);
-  replay(game);
+  settled(game);
 });

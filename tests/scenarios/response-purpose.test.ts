@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import {
   moveCards,
@@ -14,7 +14,6 @@ import {
 } from '../../src/sdk';
 import type { UseTiming } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
@@ -35,11 +34,6 @@ function create(name = 'slash', prohibitResponse = false, prohibitUse = false) {
       prohibitUse: (_ctx, _actor, semantic) => prohibitUse && semantic.name === 'standard:jink',
     },
   });
-}
-function replay(game: ReturnType<typeof create>) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
 }
 async function dodge(game: ReturnType<typeof create>, running: Promise<unknown>) {
   const request = await nextRequest(game.room);
@@ -72,7 +66,7 @@ it('抵消杀的闪是完整使用，提交使用事实和完成时点，不伪�
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(completed).toEqual(['use']);
-  replay(game);
+  settled(game);
 });
 it('禁止打出闪不禁止抵消杀时使用闪', async () => {
   const game = create('slash', true);
@@ -87,7 +81,7 @@ it('禁止打出闪不禁止抵消杀时使用闪', async () => {
   await use(game, attack());
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('dodge')).toBe('discard');
-  replay(game);
+  settled(game);
 });
 it('禁止使用闪不禁止万箭齐发要求的打出，实际完成类型仍为打出', async () => {
   const game = create('archery_attack', false, true);
@@ -95,7 +89,7 @@ it('禁止使用闪不禁止万箭齐发要求的打出，实际完成类型仍�
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('禁止使用闪时杀无法被本人闪抵消，实体与未开启的八卦判定不支付', async () => {
@@ -110,7 +104,7 @@ it('禁止使用闪时杀无法被本人闪抵消，实体与未开启的八卦�
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('red')).toBe('draw');
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('禁止打出闪时万箭齐发未获得响应，普通闪与八卦均不绕过', async () => {
   const game = cardGame({
@@ -123,7 +117,7 @@ it('禁止打出闪时万箭齐发未获得响应，普通闪与八卦均不绕�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('red')).toBe('draw');
-  replay(game);
+  settled(game);
 });
 it.each(['effect', 'play'] as const)(
   '闪有使用定义也不能在没有响应机会的 %s 用途主动使用',
@@ -158,7 +152,7 @@ it.each(['effect', 'play'] as const)(
     });
     expect(game.room.world.position('dodge')).toBe('b:hand');
     expect(game.room.history.facts(CardEvent.used)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 World 不能复用', async () => {
@@ -205,7 +199,7 @@ it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 
       ).toBe('unavailable');
     });
   }
-  replay(game);
+  settled(game);
 });
 
 async function grant(game: ReturnType<typeof create>, owner: string, skill: string) {
@@ -241,7 +235,7 @@ it('真实倾国按使用用途转换黑色杀为闪，使用后效归本人且�
     },
   });
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it.each(['slash', 'archery_attack'])(
   '真实护驾响应 %s：队友打出，只有杀请求还需主公完整使用',
@@ -275,7 +269,7 @@ it.each(['slash', 'archery_attack'])(
           context: { kind: 'response' },
         },
       });
-    replay(game);
+    settled(game);
   },
 );
 it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种活动', async () => {
@@ -298,7 +292,7 @@ it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种�
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', async () => {
   const game = cardGame({
@@ -317,7 +311,7 @@ it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', a
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('other')).toBe('c:hand');
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it.each(['prohibit', 'take', 'death'] as const)(
   '供牌完成后 %s 使主公不能继续使用：实际打出保留，材料不追回',
@@ -372,7 +366,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
     expect(game.room.world.player('b').alive).toBe(change !== 'death');
     if (change !== 'death') expect(game.room.world.player('b').hp).toBe(3);
     expect(game.room.world.position('dodge')).toBe(change === 'take' ? 'd:hand' : 'discard');
-    replay(game);
+    settled(game);
   },
 );
 it('两层委托仍只有末端 d 打出与原请求者 b 使用，候选不重复收费', async () => {
@@ -395,7 +389,7 @@ it('两层委托仍只有末端 d 打出与原请求者 b 使用，候选不重�
   expect(game.room.history.facts(Response.delegated)).toHaveLength(2);
   for (const fact of game.room.history.facts(Response.delegated))
     expect(fact.data.detail).toMatchObject({ provider: 'd' });
-  replay(game);
+  settled(game);
 });
 it('本人取消使用闪不支付，杀正常命中且请求关闭', async () => {
   const game = create();
@@ -407,7 +401,7 @@ it('本人取消使用闪不支付，杀正常命中且请求关闭', async () =
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it('连续两闪各有独立使用身份、完成和处理区，不合并为一次使用或打出', async () => {
   const game = cardGame({
@@ -436,7 +430,7 @@ it('连续两闪各有独立使用身份、完成和处理区，不合并为一�
   ).toBe(3);
   expect(game.room.history.facts(CardEvent.finished)).toHaveLength(3);
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，不重开请求', async () => {
   const game = cardGame({ hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] } });
@@ -467,7 +461,7 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
   expect(game.room.history.facts(testTiming('damage.committed'))).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('主公禁止使用闪时不诱导护驾供牌或收取发动费用', async () => {
   const game = cardGame({
@@ -482,7 +476,7 @@ it('主公禁止使用闪时不诱导护驾供牌或收取发动费用', async (
   expect(game.room.world.position('dodge')).toBe('c:hand');
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不会造成空候选等待', async () => {
   const recipe = defineSkill({
@@ -517,7 +511,7 @@ it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不�
   );
   await game.room.run('no-playable', (ctx) => runPhase(ctx, game.book, 'b', 'play'));
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留队友牌', async () => {
   let prohibited = false;
@@ -547,7 +541,7 @@ it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留�
   expect(game.room.world.position('dodge')).toBe('c:hand');
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('响应中的使用局部中止向上延续，不伪造缺闪伤害或撤销已提交材料', async () => {
   const game = create();
@@ -564,5 +558,5 @@ it('响应中的使用局部中止向上延续，不伪造缺闪伤害或撤销�
   expect(game.room.world.position('dodge')).toBe('discard');
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(2);
   expect(game.room.history.facts(Damage.dealt)).toEqual([]);
-  replay(game);
+  settled(game);
 });

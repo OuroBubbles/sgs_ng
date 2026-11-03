@@ -9,17 +9,15 @@ import {
   finishGame,
   privateCardPools,
   withPrivateTopCards,
-  useDeclarations,
   roleOf,
   Target,
   Cards,
   Phase,
 } from '../../src/sdk';
-import type { WorldSeed } from '../../src/core/model/state';
 import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
 import type { ChoiceItem } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest, room } from '../fixtures/room';
+import { card, cardGame, use, settled } from '../fixtures/cards';
+import { nextRequest, room, answer } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { standardCards } from '../../src/content/standard/cards';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -28,7 +26,6 @@ import { createOfflineMatch } from '../../src/app/offline/practice';
 import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
 import { decideBasic } from '../../src/app/offline/basic-agent';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
@@ -91,20 +88,6 @@ async function grant(
 }
 const prepare = (game: Pick<Game, 'room' | 'book'>, actor = 'a') =>
   game.room.run('prepare', (ctx) => runPhase(ctx, game.book, actor, 'prepare'));
-async function answer(game: Pick<Game, 'room'>, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
-function replay(game: Pick<Game, 'room'> & { readonly initial: WorldSeed }) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.filter((z) => z.kind === 'processing')).toEqual([]);
-  expect(game.room.world.snapshot.states.filter((s) => s.key === 'core:private-pool')).toEqual([]);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.decisions.pending).toEqual([]);
-}
 
 it('排序模型按组 ID 验证，组内先后保留，输入/输出均不共享可变数组', () => {
   class Item {
@@ -245,7 +228,7 @@ it.each([2, 4, 8])('诸葛亮初始化与观星数量按 %s 人局存活人数�
   const initial = (request.data as { initial: unknown }).initial;
   await answer(match, initial, 'arrange');
   await running;
-  replay(match);
+  settled(match);
 });
 it('观星两组顺序真实移入同一牌堆，既不是摸牌也不产生手牌得失', async () => {
   const game = scenario();
@@ -265,7 +248,7 @@ it('观星两组顺序真实移入同一牌堆，既不是摸牌也不产生手�
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   await game.room.run('draw', (ctx) => draw(ctx, { player: 'a', count: 2, reason: 'test' }));
   expect(game.room.world.zone('a:hand').cards).toEqual(['x2', 'x0']);
-  replay(game);
+  settled(game);
 });
 it('观星计数排除阵亡席位，必选排序的非法重复回复不改变牌堆或支付次数', async () => {
   const game = scenario();
@@ -286,7 +269,7 @@ it('观星计数排除阵亡席位，必选排序的非法重复回复不改变�
   await answer(game, arranged(['x2'], ['x0', 'x1']), 'arrange');
   await running;
   expect(game.room.world.zone('draw').cards).toEqual(['x2', 'x3', 'x4', 'x5', 'x0', 'x1']);
-  replay(game);
+  settled(game);
 });
 it.each(['top', 'bottom'] as const)('观星允许全部置于 %s，空组不吞牌不倒序', async (side) => {
   const game = scenario();
@@ -303,7 +286,7 @@ it.each(['top', 'bottom'] as const)('观星允许全部置于 %s，空组不吞�
   expect(game.room.world.zone('draw').cards).toEqual(
     side === 'top' ? [...cards, 'x4', 'x5'] : ['x4', 'x5', ...cards],
   );
-  replay(game);
+  settled(game);
 });
 it('拒绝发动不取牌；跳过准备阶段与他人准备阶段均不询问', async () => {
   const game = scenario();
@@ -322,7 +305,7 @@ it('拒绝发动不取牌；跳过准备阶段与他人准备阶段均不询问'
   await prepare(game);
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.world.zone('draw').cards).toEqual(topCards().map((c) => c.id));
-  replay(game);
+  settled(game);
 });
 it('观星可洗入弃牌，仍不足则使用实有牌；空牌堆无必选排序等待', async () => {
   for (const count of [0, 1, 3]) {
@@ -338,7 +321,7 @@ it('观星可洗入弃牌，仍不足则使用实有牌；空牌堆无必选排�
     await running;
     expect(game.room.world.zone('draw').cards).toHaveLength(count);
     expect(game.room.world.zone('discard').cards).toEqual([]);
-    replay(game);
+    settled(game);
   }
 });
 it.each(['lost', 'dead', 'finished', 'taken'] as const)(
@@ -381,7 +364,7 @@ it.each(['lost', 'dead', 'finished', 'taken'] as const)(
         .map((c) => c.id)
         .filter((id) => mode !== 'taken' || id !== 'x1'),
     );
-    replay(game);
+    settled(game);
   },
 );
 it('私有取牌的自定义善后在局部中止后归还实时余牌，已经转交的牌不重复移动', async () => {
@@ -412,7 +395,7 @@ it('私有取牌的自定义善后在局部中止后归还实时余牌，已经�
   expect(result).toMatchObject({ kind: 'aborted', reason: 'local' });
   expect(game.room.world.zone('draw').cards).toEqual(['x0', 'x2', 'x3', 'x4', 'x5']);
   expect(game.room.world.position('x1')).toBe('b:hand');
-  replay(game);
+  settled(game);
 });
 function privateMatch() {
   return new RoleMatch({
@@ -449,7 +432,7 @@ it('排序请求和牌面只给本人，其他投影/AI 不知牌序；公开日
   const publicView = projectMatch(match, 'b', null);
   expect(publicView.log.at(-1)?.text).toContain('1 张置顶，1 张置底');
   expect(JSON.stringify(publicView)).not.toMatch(/secret0|secret1|无中生有|借刀杀人/);
-  replay(match);
+  settled(match);
 });
 it('主持侧专用预览经过授权；暂停藏牌和请求，恢复同一排序且拒绝暂停时回复', async () => {
   const match = privateMatch();
@@ -484,7 +467,7 @@ it('主持侧专用预览经过授权；暂停藏牌和请求，恢复同一排�
   expect(session.answer(request.id, request.token, choice)).toEqual({ kind: 'accepted' });
   await running;
   session.dispose();
-  replay(match);
+  settled(match);
 });
 it('基础 AI 仅按可见私有牌排序，保留全部牌在顶，未知排序模型回退合法初始分组', async () => {
   const match = privateMatch();
@@ -517,7 +500,7 @@ it('基础 AI 仅按可见私有牌排序，保留全部牌在顶，未知排序
     kind: 'accepted',
   });
   await running;
-  replay(match);
+  settled(match);
 });
 
 it('空城只禁止空手角色成为杀/决斗目标，装备、私有池和响应资格分别处理', async () => {
@@ -561,7 +544,7 @@ it('空城只禁止空手角色成为杀/决斗目标，装备、私有池和响
       false,
     );
   });
-  replay(game);
+  settled(game);
 });
 it('空城目标确认后失去最后手牌，实际效果重查跳过；决斗已经开始则正常继续', async () => {
   const game = scenario({ hands: { a: [card('duel', 'duel')], b: [card('s', 'slash')] } });
@@ -577,7 +560,7 @@ it('空城目标确认后失去最后手牌，实际效果重查跳过；决斗�
   expect(game.room.world.player('a').hp).toBe(3);
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
-  replay(game);
+  settled(game);
   const skipped = scenario({ hands: { a: [card('s', 'slash')], b: [card('last', 'peach')] } });
   await grant(skipped, 'standard:kongcheng', 'b');
   skipped.room.on(Target.confirmed, {
@@ -601,7 +584,7 @@ it('空城目标确认后失去最后手牌，实际效果重查跳过；决斗�
     }),
   ).toMatchObject({ value: { use: { effects: [{ state: 'skipped' }] } } });
   expect(skipped.room.world.player('b').hp).toBe(4);
-  replay(skipped);
+  settled(skipped);
 });
 it('混合八人标准对局的观星由基础 AI 经正式选择完成，最终产生真实胜负', async () => {
   const roster = [

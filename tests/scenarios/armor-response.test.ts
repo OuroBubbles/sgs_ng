@@ -16,13 +16,12 @@ import {
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
 import { eightDiagram } from '../../src/content/standard/armor';
 import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
 import { Equipment } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 const slash = (id = 'slash1', actor = 'a', target = 'b'): UseIntent => ({
   actor,
   choice: { kind: 'physical', card: id },
@@ -35,11 +34,6 @@ const generated = (name = 'jink'): CardChoice => ({
   materials: [],
   reason: 'probe:supply',
 });
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value).kind).toBe('accepted');
-}
 const armor = { b: [card('armor', 'eight_diagram')] };
 const red = [card('red', 'peach', 'heart')];
 

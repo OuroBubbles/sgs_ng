@@ -1,10 +1,16 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import {
+  card,
+  cardGame,
+  use,
+  chooseAndActivate as activate,
+  grant,
+  settled,
+} from '../fixtures/cards';
+import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { projectMatch } from '../../src/app/offline/projection';
 import { standardCards } from '../../src/content/standard/cards';
@@ -23,7 +29,6 @@ import {
   installCounterspells,
   resolveCounter,
   kill,
-  useDeclarations,
   Use,
   Target,
   Resolve,
@@ -49,23 +54,6 @@ function scenario(options: Parameters<typeof cardGame>[0] = {}) {
     hands: { a: [], ...options.hands },
     skills: options.skills ?? standardGeneralSkills,
   });
-}
-async function grant(game: Game, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const r = await nextRequest(game.room);
-  expect(r.kind).toBe(kind);
-  expect(game.room.decisions.submit(r.id, r.token, value)).toEqual({ kind: 'accepted' });
-}
-async function cancel(game: Game) {
-  const r = await nextRequest(game.room);
-  expect(game.room.decisions.cancel(r.id, r.token)).toEqual({ kind: 'accepted' });
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((z) => z.kind === 'processing')).toEqual([]);
 }
 const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
   actor,
@@ -180,7 +168,7 @@ it('具名选项固定描述快照、拒绝未知项与强制取消，结束后�
   expect(await game.room.run('closed-choice', (ctx) => ctx.ask(decision))).toMatchObject({
     value: { kind: 'unavailable' },
   });
-  replay(game);
+  settled(game);
 });
 it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授予叠加', async () => {
   const game = scenario({
@@ -194,7 +182,7 @@ it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授�
     expect(game.book.distance(ctx, 'a', 'a')).toBe(0);
     expect(game.book.distance(ctx, 'a', 'b')).toBe(1);
   });
-  replay(game);
+  settled(game);
 });
 it.each(['red', 'black', 'decline', 'empty'])('铁骑 %s 判定只影响本次目标的响应', async (kind) => {
   const game = scenario({
@@ -209,7 +197,7 @@ it.each(['red', 'black', 'decline', 'empty'])('铁骑 %s 判定只影响本次�
   expect(game.room.world.player('b').hp).toBe(kind === 'red' ? 3 : 4);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(0);
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(kind === 'red' ? 1 : 2);
-  replay(game);
+  settled(game);
 });
 it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受的判定效果', async () => {
   const game = scenario({
@@ -236,7 +224,7 @@ it('铁骑使用鬼才改判后的最终红色，技能失去不撤销已接受�
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('jink')).toBe('b:hand');
-  replay(game);
+  settled(game);
 });
 it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数', async () => {
   const game = scenario({
@@ -266,7 +254,7 @@ it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数'
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.player('c').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 it('流离先于铁骑，只对新目标询问判定，旧身份的响应禁令不泄漏', async () => {
   const game = scenario({
@@ -290,7 +278,7 @@ it('流离先于铁骑，只对新目标询问判定，旧身份的响应禁令�
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.player('c').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不开启', async () => {
   const game = scenario({
@@ -324,7 +312,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
   expect(openings).toBe(0);
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.zone('draw').cards).toEqual(['red']);
-  replay(game);
+  settled(game);
 });
 it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async () => {
   const game = scenario({ hands: { a: [card('slash', 'slash')] } });
@@ -347,7 +335,7 @@ it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async (
   await game.room.run('late', (ctx) => {
     expect(() => effect!.blockResponses(ctx, 'b', 'late')).toThrow();
   });
-  replay(game);
+  settled(game);
 });
 it.each([true, false])('英姿接受=%s，只修改这次阶段摸牌', async (accepted) => {
   const game = scenario({ draw: samples() });
@@ -356,7 +344,7 @@ it.each([true, false])('英姿接受=%s，只修改这次阶段摸牌', async (a
   await answer(game, accepted);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(accepted ? 3 : 2);
-  replay(game);
+  settled(game);
 });
 it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
   const game = scenario({ draw: samples() });
@@ -368,7 +356,7 @@ it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
   );
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(ownedCards(game.room.world, 'a')).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it.each([true, false])('闭月接受=%s，结束阶段正常收束', async (accepted) => {
   const game = scenario({ draw: samples() });
@@ -377,7 +365,7 @@ it.each([true, false])('闭月接受=%s，结束阶段正常收束', async (acce
   await answer(game, accepted);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(accepted ? 1 : 0);
-  replay(game);
+  settled(game);
 });
 it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', async () => {
   for (const skip of [true, false]) {
@@ -405,7 +393,7 @@ it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', asyn
     if (!skip) await answer(game, true);
     await running;
     expect(ownedCards(game.room.world, 'a')).toHaveLength(skip ? 0 : 1);
-    replay(game);
+    settled(game);
   }
 });
 it.each(['spade', 'heart', 'club', 'diamond'])(
@@ -445,7 +433,7 @@ it.each(['spade', 'heart', 'club', 'diamond'])(
     expect(moved).toBe(true);
     expect(game.room.world.position('gift')).toBe('b:hand');
     expect(game.room.world.player('b').hp).toBe(guess === 'club' ? 4 : 3);
-    replay(game);
+    settled(game);
   },
 );
 async function selectFanjianCard(game: Game, guess = 'spade') {
@@ -478,7 +466,7 @@ it('反间取消不消耗次数，空手或只有装备时不能发动', async (
       );
     }),
   );
-  replay(game);
+  settled(game);
 });
 it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', async () => {
   const ban = defineSkill({
@@ -508,7 +496,7 @@ it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', a
   await answer(game, true);
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜错伤害', async () => {
   for (const die of [false, true]) {
@@ -543,7 +531,7 @@ it('已宣告反间失去技能仍执行，移动后来源死亡也不撤销猜�
     expect(game.room.history.facts(Damage.dealt)[0]!.data.detail).toMatchObject({
       input: { from: 'a', to: 'b' },
     });
-    replay(game);
+    settled(game);
   }
 });
 it('反间支付后手牌被取走，不生成假牌或多问一次花色，次数仍消耗', async () => {
@@ -575,7 +563,7 @@ it('反间支付后手牌被取走，不生成假牌或多问一次花色，次�
   await running;
   expect(game.room.history.facts(Fanjian.guessed)).toEqual([]);
   expect(game.room.world.player('b').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料决斗且禁止无懈', async (area) => {
   const game = scenario({
@@ -613,7 +601,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
       card: { name: 'standard:duel', materials: [] },
     },
   });
-  replay(game);
+  settled(game);
 });
 it('离间按有序目标验证禁止使用与目标禁令，不接受女性、本人和重复目标', async () => {
   let blocked = true;
@@ -651,7 +639,7 @@ it('离间按有序目标验证禁止使用与目标禁令，不接受女性、�
   ).toBe('accepted');
   await running;
   expect(game.room.world.player('c').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it('离间取消不计次、同阶段只支付一次，下一阶段重新可用', async () => {
   const game = scenario({ hands: { a: [card('fee1', 'jink'), card('fee2', 'jink')] } });
@@ -674,7 +662,7 @@ it('离间取消不计次、同阶段只支付一次，下一阶段重新可用'
     await running;
   }
   expect(game.room.world.player('b').hp).toBe(2);
-  replay(game);
+  settled(game);
 });
 it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确的展示事实序号', async () => {
   const match = new RoleMatch({
@@ -744,7 +732,7 @@ it('单次反制禁令随持久延时牌保存到后续生效，不依赖原计�
   await game.room.run('judgment', (ctx) => runPhase(ctx, game.book, 'b', 'judge'));
   expect(game.room.world.position('null')).toBe('b:hand');
   expect(game.room.decisions.pending).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍重查且费用不退', async () => {
   const ban = defineSkill({
@@ -780,7 +768,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
     expect(game.room.world.position('fee')).toBe('discard');
     expect(game.room.history.facts(CardEvent.used)).toHaveLength(blocked ? 0 : 1);
     expect(game.room.world.player('b').hp).toBe(blocked ? 4 : 3);
-    replay(game);
+    settled(game);
   }
 });
 it('离间的实际决斗者可触发集智，无双要求对方两杀，伤害仍归赢得决斗者', async () => {
@@ -803,7 +791,7 @@ it('离间的实际决斗者可触发集智，无双要求对方两杀，伤害�
     input: { from: 'b', to: 'c', card: { actor: 'c' } },
   });
   expect(game.room.world.position('drawn')).toBe('c:hand');
-  replay(game);
+  settled(game);
 });
 it('本次用牌的反制禁令复制输入，不影响之后的普通决斗', async () => {
   const game = scenario({
@@ -825,7 +813,7 @@ it('本次用牌的反制禁令复制输入，不影响之后的普通决斗', a
   await answer(game, { kind: 'physical', card: 'null' }, 'use-card');
   await next;
   expect(game.room.world.player('b').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢复完整牌型目录', async () => {
   const custom: CardDefinition = {
@@ -896,7 +884,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(3);
-  replay(game);
+  settled(game);
 });
 it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
   const seed = 27;

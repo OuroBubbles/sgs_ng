@@ -24,7 +24,7 @@ import { guose } from '../../src/content/standard/generals/daqiao';
 import { guicai } from '../../src/content/standard/generals/simayi';
 import { fanjian } from '../../src/content/standard/generals/zhouyu';
 import { vermilion } from '../../src/content/workshop/faces';
-import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
+import { card, cardGame, use, chooseAndActivate as activate, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -42,13 +42,6 @@ type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'probe' } as const;
 async function grant(game: Game, skill: string, owner = 'a') {
   await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-}
-function clean(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.world.snapshot.states.some((state) => state.key === 'core:judgment-card')).toBe(
-    false,
-  );
 }
 function filter(id: string, change: CardFaceChange): SkillDefinition {
   return defineSkill({
@@ -80,7 +73,7 @@ it('映绯统一当前手牌与装备面；印刷牌、他人手牌、公开牌�
     expect(game.book.face(ctx, 'top', 'b').suit).toBe('spade');
   });
   expect(game.room.world.card('own').suit).toBe('spade');
-  clean(game);
+  settled(game);
 });
 
 it('牌转交后按新持有者查询，失去技能立即恢复原牌面，不回写实体', async () => {
@@ -98,7 +91,7 @@ it('牌转交后按新持有者查询，失去技能立即恢复原牌面，不�
     expect(game.book.face(ctx, 'own').color).toBe('black');
     expect(ctx.world.card('own').suit).toBe('spade');
   });
-  clean(game);
+  settled(game);
 });
 
 it.each([wusheng, jijiu])(
@@ -119,7 +112,7 @@ it.each([wusheng, jijiu])(
       );
       expect(built).toMatchObject({ ok: true, value: { suit: 'heart', color: 'red', rank: 7 } });
     });
-    clean(game);
+    settled(game);
   },
 );
 
@@ -134,7 +127,7 @@ it.each([qingguo, qixi])('过滤后的黑桃不再提供 $name 的黑色配方',
         .filter((offer) => offer.kind === 'viewAs'),
     ).toEqual([]),
   );
-  clean(game);
+  settled(game);
 });
 
 it('无花色与颜色独立：显式红色黑桃可武圣，转换继承红色而不重新从黑桃推成黑色', async () => {
@@ -160,7 +153,7 @@ it('无花色与颜色独立：显式红色黑桃可武圣，转换继承红色�
       false,
     );
   });
-  clean(game);
+  settled(game);
 });
 
 it('过滤花色供国色，过滤名称供实体杀与龙胆，仍走正式牌型/材料校验', async () => {
@@ -194,7 +187,7 @@ it('过滤花色供国色，过滤名称供实体杀与龙胆，仍走正式牌�
   ).toMatchObject({ value: { kind: 'used' } });
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.card('material').name).toBe('standard:peach');
-  clean(game);
+  settled(game);
 });
 
 it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从处理区印刷牌重建', async () => {
@@ -223,7 +216,7 @@ it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从�
   expect(game.room.history.facts(CardEvent.used)[0]?.data.detail).toMatchObject({
     declaration: { card: { suit: 'heart', color: 'red' } },
   });
-  clean(game);
+  settled(game);
 });
 
 it.each(['grant', 'revoke'] as const)(
@@ -255,7 +248,7 @@ it.each(['grant', 'revoke'] as const)(
         card: { suit: action === 'grant' ? 'heart' : 'spade' },
       }),
     );
-    clean(game);
+    settled(game);
   },
 );
 
@@ -287,7 +280,7 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
     ).toMatchObject({ matched: true, card: { suit: 'heart' } }),
   );
   expect(game.room.world.position('top')).toBe('b:hand');
-  clean(game);
+  settled(game);
 });
 
 it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则最终判定仍为黑', async () => {
@@ -326,7 +319,7 @@ it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则�
     value: { matched: false, card: { suit: 'spade', color: 'black' } },
   });
   expect(seen).toEqual(['red']);
-  clean(game);
+  settled(game);
 });
 
 it.each([false, true])('字段组合与同值贡献不依赖授予顺序：reverse=%s', async (reverse) => {
@@ -340,7 +333,7 @@ it.each([false, true])('字段组合与同值贡献不依赖授予顺序：rever
   game.room.inspect((ctx) =>
     expect(game.book.face(ctx, 'slash1')).toMatchObject({ suit: 'heart', rank: 13, color: 'red' }),
   );
-  clean(game);
+  settled(game);
 });
 
 it.each([false, true])('同字段冲突明确报错，不靠登记顺序静默覆盖：reverse=%s', async (reverse) => {
@@ -351,7 +344,7 @@ it.each([false, true])('同字段冲突明确报错，不靠登记顺序静默�
     'Conflicting card face field: suit',
   );
   expect(game.room.world.card('slash1').suit).toBe('spade');
-  clean(game);
+  settled(game);
 });
 
 it.each([
@@ -370,7 +363,7 @@ it.each([
     'Invalid card face contribution',
   );
   expect(game.room.history.entries).toHaveLength(before);
-  clean(game);
+  settled(game);
 });
 
 it('查询贡献不能借助捕获的运行上下文提交、随机或注册后效', async () => {
@@ -393,7 +386,7 @@ it('查询贡献不能借助捕获的运行上下文提交、随机或注册后�
     expect(() => game.book.face(ctx, 'slash1')).toThrow('Pure queries');
   });
   expect(game.room.history.facts(testTiming('bad'))).toHaveLength(0);
-  clean(game);
+  settled(game);
 });
 
 it('UI 与 AI 读取相同当前牌面，不泄漏其他手牌；观察不改变规则证据', async () => {
@@ -442,7 +435,7 @@ it('递归牌面查询明确诊断，退出后不残留求值标记；不同实�
   );
   recursive = false;
   game.room.inspect((ctx) => expect(game.book.face(ctx, 'slash1').suit).toBe('heart'));
-  clean(game);
+  settled(game);
 });
 
 it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色，猜红桃不受伤', async () => {
@@ -475,7 +468,7 @@ it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色�
   expect(game.room.world.position('gift')).toBe('b:hand');
   expect(game.room.world.card('gift').suit).toBe('spade');
   expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
-  clean(game);
+  settled(game);
 });
 
 it('基础 AI 改判使用接收者的判定候选面，不把自己黑色手牌误认为能破坏对方红判定', async () => {

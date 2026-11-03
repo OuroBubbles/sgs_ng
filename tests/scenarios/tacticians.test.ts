@@ -1,10 +1,9 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { card, cardGame, use, grant, settled } from '../fixtures/cards';
+import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { projectMatch } from '../../src/app/offline/projection';
 import { standardCards } from '../../src/content/standard/cards';
@@ -28,7 +27,6 @@ import { legacyGenerals } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
-type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
   return cardGame({
@@ -37,29 +35,12 @@ function scenario(options: Parameters<typeof cardGame>[0] = {}) {
     skills: options.skills ?? standardGeneralSkills,
   });
 }
-async function grant(game: Game, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const r = await nextRequest(game.room);
-  expect(r.kind).toBe(kind);
-  expect(game.room.decisions.submit(r.id, r.token, value)).toEqual({ kind: 'accepted' });
-}
-async function cancel(game: Game) {
-  const r = await nextRequest(game.room);
-  expect(game.room.decisions.cancel(r.id, r.token)).toEqual({ kind: 'accepted' });
-}
 const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
   actor,
   choice: { kind: 'physical', card: id },
   targets,
   timing: { kind: 'effect' },
 });
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
-}
 
 it.each([true, false])('集智普通锦囊接受=%s，在锦囊效果之前摸牌，宣告仅一次', async (accepted) => {
   const game = scenario({
@@ -76,7 +57,7 @@ it.each([true, false])('集智普通锦囊接受=%s，在锦囊效果之前摸�
     accepted ? ['standard:jizhi', 'standard:ex_nihilo'] : ['standard:ex_nihilo'],
   );
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as const)(
   '集智不响应 %s',
@@ -118,7 +99,7 @@ it.each(['converted', 'generated-material', 'delayed', 'equipment', 'basic'] as 
     await use(game, intent);
     expect(game.room.decisions.pending).toEqual([]);
     expect(game.room.history.facts(Skill.invoked)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 it('零材料虚拟普通锦囊仍能集智，接受后失去技能不撤销摸牌', async () => {
@@ -146,7 +127,7 @@ it('零材料虚拟普通锦囊仍能集智，接受后失去技能不撤销摸�
   await answer(game, true);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(3);
-  replay(game);
+  settled(game);
 });
 it('真实无懈可击也是普通锦囊，集智摸牌发生在反制生效前', async () => {
   const game = scenario({
@@ -161,7 +142,7 @@ it('真实无懈可击也是普通锦囊，集智摸牌发生在反制生效前'
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(ownedCards(game.room.world, 'b')).toEqual(['drawn']);
-  replay(game);
+  settled(game);
 });
 it('奇才只豁免锦囊距离，不改变真实距离或杀的范围', async () => {
   const game = scenario({
@@ -173,7 +154,7 @@ it('奇才只豁免锦囊距离，不改变真实距离或杀的范围', async (
     expect(game.book.validateUse(ctx, physical('trick', 'a', ['c'])).ok).toBe(true);
     expect(game.book.validateUse(ctx, physical('slash', 'a', ['c'])).ok).toBe(false);
   });
-  replay(game);
+  settled(game);
 });
 it('作者新建锦囊只需声明类别，集智和奇才无需增补牌名表', async () => {
   const game = scenario({
@@ -199,7 +180,7 @@ it('作者新建锦囊只需声明类别，集智和奇才无需增补牌名表'
   await answer(game, true);
   await running;
   expect(ownedCards(game.room.world, 'a')).toEqual(['drawn']);
-  replay(game);
+  settled(game);
 });
 it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () => {
   const ban = defineSkill({
@@ -227,7 +208,7 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
   });
   await use(game, physical('delay'));
   expect(await use(game, physical('delay2'))).toMatchObject({ value: { kind: 'unavailable' } });
-  replay(game);
+  settled(game);
 });
 
 it.each([0, 1, 2])('无双杀连续两闪，实际提供 %i 张', async (count) => {
@@ -254,7 +235,7 @@ it.each([0, 1, 2])('无双杀连续两闪，实际提供 %i 张', async (count) 
       },
     },
   });
-  replay(game);
+  settled(game);
 });
 it('无双的声明在技能失去后保留，但没有响应机会时不强开两闪', async () => {
   for (const forbidden of [false, true]) {
@@ -277,7 +258,7 @@ it('无双的声明在技能失去后保留，但没有响应机会时不强开�
         await answer(game, { kind: 'physical', card: id }, 'card-response');
     await running;
     expect(game.room.world.player('b').hp).toBe(forbidden ? 3 : 4);
-    replay(game);
+    settled(game);
   }
 });
 it.each(['a', 'b', 'both'])('无双决斗按响应方记录要求，来源=%s', async (owner) => {
@@ -298,7 +279,7 @@ it.each(['a', 'b', 'both'])('无双决斗按响应方记录要求，来源=%s', 
   await running;
   expect(game.room.world.player('a').hp).toBe(4);
   expect(game.room.world.player('b').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it.each(['hand', 'equipment'])(
   '国色的方块 %s 进入持久延时区，保留牌面并防同名叠放',
@@ -331,7 +312,7 @@ it.each(['hand', 'equipment'])(
         choice: { kind: 'viewAs', instance, recipe: 'diamond-indulgence', materials: ['extra'] },
       }),
     ).toMatchObject({ value: { kind: 'unavailable' } });
-    replay(game);
+    settled(game);
   },
 );
 it('国色拒绝非方块和他人材料，不改变材料位置', async () => {
@@ -352,7 +333,7 @@ it('国色拒绝非方块和他人材料，不改变材料位置', async () => {
       }),
     ).toMatchObject({ value: { kind: 'unavailable' } });
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 function liuliGame(options: Parameters<typeof cardGame>[0] = {}) {
@@ -397,7 +378,7 @@ it('流离费用与目标替换原子提交，忽略出杀者距离，保留杀�
     },
   });
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it.each(['weapon', 'horse'])(
   '流离弃 %s 后不能借用离场装备的范围，联合反馈可先选目标',
@@ -423,7 +404,7 @@ it.each(['weapon', 'horse'])(
     );
     await running;
     expect(game.room.world.player('d').hp).toBe(3);
-    replay(game);
+    settled(game);
   },
 );
 it('流离不能给本人、出杀者、被禁止或已在本次杀内的目标', async () => {
@@ -445,7 +426,7 @@ it('流离不能给本人、出杀者、被禁止或已在本次杀内的目标'
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.world.position('fee')).toBe('b:hand');
   expect(game.room.world.player('b').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it('流离取消不支付，新目标独立确认并继承来源无双', async () => {
   for (const redirected of [false, true]) {
@@ -465,7 +446,7 @@ it('流离取消不支付，新目标独立确认并继承来源无双', async (
     expect(game.room.world.player('c').hp).toBe(4);
     expect(game.room.world.player('b').hp).toBe(redirected ? 4 : 3);
     expect(game.room.world.position('fee')).toBe(redirected ? 'discard' : 'b:hand');
-    replay(game);
+    settled(game);
   }
 });
 it('流离新目标的仁王盾仍生效，青釭剑规则仍随杀传递', async () => {
@@ -490,7 +471,7 @@ it('流离新目标的仁王盾仍生效，青釭剑规则仍随杀传递', asyn
     await answer(game, { cards: ['fee'], targets: ['c'] }, 'cards-targets');
     await running;
     expect(game.room.world.player('c').hp).toBe(sword ? 3 : 4);
-    replay(game);
+    settled(game);
   }
 });
 it('支付后失去流离不撤销转移，目标死亡则跳过，不退费用', async () => {
@@ -517,7 +498,7 @@ it('支付后失去流离不撤销转移，目标死亡则跳过，不退费用'
   });
   expect(game.room.world.position('fee')).toBe('discard');
   expect(game.room.world.player('b').hp).toBe(4);
-  replay(game);
+  settled(game);
 });
 
 it.each(['mixed', 'all-liuli'])(
@@ -649,7 +630,7 @@ it('人类可以支付新的费用再次流离回旧目标，每次创建独立�
     },
   });
   expect(game.room.world.player('b').hp).toBe(3);
-  replay(game);
+  settled(game);
 });
 it('目标声明只在本次生存期可改写，纯查询与关闭后调用不能写入', async () => {
   const game = liuliGame();
@@ -686,5 +667,5 @@ it('目标声明只在本次生存期可改写，纯查询与关闭后调用不�
     expect(() => effect!.requireResponses(ctx, 'b', 2, 'late')).toThrow();
   });
   expect(retained!.snapshot().effects[0]!.state).toBe('resolved');
-  replay(game);
+  settled(game);
 });

@@ -14,8 +14,7 @@ import {
   Shield,
 } from '../../src/sdk';
 import type { Context, DamageDraft } from '../../src/sdk';
-import { card, cardGame } from '../fixtures/cards';
-import { rebuildWorld } from '../../src/core/history/rebuild';
+import { card, cardGame, settled } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { testTiming } from '../fixtures/timing';
 
@@ -23,10 +22,6 @@ type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'normal' } as const;
 async function ward(game: Game, player: string, amount: number) {
   await game.room.run('shield', (ctx) => changeShield(ctx, { player, amount, reason: 'setup' }));
-}
-function rebuilt(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
 }
 function dealt(game: Game) {
   return game.room.history.facts(Damage.dealt).map((fact) => fact.data.detail);
@@ -67,7 +62,7 @@ it('护盾增减有实际量与尝试量，减少至零，无变化不发事实/
   });
   expect(changes).toEqual([3, -3]);
   expect(game.room.history.facts(Shield.changed)).toHaveLength(2);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each([0, 1, 2, 3])(
@@ -97,7 +92,7 @@ it.each([0, 1, 2, 3])(
     });
     expect(received).toBe(1);
     expect(shieldOf(game.room.world, 'b')).toBe(shield - lost);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -127,7 +122,7 @@ it('扣血、护盾消耗与解链同次提交，状态窗口看见同一个完�
   });
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire' }));
   expect(observed).toBe(true);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['prevent', 'zero'])('%s 不消耗护盾，也不发护盾消耗窗口', async (kind) => {
@@ -148,7 +143,7 @@ it.each(['prevent', 'zero'])('%s 不消耗护盾，也不发护盾消耗窗口',
   });
   expect(shieldOf(game.room.world, 'b')).toBe(3);
   expect(dealt(game)).toEqual([]);
-  rebuilt(game);
+  settled(game);
 });
 
 it('护盾读取窗口结算后的当前状态，来源快照与最终伤害不因吸收而改写', async () => {
@@ -178,7 +173,7 @@ it('护盾读取窗口结算后的当前状态，来源快照与最终伤害不�
     shieldLost: 1,
     hpLoss: 1,
   });
-  rebuilt(game);
+  settled(game);
 });
 
 it('全部抵消的属性伤害仍解链并按伤害量传播，每个目标独立吸收', async () => {
@@ -193,7 +188,7 @@ it('全部抵消的属性伤害仍解链并按伤害量传播，每个目标独�
   expect(dealt(game).map((result) => result.hpLoss)).toEqual([0, 1, 2]);
   expect(dealt(game).map((result) => result.shieldLost)).toEqual([2, 1, 0]);
   expect(['b', 'c', 'd'].some((player) => isChained(game.room.world, player))).toBe(false);
-  rebuilt(game);
+  settled(game);
 });
 
 it('忽略护盾只属于当前伤害，连环下一名角色正常吸收', async () => {
@@ -207,7 +202,7 @@ it('忽略护盾只属于当前伤害，连环下一名角色正常吸收', asyn
   expect(dealt(game).map((result) => result.hpLoss)).toEqual([2, 0]);
   expect(dealt(game).map((result) => result.shieldLost)).toEqual([0, 2]);
   expect(dealt(game).map((result) => result.shieldBypass)).toEqual(['request', null]);
-  rebuilt(game);
+  settled(game);
 });
 
 it('技能可通过普通伤害草案忽略护盾，纯查询与关闭后的草案不能修改', async () => {
@@ -230,7 +225,7 @@ it('技能可通过普通伤害草案忽略护盾，纯查询与关闭后的草�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(dealt(game)[0]).toMatchObject({ hpLoss: 2, shieldLost: 0, shieldBypass: 'probe:pierce' });
   expect(() => captured!.ignoreShield('late')).toThrow();
-  rebuilt(game);
+  settled(game);
 });
 
 it('消耗后新获得护盾不回写已提交伤害，实际 World 与事实快照分别准确', async () => {
@@ -247,7 +242,7 @@ it('消耗后新获得护盾不回写已提交伤害，实际 World 与事实快
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(dealt(game)[0]).toMatchObject({ afterShield: 0, shieldLost: 1, hpLoss: 1 });
   expect(shieldOf(game.room.world, 'b')).toBe(3);
-  rebuilt(game);
+  settled(game);
 });
 
 it('失去体力与回复不消耗或恢复护盾', async () => {
@@ -259,7 +254,7 @@ it('失去体力与回复不消耗或恢复护盾', async () => {
   });
   expect(shieldOf(game.room.world, 'b')).toBe(2);
   expect(game.room.world.player('b').hp).toBe(4);
-  rebuilt(game);
+  settled(game);
 });
 
 it('护盾全抵消时不新开濒死，即使角色已由外层规则处于零体力', async () => {
@@ -280,7 +275,7 @@ it('护盾全抵消时不新开濒死，即使角色已由外层规则处于零�
   });
   expect(dying).toBe(0);
   expect(game.room.world.player('b')).toMatchObject({ alive: true, hp: 0 });
-  rebuilt(game);
+  settled(game);
 });
 
 it('被护盾全抵消的两点伤害仍提供两次遗计，费用/池与伤害次数不借扣血量计数', async () => {
@@ -327,7 +322,7 @@ it('被护盾全抵消的两点伤害仍提供两次遗计，费用/池与伤害
   expect(game.room.world.zone('b:hand').cards).toHaveLength(4);
   expect(game.room.world.player('b').hp).toBe(4);
   expect(dealt(game)[0]!.hpLoss).toBe(0);
-  rebuilt(game);
+  settled(game);
 });
 
 it('纯查询、已关闭 Context 与终局均不能改变护盾', async () => {
@@ -345,7 +340,7 @@ it('纯查询、已关闭 Context 与终局均不能改变护盾', async () => {
   });
   expect(() => changeShield(closed!, { player: 'b', amount: 1, reason: 'closed' })).toThrow();
   expect(shieldOf(game.room.world, 'b')).toBe(0);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each([NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
@@ -358,7 +353,7 @@ it.each([NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
       ),
     ).rejects.toThrow();
     expect(game.room.history.facts()).toEqual([]);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -371,5 +366,5 @@ it('无隐藏护盾上限；安全整数溢出在同次提交前拒绝', async (
     ),
   ).rejects.toThrow('safe integer');
   expect(shieldOf(game.room.world, 'b')).toBe(Number.MAX_SAFE_INTEGER);
-  rebuilt(game);
+  settled(game);
 });

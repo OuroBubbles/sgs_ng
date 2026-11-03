@@ -1,8 +1,7 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest, room } from '../fixtures/room';
-import { rebuildWorld } from '../../src/core/history/rebuild';
+import { card, cardGame, use, grant, settled } from '../fixtures/cards';
+import { nextRequest, room, answer } from '../fixtures/room';
 import { ganglie } from '../../src/content/standard/generals/xiahoudun';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
@@ -32,24 +31,7 @@ import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
-async function grant(game: Game, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-  return game.room.world.snapshot.skills.find(
-    (entry) => entry.owner === owner && entry.skill === skill,
-  )!.id;
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-}
 const hit = (ctx: Context, from: string | null = 'b', amount = 1) =>
   damage(ctx, { from, to: 'a', amount, nature: 'normal' });
 
@@ -67,7 +49,7 @@ it('刚烈在一次两点伤害后只判定一次；少于两张可弃手牌时�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('only')).toBe('b:hand');
   expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('刚烈来源可以支付两张手牌；受保护手牌和装备不进入候选，不产生额外伤害', async () => {
@@ -102,7 +84,7 @@ it('刚烈来源可以支付两张手牌；受保护手牌和装备不进入候�
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.zone('b:hand').cards).toEqual(['protected']);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
-  replay(game);
+  settled(game);
 });
 
 it('刚烈来源可拒绝弃置；没有来源也仍判定，红桃时没有来源选择', async () => {
@@ -171,7 +153,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
     await running;
     expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
     expect(game.room.history.facts(Damage.dealt)).toHaveLength(branch === 'revoke' ? 2 : 1);
-    replay(game);
+    settled(game);
   }
 });
 
@@ -223,7 +205,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
   ]);
   expect(game.book.effects.instances(game.room.world, luoyiAftereffect)).toHaveLength(0);
   expect(JSON.stringify(results)).not.toContain('lifetime');
-  replay(game);
+  settled(game);
 });
 
 it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失；非牌伤害不会借用裸衣', async () => {
@@ -259,7 +241,7 @@ it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失�
     timing: { kind: 'effect' },
   });
   expect(game.room.world.player('b').hp).toBe(1);
-  replay(game);
+  settled(game);
 });
 
 it('决斗目标打回伤害仍是实际来源，但不是其本人使用的决斗，不借用裸衣', async () => {
@@ -294,7 +276,7 @@ it('决斗目标打回伤害仍是实际来源，但不是其本人使用的决�
     hpLoss: 1,
     edits: [],
   });
-  replay(game);
+  settled(game);
 });
 
 it.each(['physical', 'generated'] as const)(
@@ -340,7 +322,7 @@ it.each(['physical', 'generated'] as const)(
     });
     expect(game.room.decisions.pending).toEqual([]);
     expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -391,7 +373,7 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
   await running;
   const hits = game.room.history.facts(Damage.dealt).map((fact) => fact.data.detail.hpLoss);
   expect(hits).toEqual([1, 2, 1]);
-  replay(game);
+  settled(game);
 });
 
 it('拒绝裸衣保留两张摸牌；零摸牌不询问，独立阶段不虚构回合效果', async () => {
@@ -429,7 +411,7 @@ it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告�
     skills: [luoshen],
     draw: [card('black1', 'slash'), card('black2', 'jink', 'club'), card('red', 'peach', 'heart')],
   });
-  const instance = await grant(game, 'standard:luoshen');
+  const instance = (await grant(game, 'standard:luoshen')).id;
   let drawn = 0;
   game.room.on(Cards.drawn, {
     id: 'count',
@@ -458,7 +440,7 @@ it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告�
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.history.facts(Judgment.finished)).toHaveLength(3);
   expect(drawn).toBe(0);
-  replay(game);
+  settled(game);
 });
 
 it('洛神可主动停止或完全拒绝，空牌堆也会正常结束', async () => {
@@ -501,7 +483,7 @@ it.each([true, false])('洛神按最终改判颜色取牌，不沿用首次公�
   expect(game.room.world.zone('a:hand').cards).toEqual(black ? ['replacement'] : []);
   expect(game.room.world.position('original')).toBe('discard');
   expect(game.room.world.position('replacement')).toBe(black ? 'a:hand' : 'discard');
-  replay(game);
+  settled(game);
 });
 
 it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不截断已宣告的循环', async () => {
@@ -533,7 +515,7 @@ it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不�
   expect(game.room.world.position('first')).toBe('c:hand');
   expect(game.room.history.facts(Judgment.finished)).toHaveLength(3);
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取得', async () => {
@@ -559,7 +541,7 @@ it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取�
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['outer']);
   expect(game.room.world.position('nested')).toBe('discard');
-  replay(game);
+  settled(game);
 });
 
 it('判定后目标死亡时，洛神不取得牌也不再询问', async () => {
@@ -598,7 +580,7 @@ it('倾国可用黑色手牌响应闪，拒绝红牌、装备和他人的牌，�
     equipment: { a: [card('weapon', 'spear')] },
     skills: [qingguo],
   });
-  const instance = await grant(game, qingguo.id);
+  const instance = (await grant(game, qingguo.id)).id;
   const running = use(game, {
     actor: 'b',
     choice: { kind: 'physical', card: 'slash' },
@@ -625,7 +607,7 @@ it('倾国可用黑色手牌响应闪，拒绝红牌、装备和他人的牌，�
   expect(game.room.history.facts(CardEvent.used)[1]!.data.detail).toMatchObject({
     declaration: { card: { suit: 'club', rank: 12, name: 'standard:jink' } },
   });
-  replay(game);
+  settled(game);
 });
 
 it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得最终 CardBook', () => {

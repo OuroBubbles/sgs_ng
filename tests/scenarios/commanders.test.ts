@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { card, cardGame, use, grant, settled } from '../fixtures/cards';
+import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
 import { standardCards } from '../../src/content/standard/cards';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -48,20 +48,6 @@ function scenario(options: Parameters<typeof cardGame>[0] = {}) {
     skills: options.skills ?? standardGeneralSkills,
   });
 }
-async function grant(game: Pick<Game, 'room' | 'skills'>, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-}
-async function answer(game: Pick<Game, 'room'>, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
-async function cancel(game: Pick<Game, 'room'>) {
-  const request = await nextRequest(game.room);
-  expect(game.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
-}
 async function takeHidden(game: Game, target: string) {
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('cards-targets');
@@ -70,10 +56,6 @@ async function takeHidden(game: Game, target: string) {
   expect(JSON.stringify(data)).not.toContain('secret-');
   expect(data.cards[0]!.label).toContain('未知手牌');
   await answer(game, { cards: [data.cards[0]!.id], targets: [] }, 'cards-targets');
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
 }
 const slash = (actor = 'b', target = 'a'): UseIntent => ({
   actor,
@@ -201,7 +183,7 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
       ],
     },
   });
-  replay(game);
+  settled(game);
 });
 it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳阶段无替代机会', async () => {
   const game = scenario();
@@ -260,7 +242,7 @@ it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；�
   expect(game.room.world.player('a').hp).toBe(2);
   expect(game.room.world.position('hit')).toBe('a:hand');
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it.each(['full', 'partial', 'empty'] as const)(
   '奸雄只取得完整虚拟牌实体材料，不把语义牌名写回实体：%s',
@@ -296,7 +278,7 @@ it.each(['full', 'partial', 'empty'] as const)(
       kind === 'full' ? 'a:hand' : kind === 'partial' ? 'discard' : 'b:hand',
     );
     expect(game.room.world.card('one').name).toBe('standard:peach');
-    replay(game);
+    settled(game);
   },
 );
 it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理', async () => {
@@ -350,7 +332,7 @@ it.each(['lost', 'moved', 'dead'] as const)(
     expect(game.room.world.position('hit')).toBe(
       kind === 'lost' ? 'a:hand' : kind === 'moved' ? 'b:hand' : 'discard',
     );
-    replay(game);
+    settled(game);
   },
 );
 it('奸雄取得群体牌后，后续目标依然结算，但不能重复取得已离开处理区的材料', async () => {
@@ -368,7 +350,7 @@ it('奸雄取得群体牌后，后续目标依然结算，但不能重复取得�
   expect(['b', 'c', 'd'].map((id) => game.room.world.player(id).hp)).toEqual([3, 3, 3]);
   expect(game.room.world.position('aoe')).toBe('b:hand');
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由后一人支付；只结算一次打出', async () => {
@@ -399,7 +381,7 @@ it('护驾不读取手牌可用性，按座次先询问无闪魏角色，再由�
   expect(game.room.world.position('j')).toBe('discard');
   expect(finished).toBe(1);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it.each(['cancel', 'none'] as const)('护驾失败或不发动，仍可自己打闪：%s', async (kind) => {
   const game = scenario({
@@ -475,7 +457,7 @@ it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供�
   await answer(game, { kind: 'physical', card: 'right' }, 'card-response');
   await running;
   expect(game.room.world.position('wrong')).toBe('c:hand');
-  replay(game);
+  settled(game);
 });
 it('委托名称不能扩张原请求、为空或重复；失败不会支付或打开子请求', async () => {
   const game = scenario({
@@ -529,7 +511,7 @@ it.each(['qingguo', 'longdan', 'armor'] as const)(
     await running;
     expect(game.room.world.player('a').hp).toBe(4);
     expect(game.room.history.facts(Response.delegated)).toHaveLength(1);
-    replay(game);
+    settled(game);
   },
 );
 it.each(['provider', 'beneficiary'] as const)(
@@ -591,7 +573,7 @@ it.each(['lost', 'dead', 'faction'] as const)(
     await running;
     expect(game.room.history.facts(CardEvent.responded)).toHaveLength(kind === 'lost' ? 1 : 0);
     expect(game.room.world.position('j')).toBe(kind === 'lost' ? 'discard' : 'c:hand');
-    replay(game);
+    settled(game);
   },
 );
 
@@ -649,7 +631,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
   expect(drawn).toBe(0);
   expect(game.room.world.zone('a:hand').cards).toEqual(['secret-b', 'secret-c']);
   expect(game.room.world.zone('draw').cards).toEqual(['draw1', 'draw2']);
-  replay(game);
+  settled(game);
 });
 it.each(['cancel', 'empty'] as const)('突袭取消或无合法目标，正常摸两张：%s', async (kind) => {
   const game = scenario({
@@ -694,7 +676,7 @@ it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
     expect(await running).toMatchObject({ value: { exit: 'replaced' } });
     expect(game.room.world.zone('draw').cards).toHaveLength(2);
     expect(game.room.history.facts(Cards.drawn)).toHaveLength(0);
-    replay(game);
+    settled(game);
   },
 );
 it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭目标', async () => {

@@ -1,10 +1,16 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import {
+  card,
+  cardGame,
+  use,
+  chooseAndActivate as activate,
+  grant,
+  settled,
+} from '../fixtures/cards';
+import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   recover,
   kill,
@@ -43,26 +49,10 @@ function scenario(options: Parameters<typeof cardGame>[0] = {}) {
     skills: options.skills ?? standardGeneralSkills,
   });
 }
-async function grant(game: Game, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-}
-async function answer(game: Game, value: unknown, kind = 'invoke') {
-  const r = await nextRequest(game.room);
-  expect(r.kind).toBe(kind);
-  expect(game.room.decisions.submit(r.id, r.token, value)).toEqual({ kind: 'accepted' });
-}
-async function cancel(game: Game) {
-  const r = await nextRequest(game.room);
-  expect(game.room.decisions.cancel(r.id, r.token)).toEqual({ kind: 'accepted' });
-}
 async function wound(game: Game, hp = 1, player = 'a') {
   await game.room.run('wound', (ctx) =>
     ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
   );
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.filter((z) => z.kind === 'processing')).toEqual([]);
 }
 async function zhiheng(ctx: Context, game: Game, phase: PhaseView) {
   const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === 'standard:zhiheng')!;
@@ -126,7 +116,7 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
       edits: [{ before: 1, after: 3, reason: 'bonus' }],
     },
   });
-  replay(game);
+  settled(game);
 });
 it.each(['zero', 'dead', 'already-dead'] as const)(
   '回复零值、窗口中死亡和已死亡均不产生虚假实际回复：%s',
@@ -176,7 +166,7 @@ it.each(['wu', 'shu', 'self', 'changed'] as const)(
       attemptedAmount: hp,
       amount: hp,
     });
-    replay(game);
+    settled(game);
   },
 );
 it('救援不奖励普通技能回复，也不超过体力上限', async () => {
@@ -209,7 +199,7 @@ it('制衡手牌/装备同批弃置，后效后按实际费用数量摸牌，一
   expect(game.room.world.zone('a:hand').cards).toEqual(['d1', 'd2', 'd3']);
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.zone('discard').cards).toEqual(['one', 'two', 'gear']);
-  replay(game);
+  settled(game);
 });
 it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
   const lock = defineSkill({
@@ -260,7 +250,7 @@ it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死�
   await answer(game, { cards: ['fee'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.position('new')).toBe(kind === 'lost' ? 'a:hand' : 'draw');
-  replay(game);
+  settled(game);
 });
 it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () => {
   const game = scenario({ hands: { a: handCards() } });
@@ -283,7 +273,7 @@ it('克己无杀时可跳弃牌，支付后效已看到跳过标记', async () =
   expect(game.room.history.facts(testTiming('test.discard-body'))).toEqual([]);
   expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
   expect(game.room.world.zone('a:hand').cards).toHaveLength(6);
-  replay(game);
+  settled(game);
 });
 it('克己可以拒绝；独立弃牌阶段无本回合出牌记录也可发动', async () => {
   const game = scenario();
@@ -323,7 +313,7 @@ it.each(['physical', 'converted', 'before-grant'] as const)(
     });
     expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
     expect(game.room.history.facts(Phase.skipped)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动查询', async () => {
@@ -431,7 +421,7 @@ it('连营一次失去多张最后手牌只询问一次，并且记录发生于�
   await running;
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.zone('a:hand').cards).toEqual(['new']);
-  replay(game);
+  settled(game);
 });
 it('连营不会因部分手牌或仅装备离场发动，拒绝发动不产生摸牌', async () => {
   const game = scenario({
@@ -483,7 +473,7 @@ it('连营宣告后收到手牌仍摸一张，失去技能也不撤销已宣告�
   await answer(game, true);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['gift', 'new']);
-  replay(game);
+  settled(game);
 });
 it('连营支付后死亡不再摸牌，批量埋葬也不向死亡角色询问', async () => {
   const game = scenario({ hands: { a: [card('last', 'jink')] }, draw: [card('new', 'slash')] });
@@ -503,7 +493,7 @@ it('连营支付后死亡不再摸牌，批量埋葬也不向死亡角色询问'
   await running;
   expect(game.room.world.position('new')).toBe('draw');
   expect(game.room.decisions.pending).toEqual([]);
-  replay(game);
+  settled(game);
 });
 it('连营嵌在最后手牌用牌费用中，摸牌不会追回或重建原用牌材料', async () => {
   const game = scenario({ hands: { a: [card('hit', 'slash')] }, draw: [card('new', 'jink')] });
@@ -522,7 +512,7 @@ it('连营嵌在最后手牌用牌费用中，摸牌不会追回或重建原用�
   expect(game.room.history.facts(Skill.invoked)[0]!.seq).toBeLessThan(
     game.room.history.facts(CardEvent.effect)[0]!.seq,
   );
-  replay(game);
+  settled(game);
 });
 it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
   const game = scenario({
@@ -584,7 +574,7 @@ it('连营重新得到手牌再失去，会得到新的独立发动机会', asyn
   }
   expect(game.room.world.zone('a:hand').cards).toEqual(['second']);
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 it('救援同样识别急救转换的桃，并保留真实使用者', async () => {
   const game = scenario({ hands: { b: [card('red', 'slash', 'heart')] } });
@@ -606,7 +596,7 @@ it('救援同样识别急救转换的桃，并保留真实使用者', async () =
     attemptedAmount: 2,
     amount: 2,
   });
-  replay(game);
+  settled(game);
 });
 it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试量结果', async () => {
   const game = scenario();

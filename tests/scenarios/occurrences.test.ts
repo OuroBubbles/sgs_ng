@@ -10,13 +10,12 @@ import {
   moveCards,
   runPhase,
   runTurn,
-  useDeclarations,
 } from '../../src/sdk';
 import type { TriggerOccurrence, TriggerSource } from '../../src/core/runtime/event';
 import type { WorldSeed } from '../../src/core/model/state';
 import type { Room } from '../../src/core/runtime/room';
-import { room, nextRequest, choose } from '../fixtures/room';
-import { card, cardGame } from '../fixtures/cards';
+import { room, nextRequest, choose, answer, cancel } from '../fixtures/room';
+import { card, cardGame, grant, settled } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -24,7 +23,6 @@ import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'test' } as const;
-type Game = ReturnType<typeof cardGame>;
 function replay(target: Room, initial: WorldSeed) {
   expect(rebuildWorld(initial, target.history.facts())).toEqual(target.world.snapshot);
   expect(target.decisions.pending).toEqual([]);
@@ -55,15 +53,6 @@ async function order(target: Room, label: string) {
   expect(id).toBeDefined();
   expect(target.decisions.submit(request.id, request.token, id)).toEqual({ kind: 'accepted' });
   return data;
-}
-async function answer(target: Room, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(target);
-  expect(request.kind).toBe(kind);
-  expect(target.decisions.submit(request.id, request.token, value)).toEqual({ kind: 'accepted' });
-}
-async function cancel(target: Room) {
-  const request = await nextRequest(target);
-  expect(target.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
 }
 
 it('次数从开窗时的权威状态读取一次，后效不改变当前总数；下一窗口重新读取', async () => {
@@ -543,7 +532,7 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
       .filter((e) => e.window === window.id)
       .map((e) => e.occurrence.index),
   ).toEqual([2, 3]);
-  clean(game);
+  settled(game);
 });
 it('作用域监听完成后注销整个来源，后续窗口不保留任何次数', async () => {
   const target = room();
@@ -648,14 +637,6 @@ function scenario() {
     effects: [luoyiAftereffect],
   });
 }
-async function grant(game: Game, skill: string) {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner: 'a', skill, source }));
-}
-function clean(game: Game) {
-  replay(game.room, game.initial);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((z) => z.kind === 'processing')).toEqual([]);
-}
 it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次遗计', async () => {
   const game = scenario();
   await grant(game, 'standard:yiji');
@@ -684,7 +665,7 @@ it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次�
       .filter((e) => e.source === JSON.stringify([yiji.id, e.window]))
       .map((e) => e.occurrence.index),
   ).toEqual([1, 2]);
-  clean(game);
+  settled(game);
 });
 it('枭姬拒绝第一次后，能先连营再执行第二次；不会把两次发动封进一个循环', async () => {
   const game = cardGame({
@@ -725,7 +706,7 @@ it('枭姬拒绝第一次后，能先连营再执行第二次；不会把两次�
     [1, 2],
     [2, 2],
   ]);
-  clean(game);
+  settled(game);
 });
 it('遗计给空手伤害来源一张牌后，同一窗口原本不合资格的反馈可以发动', async () => {
   const game = scenario();
@@ -748,7 +729,7 @@ it('遗计给空手伤害来源一张牌后，同一窗口原本不合资格的�
   expect(
     game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:yiji', 'standard:fankui']);
-  clean(game);
+  settled(game);
 });
 it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，角色可少摸这一张', async () => {
   const game = scenario();
@@ -774,7 +755,7 @@ it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，�
   expect(
     game.room.history.facts(Skill.invoked).map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:yingzi', 'standard:luoyi']);
-  clean(game);
+  settled(game);
 });
 it.each(['观星', '洛神'])(
   '观星与洛神同一准备时点可选择 %s 先执行，真实改变后续判定',
@@ -829,6 +810,6 @@ it.each(['观星', '洛神'])(
         ? ['standard:guanxing', 'standard:luoshen']
         : ['standard:luoshen', 'standard:guanxing'],
     );
-    clean(game);
+    settled(game);
   },
 );

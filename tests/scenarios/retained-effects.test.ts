@@ -28,8 +28,8 @@ import {
 import type { Context, SkillHandle, PhaseView } from '../../src/sdk';
 import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { card, cardGame, settled } from '../fixtures/cards';
+import { nextRequest, answer } from '../fixtures/room';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
 import { Cost } from '../../src/sdk';
@@ -38,18 +38,7 @@ import { PlayerEvent } from '../../src/rules/combat/life';
 const original = { kind: 'general', id: 'original' } as const;
 const additional = { kind: 'effect', id: 'additional' } as const;
 const death = { kind: 'rule', seq: null, data: null } as const;
-type Game = ReturnType<typeof cardGame>;
 
-async function answer(game: Game, value: unknown = true) {
-  const request = await nextRequest(game.room);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-  return request;
-}
-function rebuilt(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-}
 function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void>) {
   const retained = true;
   const lost = {
@@ -108,7 +97,7 @@ it('离场装备能使用普通 invoke 宣告并摸牌，当前能力目录仍�
   await game.room.run('closed', (ctx) => {
     expect(captured.active(ctx)).toBe(false);
   });
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['revoke', 'expiration'] as const)(
@@ -161,7 +150,7 @@ it.each(['revoke', 'expiration'] as const)(
     expect(game.room.world.snapshot.skills).toHaveLength(0);
     expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(1);
     expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -186,7 +175,7 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
     await game.skills.revoke(ctx, 'a', legacy.id, original);
   });
   expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
-  rebuilt(game);
+  settled(game);
 });
 
 it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与关闭后的引用没有该资格', async () => {
@@ -237,7 +226,7 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
   });
   expect(game.room.world.position('fee')).toBe('discard');
   expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each([false, true])('死亡来源的普通 invoke 必须明确 retain，值为 %s', async (allowDead) => {
@@ -268,7 +257,7 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 retain，值�
   await running;
   expect(game.room.history.facts(testTiming('probe.last-word'))).toHaveLength(allowDead ? 1 : 0);
   expect(game.room.world.player('a').alive).toBe(false);
-  rebuilt(game);
+  settled(game);
 });
 
 it('失效不是技能失去，部分撤销也不重复发动；最后一个有效授予失去才可保留', async () => {
@@ -298,7 +287,7 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
     await game.skills.revoke(ctx, 'a', legacy.id, additional);
   });
   expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('当前失效仍能阻止历史来源', async () => {
@@ -324,7 +313,7 @@ it('当前失效仍能阻止历史来源', async () => {
     }),
   );
   expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
-  rebuilt(game);
+  settled(game);
 });
 
 for (const [window, group] of [
@@ -375,7 +364,7 @@ for (const [window, group] of [
     });
     expect(game.room.history.facts(testTiming('probe.buried'))).toHaveLength(1);
     expect(game.room.world.snapshot.skills).toHaveLength(0);
-    rebuilt(game);
+    settled(game);
   });
 }
 
@@ -406,7 +395,7 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
   await answer(game);
   await running;
   expect(game.room.history.facts(testTiming('probe.started'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('后效执行中被明确失效会停止后续支付，不回滚已经完成的发动宣告', async () => {
@@ -443,7 +432,7 @@ it('后效执行中被明确失效会停止后续支付，不回滚已经完成�
   await running;
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.world.position('fee')).toBe('a:hand');
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['abort', 'fault'] as const)(
@@ -569,7 +558,7 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
     index: 2,
   });
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('自定义窗口显式提供技能快照；目录不读取任意历史，登记在挂接后封口', async () => {
@@ -611,7 +600,7 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
   await answer(game);
   await running;
   expect(game.room.history.facts(testTiming('probe.custom'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['invalid-array', 'conflicting-owner'] as const)(
@@ -685,7 +674,7 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
   await answer(game);
   await running;
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('历史来源的支付资格不恢复转换、查询修正或主动技能', async () => {
@@ -757,7 +746,7 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
   );
   await answer(game);
   await running;
-  rebuilt(game);
+  settled(game);
 });
 
 it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展开复制方法', async () => {
@@ -797,7 +786,7 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
   await answer(game);
   await running;
   expect(game.room.history.facts(testTiming('probe.class'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否发动为 %s', async (accept) => {

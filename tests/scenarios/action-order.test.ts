@@ -28,7 +28,7 @@ import { hujia } from '../../src/content/standard/generals/caocao';
 import { jijiang } from '../../src/content/standard/generals/liubei';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
-import { worldSeed, nextRequest } from '../fixtures/room';
+import { worldSeed, nextRequest, answer } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 
 const seats = ['a', 'b', 'c', 'd'];
@@ -60,11 +60,6 @@ function observe<T>(
 }
 async function fire(ctx: Context, value: string, subject = 'c') {
   await ctx.window(probe, value, { subject });
-}
-async function answer(room: Room, value: unknown) {
-  const request = await nextRequest(room);
-  expect(room.decisions.submit(request.id, request.token, value)).toEqual({ kind: 'accepted' });
-  return request;
 }
 const source = { kind: 'general', id: 'probe' } as const;
 const death = { kind: 'rule', seq: null, data: null } as const;
@@ -626,7 +621,7 @@ it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际
       },
     }),
   );
-  const request = await answer(game.room, { kind: 'physical', card: 'j' });
+  const request = await answer(game.room, { kind: 'physical', card: 'j' }, 'card-response');
   expect(request.player).toBe('c');
   await running;
   expect(seen).toEqual(['b', 'c', 'd', 'a', 'b', 'c', 'd', 'a']);
@@ -669,7 +664,7 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
       },
     }),
   );
-  await answer(game.room, { cards: ['replacement'], targets: [] });
+  await answer(game.room, { cards: ['replacement'], targets: [] }, 'cards-targets');
   await running;
   expect(responses).toEqual(['b', 'c', 'd', 'a']);
   expect(judgments).toEqual(['b', 'c', 'd', 'a']);
@@ -825,7 +820,11 @@ for (const custom of [false, true]) {
         },
       }),
     );
-    const supplied = await answer(game.room, { kind: 'physical', card: custom ? 'sd' : 'sb' });
+    const supplied = await answer(
+      game.room,
+      { kind: 'physical', card: custom ? 'sd' : 'sb' },
+      'card-response',
+    );
     expect(supplied.player).toBe(custom ? 'd' : 'b');
     await running;
     expect(game.room.world.player('c').hp).toBe(3);
@@ -913,7 +912,11 @@ it('真实五谷在 b 回合由 d 使用：共享牌池按 b、c、d、a 依次�
     }),
   );
   for (const [i, owner] of ['b', 'c', 'd', 'a'].entries()) {
-    const request = await answer(game.room, { cards: [`pool${i + 1}`], targets: [] });
+    const request = await answer(
+      game.room,
+      { cards: [`pool${i + 1}`], targets: [] },
+      'cards-targets',
+    );
     expect(request.player).toBe(owner);
   }
   await running;

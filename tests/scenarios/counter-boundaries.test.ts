@@ -12,7 +12,7 @@ import {
 } from '../../src/sdk';
 import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Cost } from '../../src/sdk';
@@ -82,16 +82,6 @@ async function invalidate(ctx: Context, boundary: Boundary, effect: CardEffect) 
   else if (boundary === 'finished')
     await finishGame(ctx, { winners: ['d'], reason: 'counter boundary' });
   else effect.cancel(ctx, 'root cancelled during counter opening');
-}
-
-function conserved(game: Game) {
-  expect(game.room.status).toBe('ready');
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.world.snapshot.zones.flatMap((zone) => zone.cards).sort()).toEqual(
-    game.initial.cards.map((item) => item.id).sort(),
-  );
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 }
 
 it.each(boundaries)(

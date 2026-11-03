@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, grant } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { longdan } from '../../src/content/standard/generals/zhaoyun';
 import { paoxiao } from '../../src/content/standard/generals/zhangfei';
@@ -20,21 +20,14 @@ import { createOfflineMatch } from '../../src/app/offline/practice';
 import { legacyGenerals } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
-async function grant(game: Game, skill: string) {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner: 'a', skill, source }));
-  return game.room.world.snapshot.skills.find(
-    (entry) => entry.owner === 'a' && entry.skill === skill,
-  )!.id;
-}
 
 it('龙胆将闪当杀沿用原花色点数、材料和伤害管线', async () => {
   const game = cardGame({
     hands: { a: [card('j', 'jink', 'diamond', 9)], b: [] },
     skills: [longdan],
   });
-  const instance = await grant(game, longdan.id);
+  const instance = (await grant(game, longdan.id)).id;
   await use(game, {
     actor: 'a',
     choice: { kind: 'viewAs', instance, recipe: 'jink-slash', materials: ['j'] },
@@ -55,7 +48,7 @@ it('龙胆响应时杀可当闪，不能直接以实体杀响应闪，不能冒�
     hands: { a: [card('mine', 'slash')], b: [card('enemy', 'slash')] },
     skills: [longdan],
   });
-  const instance = await grant(game, longdan.id);
+  const instance = (await grant(game, longdan.id)).id;
   const running = use(game, {
     actor: 'b',
     choice: { kind: 'physical', card: 'enemy' },
@@ -96,7 +89,7 @@ it('龙胆不绕过杀的距离与阶段次数，失去技能后旧配方立即�
     hands: { a: [card('j1', 'jink'), card('j2', 'jink')], b: [] },
     skills: [longdan],
   });
-  const instance = await grant(game, longdan.id);
+  const instance = (await grant(game, longdan.id)).id;
   await game.room.run('phase', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
       const intent = {
@@ -172,7 +165,7 @@ it('奇袭可以使用受自弃禁止的黑色装备作材料，仍触发枭姬�
     skills: [qixi, xiaoji, locked],
     draw: [card('d1', 'jink'), card('d2', 'jink')],
   });
-  const instance = await grant(game, qixi.id);
+  const instance = (await grant(game, qixi.id)).id;
   await grant(game, xiaoji.id);
   await grant(game, locked.id);
   const running = use(game, {
@@ -204,7 +197,7 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
     },
     skills: [qixi],
   });
-  const instance = await grant(game, qixi.id);
+  const instance = (await grant(game, qixi.id)).id;
   await game.room.run('check', async (ctx) => {
     const intent = {
       actor: 'a',

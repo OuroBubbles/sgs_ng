@@ -25,7 +25,7 @@ import {
   Dying,
 } from '../../src/sdk';
 import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
-import { card, cardGame } from '../fixtures/cards';
+import { card, cardGame, settled } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
@@ -44,10 +44,6 @@ async function link(game: Game, players = ['b', 'c', 'd']) {
 }
 function results(game: Game) {
   return game.room.history.facts(Damage.dealt).map((fact) => fact.data.detail);
-}
-function rebuilt(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
 }
 
 it('连环是公开权威状态，实际变化才提交并开放只读窗口', async () => {
@@ -71,7 +67,7 @@ it('连环是公开权威状态，实际变化才提交并开放只读窗口', a
   });
   expect(changed).toEqual([true, false]);
   expect(game.room.history.facts(Chain.changed)).toHaveLength(2);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['normal', 'fire', 'thunder'])(
@@ -99,7 +95,7 @@ it.each(['normal', 'fire', 'thunder'])(
     }
     expect(new Set(dealt.map((result) => result.id)).size).toBe(dealt.length);
     expect(Object.isFrozen(dealt[0]!.chainPlan)).toBe(true);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -118,7 +114,7 @@ it.each([
     );
     expect(results(game)).toHaveLength(spread ? 3 : 1);
     expect(isChained(game.room.world, 'b')).toBe(!spread);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -148,7 +144,7 @@ it('传播以起点最终伤害为基数，每个目标独立防御，不污染�
   expect(dealt.map((result) => result.sourceSnapshot.amount)).toEqual([3, 1, 1]);
   expect(dealt.map((result) => result.input.amount)).toEqual([2, 1, 1]);
   expect(dealt.map((result) => result.afterHp)).toEqual([3, 2, 3]);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['prevent', 'zero'])('起点 %s 时不解链、不传播，仍正常收束', async (kind) => {
@@ -171,7 +167,7 @@ it.each(['prevent', 'zero'])('起点 %s 时不解链、不传播，仍正常收�
   });
   expect(results(game)).toEqual([]);
   expect(['b', 'c', 'd'].every((player) => isChained(game.room.world, player))).toBe(true);
-  rebuilt(game);
+  settled(game);
 });
 
 it('传播中的防止只影响该名角色，它保留连环，后续角色继续结算', async () => {
@@ -189,7 +185,7 @@ it('传播中的防止只影响该名角色，它保留连环，后续角色继�
   expect(results(game).map((result) => result.input.to)).toEqual(['b', 'd']);
   expect(isChained(game.room.world, 'c')).toBe(true);
   expect(game.room.history.facts(Damage.prevented)).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['unlink', 'kill'])(
@@ -218,7 +214,7 @@ it.each(['unlink', 'kill'])(
     expect(results(game)[0]!.chainPlan).toEqual(['c', 'd']);
     expect(game.room.world.player('a').hp).toBe(4);
     expect(isChained(game.room.world, 'a')).toBe(true);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -237,7 +233,7 @@ it('传播顺序在提交时按模式冻结，包含来源本人，不随后效�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(results(game)[0]!.chainPlan).toEqual(['c', 'd', 'a']);
   expect(results(game).map((result) => result.input.to)).toEqual(['b', 'c', 'd', 'a']);
-  rebuilt(game);
+  settled(game);
 });
 
 it('起点收束与各传播子流程完整结束后 damage 才返回', async () => {
@@ -257,7 +253,7 @@ it('起点收束与各传播子流程完整结束后 damage 才返回', async ()
     order.push('returned');
   });
   expect(order).toEqual(['b', 'c', 'd', 'returned']);
-  rebuilt(game);
+  settled(game);
 });
 
 it('嵌套新起点独立传播，外层计划重查已解除状态，不重复击中', async () => {
@@ -276,7 +272,7 @@ it('嵌套新起点独立传播，外层计划重查已解除状态，不重复�
   expect(dealt.map((result) => result.input.to)).toEqual(['b', 'c', 'd']);
   expect(dealt[1]!.input.origin).toBeUndefined();
   expect(dealt[2]!.input.origin?.damage).toBe(dealt[1]!.id);
-  rebuilt(game);
+  settled(game);
 });
 
 it('濒死子流程先于传播，回复后继续，事实中的伤害与当前体力各自准确', async () => {
@@ -309,7 +305,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
   expect(order).toEqual(['dying', 'saved', 'c', 'd']);
   expect(results(game)[0]!.afterHp).toBe(-1);
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
-  rebuilt(game);
+  settled(game);
 });
 
 it('来源在起点后效死亡，已经产生的传播仍保留来源身份', async () => {
@@ -330,7 +326,7 @@ it('来源在起点后效死亡，已经产生的传播仍保留来源身份', a
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(results(game).map((result) => result.input.from)).toEqual(['a', 'a', 'a']);
-  rebuilt(game);
+  settled(game);
 });
 
 it('纯查询不能改变连环，关闭 Context 也不能继续调用状态操作', async () => {
@@ -342,7 +338,7 @@ it('纯查询不能改变连环，关闭 Context 也不能继续调用状态操�
   });
   expect(() => setChained(closed!, 'b', true, 'closed')).toThrow();
   expect(isChained(game.room.world, 'b')).toBe(false);
-  rebuilt(game);
+  settled(game);
 });
 
 it('终局确定后保留起点事实与计划，但不再执行后续传播', async () => {
@@ -361,7 +357,7 @@ it('终局确定后保留起点事实与计划，但不再执行后续传播', a
   expect(results(game)[0]!.chainPlan).toEqual(['c', 'd']);
   expect(game.room.world.player('c').hp).toBe(4);
   expect(isChained(game.room.world, 'c')).toBe(true);
-  rebuilt(game);
+  settled(game);
 });
 
 it('起点死亡不丢失已提交的传播计划，死亡善后结束后才继续', async () => {
@@ -380,7 +376,7 @@ it('起点死亡不丢失已提交的传播计划，死亡善后结束后才继�
         fact.data.kind === 'damage.dealt' && (fact.data.detail as DamageResult).input.to === 'c',
     ),
   );
-  rebuilt(game);
+  settled(game);
 });
 
 const flame = defineSkill({
@@ -479,7 +475,7 @@ it('真实转换火杀的裸衣只在直接伤害增伤，传播不再次叠加'
   expect(results(game).map((result) => result.amount)).toEqual([2, 2, 2]);
   expect(results(game).map((result) => result.edits.length)).toEqual([1, 0, 0]);
   expect(game.room.world.position('spark')).toBe('discard');
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['kylin_bow', 'ice_sword'])('真实火杀的 %s 不因传播对其他角色重复发动', async (weapon) => {
@@ -494,7 +490,7 @@ it.each(['kylin_bow', 'ice_sword'])('真实火杀的 %s 不因传播对其他角
   expect(results(game).map((result) => result.amount)).toEqual([1, 1]);
   expect(game.room.world.position('horse')).toBe('c:equipment');
   expect(game.room.world.zone('c:hand').cards).toHaveLength(2);
-  rebuilt(game);
+  settled(game);
 });
 
 it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自己的防具限伤', async () => {
@@ -542,7 +538,7 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
   expect(results(game).map((result) => result.amount)).toEqual([2, 1, 2]);
   expect(results(game)[1]!.input.card!.target).toBe('b');
   expect(results(game)[1]!.input.to).toBe('c');
-  rebuilt(game);
+  settled(game);
 });
 
 it('传播保留原牌材料关联，曹操仍可奸雄取得处理区材料且不重复弃置', async () => {
@@ -559,7 +555,7 @@ it('传播保留原牌材料关联，曹操仍可奸雄取得处理区材料且�
   expect(game.room.world.position('spark')).toBe('c:hand');
   expect(results(game)[1]!.input.card!.card.materials).toEqual(['spark']);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  rebuilt(game);
+  settled(game);
 });
 
 it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连环伤害并清理材料', async () => {
@@ -642,7 +638,7 @@ it.each([
     game.room.run('invalid', (ctx) => damage(ctx, { ...hit, ...extra } as DamageInput)),
   ).rejects.toThrow('Invalid damage nature or origin');
   expect(game.room.history.facts()).toEqual([]);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['workshop:ice', '', '  '])(
@@ -688,7 +684,7 @@ it.each(['workshop:ice', '', '  '])(
     });
     expect(game.room.world.position('slash1')).toBe('a:hand');
     expect(game.room.history.facts(Cost.paid)).toEqual([]);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -737,5 +733,5 @@ it('自定义属性攻击复用完整闪/突破流程，仅用普通伤害函数
   expect(results(game).every((result) => result.input.nature === 'workshop:ice')).toBe(true);
   expect(game.room.history.facts(Attack.finished)).toHaveLength(1);
   expect(game.room.world.position('ice')).toBe('discard');
-  rebuilt(game);
+  settled(game);
 });

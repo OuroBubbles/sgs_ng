@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { kill, finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
 import { allotment } from '../../src/content/workshop/allotment';
 import { card, cardGame } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { practiceContent } from '../../src/app/offline/practice';
@@ -31,12 +31,6 @@ async function grant(game: Game) {
 }
 const prepare = (game: Game) =>
   game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
-async function answer(game: Game, value: unknown) {
-  const request = await nextRequest(game.room);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
 function replay(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
@@ -110,7 +104,7 @@ it('红牌接收条件与每人额度共用最终校验，全部分配同次提�
   });
   expect(game.room.history.facts(Cards.distributed)).toHaveLength(0);
   expect(game.room.decisions.preview(request.id, valid)?.valid).toBe(true);
-  await answer(game, valid);
+  await answer(game, valid, 'arrange');
   await running;
   expect(observed).toBe(1);
   expect(game.room.history.facts(Cards.distributed)).toHaveLength(1);
@@ -142,7 +136,7 @@ it('发动支付后某接收者死亡，候选组从当前存活角色派生，�
     'c',
     'd',
   ]);
-  await answer(game, (request.data as { initial: unknown }).initial);
+  await answer(game, (request.data as { initial: unknown }).initial, 'arrange');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(top.map((card) => card.id));
   replay(game);
@@ -192,7 +186,7 @@ it('发动后失去技能不撤回已宣告的分配', async () => {
   const running = prepare(game);
   await answer(game, true);
   const request = await nextRequest(game.room);
-  await answer(game, (request.data as { initial: unknown }).initial);
+  await answer(game, (request.data as { initial: unknown }).initial, 'arrange');
   await running;
   expect(game.room.world.zone('a:hand').cards).toHaveLength(4);
   replay(game);

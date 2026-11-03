@@ -15,7 +15,7 @@ import {
 } from '../../src/sdk';
 import type { Context, SkillDefinition, SkillHandle, SkillProvider } from '../../src/sdk';
 import type { TriggerSource } from '../../src/core/runtime/event';
-import { card, cardGame } from '../fixtures/cards';
+import { card, cardGame, settled } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Cost } from '../../src/sdk';
@@ -30,11 +30,6 @@ const source: SkillHandle = {
   origin: { kind: 'effect', id: 'provider' },
   active: () => true,
 };
-
-function rebuilt(game: ReturnType<typeof cardGame>) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-}
 
 it('卸载 Provider 后不执行剩余次数', async () => {
   let remove: (ctx?: Context) => void;
@@ -62,7 +57,7 @@ it('卸载 Provider 后不执行剩余次数', async () => {
   });
   expect(seen).toEqual([1]);
   expect(game.room.history.facts(testTiming('probe.provider'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('底层 TriggerSource 重新挂接也不复活原窗口，旧卸载函数只属于原登记', async () => {
@@ -189,7 +184,7 @@ it('顺序选择返回后重查 Provider 登记，旧选项被跳过且不影响
   expect(game.room.decisions.submit(second.id, second.token, id)).toEqual({ kind: 'accepted' });
   await running;
   expect(seen).toEqual(['B', 'A', 'B']);
-  rebuilt(game);
+  settled(game);
 });
 
 it('中途安装的新 Provider 立即参与当前查询，但触发候选从下一窗口开始', async () => {
@@ -245,7 +240,7 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
     await ctx.window(window, null);
   });
   expect(seen).toEqual(['A', 'B', 'A']);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让旧询问支付', async (reinstall) => {
@@ -286,7 +281,7 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
   await running;
   expect(accepted).toBe(false);
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
-  rebuilt(game);
+  settled(game);
 });
 
 it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新的技能支付失效', async () => {
@@ -342,7 +337,7 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   expect(game.room.history.facts(Cost.paid)).toHaveLength(1);
   expect(game.room.history.facts(testTiming('probe.continued'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('来源卸载立即移除查询/转换/主动入口，重新登记只产生新的有效引用', async () => {
@@ -394,7 +389,7 @@ it('来源卸载立即移除查询/转换/主动入口，重新登记只产生�
       removeNew(at);
     }),
   );
-  rebuilt(game);
+  settled(game);
 });
 
 it('装配期无需 Context，重复登记拒绝；挂接后省略 Context 不得安装或卸载', async () => {
@@ -431,7 +426,7 @@ it('纯查询中的安装/卸载均拒绝且保留登记，正常规则操作仍
     remove(ctx);
     expect(game.skills.binding(ctx.world, source.id)).toBeUndefined();
   });
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['add', 'remove'] as const)(
@@ -454,7 +449,7 @@ it.each(['add', 'remove'] as const)(
       remove(ctx);
       expect(game.skills.bindings(ctx.world)).toEqual([]);
     });
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -481,7 +476,7 @@ it('外局、已关闭 Context 和多局共享目录不能改变运行期 Provid
   });
   detach();
   await game.room.run('own', (ctx) => remove(ctx));
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['finish', 'abort', 'fault'] as const)(
@@ -505,7 +500,7 @@ it.each(['finish', 'abort', 'fault'] as const)(
       oldDetach();
       remove(ctx);
     });
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -595,7 +590,7 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     expect(handle.active(ctx)).toBe(false);
   });
   expect(game.room.history.facts(testTiming('probe.class'))).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也不能删除新登记', async () => {
@@ -634,5 +629,5 @@ it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也
     remove(ctx);
   });
   expect(seen).toEqual([1, 1, 2, 3]);
-  rebuilt(game);
+  settled(game);
 });

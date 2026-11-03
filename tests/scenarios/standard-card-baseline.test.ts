@@ -1,5 +1,4 @@
 import { expect, it } from 'vitest';
-import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   blockSkill,
   delayedCards,
@@ -8,18 +7,16 @@ import {
   installCounterspells,
   moveCards,
   runPhase,
-  useDeclarations,
   withLifetime,
 } from '../../src/sdk';
 import type { SemanticCard, UseIntent } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Judgment } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 const slash: SemanticCard = {
   name: 'standard:slash',
   suit: 'none',
@@ -35,13 +32,6 @@ const physical = (id: string, targets: readonly string[] = []): UseIntent => ({
   targets,
   timing: { kind: 'effect' },
 });
-
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
-}
 
 it.each([
   ['chitu', false],
@@ -78,7 +68,7 @@ it.each([
     );
     expect(distances()).toEqual([2, 2]);
   });
-  replay(game);
+  settled(game);
 });
 
 it.each([
@@ -112,7 +102,7 @@ it.each([
     expect(game.book.attackRange(ctx, 'a', slash)).toBe(1);
     expect(game.book.attackRange(ctx, 'b', slash)).toBe(range);
   });
-  replay(game);
+  settled(game);
 });
 
 it.each(['use', 'response'] as const)(
@@ -169,7 +159,7 @@ it.each(['use', 'response'] as const)(
     });
     expect(game.room.history.facts(CardEvent.used)).toEqual([]);
     expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -192,7 +182,7 @@ it.each(['eight_diagram', 'nioh_shield'] as const)(
       expect(equipmentInSlot(ctx.world, game.book, 'a', 'armor')).toEqual([]);
       expect(equipmentInSlot(ctx.world, game.book, 'b', 'armor')).toEqual(['armor']);
     });
-    replay(game);
+    settled(game);
   },
 );
 
@@ -217,7 +207,7 @@ it.each(['heart', 'diamond', 'club'] as const)(
     ]);
     expect(game.room.world.position('judgment')).toBe('discard');
     expect(game.room.history.facts(Judgment.finished)).toHaveLength(1);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -239,7 +229,7 @@ it.each(['indulgence', 'lightning'] as const)(
     expect(game.room.world.position('second')).toBe('a:hand');
     expect(delayedCards(game.room.world, self ? 'a' : 'b')).toHaveLength(1);
     expect(game.room.history.facts(Judgment.finished)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -257,7 +247,7 @@ it('无中生有仅以本人为目标，实际摸两张并完成材料善后', a
   expect(game.room.world.zone('draw').cards).toEqual(['three']);
   expect(game.room.world.zone('discard').cards).toEqual(['spell']);
   expect(game.room.history.facts(Draw.completed)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it.each([1, 2])(
@@ -290,6 +280,6 @@ it.each([1, 2])(
     );
     expect(game.room.history.facts(CardEvent.used)).toHaveLength(depth + 1);
     expect(game.room.history.facts(Draw.completed)).toHaveLength(depth === 1 ? 0 : 1);
-    replay(game);
+    settled(game);
   },
 );

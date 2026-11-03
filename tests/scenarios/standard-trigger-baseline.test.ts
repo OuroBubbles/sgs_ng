@@ -1,9 +1,8 @@
 import { setImmediate } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { ownedCards, runPhase, useDeclarations } from '../../src/sdk';
-import { card, cardGame, use } from '../fixtures/cards';
+import { ownedCards, runPhase } from '../../src/sdk';
+import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
@@ -27,13 +26,6 @@ async function grant(game: Game, name: string, owner = 'a') {
   return game.room.world.snapshot.skills.find(
     (instance) => instance.owner === owner && instance.skill === `standard:${name}`,
   )!.id;
-}
-
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(useDeclarations(game.room.world)).toEqual([]);
-  expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
-  expect(game.room.decisions.pending).toEqual([]);
 }
 
 // 主动接受任何意外发动：回归时直接核对其实际影响，不靠等不到请求的超时来判断。
@@ -88,7 +80,7 @@ it('无双不会把万箭齐发的一次打出闪扩张为连续两次', async (
   expect(game.room.world.player('d').hp).toBe(3);
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it.each(['qianxun', 'kongcheng'] as const)(
@@ -127,7 +119,7 @@ it.each(['qianxun', 'kongcheng'] as const)(
       expect(ctx.world.snapshot).toEqual(before);
     });
     expect(game.room.history.facts(CardEvent.used)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -151,7 +143,7 @@ it('集智不响应他人使用的实体普通锦囊', async () => {
   expect(ownedCards(game.room.world, 'a')).toEqual([]);
   expect(ownedCards(game.room.world, 'b')).toEqual(['one', 'two']);
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it('集智不响应奇袭转换的有材料普通锦囊，实际拆牌仍完成', async () => {
@@ -180,7 +172,7 @@ it('集智不响应奇袭转换的有材料普通锦囊，实际拆牌仍完成'
   expect(game.room.world.zone('draw').cards).toEqual(['untouched']);
   expect(game.room.history.facts(Skill.invoked)).toEqual([]);
   expect(game.room.history.facts(Draw.completed)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it.each(['yingzi', 'biyue'] as const)(
@@ -196,6 +188,6 @@ it.each(['yingzi', 'biyue'] as const)(
     expect(ownedCards(game.room.world, 'a')).toHaveLength(skill === 'yingzi' ? 0 : 2);
     expect(ownedCards(game.room.world, 'b')).toHaveLength(skill === 'yingzi' ? 2 : 0);
     expect(game.room.history.facts(Skill.invoked)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );

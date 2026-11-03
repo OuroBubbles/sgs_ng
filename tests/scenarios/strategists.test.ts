@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
-import { card, cardGame } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { card, cardGame, grant, settled } from '../fixtures/cards';
+import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
 import {
@@ -34,7 +34,6 @@ import { CardEvent } from '../../src/sdk';
 import { Lifetime } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
   return cardGame({
     ...options,
@@ -43,27 +42,6 @@ function scenario(options: Parameters<typeof cardGame>[0] = {}) {
   });
 }
 const source = { kind: 'general', id: 'test' } as const;
-async function grant(game: Pick<Game, 'room' | 'skills'>, skill: string, owner = 'a') {
-  await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
-  return game.skills
-    .bindings(game.room.world)
-    .find((binding) => binding.self.owner === owner && binding.self.skill === skill)!.self;
-}
-async function answer(game: Pick<Game, 'room'>, value: unknown, kind = 'invoke') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value)).toEqual({
-    kind: 'accepted',
-  });
-}
-async function cancel(game: Pick<Game, 'room'>) {
-  const request = await nextRequest(game.room);
-  expect(game.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
-}
 const healthCause = { kind: 'rule', seq: null, data: 'test' } as const;
 
 it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与宣告同次提交', async () => {
@@ -136,7 +114,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
   expect(played).toBe(1);
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it.each(['response', 'use', 'discard'] as const)(
@@ -217,7 +195,7 @@ it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，�
     value: { matched: false, card: { id: 'last' } },
   });
   expect(game.room.history.facts(Judgment.replaced)).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 
 it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () => {
@@ -247,7 +225,7 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
     await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
     expect(await running).toMatchObject({ value: { matched: true } });
     expect(game.room.history.facts(Judgment.replaced)).toHaveLength(1);
-    replay(game);
+    settled(game);
   }
 });
 
@@ -316,7 +294,7 @@ it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', a
   expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail).toMatchObject({
     declaration: { open: false },
   });
-  replay(game);
+  settled(game);
 });
 
 it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不受弃置禁令阻挡', async () => {
@@ -415,7 +393,7 @@ it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取'
       branch === 'declared-skill' ? ['chosen'] : [],
     );
     expect(game.room.decisions.pending).toEqual([]);
-    replay(game);
+    settled(game);
   }
 });
 
@@ -434,7 +412,7 @@ it('天妒取得最终改判牌，不受判定是否成功影响，旧判定牌�
   expect(await running).toMatchObject({ value: { matched: false } });
   expect(game.room.world.position('new')).toBe('b:hand');
   expect(game.room.world.position('old')).toBe('discard');
-  replay(game);
+  settled(game);
 });
 
 it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则不强取', async () => {
@@ -464,7 +442,7 @@ it('天妒宣告后技能失去仍可取得，牌被先取走或本人死亡则�
     expect(game.room.world.position('top')).toBe(
       branch === 'revoke' ? 'a:hand' : branch === 'taken' ? 'c:hand' : 'discard',
     );
-    replay(game);
+    settled(game);
   }
 });
 
@@ -561,7 +539,7 @@ it('遗计每点伤害独立征询，拒绝第一点不取消第二点，可一�
   expect(game.room.world.zone('c:hand').cards).toEqual(['one', 'two']);
   expect(game.room.world.position('unused')).toBe('draw');
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence 不再发动', async () => {
@@ -585,7 +563,7 @@ it('遗计已宣告部分不因失去技能中断，后一个伤害 occurrence �
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['one', 'two']);
   expect(game.room.world.position('unused')).toBe('draw');
-  replay(game);
+  settled(game);
 });
 
 it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌弃置且元数据关闭', async () => {
@@ -608,7 +586,7 @@ it('遗计交出部分牌后本人死亡，已交出的牌保留，池中余牌�
   expect(game.room.world.position('one')).toBe('b:hand');
   expect(game.room.world.position('two')).toBe('discard');
   expect(privateCardPools(game.room.world, 'a')).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it('私有牌池只洗弃牌补足，不借用外层处理区；牌被先取走后按实时余牌选择', async () => {
@@ -639,7 +617,7 @@ it('私有牌池只洗弃牌补足，不借用外层处理区；牌被先取走�
   await running;
   expect(game.room.world.position('first')).toBe('c:hand');
   expect(game.room.world.position('second')).toBe('a:hand');
-  replay(game);
+  settled(game);
 });
 
 it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者状态', async () => {
@@ -684,7 +662,7 @@ it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者�
       statesBefore: [{ key: 'core:private-pool', owner: 'a' }],
     },
   ]);
-  replay(game);
+  settled(game);
 });
 
 it('遗计空牌堆或不足两张时正常结束，不制造必选死锁', async () => {
@@ -698,7 +676,7 @@ it('遗计空牌堆或不足两张时正常结束，不制造必选死锁', asyn
     if (count) await cancel(game);
     await running;
     expect(game.room.world.zone('a:hand').cards).toHaveLength(count);
-    replay(game);
+    settled(game);
   }
 });
 

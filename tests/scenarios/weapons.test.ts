@@ -17,12 +17,11 @@ import {
 import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 const strike = (
   choice: CardChoice = { kind: 'physical', card: 's0' },
   targets = ['b'],
@@ -33,11 +32,6 @@ const generated: CardChoice = {
   materials: [],
   reason: 'probe',
 };
-async function answer(game: Game, value: unknown, kind = 'card-response') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value).kind).toBe('accepted');
-}
 function axeGame(extra = 2) {
   return cardGame({
     hands: {
@@ -63,7 +57,7 @@ it.each([false, true])(
         run: (_ctx, draft) => draft.prevent('probe'),
       });
     const running = use(game, strike());
-    await answer(game, { kind: 'physical', card: 'j' });
+    await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
     const request = await nextRequest(game.room);
     expect(
       game.room.decisions.submit(request.id, request.token, {
@@ -91,7 +85,7 @@ it.each([false, true])(
 it.each([1, 2])('贯石斧材料不足或取消不收费：其他牌 %s', async (extra) => {
   const game = axeGame(extra);
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   if (extra === 2) {
     const request = await nextRequest(game.room);
     game.room.decisions.cancel(request.id, request.token);
@@ -125,7 +119,7 @@ it.each(['lost', 'dead'])('贯石斧已支付后来源 %s，已宣告突破仍�
     },
   });
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await answer(game, { cards: ['fee0', 'fee1'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
@@ -142,7 +136,7 @@ it('防御结果在全部闪满足后才开放；部分成功不会激活贯石�
     policy: { responseTimes: () => 2 },
   });
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.history.facts(Attack.defended)).toHaveLength(0);
@@ -162,7 +156,7 @@ it('防御结果禁止纯查询修改，封口后迟到突破被拒绝', async (
     },
   });
   const running = use(game, strike({ kind: 'physical', card: 'slash1' }));
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await running;
   await game.room.run('late', () => {
     expect(() => draft.breakDefense('late')).toThrow();
@@ -179,7 +173,7 @@ it('万箭的闪不激活贯石斧；防具直接取消杀也不冒充闪避', a
     equipment: { a: [card('weapon', 'axe')] },
   });
   const running = use(volley, strike({ kind: 'physical', card: 'v' }, []));
-  await answer(volley, { kind: 'physical', card: 'j' });
+  await answer(volley, { kind: 'physical', card: 'j' }, 'card-response');
   await running;
   expect(volley.room.history.facts(Skill.invoked)).toHaveLength(0);
   expect(volley.room.world.player('b').hp).toBe(4);
@@ -208,7 +202,7 @@ it('青龙追加杀具有独立身份与处理区，原杀仍是已防御', asyn
     },
   });
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   await answer(game, { kind: 'physical', card: 's1' }, 'use-card');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
@@ -235,7 +229,7 @@ it('青龙连续追杀依次嵌套，每次仍能闪避与选择继续', async (
   });
   const running = use(game, strike());
   for (let i = 0; i < 2; i++) {
-    await answer(game, { kind: 'physical', card: `j${i}` });
+    await answer(game, { kind: 'physical', card: `j${i}` }, 'card-response');
     await answer(game, { kind: 'physical', card: `s${i + 1}` }, 'use-card');
   }
   await running;
@@ -266,7 +260,7 @@ it.each([false, true])('青龙忽略变化后的距离，但仍受目标禁令�
     },
   });
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j' });
+  await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
   if (!prohibited) await answer(game, { kind: 'physical', card: 's1' }, 'use-card');
   await running;
   expect(game.room.world.player('b').hp).toBe(prohibited ? 4 : 3);
@@ -295,7 +289,7 @@ it('青龙在发动前离场不再追杀；主动拒绝追杀也不消耗杀', a
         },
       });
     const running = use(game, strike());
-    await answer(game, { kind: 'physical', card: 'j' });
+    await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
     if (!lost) {
       const request = await nextRequest(game.room);
       game.room.decisions.cancel(request.id, request.token);
@@ -320,11 +314,11 @@ it('青龙允许武圣以刀本身追杀，宣告离场后不再继续追杀', a
     });
   });
   const running = use(game, strike());
-  await answer(game, { kind: 'physical', card: 'j0' });
+  await answer(game, { kind: 'physical', card: 'j0' }, 'card-response');
   const request = await nextRequest(game.room);
   const offer = (request.data as { offers: CardOffer[] }).offers.find((o) => o.label === '武圣')!;
   await answer(game, { kind: 'viewAs', ...offer.choice, materials: ['weapon'] }, 'use-card');
-  await answer(game, { kind: 'physical', card: 'j1' });
+  await answer(game, { kind: 'physical', card: 'j1' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.position('weapon')).toBe('discard');

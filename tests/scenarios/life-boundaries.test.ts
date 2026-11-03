@@ -1,8 +1,7 @@
 import { expect, it } from 'vitest';
 import { finishGame, kill, pay, loseHp, recover, Death, Hp } from '../../src/sdk';
 import type { Context, DeathDraft, RecoveryDraft } from '../../src/sdk';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 import { Cost } from '../../src/sdk';
 import { Dying } from '../../src/sdk';
@@ -20,11 +19,6 @@ async function wound(game: Game, hp = 1) {
   await game.room.run('setup', (ctx) =>
     ctx.commit(testTiming('test.wound'), [{ kind: 'vitality', player: 'b', hp }], null),
   );
-}
-function conserved(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.status).toBe('ready');
 }
 async function lateCost(ctx: Context) {
   ctx.commit(testTiming('test.late-candidate'), [], null);

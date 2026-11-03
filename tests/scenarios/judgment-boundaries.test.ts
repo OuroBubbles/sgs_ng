@@ -1,12 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { judge, kill, finishGame, draw, Judgment } from '../../src/sdk';
 import type { Context, JudgmentResult } from '../../src/sdk';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 
-type Game = ReturnType<typeof cardGame>;
 type Boundary = 'dead' | 'finished';
 const stages = [Judgment.revealed, Judgment.retrial] as const;
 const boundaries = ['dead', 'finished'] as const;
@@ -27,18 +25,6 @@ async function invalidate(ctx: Context, boundary: Boundary, player = 'a') {
       reason: 'rule',
       cause: { kind: 'rule', seq: null, data: null },
     });
-}
-function conserved(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
-  expect(game.room.world.snapshot.states.some((state) => state.key === 'core:judgment-card')).toBe(
-    false,
-  );
-  expect(game.room.world.snapshot.zones.flatMap((zone) => zone.cards).sort()).toEqual(
-    game.initial.cards.map((card) => card.id).sort(),
-  );
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.status).toBe('ready');
 }
 
 for (const stage of stages) {

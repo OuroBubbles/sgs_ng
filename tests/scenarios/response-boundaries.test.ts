@@ -23,7 +23,7 @@ import { guicai } from '../../src/content/standard/generals/simayi';
 import { wushuang } from '../../src/content/standard/generals/lvbu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
-import { worldSeed, nextRequest } from '../fixtures/room';
+import { worldSeed, nextRequest, answer } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -42,10 +42,6 @@ function watchOrder<T>(game: ReturnType<typeof cardGame>, window: Timing<T, unkn
       },
     });
   return seen;
-}
-async function answer(room: Room, value: unknown) {
-  const request = await nextRequest(room);
-  expect(room.decisions.submit(request.id, request.token, value)).toEqual({ kind: 'accepted' });
 }
 
 for (const delegated of [false, true]) {
@@ -80,7 +76,7 @@ for (const delegated of [false, true]) {
       targets: [delegated ? 'b' : 'c'],
       timing: { kind: 'effect', ignoreDistance: true },
     });
-    await answer(game.room, { kind: 'physical', card: 'j' });
+    await answer(game.room, { kind: 'physical', card: 'j' }, 'card-response');
     await running;
     expect(finished).toEqual(delegated ? ['c', 'd', 'a', 'b'] : []);
     expect(used).toEqual([
@@ -131,7 +127,7 @@ it('鬼才由 c 为 b 改判：实际打出者决定支付和打出完成窗口�
       match: (_at, card) => card.suit === 'heart',
     }),
   );
-  await answer(game.room, { cards: ['replacement'], targets: [] });
+  await answer(game.room, { cards: ['replacement'], targets: [] }, 'cards-targets');
   expect(await running).toMatchObject({
     kind: 'resolved',
     value: { kind: 'judged', matched: true, player: 'b' },
@@ -176,7 +172,7 @@ it('独立供牌保留原接收者与查询守卫，从实际 c 结算完成窗�
   );
   await nextRequest(game.room);
   input.available = () => false;
-  await answer(game.room, { kind: 'physical', card: 'supply' });
+  await answer(game.room, { kind: 'physical', card: 'supply' }, 'card-response');
   expect(await running).toMatchObject({
     kind: 'resolved',
     value: { kind: 'supplied', value: 'standard:slash' },
@@ -212,7 +208,7 @@ it('供牌支付后的异步资格不能被布尔组合掩盖，已提交费用�
     ),
   );
   const failed = expect(running).rejects.toThrow('Queries cannot await');
-  await answer(game.room, { kind: 'physical', card: 'supply' });
+  await answer(game.room, { kind: 'physical', card: 'supply' }, 'card-response');
   await failed;
   expect(game.room.status).toBe('faulted');
   expect(game.room.history.facts(testTiming('probe.supply-after-async'))).toEqual([]);
@@ -318,7 +314,7 @@ for (const interruptAt of [1, 2]) {
         timing: { kind: 'effect' },
       }),
     );
-    if (interruptAt === 2) await answer(room, { kind: 'physical', card: 'b1' });
+    if (interruptAt === 2) await answer(room, { kind: 'physical', card: 'b1' }, 'card-response');
     expect(await running).toMatchObject({
       kind: 'resolved',
       value: {
@@ -351,7 +347,7 @@ it('无双决斗要求 b 连续两杀：第二张流程中止不变成失败，�
       timing: { kind: 'effect' },
     }),
   );
-  await answer(room, { kind: 'physical', card: 'b1' });
+  await answer(room, { kind: 'physical', card: 'b1' }, 'card-response');
   expect(await running).toMatchObject({
     kind: 'resolved',
     value: { use: { effects: [{ state: 'aborted' }] } },

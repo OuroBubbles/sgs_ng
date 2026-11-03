@@ -1,6 +1,6 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import { cardGame, card } from '../fixtures/cards';
+import { cardGame, card, settled } from '../fixtures/cards';
 import { covenant } from '../../examples/effects/covenant';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -82,10 +82,6 @@ function create(
   };
 }
 type Game = ReturnType<typeof create>;
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-}
 function value(game: Game) {
   return game.room.inspect((ctx) => game.skills.query(ctx, strength, null, 0));
 }
@@ -163,7 +159,7 @@ it('独立实例跨创建 Flow 存在、参与查询与触发，不授予假技�
   });
   expect(value(game)).toBe(0);
   expect(game.ended).toEqual([id]);
-  replay(game);
+  settled(game);
 });
 it('相同定义的多个实例独立叠加、更新与移除，不共享技能次数或数据', async () => {
   const game = create();
@@ -178,7 +174,7 @@ it('相同定义的多个实例独立叠加、更新与移除，不共享技能�
   expect(value(game)).toBe(10);
   await game.room.run('remove', (ctx) => game.effects.end(ctx, second!.id, 'used'));
   expect(value(game)).toBe(7);
-  replay(game);
+  settled(game);
 });
 it('领域结束先清除所有实例的查询资格，再发结束后效，重建不会复活', async () => {
   const game = create();
@@ -200,7 +196,7 @@ it('领域结束先清除所有实例的查询资格，再发结束后效，重�
   expect(game.ended).toHaveLength(2);
   expect(game.effects.instances(game.room.world)).toEqual([]);
   expect(value(game)).toBe(0);
-  replay(game);
+  settled(game);
 });
 it.each([false, true])(
   '同批到期后效的局部中止不吞掉其余实例，领域本体中止=%s',
@@ -236,7 +232,7 @@ it.each([false, true])(
     );
     expect(resumed).toBe(!abortBody);
     expect(game.room.status).toBe('ready');
-    replay(game);
+    settled(game);
   },
 );
 
@@ -256,7 +252,7 @@ it('显式结束的后效中止仍传播给调用者，不借批量到期边界�
   expect(game.room.status).toBe('ready');
   expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
   expect(game.effects.instances(game.room.world)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it.each(['fault', 'close'] as const)(
@@ -284,7 +280,7 @@ it.each(['fault', 'close'] as const)(
     expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
     expect(game.room.history.facts(testTiming('must not write'))).toEqual([]);
     expect(game.effects.instances(game.room.world)).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -308,7 +304,7 @@ it('来源与效果归属角色死亡不隐含撤销，规则可在死亡后继�
   expect(value(game)).toBe(3);
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(game.fired).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 it('实例声明可与费用同次提交，支付后效立即看到效果，未支付不添加', async () => {
   const game = create();
@@ -353,7 +349,7 @@ it('实例声明可与费用同次提交，支付后效立即看到效果，未�
     ).toBe('paid');
   });
   expect(value(game)).toBe(5);
-  replay(game);
+  settled(game);
 });
 
 it('全局实例与角色实例按本局行动序调度，不把原来源当作永久锚点', async () => {
@@ -377,7 +373,7 @@ it('全局实例与角色实例按本局行动序调度，不把原来源当作�
   );
   // Window 的无角色候选先于席位候选；席位仍从当前 b 回合排序。
   expect(game.fired).toEqual([records[2]!.id, records[1]!.id, records[0]!.id]);
-  replay(game);
+  settled(game);
 });
 it('已宣告效果不依赖原技能继续持有或有效', async () => {
   const independent = defineEffect<Data>({
@@ -437,7 +433,7 @@ it('入场后更新数据，既有候选执行时读取最新值', async () => {
   });
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(seen).toEqual([8]);
-  replay(game);
+  settled(game);
 });
 it('前组结束效果后，已收集的后组候选不再执行或收费', async () => {
   let charged = 0;
@@ -470,7 +466,7 @@ it('前组结束效果后，已收集的后组候选不再执行或收费', asyn
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(charged).toBe(0);
   expect(game.room.history.facts(Cost.paid)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it('有限次数在入场时固定，逐次执行可读取更新数据，不从新数值补次数', async () => {
@@ -495,7 +491,7 @@ it('有限次数在入场时固定，逐次执行可读取更新数据，不从�
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(seen).toEqual([1, 2]);
   expect(game.effects.instances(game.room.world)[0]!.data).toEqual({ amount: 7 });
-  replay(game);
+  settled(game);
 });
 it('普通异步函数可以嵌套同类窗口，实例数据与每次事件身份独立', async () => {
   const seen: number[] = [];
@@ -520,7 +516,7 @@ it('普通异步函数可以嵌套同类窗口，实例数据与每次事件身�
   );
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(seen).toEqual([1, 0]);
-  replay(game);
+  settled(game);
 });
 it('创建流程中止仍结束临时效果；结束回调不能恢复查询资格', async () => {
   const game = create({
@@ -539,7 +535,7 @@ it('创建流程中止仍结束临时效果；结束回调不能恢复查询资�
   expect(game.room.history.facts(Effect.ended)[0]?.data.detail).toMatchObject({
     reason: 'lifetime:aborted:aborted',
   });
-  replay(game);
+  settled(game);
 });
 it('效果句柄拒绝外局和旧挂接；重新挂接只产生新的执行资格', async () => {
   const game = create();
@@ -571,7 +567,7 @@ it('效果句柄拒绝外局和旧挂接；重新挂接只产生新的执行资�
   expect(next.inspect((ctx) => game.skills.query(ctx, strength, null, 0))).toBe(2);
   expect(game.handle()!.current(next.world)?.data.amount).toBe(2);
   detachAgain();
-  replay(game);
+  settled(game);
 });
 it('已提交实例以普通数据重建，新执行器加载同一定义后恢复查询和触发', async () => {
   const game = create();
@@ -585,7 +581,7 @@ it('已提交实例以普通数据重建，新执行器加载同一定义后恢�
   await restored.run('tick', (ctx) => ctx.window(tick, null));
   expect(game.fired).toHaveLength(1);
   detach();
-  replay(game);
+  settled(game);
 });
 it.each(['data', 'owner', 'definition'] as const)(
   '非法 %s 在整次声明前拒绝，不留下半条状态',
@@ -641,7 +637,7 @@ it('创建、更新与结束都拒绝纯查询写入', async () => {
     expect(() => ctx.query(() => game.effects.end(ctx, record.id, 'pure'))).toThrow('Pure queries');
   });
   expect(value(game)).toBe(1);
-  replay(game);
+  settled(game);
 });
 it('普通工厂的分支移除触发后，已收集候选不再借旧回调执行', async () => {
   let fired = 0;
@@ -675,7 +671,7 @@ it('普通工厂的分支移除触发后，已收集候选不再借旧回调执�
   });
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(fired).toBe(0);
-  replay(game);
+  settled(game);
 });
 it('同一候选身份的工厂闭包按最新数据重绑，入场次数仍保持快照', async () => {
   const seen: number[] = [];
@@ -709,7 +705,7 @@ it('同一候选身份的工厂闭包按最新数据重绑，入场次数仍保�
   });
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(seen).toEqual([9]);
-  replay(game);
+  settled(game);
 });
 it('数据声明复制冻结，非法更新在提交前拒绝，旧内容与事实保留', async () => {
   const game = create();
@@ -835,7 +831,7 @@ it('嵌套领域到期只移除自己的实例，外层与独立实例继续贡�
   );
   expect(value(game)).toBe(3);
   expect(game.ended).toHaveLength(2);
-  replay(game);
+  settled(game);
 });
 it('外局仍活跃的领域不能赋给本局效果，拒绝前不提交状态', async () => {
   const game = create();
@@ -855,7 +851,7 @@ it('外局仍活跃的领域不能赋给本局效果，拒绝前不提交状态'
   );
   expect(game.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.history.facts(Effect.added)).toEqual([]);
-  replay(other);
+  settled(other);
 });
 it.each(['factory', 'contribution'] as const)(
   '直接纯查询也拒绝效果 %s 中的规则写入，失败后守卫正常退出',
@@ -889,7 +885,7 @@ it.each(['factory', 'contribution'] as const)(
     });
     expect(game.room.history.facts(testTiming('bad-factory'))).toEqual([]);
     expect(game.room.history.facts(testTiming('bad-query'))).toEqual([]);
-    replay(game);
+    settled(game);
   },
 );
 it.each(['finish', 'abort', 'fault'] as const)(

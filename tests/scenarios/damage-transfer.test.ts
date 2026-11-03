@@ -20,18 +20,13 @@ import type {
   Context,
   Timing,
 } from '../../src/sdk';
-import { cardGame, card } from '../fixtures/cards';
-import { rebuildWorld } from '../../src/core/history/rebuild';
+import { cardGame, card, settled } from '../fixtures/cards';
 import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'normal' } as const;
 const facts = (game: Game, kind: Timing<unknown, unknown> = Damage.dealt) =>
   game.room.history.facts(kind).map((fact) => fact.data.detail as DamageResult);
-function rebuilt(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-}
 function redirect(game: Game, to = 'c') {
   game.room.on(Damage.inflicting, {
     id: 'redirect',
@@ -128,7 +123,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
   expect(shieldOf(game.room.world, 'b')).toBe(3);
   expect(game.room.world.player('c').hp).toBe(2);
   expect(facts(game, Damage.transferred)).toEqual([parent]);
-  rebuilt(game);
+  settled(game);
 });
 
 it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', async () => {
@@ -158,7 +153,7 @@ it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', asy
   expect(facts(game)).toHaveLength(1);
   expect(facts(game)[0]!.input.to).toBe('b');
   expect(facts(game, Damage.transferred)).toHaveLength(2);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结算', async (kind) => {
@@ -184,7 +179,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(facts(game)[0]!.input.to).toBe('b');
   expect(game.room.history.facts(Damage.transferring)).toHaveLength(0);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消耗原护盾', async (kind) => {
@@ -218,7 +213,7 @@ it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消
       kind === 'prevent' ? Damage.prevented : kind === 'die' ? Damage.unavailable : Damage.zero,
     ),
   ).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });
 
 it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防御中死亡不删除归属', async () => {
@@ -247,7 +242,7 @@ it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(facts(game)[0]!.input.from).toBe('a');
   expect(game.room.world.player('b').hp).toBe(4);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡不恢复原伤害', async (kind) => {
@@ -299,7 +294,7 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
   expect(game.room.world.player('c').hp).toBe(kind === 'receiver' ? 0 : 2);
   expect(facts(game, Damage.transferred)[0]!.hpLoss).toBe(0);
   expect(JSON.stringify(game.room.history.facts(Cost.paid))).toContain('"target":"c"');
-  rebuilt(game);
+  settled(game);
 });
 
 it('费用同批状态令接收方死亡，仍完成已承诺转移；没有支付后存活重查恢复伤害', async () => {
@@ -328,7 +323,7 @@ it('费用同批状态令接收方死亡，仍完成已承诺转移；没有支�
   await game.room.run('hit', (ctx) => damage(ctx, hit));
   expect(game.room.world.player('b').hp).toBe(4);
   expect(facts(game)).toEqual([]);
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
@@ -366,7 +361,7 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
     expect(game.room.world.position('fee')).toBe('b:hand');
     expect(game.room.world.player('b').hp).toBe(kind === 'prevented' ? 4 : 2);
     expect(game.room.history.facts(Damage.transferring)).toEqual([]);
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -407,7 +402,7 @@ it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭�
   expect(game.room.history.facts(Damage.transferring)[0]!.data.detail).toMatchObject({
     amount: 1,
   });
-  rebuilt(game);
+  settled(game);
 });
 
 it.each(['source', 'query', 'foreign', 'stale'])(
@@ -446,7 +441,7 @@ it.each(['source', 'query', 'foreign', 'stale'])(
       });
     }
     expect(facts(game)[0]!.input.to).toBe('b');
-    rebuilt(game);
+    settled(game);
   },
 );
 
@@ -458,7 +453,7 @@ it('转移到未连环角色：原角色保留连环，其余角色不传播', a
   expect(facts(game).map((result) => result.input.to)).toEqual(['c']);
   expect(isChained(game.room.world, 'b')).toBe(true);
   expect(isChained(game.room.world, 'd')).toBe(true);
-  rebuilt(game);
+  settled(game);
 });
 
 it('直接伤害转移到连环角色，在实际接收方冻结新计划；原目标可在计划中再次受伤', async () => {
@@ -478,7 +473,7 @@ it('直接伤害转移到连环角色，在实际接收方冻结新计划；原�
   expect(results[0]!.chainPlan).toEqual(['d', 'b']);
   expect(results.slice(1).every((result) => isChainDamage(result.input))).toBe(true);
   expect(isChainDamage(results[0]!.input)).toBe(false);
-  rebuilt(game);
+  settled(game);
 });
 
 it('传播包被转移仍属于原连环，不重新扩张；已解链的新目标不再重复传播', async () => {
@@ -501,7 +496,7 @@ it('传播包被转移仍属于原连环，不重新扩张；已解链的新目�
   });
   expect(isChainDamage(results[1]!.input)).toBe(true);
   expect(isChained(game.room.world, 'c')).toBe(true);
-  rebuilt(game);
+  settled(game);
 });
 
 it('忽略护盾随本次伤害转移，来源归属保持，后续连环各自仍使用护盾', async () => {
@@ -517,7 +512,7 @@ it('忽略护盾随本次伤害转移，来源归属保持，后续连环各自�
     { input: { to: 'c' }, hpLoss: 2, shieldLost: 0, shieldBypass: 'request' },
     { input: { to: 'd' }, hpLoss: 0, shieldLost: 2, shieldBypass: null },
   ]);
-  rebuilt(game);
+  settled(game);
 });
 
 it('新目标后效结束整局，原结果仍为已转移并停止原防御候选', async () => {
@@ -538,5 +533,5 @@ it('新目标后效结束整局，原结果仍为已转移并停止原防御候�
   expect(result.kind).toBe('transferred');
   expect(game.room.world.player('b').hp).toBe(4);
   expect(facts(game)).toHaveLength(1);
-  rebuilt(game);
+  settled(game);
 });

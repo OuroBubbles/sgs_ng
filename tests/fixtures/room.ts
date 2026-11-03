@@ -44,3 +44,24 @@ export async function nextRequest(target: Room): Promise<DecisionRequest> {
     return request;
   });
 }
+
+type Roomed = Room | { readonly room: Room };
+const roomOf = (target: Roomed): Room => (target instanceof Room ? target : target.room);
+/** 回答下一个请求并断言被接受；kind 为 null 时不检查请求类型。 */
+export async function answer(
+  target: Roomed,
+  value: unknown = true,
+  kind: string | null = 'invoke',
+): Promise<DecisionRequest> {
+  const at = roomOf(target);
+  const request = await nextRequest(at);
+  if (kind !== null) expect(request.kind).toBe(kind);
+  expect(at.decisions.submit(request.id, request.token, value)).toEqual({ kind: 'accepted' });
+  return request;
+}
+/** 取消下一个请求并断言被接受。 */
+export async function cancel(target: Roomed): Promise<void> {
+  const at = roomOf(target);
+  const request = await nextRequest(at);
+  expect(at.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
+}

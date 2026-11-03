@@ -15,7 +15,7 @@ import {
 import type { CardOffer, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use } from '../fixtures/cards';
-import { nextRequest } from '../fixtures/room';
+import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
 import { Collateral } from '../../src/content/standard/collateral';
@@ -37,11 +37,6 @@ function create(slashes = 0) {
     },
     equipment: { b: [card('weapon', 'crossbow')] },
   });
-}
-async function answer(game: Game, value: unknown, kind = 'use-card') {
-  const request = await nextRequest(game.room);
-  expect(request.kind).toBe(kind);
-  expect(game.room.decisions.submit(request.id, request.token, value).kind).toBe('accepted');
 }
 function killPlayer(game: Game, target: string) {
   game.room.on(Use.declared, {
@@ -86,7 +81,7 @@ it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随�
     data: { targets: ['c'], timing: 'effect' },
   });
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(1);
-  await answer(game, { kind: 'physical', card: 's0' });
+  await answer(game, { kind: 'physical', card: 's0' }, 'use-card');
   expect((await running).kind).toBe('resolved');
   expect(game.room.history.facts(CardEvent.finished)[1]?.data.detail).toMatchObject({
     parameters: { victim: 'c' },
@@ -151,7 +146,7 @@ it('受害者可以是借刀者；禁止锦囊指定受害者不冒充禁止指�
     },
   });
   const running = use(game, intent({ victim: 'a' }));
-  await answer(game, { kind: 'physical', card: 'slash' });
+  await answer(game, { kind: 'physical', card: 'slash' }, 'use-card');
   await running;
   expect(game.room.world.player('a').hp).toBe(3);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
@@ -182,7 +177,7 @@ it('杀被仁王盾抵消仍已履行用杀，不再交武器', async () => {
     equipment: { b: [card('weapon', 'crossbow')], c: [card('shield', 'nioh_shield')] },
   });
   const running = use(game, intent());
-  await answer(game, { kind: 'physical', card: 's' });
+  await answer(game, { kind: 'physical', card: 's' }, 'use-card');
   await running;
   expect(game.room.world.player('c').hp).toBe(4);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
@@ -208,7 +203,7 @@ it('被要求的杀可用转换配方，仍是用牌而非打出响应', async (
   const offer = (request.data as { offers: CardOffer[] }).offers.find(
     (offer) => offer.label === '武圣',
   )!;
-  await answer(game, { kind: 'viewAs', ...offer.choice, materials: ['red'] });
+  await answer(game, { kind: 'viewAs', ...offer.choice, materials: ['red'] }, 'use-card');
   await running;
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('red')).toBe('discard');
@@ -238,7 +233,7 @@ it('借刀额外用杀不受出牌阶段限次影响，也不消耗新的阶段�
       ).toMatchObject({ ok: false, reason: 'Usage limit reached.' });
     }),
   );
-  await answer(game, { kind: 'physical', card: 's1' });
+  await answer(game, { kind: 'physical', card: 's1' }, 'use-card');
   await running;
   expect(game.room.world.player('c').hp).toBe(2);
 });
@@ -282,7 +277,7 @@ it.each([0, 1])('借刀者死亡不吞掉已宣告效果，但不会获得武器
   const game = create(count);
   killPlayer(game, 'a');
   const running = use(game, intent());
-  if (count) await answer(game, { kind: 'physical', card: 's0' });
+  if (count) await answer(game, { kind: 'physical', card: 's0' }, 'use-card');
   await running;
   expect(game.room.world.player('c').hp).toBe(count ? 3 : 4);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
@@ -295,7 +290,7 @@ it('无懈只反制持武器者上的借刀效果，不向附属目标再开一�
   });
   installCounterspells(game.room, game.book);
   const running = use(game, intent());
-  await answer(game, { kind: 'physical', card: 'n' });
+  await answer(game, { kind: 'physical', card: 'n' }, 'use-card');
   const result = await running;
   expect(result).toMatchObject({
     value: { use: { effects: [{ target: 'b', state: 'cancelled' }] } },
@@ -357,9 +352,13 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
             return game.book.use(ctx, { actor, choice, timing, ...selected.value });
           })
         : use(game, intent());
-    await answer(game, { kind: 'physical', card: mode === 'replace' ? 'd0' : 'b0' });
+    await answer(game, { kind: 'physical', card: mode === 'replace' ? 'd0' : 'b0' }, 'use-card');
     if (mode !== 'replace')
-      await answer(game, { kind: 'physical', card: mode === 'additional' ? 'd0' : 'b1' });
+      await answer(
+        game,
+        { kind: 'physical', card: mode === 'additional' ? 'd0' : 'b1' },
+        'use-card',
+      );
     await running;
     expect(game.room.world.player('c').hp).toBe(mode === 'replace' ? 3 : 2);
     expect(game.room.world.position('bw')).toBe('b:equipment');
@@ -373,7 +372,7 @@ it('外部修改预填参数不改变已宣告受害者', async () => {
   const running = use(game, intent(input));
   const request = await nextRequest(game.room);
   input.victim = 'a';
-  await answer(game, { kind: 'physical', card: 's0' });
+  await answer(game, { kind: 'physical', card: 's0' }, 'use-card');
   await running;
   expect(request.data).toMatchObject({ targets: ['c'] });
   expect(game.room.world.player('c').hp).toBe(3);

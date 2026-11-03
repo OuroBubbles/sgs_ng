@@ -13,14 +13,12 @@ import {
 } from '../../src/sdk';
 import { qingguo } from '../../src/content/standard/generals/zhenji';
 import type { CardEffect } from '../../src/sdk';
-import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
 
-type Game = ReturnType<typeof cardGame>;
 const attack = {
   actor: 'a',
   choice: { kind: 'physical', card: 'attack' },
@@ -31,11 +29,6 @@ function create() {
   return cardGame({
     hands: { a: [card('attack', 'slash')], b: [card('dodge', 'jink'), card('answer', 'slash')] },
   });
-}
-function replay(game: Game) {
-  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
 }
 
 it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成立', async () => {
@@ -78,7 +71,7 @@ it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成�
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('answer')).toBe('discard');
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另行请求的杀', async () => {
@@ -123,7 +116,7 @@ it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另�
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.position('dodge')).toBe('b:hand');
   expect(game.room.world.position('answer')).toBe('discard');
-  replay(game);
+  settled(game);
 });
 
 it('响应次数按实际请求牌名查询，禁闪不把杀次数归零，政策可区分名称', async () => {
@@ -143,7 +136,7 @@ it('响应次数按实际请求牌名查询，禁闪不把杀次数归零，政�
     },
   });
   await use(game, attack);
-  replay(game);
+  settled(game);
 });
 
 it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再次索取费用', async () => {
@@ -182,7 +175,7 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
   expect(game.room.history.facts(testTiming('test.extra-provider'))).toEqual([]);
   expect(game.room.world.position('fee')).toBe('c:hand');
   expect(game.room.history.facts(CardEvent.responded)).toHaveLength(1);
-  replay(game);
+  settled(game);
 });
 
 it('混合请求的菜单和最终回复仅允许未被禁用的牌，八卦不为已禁闪开启判定', async () => {
@@ -220,7 +213,7 @@ it('混合请求的菜单和最终回复仅允许未被禁用的牌，八卦不�
     requestedNames: ['standard:jink', 'standard:slash'],
     names: ['standard:slash'],
   });
-  replay(game);
+  settled(game);
 });
 
 it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未禁用的黑色实体杀', async () => {
@@ -267,7 +260,7 @@ it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未�
   expect(game.room.history.facts(CardEvent.responded)[0]!.data.detail).toMatchObject({
     declaration: { card: { name: 'standard:slash', source: null } },
   });
-  replay(game);
+  settled(game);
 });
 
 it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际代打者保留独立身份', async () => {
@@ -315,7 +308,7 @@ it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际�
   });
   expect(game.room.world.position('supply')).toBe('discard');
   expect(game.room.world.position('dodge')).toBe('b:hand');
-  replay(game);
+  settled(game);
 });
 
 it('实际代打者的禁止打出查询仍生效，委托失败后原请求继续并能由本人响应', async () => {
@@ -376,7 +369,7 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
   expect(game.room.history.facts(CardEvent.responded)[0]!.data.detail).toMatchObject({
     actor: 'b',
   });
-  replay(game);
+  settled(game);
 });
 
 it.each([undefined, null] as const)(
@@ -409,7 +402,7 @@ it.each([undefined, null] as const)(
       value: { use: { effects: [{ responseBlocks: [{ names: null }] }] } },
     });
     expect(opened).toBe(0);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -457,7 +450,7 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
   expect(counts).toBe(0);
   expect(collections).toBe(0);
   expect(game.room.history.facts(CardEvent.responded)).toEqual([]);
-  replay(game);
+  settled(game);
 });
 
 it.each([[], [''], ['  '], ['standard:jink', 'standard:jink'], [1]].map((names) => ({ names })))(
@@ -478,7 +471,7 @@ it.each([[], [''], ['  '], ['standard:jink', 'standard:jink'], [1]].map((names) 
       },
     });
     await use(game, attack);
-    replay(game);
+    settled(game);
   },
 );
 
@@ -511,7 +504,7 @@ it('具名列表在宣告时复制并冻结，纯查询/封口后不能改写，
   await game.room.run('late', (ctx) => {
     expect(() => held!.blockResponses(ctx, 'b', 'late', ['standard:slash'])).toThrow();
   });
-  replay(game);
+  settled(game);
 });
 
 it('禁令只属于指定效果与响应角色，多目标的另一人仍可正常打闪', async () => {
@@ -549,7 +542,7 @@ it('禁令只属于指定效果与响应角色，多目标的另一人仍可正�
   expect(game.room.world.player('c').hp).toBe(4);
   expect(game.room.world.position('bj')).toBe('b:hand');
   expect(game.room.world.position('cj')).toBe('discard');
-  replay(game);
+  settled(game);
 });
 
 it('纯查询修正可按响应牌名计算次数，具名禁止仍优先于追加最低要求', async () => {
@@ -585,5 +578,5 @@ it('纯查询修正可按响应牌名计算次数，具名禁止仍优先于追�
     },
   });
   await use(game, attack);
-  replay(game);
+  settled(game);
 });
