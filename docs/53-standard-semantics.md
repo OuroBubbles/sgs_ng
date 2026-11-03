@@ -1,6 +1,6 @@
-# 53 · 标准目录与活动的领域归属
+# 53 · 标准规则与验收入口
 
-更新：2026-10-18。本批为已实现的标准＋EX 目录建立逐项核对入口，并修正克己将嵌套回合、非出牌阶段及阶段边界动作混入本回合统计的问题。目录不是完成证明；完整离线验收继续按 [路线](11-offline-roadmap.md) 推进。
+本页集中说明标准目录、条件清单与活动归属。具体规则以项目源码和人工条件清单为准；当前验证及平台覆盖只查 [STATUS](STATUS.md)，产品范围见[路线](11-offline-roadmap.md)。
 
 ## 先固定来源，再判断行为
 
@@ -8,13 +8,34 @@
 pnpm audit:standard
 ```
 
-[审阅工具](../scripts/audit-standard.mjs) 只读取当前项目与本地 freekill/noname，通过 TypeScript AST 和 Lua 字面文本生成 `.artifacts/validation/standard-semantics-inventory.json`。报告包含当前 25 名武将的技能装配、40 个技能和 32 种牌的项目说明、两份参考说明、源码位置以及输入文件 SHA-256。该批初次清单为 standard@0.1.11，共记录 101 个输入文件。报告随每次显式执行刷新，以报告实际版本和输入哈希为准。
+[审阅工具](../scripts/audit-standard.mjs) 只读取当前项目与本地 freekill/noname，通过 TypeScript AST 和 Lua 字面文本生成 `.artifacts/validation/standard-semantics-inventory.json`。报告包含当前 25 名武将的技能装配、40 个技能和 32 种牌的项目说明、两份参考说明、源码位置以及输入文件 SHA-256。报告随显式执行刷新，以实际输入哈希定位来源。
 
 工具不执行参考代码，不自动导入它们的架构，也不判断文本等价或技能分支已经通过。报告明确标记 static-reference-inventory 与 behaviorVerified=false；常规构建、测试不读取参考项目。坐骑只解析本目录明确的 horse 工厂调用，不尝试解释任意作者函数。
 
-后续 [63](63-standard-behavior-review.md) 开始逐条条件与具名断言的人工绑定，[64](64-standard-skills-review.md) 补齐技能，[65](65-standard-card-review.md) 再补齐 32 种牌，合计 72 对象、172 条条件、480 条去重通过断言。`pnpm audit:standard:behavior --complete` 当前通过有限清单的完整登记，仍不证明所有分支或完整离线产品验收，不与本页的静态参考清单混同。
+规则依据优先读取项目实际定义与说明；参考分别记录，不能把不同项目、不同模式的文本拼成一套规则。当前目录见 [武将/技能装配](../src/content/standard/generals.ts)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts)。本地参考入口为 [FreeKill 标准文本](../../freekill/packages/standard/i18n/zh_CN.lua)、[牌文本](../../freekill/packages/standard_cards/i18n/zh_CN.lua)、[noname 标准文本](../../noname/resources/app/character/standard/translate.js) 与 [牌包](../../noname/resources/app/card/standard.js)。它们不代表上游最新版本。
 
-规则依据优先读取项目实际定义与说明；参考分别记录，不能把不同项目、不同模式的文本拼成一套规则。当前目录见 [武将/技能装配](../src/content/standard/generals.ts)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts)。本地参考入口为 [FreeKill 标准文本](../freekill/packages/standard/i18n/zh_CN.lua)、[牌文本](../freekill/packages/standard_cards/i18n/zh_CN.lua)、[noname 标准文本](../noname/resources/app/character/standard/translate.js) 与 [牌包](../noname/resources/app/card/standard.js)。它们不代表上游最新版本。
+## 行为清单与检查
+
+[技能清单](../scripts/standard-behavior-review.mjs)与[牌清单](../scripts/standard-card-review.mjs)逐条绑定项目规则文本、条件说明、测试文件和完整测试名称。先人工核对实现与实际断言，再登记；检查器不按技能名推算覆盖率。当前对象、条件及通过数量由报告和 STATUS 维护。
+
+通用机制证明与具体声明证明分别保留：武圣不能借龙胆的额度场景，无中生有不能借决斗的反制记录。直接声明的边界可从[标准配方](../tests/scenarios/standard-authoring-baseline.test.ts)、[标准触发](../tests/scenarios/standard-trigger-baseline.test.ts)和[标准牌](../tests/scenarios/standard-card-baseline.test.ts)场景追到实际材料、响应、来源与后效。
+
+```sh
+pnpm check
+
+# 局部审阅：先生成完整、通过的测试报告，再检查已登记条件。
+pnpm test
+pnpm audit:standard:behavior
+
+# 要求整个标准目录登记完整。
+pnpm audit:standard:behavior --complete
+```
+
+[检查器](../scripts/audit-standard-behavior.mjs)核对规则文本一致、具名断言唯一且通过，以及当前源码与引用测试没有晚于报告开始时间。修改规则文本要重新审阅条件；合并或改名被引用的测试时同步更新清单。缺失、歧义、失败、过期或文本不符均失败，不沿用旧绿色结果。报告记录输入、两份人工清单及测试报告的哈希。
+
+普通模式明确列出待审对象；`--complete` 还要求全部目录登记，`pnpm check` 使用这一严格模式。常规检查只读自有代码，不依赖参考项目或上次的静态目录报告。
+
+`catalogueComplete` 只表示有限条件清单登记完整，不证明未列出的分支、任意内容组合、其他社区版本或完整产品验收。`fullOfflineVerified` 不由此自动成立；客户端、资源和平台仍按路线单独验证。
 
 ## 武将目录：基线与行为证据入口
 
@@ -87,42 +108,30 @@ pnpm audit:standard
 | 的卢       | 同类防御坐骑，与绝影同槽                                  | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
 | 爪黄飞电   | 同类防御坐骑，独立实体/目录身份                           | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
 
-## 已明确的版本选择与仍需关闭的边界
+## 项目采用的规则语义
 
 - 仁德以出牌阶段累计。FreeKill 使用 `_rende_cards-phase`，noname 说明使用“回合”措辞；本项目按 [仁德实现](../src/content/standard/benevolence.ts) 的明确阶段生存期与原子交牌累计处理，不从文本相似推断嵌套行为相同。
 - 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的独立效果处理，详见 [42](42-skill-identity-audit.md)。
 - 方天选择“材料包含全部非空手牌”，和 FreeKill 当前代码一致；不能仅按 noname“最后手牌”短句推断多材料或零材料分支。
 - 天妒的公共判定结束机会先于洛神的本次判定后续；最终牌若已被取得，后者不抢回，详见 [29](29-wei-judgment-effects.md) 与谋士专项。判定最终快照与当前牌面分开，见 [50](50-card-faces.md)。
-- 该批标准闪统一走打出管线，后续 [55](55-response-purpose.md) 已区分抵消杀时使用与万箭要求打出，并验证独立禁令、完成时点、转换和委托材料交接。依据为：[FreeKill 的 SlashOffsetFunc](../freekill/lua/core/util.lua) 明确 askToUseCard/useCard，[万箭齐发](../freekill/packages/standard_cards/pkg/skills/archery_attack.lua) 则 askToResponse/responseCard；noname 的杀也走 chooseToUse。修复包含完整使用流程，不仅更换事实名称。
-- 该批铁骑以效果级禁止响应实现，标准杀只要求闪；后续 [54](54-named-response-blocks.md) 已补具名禁止、混合请求过滤和唯一供牌窗口收束。复杂替代额度仍需单独验证，不能把当前标准分支通过推广到所有作者扩展。
+- 抵消杀时使用闪，万箭齐发要求打出闪；用途、禁令、完成时点、转换和委托材料交接见 [55](55-response-purpose.md)。参考为 [FreeKill 的 SlashOffsetFunc](../../freekill/lua/core/util.lua)、[万箭齐发](../../freekill/packages/standard_cards/pkg/skills/archery_attack.lua)与本地 noname 的 chooseToUse；用途区别不只是事实名称。
+- 铁骑的具名响应禁令、混合请求过滤和唯一供牌窗口收束见 [54](54-named-response-blocks.md)。复杂替代额度仍需按具体规则验证，不把标准分支推广到所有内容。
 - 身份胜负选择死亡后效/埋葬完成后判胜，未终局才执行击杀奖惩；这属于已声明的项目基线，见 [15](15-life-role-match.md)，不宣称逐时点复制两个参考实现。
 
-上述表格是完整目录索引，下一轮仍需逐项将每条文本条件与具名断言关联，登记缺失的反例和差异处理。完整标准审计、长期独立效果、复杂选择与独立资源交付尚未完成，也没有因此缩小离线版目标。
+待决资格分别见[判定](58-judgment-pending-windows.md)、[反制](60-counter-pending-windows.md)、[目标](61-target-pending-windows.md)及[内层效果关联](62-counter-effect-eligibility.md)。检查发生在候选与结果封口边界，不让普通异步函数在任意位置自动中断；独立持续效果见 [56](56-independent-effects.md)。
 
-后续 [58](58-judgment-pending-windows.md) 补齐判定待决资格：翻牌/改判中判定者死亡或终局会收束同窗剩余候选，已交换材料不回滚，嵌套判定各自独立，完成后的事实不倒改。新增 18 项具名断言，包括实际八卦阵；这只关闭判定域的该组缺口，不把所有判定类技能的其他分支视为已覆盖。长期独立效果基础能力已在 [56](56-independent-effects.md) 接入，复杂组合仍需继续。
+## 活动的领域归属
 
-后续 [60](60-counter-pending-windows.md) 补齐反制开窗持续资格及结果封口检查：原目标死亡/终局/效果取消停止本窗剩余候选，嵌套返回后已失效的机会不再误记 unopposed。16 项具名断言分别保留已付费用、实际无懈的 by、来源死亡后的正常机会和公共完成后效，仍不能代替其他锦囊分支验收。
+因果后代不等于实际活动领域。统计本回合或本人出牌阶段的行为时，不能仅凭祖先 scopePath 把嵌套回合、其他阶段或边界动作混入。
 
-后续 [61](61-target-pending-windows.md) 补齐四层目标和效果启动同窗资格，51 项具名断言验证六种旧身份失效、来源死亡/局部中止的正常继续，以及真实流离、仁王盾、无懈、桃园和顺手/拆桥。目标声明不使用 canResolve，公共完成后效保留取消结果；作者在一个运行中的回调内部仍须重查 await 后的操作，未承诺任意位置自动中断。
-
-后续 [62](62-counter-effect-eligibility.md) 补齐反制内部与实际 canResolve/目标禁令的持续关联，20 项具名断言覆盖桃园治满、顺手/拆桥失牌或来源死亡、动态禁止及两层无懈；正常决斗、延时后续 resolver 和封口后公共结果另有正例。共享普通纯函数，没有按标准牌名列特殊分支；其他标准分支仍需继续审计。
-
-## 克己修复：因果包含不等于领域归属
-
-旧实现查找本回合后代里的所有出牌阶段，再判断用牌事实路径是否包含其中之一。外层出牌阶段仍在原因链中时，嵌套回合、内层判定阶段甚至阶段开始前/结束后的杀都可能被误算，错误阻止克己。
-
-[cardActivities](../src/rules/cards/activity.ts) 现在仍返回原始 scopePath，另给出宣告当时的 turnId 与 phase `{ id, owner, kind }`，没有对应的实际活动领域时为 null。按有序的 turn.started、phase.before、phase.started、lifetime.ended 事实解析最近边界：
+[cardActivities](../src/rules/cards/activity.ts) 接收完整、有序的事实列表，返回原始 scopePath、宣告当时的 turnId 与 phase `{ id, owner, kind }`，没有对应的实际活动领域时为 null。按有序的 turn.started、phase.before、phase.started、lifetime.ended 事实解析最近边界：
 
 - 内层回合阻止继承暂停的外层阶段；内层阶段尚未开始或已结束时，也不会穿透到外层阶段。
 - 出牌阶段开始前和生存期结束后的用牌没有活动阶段；回合结束后的后效也不伪装成仍在回合内。
 - 普通 Flow 即使命名为 play 或 turn，也不是领域开始事实。
-- 结束事实只改变之后的归属，不能修改已经发生的活动。查询返回冻结数据，可以从纯事实 HistoryReader 重建，不依赖当前 World、Scope 活对象或可恢复的协程。
-- withinScope 仍只表示因果后代过滤。祖先开始记录可能在过滤范围之外，因此先从完整历史读取边界，再返回该因果范围的活动。
+- 结束事实只改变之后的归属，不能修改已经发生的活动。查询返回冻结数据，可直接由事实列表重建，不需要 HistoryReader、当前 World、Scope 活对象或可恢复的协程。
+- withinScope 仍只表示因果后代过滤。祖先开始记录可能在过滤范围之外，因此传入完整事实列表，由查询解析边界后返回该因果范围的活动，不能预先裁掉祖先记录。
 
 克己只选择实际 turnId 等于本回合、实际 phase 为本人 play、实际使用/打出者为本人的杀；真正嵌套在本回合内的出牌阶段仍计入，嵌套其他回合则不计入。普通响应和鬼才改判的打出都保留真实主体。
 
-[18 项新增场景](../tests/scenarios/activity-periods.test.ts) 覆盖六个最初失败反例、内外回合/阶段恢复、普通响应、鬼才改判、独立阶段/根用牌、普通命名 Flow、关闭边界、窄因果查询、冻结快照与纯事实历史。原有吴将和额外回合 51 项专项继续通过，报告为 `.artifacts/validation/activity-periods-after.json`；修复前六项失败为 `activity-periods-before.json`。最初超距目标的夹具错误另存 `activity-periods-fixture-error.json`，未作为领域缺陷证据。
-
-本批全部单元/行为 1178 项一次全量通过，其中规则/主持侧 1171 项；分类与原报告 SHA-256 见 `.artifacts/validation/activity-periods-core-coverage.json`，没有另做独立规则全量运行。标准整局 60 秒/2400 决策预算保持不变。桌面/触控浏览器 174 项全量通过，无跳过或重试通过；Windows Debug/Release 各 66 组实际 WebView2 检查及真实不同 PID 重启恢复通过，控制台无错误。新增历史归属分支由规则场景验证。发布 ZIP 4,617,175 字节，实际四个成员、exe/模块及原生证明独立核对见 `.artifacts/validation/activity-period-package-audit.json`；测试目录、进程和端口已清理。
-
-该批标准与演武更新为 0.1.11，渡口仍为 0.1.0 且精确依赖 standard@0.1.11，应用壳仍为 0.1.0。完整测试、浏览器、实际原生运行和发布包以 [STATUS](STATUS.md) 的当前证据为准。默认人类甲席、其他角色基础 AI；Android、完整智能托管与联机继续按既定顺序推进。
+[活动归属场景](../tests/scenarios/activity-periods.test.ts)覆盖内外回合与阶段恢复、普通响应、鬼才改判、独立阶段与根用牌、普通命名 Flow、关闭边界、窄因果查询及纯事实历史。具体通过结果见 STATUS。

@@ -1,42 +1,53 @@
 # sgs_ng
 
-一个从零设计的三国杀项目。目标是用清晰、可组合的语义承载复杂规则，让内容作者能够自然地写出复杂技能，同时实现精致的桌面与安卓体验。
+从零设计的三国杀项目：以个人开发、AI 辅助持续迭代，用简洁、可组合的规则语义承载复杂技能，追求 SoTA 的系统与玩家体验。
 
-当前阶段：**默认由你控制甲席，其余角色以基础 AI 自动行动。** 已有六阶段、用牌/响应/转换、主动技能、濒死/救援/死亡与身份胜负；默认使用标准＋EX 的 108 张实体牌、32 种牌，可选关羽、黄盖、孙尚香、赵云、张飞、甘宁、夏侯惇、许褚、甄姬、司马懿、郭嘉、曹操、张辽、刘备、华佗、孙权、吕蒙、陆逊、黄月英、吕布、大乔、马超、周瑜、貂蝉、诸葛亮，共二十五名。标准包系统语义审计与完整离线三国杀验收仍待完成；Android 构建等桌面版完成之后开展，已有安装包仍为 P0。
+内置内容直接使用普通 TypeScript 定义与组合，不要求扩展包清单、版本或依赖登记。未来开放创作者扩展保留内容定义与目录注入接口；包格式、专用编译器、安装与持久内容库已移除。当前代码与平台验证见 [STATUS](docs/STATUS.md)。
 
-## 本地运行
+**离线桌面 v0.1 已完成基线验收**：现有标准＋EX、身份模式、固定甲席＋基础 AI 和普通作者扩展。持续以具体反例审视规则内核、作者语义与承载力，不以重构成本保留问题，并定期清理过时实现与说明。技术栈为 TypeScript + PixiJS 8 + Svelte 5 + Tauri 2。阶段顺序为离线桌面/UI/AI 托管、桌面联机、Android 与双端联机；当前 Windows 客户端可直接创建和加入联机房间。策略和暂停边界见 [基础 AI](docs/26-basic-ai.md)，当前企划见 [路线](docs/11-offline-roadmap.md)，实际完成情况只在 [STATUS](docs/STATUS.md) 维护。
 
-需要 Node.js 24 和 pnpm 11.25.0。工作区内先激活环境，再用 `sgs-ng install` / `sgs-ng dev`；`sgs-ng check` 转发下面的完整检查，`sgs-ng typecheck` 只做类型检查，`sgs-ng ui` 包含内容包准备。
+## 运行与验证
+
+在 `C:/workspace/sgs-ng` 使用 Node.js 24、pnpm 11.25.0：
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开 `http://127.0.0.1:1420`，选择席位、牌组与种子，开始单机对局。AI 武将可保留默认预设或统一指定。你固定控制甲席，其他角色自动行动；暂停或切到后台会藏牌并等待明确继续。按 1–9 选牌、Enter 确认、Esc 清除草稿。“手动演练（内容调试）”可切回多席手动控制；顶部“动画验证”可检查 1／8 个 Spine 实例与采样。基础 AI 的能力和边界见 [26](docs/26-basic-ai.md)。
+打开 `http://127.0.0.1:1420`，从启动页选择“单机演武”，配置后开始对局。默认固定控制甲席，其他角色以基础 AI 行动；手动演练供内容调试。按 1–9 选牌、Enter 确认、Esc 清除草稿，暂停或进入后台会藏牌并等待明确继续。
+
+联机：Windows 启动页选择“联机房间”，设置 2–8 席、玩家人数、所选内容的牌组、初始阵容和种子后创建，再将“房间地址”中的局域网地址发给其他玩家。完整解压交付包即可运行，无需另装 Node。创建者选择标准或机制演武源码目录；加入者使用主持端提供的资源与展示数据。玩家依次入席，可自行选将和取消准备，全部准备后开局，其余席位为基础 AI。终局后各自点击“准备下一局”，其他人可继续查看结果；全部准备后在原连接中开始新局。短暂断线可重连原席位，刷新后可从开局页返回原房间；不重开当前局，不重发旧答案。主动离开结束本局，有人断线时其他玩家也可明确结束。创建者关闭房间或退出程序会关闭主持端；关闭后可重新创建，并保留上次创建配置。真实跨机器验收仍待完成。开发者仍可用 `pnpm online` 启动独立主持端。见 [客户端契约](docs/16-local-client.md#联机纵切)。
 
 ```sh
+pnpm typecheck
 pnpm check
-pnpm test:core
-pnpm exec playwright install chromium
-pnpm test:ui
-pnpm platform:check
+pnpm format:check
 ```
 
-`pnpm build` 产出 `dist/`；`pnpm desktop:build` 与 `pnpm android:init` / `pnpm android:build` 使用 Tauri。原生命令需要额外的 Rust、MSVC 或 Android SDK/NDK，详见 [P0 实施记录](docs/07-p0.md)。
+界面改动另运行 `pnpm test:ui`；首次需要 `pnpm exec playwright install chromium`。Windows 构建、实际程序验收和归档入口见 [开发指南](docs/08-development-guide.md)。Android 构建入口见同一指南，当前候选包与平台待验范围在 STATUS 维护。
 
-作者源码包已接入。新增 `src/content/<packageId>/index.ts` 并默认导出 `definePackage(...)`，重新构建后可在开局选择；示例“作者演武”提供新牌、技能、跨包武将与独立牌堆。实际 API、依赖/版本和验收边界见 [39 · 普通源码内容包](docs/39-source-packages.md)。
+## 内容开发
 
-也可用 `pnpm content:build <entry.ts> <output.sgs.mjs>` 单独构建内容，从开局页“导入内容包”载入，无需重新构建主程序。可运行源码见 [渡口示例](examples/content/harbor/index.ts)，加载与依赖见 [47](docs/47-local-content-modules.md)，持久保存与启动恢复见 [48](docs/48-content-persistence.md)。Windows 包附带 `harbor.sgs.mjs`。
+直接修改 [标准内容](src/content/standard/index.ts)、[机制演武](src/content/workshop/index.ts) 或其普通源码文件。导出 `ContentDefinition` 对象，再用 `createContent(...)` 组合；定义、Window、Query 与闭包共享真实对象，无需打包或注册内容版本。日常技能写法从 [制衡等技能](src/content/standard/wu.ts) 与 [开发入口](docs/05-authoring.md) 阅读。
 
-内容模块及启用状态会持久保存并在重启后恢复。事务失败保留旧目录，多窗口修改检查版本，错误记录可明确重载或清空；实现与实际原生重启验证见 [48](docs/48-content-persistence.md)。
+主动技能使用 `run(ctx, { self, phase, book, choice })`，按需解构字段；支付、后效和嵌套结算仍由普通函数、分支、循环与 await 组织。新增交互类型需要补齐 UI / AI 映射。跨文件合作使用普通 import，示例直接纳入类型检查与真实结算场景。
 
-当前标准与演武内容为 0.1.20。[牌堆提交边界](docs/49-deck-boundaries.md) 已修正洗牌后效失效时继续摸牌的问题；[当前牌面与快照](docs/50-card-faces.md) 已统一红颜式过滤、转换材料、判定、UI 与基础 AI。[窗口显式加入](docs/51-window-admission.md) 允许新获得的技能参与本次尚未结束的时点，保持已有候选身份和固定顺序。启用作者演武可选择问道客，体验首次 AI 伤害后学习余响并立即选择发动；也可选择绯衣客及 40 张牌面演练。[生命待决边界](docs/52-life-boundaries.md) 已修正回复/死亡失效后继续执行候选的问题，并保留已提交事实与材料善后。[标准目录与活动归属](docs/53-standard-semantics.md) 已建立 25 将/40 技能/32 牌的核对入口，并修正克己对嵌套回合和阶段边界的误计。可运行 `pnpm audit:standard` 生成本地参考文本与源码哈希清单；它不替代行为验收。[具名响应禁令](docs/54-named-response-blocks.md) 已让铁骑仅禁止闪，普通/委托供牌先过滤名称，并在唯一供牌完成后收束其他候选。[响应中的使用与打出](docs/55-response-purpose.md) 已区分抵消杀时使用闪与万箭要求打出闪；护驾队友先打出，再由主公使用，材料在处理区内交接。完整离线版仍需继续标准内容语义审计。
+## 阅读入口
 
-[独立效果](docs/56-independent-effects.md) 已支持普通数据实例、全局/角色归属、查询、触发、更新和生存期结束后效。裸衣使用同一套规则库，另有 [跨回合守约源码](examples/effects/covenant.ts) 与真实外部模块验证，来源技能失去或宣告者死亡不必撤销已宣告的效果。
+| 需要了解          | 入口                                                   |
+| ------------- | ---------------------------------------------------- |
+| 当前目标与取舍       | [路线](docs/11-offline-roadmap.md)                     |
+| 已实现、已验证与缺口    | [STATUS](docs/STATUS.md)                             |
+| 模块职责、依赖和所有权   | [架构](docs/03-architecture.md)                        |
+| 嵌套流程、时点、提交和决策 | [结算契约](docs/04-resolution.md)                        |
+| 实际作者 API      | [作者入口](docs/05-authoring.md)、[SDK](src/sdk/index.ts) |
+| 独立效果及其生存期     | [独立效果](docs/56-independent-effects.md)               |
+| 内容组合与模块共享     | [内容组合与未来扩展](docs/39-source-packages.md)              |
 
-[判定待决窗口](docs/58-judgment-pending-windows.md) 已修复翻牌/改判中死亡或终局后继续执行旧候选的问题；保留已提交交换与封口后的真实结果，不要求扩展为每个后效重复保护整个判定域。
+编号文档中的历史批次验收、版本和后续计划不作为当前任务队列；作者先从当前 [作者入口](docs/05-authoring.md) 阅读，再按需查阅专题契约。
 
+<<<<<<< HEAD
 [反制持续资格](docs/60-counter-pending-windows.md) 已修复机会失效后继续执行开窗候选、嵌套返回后误记结果的问题；已实际使用的无懈仍保留用牌身份和材料事实，公共完成后效不倒改封口结果。
 
 [目标与效果启动持续资格](docs/61-target-pending-windows.md) 已补齐同窗内取消、移除、转移、死亡和禁止后的候选收束；真实流离的新身份仍补齐四层，仁王盾/无懈取消后保留公共完成事实。各牌 canResolve 只用于实际效果，不提前过滤目标声明。
@@ -110,4 +121,4 @@ pnpm platform:check
 
 历史来源的普通发动/支付见 [43](docs/43-retained-effects.md)：当前所有权与本次后效资格分开，撤销/到期/埋葬快照与自定义窗口显式登记。作者演武新增遗玉与 40 张演练牌组，可以在真实界面体验装备离场后接受或拒绝摸牌。
 
-> > > > > > > 
+遵守上级 [工作区约定](../WORKSPACE.md)：复用已有工具，项目依赖与产物留在项目内，不为项目另建通用环境管理层。同级目录 `../freekill/`、`../noname/` 是只读参考，不属于新项目构建输入。

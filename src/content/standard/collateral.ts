@@ -33,17 +33,6 @@ function canAttack(
   }).ok;
 }
 
-function victims(
-  ctx: Context,
-  request: UseRequest,
-  holder: string,
-  book: CardBook,
-): readonly string[] {
-  return ctx.world.snapshot.players
-    .filter((player) => player.alive && canAttack(ctx, request, holder, player.id, book))
-    .map((player) => player.id);
-}
-
 export const collateral: CardDefinition = {
   id: 'standard:collateral',
   type: 'trick',
@@ -51,34 +40,63 @@ export const collateral: CardDefinition = {
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
-    target: (ctx, request, target, book) =>
+    target: (ctx, { request, target, book }) =>
       target !== request.actor &&
       equipmentInSlot(ctx.world, book, target, 'weapon').length > 0 &&
-      (request.parameters === undefined
-        ? victims(ctx, request, target, book).length > 0
-        : canAttack(ctx, request, target, victimOf(request.parameters) ?? '', book)),
-    async prepare(ctx, request, book) {
-      if (request.parameters !== undefined) return { ok: true, value: request.parameters };
-      const holder = request.targets[0]!;
-      const model = new JointSelection({
-        cards: () => [],
-        cardCount: { min: 0, max: 0 },
-        targetCount: { min: 1, max: 1 },
-        targets: () => victims(ctx, request, holder, book).map((id) => ({ id, label: id })),
+      canAttack(ctx, request, target, victimOf(request.parameters) ?? '', book),
+    selection(ctx, { intent, book }) {
+      // 草稿包含两种角色；实际持械者上限由完整意图的 validateUse 计算。
+      const targetCount = { min: 2, max: 'all' as const };
+      const players = ctx.world.snapshot.players.filter((player) => player.alive);
+      // 最后一位是杀的目标，不进入借刀本身的效果列表；额外持械者共用此目标。
+      const selectedTargets = (targets: readonly string[]) => ({
+        targets: targets.slice(0, -1),
+        parameters: { victim: targets.at(-1) },
       });
-      const answer = await ctx.ask(
-        model.decision(request.actor, `借刀杀人：选择 ${holder} 使用杀的目标`, true, {
-          cancelLabel: '取消用牌',
-        }),
-      );
-      return answer.kind === 'chosen'
-        ? { ok: true, value: { victim: answer.value.targets[0]! } }
-        : { ok: false, reason: 'Collateral victim selection cancelled or unavailable.' };
+      const complete = (targets: readonly string[]) =>
+        targets.length >= 2 && book.validateUse(ctx, { ...intent, ...selectedTargets(targets) }).ok;
+      const canComplete = (targets: readonly string[]): boolean => {
+        if (complete(targets)) return true;
+        if (!targets.length) return players.some((player) => canComplete([player.id]));
+        return players.some(
+          (player) => !targets.includes(player.id) && complete([...targets, player.id]),
+        );
+      };
+      const model = new JointSelection({
+        targetCount,
+        targets: () => players.map((player) => player.id),
+        constraints: {
+          complete: (choice) => (complete(choice.targets) ? null : 'Illegal target.'),
+          canComplete: (choice) => canComplete(choice.targets),
+        },
+      });
+      const prompt = '借刀杀人：先选持械者，最后选出杀目标';
+      return {
+        ...model.decision(intent.actor, prompt, { optional: true }),
+        feedback: (input) => {
+          const preview = model.inspect(input);
+          return {
+            ...preview,
+            targetCount: {
+              ...targetCount,
+              min:
+                preview.valid && !preview.complete
+                  ? Math.max(targetCount.min, preview.selection.targets.length + 1)
+                  : targetCount.min,
+            },
+            prompt,
+          };
+        },
+        validate: (input) => {
+          const chosen = model.validate(input);
+          return chosen.ok ? { ok: true, value: selectedTargets(chosen.value.targets) } : chosen;
+        },
+      };
     },
-    async execute(ctx, use, book, resolveTargets) {
+    async execute(ctx, { use, book, resolveTargets }) {
       const victim = victimOf(use.parameters);
       if (!victim) throw new Error('Declared collateral has no victim.');
-      await resolveTargets(ctx, async (at, effect) => {
+      await resolveTargets(ctx, async (at, { effect }) => {
         const result = await book.askUse(at, {
           actor: effect.target,
           names: ['standard:slash'],
@@ -86,9 +104,9 @@ export const collateral: CardDefinition = {
           timing: { kind: 'effect' },
           prompt: `借刀杀人：对 ${victim} 使用杀，否则将武器交给 ${effect.actor}`,
         });
-        if (result.kind === 'aborted') return at.abort(result.reason);
+
         if (
-          result.value.kind === 'used' ||
+          result.kind === 'used' ||
           isGameOver(at.world) ||
           !at.world.player(effect.actor).alive ||
           !at.world.player(effect.target).alive
@@ -103,8 +121,8 @@ export const collateral: CardDefinition = {
           to: `${effect.actor}:hand`,
           place: 'bottom' as const,
         }));
-        const moved = await moveCards(at, moves, 'standard:collateral');
-        if (moved.kind === 'aborted') return at.abort(moved.reason);
+        await moveCards(at, moves, 'standard:collateral');
+
         at.commit('collateral.weapon-taken', [], {
           actor: effect.actor,
           holder: effect.target,

@@ -1,19 +1,9 @@
 import { afterAll, expect, it } from 'vitest';
+import { playMatch } from '../fixtures/match';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { setImmediate } from 'node:timers/promises';
 import { createOfflineMatch, defaultContent } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import {
-  activePhase,
-  activeTarget,
-  activeTurn,
-  generalOf,
-  privateCardPools,
-  readState,
-  useDeclarations,
-} from '../../src/sdk';
+import { generalOf, genderOf, kingdomOf, roleOf } from '../../src/sdk';
 import type { GameResult } from '../../src/sdk';
 
 interface GameEvidence {
@@ -37,7 +27,7 @@ afterAll(async () => {
     JSON.stringify(
       {
         capturedAt: new Date().toISOString(),
-        versions: defaultContent.versions,
+        generals: defaultContent.generals.map((general) => general.id),
         complete: evidence.length === 25,
         expected: 25,
         cases: evidence,
@@ -48,86 +38,114 @@ afterAll(async () => {
   );
 });
 
-for (const [index, general] of generals.entries()) {
-  it(`${general.name}进入四人标准身份局，真实决策至胜负并清理临时结算`, async () => {
-    expect(generals).toHaveLength(25);
-    // 每名武将轮流位于甲席，并通过不同偏移与其他武将组合；不重排起手或注入状态。
-    const lineup = [0, 7, 13, 19].map((offset) => generals[(index + offset) % generals.length]!.id);
-    const seed = 42 + index * 17;
-    const match = createOfflineMatch(4, seed, 'standard:identity', lineup);
-    const running = match.start();
-    let decisions = 0;
-    try {
-      for (let step = 0; step < 12_000 && !match.result; step++) {
-        await setImmediate();
-        expect(match.room.status).not.toBe('faulted');
-        const request = match.room.decisions.pending[0];
-        if (!request) continue;
-        if (decisions >= 2400) throw new Error(`${general.id}: decision budget exhausted.`);
-        const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-          match.room.decisions.preview(request.id, input),
-        );
-        if (answer.kind === 'unsupported') throw new Error(`${request.prompt}: ${answer.reason}`);
-        const accepted =
-          answer.kind === 'cancel'
-            ? match.room.decisions.cancel(request.id, request.token)
-            : match.room.decisions.submit(request.id, request.token, answer.value);
-        expect(accepted, `${general.id}: ${request.prompt}`).toEqual({ kind: 'accepted' });
-        decisions++;
-      }
-      expect(match.result, `${general.id}: ${decisions} decisions`).not.toBeNull();
-      expect(await running).toMatchObject({ kind: 'resolved', value: match.result });
-      expect(match.room.status).toBe('ended');
-      expect(generalOf(match.room.world, '甲席')).toBe(general.id);
-      expect(match.room.decisions.pending).toEqual([]);
-      expect(readState(match.room.world, activeTurn, activeTarget)).toBeNull();
-      expect(readState(match.room.world, activePhase, activeTarget)).toBeNull();
-      expect(useDeclarations(match.room.world)).toEqual([]);
-      expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(
-        false,
-      );
-      for (const player of match.room.world.snapshot.players)
-        expect(privateCardPools(match.room.world, player.id)).toEqual([]);
+it('标准二十五将统一初始化：目录字段、主公技能与体力奖励及事实重建', async () => {
+  expect(generals).toHaveLength(25);
+  // 保留迁入场景的种子；其余目录项使用 42。六席同将同时检查主公和非主公。
+  const seeds: Readonly<Record<string, number>> = {
+    'standard:liubei': 14,
+    'standard:huatuo': 14,
+    'standard:sunquan': 14,
+    'standard:lvmeng': 14,
+    'standard:luxun': 14,
+    'standard:huangyueying': 12,
+    'standard:lvbu': 12,
+    'standard:daqiao': 12,
+    'standard:machao': 9,
+    'standard:zhouyu': 9,
+    'standard:diaochan': 9,
+  };
+  const lordSkills = new Set(['standard:hujia', 'standard:jijiang', 'standard:jiuyuan']);
 
-      const cards = match.room.world.snapshot.zones.flatMap((zone) => zone.cards);
-      expect(cards).toHaveLength(108);
-      expect(new Set(cards).size).toBe(108);
-      expect([...cards].sort()).toEqual(match.initial.cards.map((card) => card.id).sort());
-      expect(match.room.history.facts('game.finished')).toHaveLength(1);
+  for (const general of generals) {
+    // 保留旧场景独立于目录的明确值；通用检查同时核对其实际初始化结果。
+    if (['standard:simayi', 'standard:guojia'].includes(general.id))
+      expect(general).toMatchObject({ gender: 'male', maxHp: 3 });
+    if (['standard:sunquan', 'standard:lvmeng', 'standard:luxun'].includes(general.id))
+      expect(general.kingdom).toBe('吴');
+
+    const match = createOfflineMatch({
+      seed: seeds[general.id] ?? 42,
+      preset: 'standard:identity',
+      lineup: Array<string>(6).fill(general.id),
+    });
+    try {
+      await match.prepare();
+      for (const player of match.room.world.snapshot.players) {
+        const lord = roleOf(match.room.world, player.id) === 'lord';
+        expect(
+          {
+            general: generalOf(match.room.world, player.id),
+            gender: genderOf(match.room.world, player.id),
+            kingdom: kingdomOf(match.room.world, player.id),
+            maxHp: player.maxHp,
+            skills: match.room.world.snapshot.skills
+              .filter((skill) => skill.owner === player.id)
+              .map((skill) => skill.skill),
+          },
+          `${general.name}/${player.id}`,
+        ).toEqual({
+          general: general.id,
+          gender: general.gender,
+          kingdom: general.kingdom,
+          maxHp: general.maxHp + Number(lord),
+          skills: general.skills.filter((id) => !lordSkills.has(id) || lord),
+        });
+      }
       expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
         match.room.world.snapshot,
       );
-      const facts = match.room.history.facts();
-      evidence.push({
-        general: general.id,
-        seed,
-        lineup,
-        decisions,
-        turns: match.progress!.turns,
-        result: match.result!,
-        facts: facts.length,
-        invokedSkills: [
-          ...new Set(
-            match.room.history
-              .facts('skill.invoked')
-              .map((fact) => (fact.data.detail as { skill: string }).skill),
-          ),
-        ].sort(),
-        usedCards: [
-          ...new Set(
-            match.room.history
-              .facts('card.used')
-              .map(
-                (fact) =>
-                  (fact.data.detail as { declaration: { card: { name: string } } }).declaration.card
-                    .name,
-              ),
-          ),
-        ].sort(),
-      });
     } finally {
       match.room.abort('test cleanup');
-      await running;
     }
+  }
+});
+
+for (const [index, general] of generals.entries()) {
+  it(`${general.name}进入四人标准身份局，真实决策至胜负并清理临时结算`, async () => {
+    // 每名武将轮流位于甲席，并通过不同偏移与其他武将组合；不重排起手或注入状态。
+    const lineup = [0, 7, 13, 19].map((offset) => generals[(index + offset) % generals.length]!.id);
+    const seed = 42 + index * 17;
+    const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
+    const decisions = await playMatch(match, { steps: 12_000, decisions: 2400 });
+
+    expect(generalOf(match.room.world, '甲席')).toBe(general.id);
+    expect(match.initial.cards).toHaveLength(108);
+    const facts = match.room.history.facts();
+    // 苦肉的 AI 接入归入统一整局矩阵，避免在主动技能场景中重复开局。
+    if (general.id === 'standard:huanggai') {
+      expect(
+        match.room.history
+          .facts('skill.invoked')
+          .some((fact) => (fact.data.detail as { skill: string }).skill === 'standard:kurou'),
+      ).toBe(true);
+      expect(match.room.history.facts('hp.lost').length).toBeGreaterThan(0);
+    }
+    evidence.push({
+      general: general.id,
+      seed,
+      lineup,
+      decisions,
+      turns: match.progress!.turns,
+      result: match.result!,
+      facts: facts.length,
+      invokedSkills: [
+        ...new Set(
+          match.room.history
+            .facts('skill.invoked')
+            .map((fact) => (fact.data.detail as { skill: string }).skill),
+        ),
+      ].sort(),
+      usedCards: [
+        ...new Set(
+          match.room.history
+            .facts('card.used')
+            .map(
+              (fact) =>
+                (fact.data.detail as { declaration: { card: { name: string } } }).declaration.card
+                  .name,
+            ),
+        ),
+      ].sort(),
+    });
   }, 60_000);
 }

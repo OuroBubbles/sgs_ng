@@ -83,7 +83,7 @@ it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 c
     }).kind,
   ).toBe('rejected');
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'p' });
-  expect(await running).toMatchObject({ value: { value: { kind: 'dealt', afterHp: 0 } } });
+  expect(await running).toMatchObject({ value: { kind: 'dealt', afterHp: 0 } });
   expect(order).toEqual(['heal', 'after']);
   expect(game.room.history.facts('card.used')).toHaveLength(1);
   expect(game.room.history.facts('card.responded')).toEqual([]);
@@ -121,13 +121,13 @@ it('救援能使用作者转换配方，并统一检查用牌禁止', async () =
   const medicine = defineSkill({
     id: 'probe:medicine',
     name: '药',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'peach',
         label: '转桃',
         names: () => ['standard:peach'],
-        materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+        materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
         count: { min: 1, max: 1 },
         make: () => ({ name: 'standard:peach' }),
       }),
@@ -169,12 +169,12 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
   const legacy = defineSkill({
     id: 'probe:legacy',
     name: '遗赠',
-    effects: [
+    triggers: [
       on(playerDied, {
         id: 'gift',
         allowDead: true,
-        when: (_ctx, event, self) => event.player === self.owner,
-        async run(ctx, event) {
+        when: (_ctx, { payload: event, self }) => event.player === self.owner,
+        async run(ctx, { payload: event }) {
           expect(event.zonesBefore.find((zone) => zone.id === 'b:hand')?.cards).toEqual([
             'gift',
             'rest',

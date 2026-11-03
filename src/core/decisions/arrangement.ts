@@ -1,7 +1,10 @@
 import type { Decision, Validation } from './hub';
-import type { ChoiceCount, ChoiceItem } from './selection';
-import { immutable } from '../model/value';
+import type { ChoiceItem } from './selection';
+import { normalizeChoiceCount } from './count';
+import type { ChoiceCount } from './count';
+import { immutable, isStringArray } from '../model/value';
 import { assignGroups } from './assignment';
+import { syncQueryValue } from '../runtime/query';
 
 export interface ArrangementGroup extends ChoiceItem {
   readonly count: ChoiceCount;
@@ -22,16 +25,17 @@ interface ArrangementState {
   readonly allowed: readonly (readonly boolean[])[];
 }
 
-function checkGroups(groups: readonly ArrangementGroup[]): void {
+function normalizeGroups(input: readonly ArrangementGroup[]): readonly ArrangementGroup[] {
+  const groups = immutable(
+    Array.from(input, ({ id, label, count }) => ({
+      id,
+      label,
+      count: normalizeChoiceCount(count, 'arrangement'),
+    })),
+  );
   if (groups.some((g) => !g.id) || new Set(groups.map((g) => g.id)).size !== groups.length)
     throw new Error('Arrangement requires distinct named groups.');
-  for (const { count } of groups)
-    if (
-      !Number.isSafeInteger(count.min) ||
-      count.min < 0 ||
-      (count.max !== 'all' && (!Number.isSafeInteger(count.max) || count.max < count.min))
-    )
-      throw new Error('Invalid arrangement count.');
+  return groups;
 }
 
 /** 全部候选恰好分配一次，各组内部顺序有意义；模型只验证选择，不移动实体。 */
@@ -41,21 +45,27 @@ export class ArrangementSelection {
   readonly #canPlace: ArrangementSpec['canPlace'];
 
   constructor(spec: ArrangementSpec) {
-    if (typeof spec.groups === 'function') this.#groups = spec.groups;
-    else {
-      if (!spec.groups.length) throw new Error('Arrangement requires distinct named groups.');
-      checkGroups(spec.groups);
-      const groups = immutable(spec.groups);
-      this.#groups = () => groups;
+    const groups = spec.groups;
+    if (typeof groups === 'function') {
+      const read = groups.bind(spec);
+      this.#groups = () => normalizeGroups(syncQueryValue(read(), 'arrangement.groups'));
+    } else {
+      if (!groups.length) throw new Error('Arrangement requires distinct named groups.');
+      const fixed = normalizeGroups(groups);
+      this.#groups = () => fixed;
     }
-    this.#items = spec.items;
-    this.#canPlace = spec.canPlace;
+    this.#items = spec.items.bind(spec);
+    this.#canPlace = spec.canPlace?.bind(spec);
   }
 
   #state(): ArrangementState {
-    const items = immutable(this.#items());
-    const groups = immutable(this.#groups());
-    checkGroups(groups);
+    const items = immutable(
+      Array.from(syncQueryValue(this.#items(), 'arrangement.items'), ({ id, label }) => ({
+        id,
+        label,
+      })),
+    );
+    const groups = this.#groups();
     if (
       items.some((item) => !item.id) ||
       new Set(items.map((item) => item.id)).size !== items.length
@@ -63,7 +73,10 @@ export class ArrangementSelection {
       throw new Error('Arrangement items require distinct stable IDs.');
     const allowed = items.map((item) =>
       groups.map((group) => {
-        const accepted = this.#canPlace ? this.#canPlace(item.id, group.id) : true;
+        const accepted = syncQueryValue(
+          this.#canPlace ? this.#canPlace(item.id, group.id) : true,
+          'arrangement.canPlace',
+        );
         if (typeof accepted !== 'boolean')
           throw new Error('Arrangement canPlace must return a boolean.');
         return accepted;
@@ -112,7 +125,7 @@ export class ArrangementSelection {
       )
         return { ok: false, reason: 'Expected stable group and item IDs.' };
       const items: readonly unknown[] = value.items;
-      if (!items.every((id): id is string => typeof id === 'string'))
+      if (!isStringArray(items))
         return { ok: false, reason: 'Expected stable group and item IDs.' };
       groups.push({ id: value.id, items: [...items] });
     }
@@ -179,7 +192,6 @@ export class ArrangementSelection {
       prompt,
       kind: 'arrange',
       optional,
-      data: null,
       available: () => this.#initial(this.#state()) !== null,
       describe: () => {
         const state = this.#state();

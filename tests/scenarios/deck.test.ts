@@ -17,7 +17,7 @@ it('标准 + EX 108 张包含全部 32 种牌，实体身份独立，牌面可�
   expect(Object.isFrozen(deck)).toBe(true);
   expect(deck.every(Object.isFrozen)).toBe(true);
   if (process.env.SGS_REFERENCE_AUDIT === '1') {
-    const reference = 'freekill/packages/standard_cards/pkg/init.lua';
+    const reference = '../freekill/packages/standard_cards/pkg/init.lua';
     const bytes = readFileSync(reference);
     const rows = [
       ...bytes
@@ -102,7 +102,7 @@ it('标准 + EX 数量配比固定，各花色 27 张，EX 的四张额外牌面
 
 it('默认开局使用标准牌表，机制牌组明确独立，性别预设随初始事实提交', async () => {
   const normal = createOfflineMatch();
-  const mechanics = createOfflineMatch(4, 42, 'standard:mechanics');
+  const mechanics = createOfflineMatch({ count: 4, seed: 42, preset: 'standard:mechanics' });
   expect(normal.initial.cards).toHaveLength(108);
   expect(normal.deckName).toBe('标准＋EX（108 张）');
   expect(mechanics.initial.cards).toHaveLength(288);
@@ -115,8 +115,8 @@ it('默认开局使用标准牌表，机制牌组明确独立，性别预设随�
 });
 
 it('标准牌表初始化可复现，洗牌/发牌后实体位置守恒', async () => {
-  const a = createOfflineMatch(8, 2026);
-  const b = createOfflineMatch(8, 2026);
+  const a = createOfflineMatch({ count: 8, seed: 2026 });
+  const b = createOfflineMatch({ count: 8, seed: 2026 });
   await a.prepare();
   await b.prepare();
   expect(a.room.world.snapshot).toEqual(b.room.world.snapshot);

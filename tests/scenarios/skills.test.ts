@@ -12,7 +12,7 @@ import {
   setState,
   lifetimeEnded,
 } from '../../src/sdk';
-import type { Lifetime } from '../../src/sdk';
+import type { Context, Lifetime, SkillHandle, Trigger, TriggerOccurrence } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed } from '../fixtures/room';
 
@@ -20,36 +20,77 @@ const general = { kind: 'general', id: 'general:a' } as const;
 const equipment = { kind: 'equipment', id: 'equipment:1' } as const;
 
 describe('技能实例与独立授予来源', () => {
-  it('两个来源授予同一技能只触发一次，失去一个来源不移除技能', async () => {
+  it('自定义技能绑定保留原型身份和方法，有限次数及组序正常结算', async () => {
     const game = room();
-    const window = defineWindow<null>('test.skill');
-    const hits: string[] = [];
-    const book = new SkillBook([
-      defineSkill({
-        id: 'test:skill',
-        name: 'test',
-        effects: [
-          on(window, {
-            id: 'hit',
-            run: (_ctx, _data, self) => {
-              hits.push(self.id);
-            },
+    const window = defineWindow<null>('test.bound-method', ['before', 'main']);
+    class Bound implements Trigger<unknown> {
+      #self: SkillHandle;
+      #count = 2;
+
+      constructor(self: SkillHandle) {
+        this.#self = self;
+      }
+
+      get id() {
+        return `${this.#self.id}:raw`;
+      }
+
+      get owner() {
+        return this.#self.owner;
+      }
+
+      get group() {
+        return 'before';
+      }
+
+      times() {
+        return this.#count;
+      }
+
+      eligible(ctx: Context) {
+        return this.#self.effective(ctx.world);
+      }
+
+      async run(ctx: Context, _payload: unknown, occurrence: TriggerOccurrence) {
+        await ctx.flow('bound', (child) =>
+          child.commit('probe.bound', [], {
+            owner: this.#self.owner,
+            index: occurrence.index,
+            total: occurrence.total,
+            count: this.#count++,
           }),
-        ],
-      }),
+        );
+      }
+    }
+    const book = new SkillBook([
+      {
+        id: 'test:bound-method',
+        name: '绑定探针',
+        triggers: [{ id: 'raw', window, bind: (self) => new Bound(self) }],
+      },
     ]);
     book.attach(game);
-    await game.run('skills', async (ctx) => {
-      await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
-      await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: equipment });
-      await ctx.window(window, null);
-      await book.revoke(ctx, 'a', 'test:skill', general);
+    game.on(window, {
+      id: 'main',
+      owner: null,
+      eligible: () => true,
+      run: (ctx) => ctx.commit('probe.main', [], null),
+    });
+    await game.run('bound-method', async (ctx) => {
+      await book.grant(ctx, { owner: 'a', skill: 'test:bound-method', source: general });
       await ctx.window(window, null);
     });
-    expect(hits).toHaveLength(2);
-    expect(hits[0]).toBe(hits[1]);
-    expect(game.world.snapshot.skills[0]?.grants).toHaveLength(1);
-    expect(game.world.snapshot.skills[0]?.grants[0]?.source).toEqual(equipment);
+    expect(game.history.facts('probe.bound').map((fact) => fact.data.detail)).toEqual([
+      { owner: 'a', index: 1, total: 2, count: 2 },
+      { owner: 'a', index: 2, total: 2, count: 3 },
+    ]);
+    expect(
+      game.history
+        .facts()
+        .slice(-3)
+        .map((fact) => fact.data.kind),
+    ).toEqual(['probe.bound', 'probe.bound', 'probe.main']);
+    expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
   });
 
   it('失去最后来源再获得产生新实例，开窗候选不会借新身份复活', async () => {
@@ -60,10 +101,10 @@ describe('技能实例与独立授予来源', () => {
       defineSkill({
         id: 'test:skill',
         name: 'test',
-        effects: [
+        triggers: [
           on(window, {
             id: 'run',
-            run: (_ctx, _data, self) => {
+            run: (_ctx, { self }) => {
               hits.push(self.id);
             },
           }),
@@ -81,8 +122,12 @@ describe('技能实例与独立授予来源', () => {
       owner: 'a',
       eligible: () => true,
       run: async (ctx) => {
+        const previousHandle = book.binding(ctx.world, previous)!.self;
+        expect(previousHandle.effective(ctx.world)).toBe(true);
         await book.revoke(ctx, 'b', 'test:skill', general);
+        expect(previousHandle.effective(ctx.world)).toBe(false);
         await book.grant(ctx, { owner: 'b', skill: 'test:skill', source: general });
+        expect(previousHandle.effective(ctx.world)).toBe(false);
       },
     });
     await game.run('window', (ctx) => ctx.window(window, null));
@@ -98,7 +143,7 @@ describe('技能实例与独立授予来源', () => {
       defineSkill({
         id: 'test:new',
         name: 'new',
-        effects: [
+        triggers: [
           on(window, {
             id: 'hit',
             run: () => {
@@ -123,39 +168,76 @@ describe('技能实例与独立授予来源', () => {
     expect(hits).toEqual(['new']);
   });
 
-  it('单独关闭一个授予来源，不影响另一个有效来源', async () => {
+  it('多来源授予、开关和撤销保持同一实例与单次触发，句柄按实际 World 查询', async () => {
     const game = room();
-    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', effects: [] })]);
-    book.attach(game);
-    await game.run('toggle', async (ctx) => {
-      await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
-      await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: equipment });
-      const id = ctx.world.snapshot.skills[0]?.id ?? '';
-      await book.setEnabled(ctx, 'a', 'test:skill', general, false);
-      expect(skillEffective(ctx.world, id)).toBe(true);
-      await book.setEnabled(ctx, 'a', 'test:skill', equipment, false);
-      expect(skillEffective(ctx.world, id)).toBe(false);
-      await book.setEnabled(ctx, 'a', 'test:skill', general, true);
-      expect(skillEffective(ctx.world, id)).toBe(true);
+    const other = room();
+    const window = defineWindow<null>('test.skill');
+    const hits: string[] = [];
+    const trigger = on(window, {
+      run: (_ctx, { self }) => {
+        hits.push(self.id);
+      },
     });
-  });
+    expect(() => on(window, { id: '', run: () => {} })).toThrow('Skill trigger requires an ID.');
+    expect(
+      () => new SkillBook([{ id: 'duplicate', name: '重复', triggers: [trigger, trigger] }]),
+    ).toThrow('[duplicate] Duplicate trigger ID: test.skill.');
+    const book = new SkillBook([
+      defineSkill({ id: 'test:skill', name: 'test', triggers: [trigger] }),
+    ]);
+    book.attach(game);
+    book.attach(other);
+    try {
+      await game.run('toggle', async (ctx) => {
+        await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
+        await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: equipment });
+        const id = ctx.world.snapshot.skills[0]!.id;
+        const handle = book.binding(ctx.world, id)!.self;
+        expect(ctx.world.snapshot.skills).toHaveLength(1);
+        expect(other.world.snapshot.skills).toEqual([]);
+        expect(handle.effective(other.world)).toBe(false);
 
-  it('定义目录可在多 Room 共享，局内授予和实例不会共享', async () => {
-    const a = room('a');
-    const b = room('b');
-    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', effects: [] })]);
-    book.attach(a);
-    book.attach(b);
-    await a.run('grant', (ctx) =>
-      book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general }),
-    );
-    expect(b.world.snapshot.skills).toEqual([]);
-    expect(a.world.snapshot.skills).toHaveLength(1);
+        // 两局刻意使用相同规则 ID，句柄必须查询实际传入的 World。
+        await other.run('grant', (at) =>
+          book.grant(at, { owner: 'a', skill: 'test:skill', source: general }),
+        );
+        expect(other.world.snapshot.skills[0]!.id).toBe(id);
+        const otherHandle = book.binding(other.world, id)!.self;
+        expect(handle.effective(other.world)).toBe(true);
+
+        await book.setEnabled(ctx, 'a', 'test:skill', general, false);
+        expect(skillEffective(ctx.world, id)).toBe(true);
+        expect(handle.effective(ctx.world)).toBe(true);
+        await book.setEnabled(ctx, 'a', 'test:skill', equipment, false);
+        expect(skillEffective(ctx.world, id)).toBe(false);
+        expect(handle.effective(ctx.world)).toBe(false);
+        expect(otherHandle.effective(other.world)).toBe(true);
+        expect(otherHandle.effective(ctx.world)).toBe(false);
+        await ctx.window(window, null);
+        expect(hits).toEqual([]);
+
+        await book.setEnabled(ctx, 'a', 'test:skill', general, true);
+        expect(skillEffective(ctx.world, id)).toBe(true);
+        expect(handle.effective(ctx.world)).toBe(true);
+
+        await book.setEnabled(ctx, 'a', 'test:skill', equipment, true);
+        await ctx.window(window, null);
+        await book.revoke(ctx, 'a', 'test:skill', general);
+        await ctx.window(window, null);
+      });
+      expect(hits).toHaveLength(2);
+      expect(hits[0]).toBe(hits[1]);
+      expect(game.world.snapshot.skills[0]?.grants).toHaveLength(1);
+      expect(game.world.snapshot.skills[0]?.grants[0]?.source).toEqual(equipment);
+    } finally {
+      game.abort('test cleanup');
+      other.abort('test cleanup');
+    }
   });
 
   it('重复授予同来源幂等，未知定义不留下半注册实例', async () => {
     const game = room();
-    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', effects: [] })]);
+    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', triggers: [] })]);
     book.attach(game);
     await game.run('grant', async (ctx) => {
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
@@ -178,7 +260,7 @@ describe('技能实例与独立授予来源', () => {
       defineSkill({
         id: 'test:skill',
         name: 'test',
-        effects: [
+        triggers: [
           on(window, {
             id: 'ordinary',
             run: () => {
@@ -206,6 +288,35 @@ describe('技能实例与独立授予来源', () => {
 });
 
 describe('显式生存期、状态与授予到期', () => {
+  it('状态初值与写入校验同一份快照，getter 不会在校验后重新读取', async () => {
+    const game = room();
+    let reads = 0;
+    const input = {
+      get amount() {
+        return ++reads === 1 ? 1 : -1;
+      },
+    };
+    const key = defineState('test:snapshot', input, (value): value is { amount: number } => {
+      if (!value || typeof value !== 'object' || !('amount' in value)) return false;
+      const amount = value.amount;
+      return Number.isSafeInteger(amount) && Number(amount) >= 0;
+    });
+    expect(key.initial.amount).toBe(1);
+    expect(reads).toBe(1);
+
+    reads = 0;
+    const target = { owner: 'a', source: null, lifetime: null };
+    await game.run('state', (ctx) => {
+      setState(ctx, key, target, input);
+      expect(reads).toBe(1);
+      expect(readState(ctx.world, key, target).amount).toBe(1);
+    });
+    expect(input.amount).toBe(-1);
+    expect(readState(game.world, key, target).amount).toBe(1);
+    expect(game.status).toBe('ready');
+    expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
+  });
+
   it('复杂状态读取在类型和运行时都深只读，外部输入修改不影响已提交值', async () => {
     const game = room();
     const key = defineState(
@@ -240,7 +351,7 @@ describe('显式生存期、状态与授予到期', () => {
 
   it('阶段中止仍原子清除临时状态和授予，永久来源保留', async () => {
     const game = room();
-    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', effects: [] })]);
+    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', triggers: [] })]);
     book.attach(game);
     await game.run('turn', async (ctx) => {
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
@@ -263,7 +374,7 @@ describe('显式生存期、状态与授予到期', () => {
       defineSkill({
         id: 'test:skill',
         name: 'test',
-        effects: [
+        triggers: [
           on(window, {
             id: 'run',
             run: () => {
@@ -287,7 +398,7 @@ describe('显式生存期、状态与授予到期', () => {
 
   it('技能失去不一刀切删除其已产生的独立状态', async () => {
     const game = room();
-    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', effects: [] })]);
+    const book = new SkillBook([defineSkill({ id: 'test:skill', name: 'test', triggers: [] })]);
     book.attach(game);
     await game.run('turn', (ctx) =>
       withLifetime(ctx, 'turn', async (turn, lifetime) => {

@@ -1,10 +1,10 @@
 # 62 · 嵌套反制复用本次效果资格
 
-更新：2026-10-18。继续 [61](61-target-pending-windows.md) 的组合审计，修正运行中的反制候选与实际牌体资格脱节的问题。
+本页说明[目标持续资格](61-target-pending-windows.md)如何传入嵌套反制。
 
 ## 外层检查不能代替内层资格
 
-effectStarting 已在各候选边界检查目标存活、终局、禁止和 canResolve。但 [反制安装器](../src/rules/cards/counter.ts) 原本只向内部机会传入 effect.state 为 ready：
+effectStarting 在各候选边界检查目标存活、终局、禁止和 canResolve。[反制安装器](../src/rules/cards/counter.ts)必须关联这些条件，仅看 effect.state 为 ready 不能覆盖以下变化：
 
 - 桃园目标在反制开窗中被治满，效果依旧 ready，旧机会仍可继续征询和消耗无懈。
 - 顺手/拆桥目标的最后一张牌离场，或来源死亡，牌体已经不可执行，内部机会仍未关闭。
@@ -30,18 +30,6 @@ available 是纯运行期查询，既不是状态快照，也不是支付能力�
 
 结果封口之后仍按 [60](60-counter-pending-windows.md) 的公共完成语义处理。counterFinished 的后效把桃园目标治满，不倒改已经确定的 countered，也不返还无懈；仍可取消尚为 ready 的原效果。没有把公共完成后效降格成可以追溯撤销的预览。
 
-## 行为证据
+## 验证入口
 
-[20 项新增场景](../tests/scenarios/counter-effect-eligibility.test.ts)：
-
-- 六种牌体/禁止失效分别发生在原机会与第一张无懈后的内层机会，共 12 项；实际接纳旧实现错误开放的无懈，直接检查不应发生的候选、征询与用牌，没有依靠超时证明关闭。
-- 决斗三种无关变化仍可反制，同一候选临时恢复条件仍可反制，共 4 项。
-- 作者普通 canResolve 闭包、延时后续 resolver、封口后的公共回复，以及资格查询 World/结束边界，共 4 项。
-
-每项核对牌守恒、声明与处理区清理、无残留请求、事实重建和事实可结构化复制。最初 19 项报告为 `counter-effect-before.json`，14 失败/5 通过，其中一项误把四个自动目标的结果断言成两项。修正该夹具后 `counter-effect-before-corrected-fixtures.json` 为 13 项真实失败/6 项通过；没有修改桃园目标规则来适应夹具。新增资格查询接口场景在修复后加入。
-
-与既有反制、目标窗口、延时和锦囊场景共 161 项专项已通过，报告为 `.artifacts/validation/counter-effect-after.json`；完整回归、原生与发布包见 [STATUS](STATUS.md)。新的组合缺陷由规则场景证明，正常浏览器/原生无懈流程不等于复现全部失效反例。
-
-最终完整单元/行为 1402 项一次通过，其中规则/主持侧 1392 项由同一报告分类计数，不另算独立执行。桌面/触控浏览器 188 项无跳过或重试通过；Windows Debug/Release 各 72 组实际检查及不同 PID 的内容重启恢复通过，控制台无错误。归档四个成员、exe/模块实际字节、精确依赖、清单和原生证明已核对，隔离目录、原生进程与调试端口已清理；独立核对报告为 `.artifacts/validation/counter-effect-package-audit.json`。
-
-本批标准/演武为 `0.1.20`，渡口仍为 `0.1.1` 且精确依赖 standard@0.1.20，旧模块需重新构建或导入随包文件。默认标准 32 牌/25 将/108 实体，启用演武 37 牌/30 将及五种牌堆不变；固定甲席与非主控基础 AI 保持原样。标准其余分支、复杂响应额度、信息记忆与独立作者资源仍待继续，Android、高级托管和联机后置。
+[反制效果资格场景](../tests/scenarios/counter-effect-eligibility.test.ts)核对牌体与禁令变化、内层机会、临时恢复、延时后续 resolver 和封口后的公共结果，检查牌守恒、处理区清理及事实重建。检查方法见[标准验收入口](53-standard-semantics.md#行为清单与检查)，当前结果见 [STATUS](STATUS.md)。

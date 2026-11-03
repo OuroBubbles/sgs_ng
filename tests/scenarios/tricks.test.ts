@@ -361,10 +361,10 @@ it('整牌本体不能遗漏或重复执行目标；发生作者错误时不回�
       use: {
         count: { min: 1, max: 1 },
         target: () => true,
-        resolve(ctx, effect) {
+        resolve(ctx, { effect }) {
           ctx.commit('probe:resolved', [{ kind: 'vitality', player: effect.target, hp: 3 }], null);
         },
-        async execute(ctx, _use, _book, resolveTargets) {
+        async execute(ctx, { resolveTargets }) {
           if (!twice) return;
           await resolveTargets(ctx);
           await resolveTargets(ctx);
@@ -392,7 +392,7 @@ it('全部目标被取消仍须调度一次，保留每个效果的完成事实�
       use: {
         count: { min: 1, max: 1 },
         target: () => true,
-        async execute(ctx, plan, _book, resolveTargets) {
+        async execute(ctx, { use: plan, resolveTargets }) {
           for (const effect of plan.effects) plan.removeTarget(ctx, effect.effectId, 'probe');
           if (dispatched) await resolveTargets(ctx);
         },
@@ -453,7 +453,7 @@ it('作者转换可借用五谷公开牌池材料反制当前目标，两个处�
   const skill = defineSkill({
     id: 'probe:pool-counter',
     name: '借牌反制',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'pool',
@@ -542,7 +542,7 @@ it('扩展选择特殊私有区时默认仍暗选，选择与移动分离', asyn
   expect(JSON.stringify(request.data)).not.toContain('peach');
   await choose(game, 'a');
   expect(await running).toMatchObject({
-    value: { value: { kind: 'chosen', card: 'secret-special' } },
+    value: { kind: 'chosen', card: 'secret-special' },
   });
   expect(game.room.world.position('secret-special')).toBe('b:private');
 });

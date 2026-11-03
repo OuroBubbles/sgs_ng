@@ -155,10 +155,8 @@ it('普通回合和额外回合共用执行器，自定义阶段可重复，skip
   expect(new Set(ids).size).toBe(2);
   expect(result).toMatchObject({
     value: {
-      value: {
-        origin: { kind: 'extra' },
-        phases: [{ exit: 'skipped' }, { exit: 'completed' }, { exit: 'completed' }],
-      },
+      origin: { kind: 'extra' },
+      phases: [{ exit: 'skipped' }, { exit: 'completed' }, { exit: 'completed' }],
     },
   });
   expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
@@ -190,7 +188,7 @@ it('嵌套回合恢复外层活动阶段与回合，内层生存期不清掉外�
             expect(readState(inner.world, activeTurn, activeTarget)?.owner).toBe('b');
           },
         });
-        expect(extra.kind).toBe('resolved');
+        expect(extra.owner).toBe('b');
         expect(readState(at.world, activeTurn, activeTarget)).toMatchObject({
           owner: 'a',
           origin: { kind: 'normal' },
@@ -273,11 +271,11 @@ it('阶段计划在进入等待前复制，空回合仍有开始/结束与独立
   origin.reason = 'changed';
   game.room.decisions.submit(request.id, request.token, true);
   expect(await running).toMatchObject({
-    value: { value: { origin: { reason: 'original' }, phases: [{ phase: { kind: 'prepare' } }] } },
+    value: { origin: { reason: 'original' }, phases: [{ phase: { kind: 'prepare' } }] },
   });
   await game.room.run('empty', async (ctx) => {
     const result = await runTurn(ctx, game.book, 'a', { phases: [] });
-    expect(result).toMatchObject({ value: { phases: [], origin: { kind: 'normal' } } });
+    expect(result).toMatchObject({ phases: [], origin: { kind: 'normal' } });
     expect(() => runTurn(ctx, game.book, 'a', { phases: ['invalid' as PhaseKind] })).toThrow(
       'Invalid',
     );
@@ -297,7 +295,9 @@ function match(body: PhaseBody) {
     players: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
     roles: ['lord', 'loyalist', 'rebel', 'renegade'],
     deck: [],
-    cards: standardCards,
+    content: {
+      cards: standardCards,
+    },
     phaseBody: body,
   });
 }

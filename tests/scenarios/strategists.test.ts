@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
@@ -22,11 +22,8 @@ import {
   privateCardPools,
   withPrivateTopCards,
   runPhase,
-  generalOf,
-  genderOf,
-  roleOf,
 } from '../../src/sdk';
-import type { Judgment } from '../../src/sdk';
+import type { Context, Judgment } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
@@ -132,7 +129,7 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
     }),
   );
   await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
-  expect(await running).toMatchObject({ value: { value: { matched: true, card: { id: 'new' } } } });
+  expect(await running).toMatchObject({ value: { matched: true, card: { id: 'new' } } });
   expect(paid).toBe(1);
   expect(played).toBe(1);
   expect(game.room.history.facts('card.responded')).toEqual([]);
@@ -146,7 +143,7 @@ it.each(['response', 'use', 'discard'] as const)(
     const locked = defineSkill({
       id: 'test:lock',
       name: '禁止',
-      effects: [],
+      triggers: [],
       modifiers: [
         kind === 'response'
           ? modify(cardQueries.prohibitResponse, () => true)
@@ -158,7 +155,7 @@ it.each(['response', 'use', 'discard'] as const)(
     const game = scenario({
       hands: { a: [card('new', 'peach', 'heart')] },
       draw: [card('old', 'slash')],
-      skills: (book) => [...standardGeneralSkills(book), locked],
+      skills: [...standardGeneralSkills, locked],
     });
     await grant(game, 'standard:guicai');
     await grant(game, locked.id);
@@ -170,7 +167,7 @@ it.each(['response', 'use', 'discard'] as const)(
       }),
     );
     if (kind !== 'response') await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
-    expect(await running).toMatchObject({ value: { value: { matched: kind !== 'response' } } });
+    expect(await running).toMatchObject({ value: { matched: kind !== 'response' } });
     expect(game.room.world.position('new')).toBe(kind === 'response' ? 'a:hand' : 'discard');
   },
 );
@@ -215,7 +212,7 @@ it('多个鬼才按判定角色锚点依次改判，后者看到实时新牌，�
   expect(next.data).toMatchObject({ judgment: { card: { id: 'first' } } });
   await answer(game, { cards: ['last'], targets: [] }, 'cards-targets');
   expect(await running).toMatchObject({
-    value: { value: { matched: false, card: { id: 'last' } } },
+    value: { matched: false, card: { id: 'last' } },
   });
   expect(game.room.history.facts('judgment.replaced')).toHaveLength(2);
   replay(game);
@@ -246,7 +243,7 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
       }),
     );
     await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
-    expect(await running).toMatchObject({ value: { value: { matched: true } } });
+    expect(await running).toMatchObject({ value: { matched: true } });
     expect(game.room.history.facts('judgment.replaced')).toHaveLength(1);
     replay(game);
   }
@@ -255,11 +252,11 @@ it('鬼才宣告后改判者死亡或失去技能不回滚新牌面', async () =
 it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
   '带宣告的底层改判在提交前拒绝失效费用，不留下半改判：%s',
   async (branch) => {
-    const probe = defineSkill({ id: 'test:retrial', name: '改判探针', effects: [] });
+    const probe = defineSkill({ id: 'test:retrial', name: '改判探针', triggers: [] });
     const game = scenario({
       hands: { a: [card('new', 'peach', 'heart')], c: [card('other', 'jink')] },
       draw: [card('old', 'slash')],
-      skills: (book) => [...standardGeneralSkills(book), probe],
+      skills: [...standardGeneralSkills, probe],
     });
     const self = await grant(game, probe.id);
     game.room.on(judgmentRetrial, {
@@ -275,7 +272,7 @@ it.each(['lost-skill', 'wrong-owner', 'legal'] as const)(
           skill: self,
           legal: () => branch !== 'legal',
         });
-        expect(result).toEqual({ kind: 'resolved', value: 'unavailable' });
+        expect(result).toEqual('unavailable');
       },
     });
     await game.room.run('judge', (ctx) =>
@@ -293,15 +290,27 @@ it('反馈按一次伤害发动一次，暗选不暴露手牌实体或牌名', a
   const running = game.room.run('hit', (ctx) =>
     damage(ctx, { from: 'b', to: 'a', amount: 2, nature: 'normal' }),
   );
-  await answer(game, true);
   const request = await nextRequest(game.room);
+  expect(request.kind).toBe('cards-targets');
+  expect(request.optional).toBe(true);
+  expect(game.room.history.facts('skill.invoked')).toEqual([]);
   expect(JSON.stringify(request.data)).not.toContain('secret');
   expect(JSON.stringify(request.data)).not.toContain('无中生有');
   const option = (request.data as { preview: { cards: { id: string }[] } }).preview.cards[0]!.id;
+  for (const cards of [['secret'], ['unknown'], [option, option]])
+    expect(
+      game.room.decisions.submit(request.id, request.token, { cards, targets: [] }),
+    ).toMatchObject({
+      kind: 'rejected',
+      reason: 'invalid',
+    });
+  expect(game.room.history.facts('skill.invoked')).toEqual([]);
   await answer(game, { cards: [option], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['secret']);
   expect(game.room.history.facts('card.taken')).toHaveLength(1);
+  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+  expect(game.room.decisions.pending).toEqual([]);
   expect(game.room.history.facts('card.taken')[0]!.data.detail).toMatchObject({ open: false });
   replay(game);
 });
@@ -310,20 +319,19 @@ it('反馈自伤时只能收回装备，不能选择原有手牌；装备也不�
   const locked = defineSkill({
     id: 'test:no-discard',
     name: '禁止弃置',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
   const game = scenario({
     hands: { a: [card('hand', 'peach')] },
     equipment: { a: [card('weapon', 'spear')] },
-    skills: (book) => [...standardGeneralSkills(book), locked],
+    skills: [...standardGeneralSkills, locked],
   });
   await grant(game, 'standard:fankui');
   await grant(game, locked.id);
   const running = game.room.run('hit', (ctx) =>
     damage(ctx, { from: 'a', to: 'a', amount: 1, nature: 'normal' }),
   );
-  await answer(game, true);
   const request = await nextRequest(game.room);
   const choices = (request.data as { preview: { cards: { id: string; label: string }[] } }).preview
     .cards;
@@ -356,9 +364,50 @@ it('反馈无来源、来源先死亡或仅有自伤手牌时不制造选择；�
         nature: 'normal',
       }),
     );
-    if (branch === 'decline') await answer(game, false);
+    if (branch === 'decline') await cancel(game);
     await running;
     expect(game.room.history.facts('card.taken')).toEqual([]);
+    expect(game.room.history.facts('skill.invoked')).toEqual([]);
+    expect(game.room.history.facts('card.chosen')).toEqual([]);
+  }
+});
+
+it('反馈宣告后失去技能仍取牌，选牌离区或来源死亡不追取', async () => {
+  for (const branch of ['declared-card', 'declared-skill', 'dead'] as const) {
+    const game = scenario({ hands: { b: [card('chosen', 'peach')] } });
+    await grant(game, 'standard:fankui');
+    const change = async (ctx: Context) => {
+      if (branch.endsWith('skill')) await game.skills.revoke(ctx, 'a', 'standard:fankui', source);
+      else if (branch === 'dead')
+        await kill(ctx, { player: 'b', killer: null, reason: 'rule', cause: healthCause });
+      else
+        await moveCards(
+          ctx,
+          [{ cards: ['chosen'], from: 'b:hand', to: 'c:hand', place: 'bottom' }],
+          'probe',
+        );
+    };
+    game.room.on(costPaid, {
+      id: 'after-declaration',
+      owner: null,
+      eligible: (_ctx, receipt) => receipt.skill === 'standard:fankui',
+      run: change,
+    });
+    const running = game.room.run('hit', (ctx) =>
+      damage(ctx, { from: 'b', to: 'a', amount: 1, nature: 'normal' }),
+    );
+    const request = await nextRequest(game.room);
+    const option = (request.data as { preview: { cards: { id: string }[] } }).preview.cards[0]!.id;
+    await answer(game, { cards: [option], targets: [] }, 'cards-targets');
+    await running;
+    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+    expect(game.room.history.facts('card.chosen')).toHaveLength(1);
+    expect(game.room.history.facts('card.taken')).toHaveLength(branch === 'declared-skill' ? 1 : 0);
+    expect(game.room.world.zone('a:hand').cards).toEqual(
+      branch === 'declared-skill' ? ['chosen'] : [],
+    );
+    expect(game.room.decisions.pending).toEqual([]);
+    replay(game);
   }
 });
 
@@ -374,7 +423,7 @@ it('天妒取得最终改判牌，不受判定是否成功影响，旧判定牌�
   );
   await answer(game, { cards: ['new'], targets: [] }, 'cards-targets');
   await answer(game, true);
-  expect(await running).toMatchObject({ value: { value: { matched: false } } });
+  expect(await running).toMatchObject({ value: { matched: false } });
   expect(game.room.world.position('new')).toBe('b:hand');
   expect(game.room.world.position('old')).toBe('discard');
   replay(game);
@@ -430,8 +479,10 @@ function privateMatch() {
     id: 'privacy',
     seed: 42,
     players: [{ id: 'a' }, { id: 'b' }],
-    cards: standardCards,
-    skills: standardGeneralSkills,
+    content: {
+      cards: standardCards,
+      skills: standardGeneralSkills,
+    },
     deck: [card('secret-one', 'ex_nihilo', 'heart'), card('secret-two', 'collateral')],
   });
 }
@@ -588,23 +639,43 @@ it('私有牌池嵌套互不混合，子流程中止也清理余牌与可见者�
   const result = await game.room.run('pools', (ctx) =>
     withPrivateTopCards(ctx, { player: 'a', count: 1, reason: 'outer' }, async (at, outer) => {
       expect(privateCardPools(at.world, 'a')[0]!.cards).toEqual(['outer']);
-      const inner = await withPrivateTopCards(
-        at,
-        { player: 'b', count: 2, reason: 'inner' },
-        (child, pool) => {
+      expect(at.world.snapshot.states.find((state) => state.source === outer.zone)).toMatchObject({
+        scopeId: outer.lifetime.id,
+      });
+      const inner = await at.attempt('inner pool', (inside) =>
+        withPrivateTopCards(inside, { player: 'b', count: 2, reason: 'inner' }, (child, pool) => {
           expect(pool.remaining()).toEqual(['inner']);
           expect(privateCardPools(child.world, 'a')[0]!.zone).toBe(outer.zone);
           expect(privateCardPools(child.world, 'b')[0]!.cards).toEqual(['inner']);
+          expect(
+            child.world.snapshot.states.find((state) => state.source === pool.zone),
+          ).toMatchObject({
+            scopeId: pool.lifetime.id,
+          });
           child.abort('inner cancelled');
-        },
+        }),
       );
       expect(inner.kind).toBe('aborted');
       expect(outer.remaining()).toEqual(['outer']);
+      expect(privateCardPools(at.world, 'b')).toEqual([]);
+      return 'outer-result';
     }),
   );
-  expect(result.kind).toBe('resolved');
+  expect(result).toMatchObject({ kind: 'resolved', value: 'outer-result' });
   expect(game.room.world.zone('discard').cards).toEqual(['inner', 'outer']);
   expect(game.room.world.snapshot.states).toEqual([]);
+  expect(game.room.history.facts('lifetime.ended').map((fact) => fact.data.detail)).toMatchObject([
+    {
+      kind: 'processing',
+      exit: 'aborted',
+      statesBefore: [{ key: 'core:private-pool', owner: 'b' }],
+    },
+    {
+      kind: 'processing',
+      exit: 'resolved',
+      statesBefore: [{ key: 'core:private-pool', owner: 'a' }],
+    },
+  ]);
   replay(game);
 });
 
@@ -684,65 +755,21 @@ it('基础 AI 用本人真实红桃手牌改善自己的乐不思蜀，仍经过
     kind: 'accepted',
   });
   expect(await running).toMatchObject({
-    value: { value: { matched: true, card: { id: 'secret-one' } } },
+    value: { matched: true, card: { id: 'secret-one' } },
   });
-});
-
-it('两名新武将的目录、技能、体力性别与主公奖励完整初始化', async () => {
-  expect(standardGenerals).toHaveLength(25);
-  for (const general of standardGenerals.slice(9, 11)) {
-    const match = createOfflineMatch(
-      6,
-      42,
-      'standard:identity',
-      Array.from({ length: 6 }, () => general.id),
-    );
-    await match.prepare();
-    for (const player of match.room.world.snapshot.players) {
-      expect(generalOf(match.room.world, player.id)).toBe(general.id);
-      expect(genderOf(match.room.world, player.id)).toBe('male');
-      expect(player.maxHp).toBe(3 + (roleOf(match.room.world, player.id) === 'lord' ? 1 : 0));
-      expect(
-        match.room.world.snapshot.skills
-          .filter((skill) => skill.owner === player.id)
-          .map((skill) => skill.skill),
-      ).toEqual(general.skills);
-    }
-    match.room.abort('done');
-  }
 });
 
 it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗选和分牌走到身份胜负', async () => {
   const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => standardGenerals[index]!.id);
-  const match = createOfflineMatch(8, 3, 'standard:identity', lineup);
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 5000; step++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const reply = decideBasic(observeAgent(match, request.player), request, (value) =>
-        match.room.decisions.preview(request.id, value),
-      );
-      if (reply.kind === 'unsupported') throw new Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(match.room.history.facts('judgment.replaced').length).toBeGreaterThan(0);
-    expect(
-      match.room.history
-        .facts('card.taken')
-        .some((fact) => (fact.data.detail as { reason?: string }).reason === 'standard:fankui'),
-    ).toBe(true);
-    expect(match.room.history.facts('cards.peeked').length).toBeGreaterThan(0);
-    expect(match.room.history.facts('cards.given').length).toBeGreaterThan(0);
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 3, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 5000 });
+
+  expect(match.room.history.facts('judgment.replaced').length).toBeGreaterThan(0);
+  expect(
+    match.room.history
+      .facts('card.taken')
+      .some((fact) => (fact.data.detail as { reason?: string }).reason === 'standard:fankui'),
+  ).toBe(true);
+  expect(match.room.history.facts('cards.peeked').length).toBeGreaterThan(0);
+  expect(match.room.history.facts('cards.given').length).toBeGreaterThan(0);
 }, 60_000);

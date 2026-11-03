@@ -50,10 +50,10 @@ const { skills, cards, generals, definitions } = collectStandardCatalogue(
     .sort(),
 );
 
-const fkSkills = translations('freekill/packages/standard/i18n/zh_CN.lua', true);
-const fkCards = translations('freekill/packages/standard_cards/i18n/zh_CN.lua', true);
-const nmSkills = translations('noname/resources/app/character/standard/translate.js');
-const nmCards = translations('noname/resources/app/card/standard.js');
+const fkSkills = translations('../freekill/packages/standard/i18n/zh_CN.lua', true);
+const fkCards = translations('../freekill/packages/standard_cards/i18n/zh_CN.lua', true);
+const nmSkills = translations('../noname/resources/app/character/standard/translate.js');
+const nmCards = translations('../noname/resources/app/card/standard.js');
 const aliases = {
   slash: 'sha',
   jink: 'shan',
@@ -96,8 +96,8 @@ function reference(entry, card) {
   if (!freeKill || !noname) throw new Error(`Missing literal reference text: ${entry.id}`);
   if (card && !definitions.has(entry.id))
     throw new Error(`Missing static card definition: ${entry.id}`);
-  const fkRule = `freekill/packages/${card ? 'standard_cards' : 'standard'}/pkg/skills/${id}.lua`;
-  const nmRule = `noname/resources/app/${card ? 'card/standard.js' : 'character/standard/skill.js'}`;
+  const fkRule = `../freekill/packages/${card ? 'standard_cards' : 'standard'}/pkg/skills/${id}.lua`;
+  const nmRule = `../noname/resources/app/${card ? 'card/standard.js' : 'character/standard/skill.js'}`;
   read(fkRule);
   read(nmRule);
   return {
@@ -107,12 +107,10 @@ function reference(entry, card) {
     noname: { id: name, ...noname, rule: nmRule },
   };
 }
-const packageSource = read('src/content/standard/index.ts');
 const report = {
   capturedAt: new Date().toISOString(),
   kind: 'static-reference-inventory',
   behaviorVerified: false,
-  version: packageSource.match(/version: '([^']+)'/)?.[1],
   generals,
   skills: [...skills.values()]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -126,7 +124,7 @@ const output = resolve(root, '.artifacts/validation/standard-semantics-inventory
 mkdirSync(resolve(root, '.artifacts/validation'), { recursive: true });
 writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
 console.log(
-  `Static reference inventory: ${generals.length} generals, ${skills.size} skills, ${cards.size} cards; standard@${report.version}.`,
+  `Static reference inventory: ${generals.length} generals, ${skills.size} skills, ${cards.size} cards; ${inputs.size} hashed inputs.`,
 );
 console.log(
   `${output}\nText/source inventory only; semantic equivalence and branch coverage require review and behavior evidence.`,

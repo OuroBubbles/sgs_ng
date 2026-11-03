@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { longdan, paoxiao, qixi } from '../../src/content/standard/martial';
@@ -14,8 +14,6 @@ import {
   roleOf,
 } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -128,7 +126,7 @@ it('咆哮允许连续用杀但仍累计次数，失去后恢复已累计的上�
           targets: ['b'],
           timing: phase.playTiming(),
         });
-        expect(used).toMatchObject({ value: { kind: 'used' } });
+        expect(used).toMatchObject({ kind: 'used' });
       }
       await game.skills.revoke(at, 'a', paoxiao.id, source);
       expect(
@@ -148,7 +146,7 @@ it('咆哮允许连续用杀但仍累计次数，失去后恢复已累计的上�
           targets: ['b'],
           timing: phase.playTiming(),
         }),
-      ).toMatchObject({ value: { kind: 'used' } });
+      ).toMatchObject({ kind: 'used' });
     });
   });
   expect(game.room.world.player('b').hp).toBe(1);
@@ -158,8 +156,10 @@ it('奇袭可以使用受自弃禁止的黑色装备作材料，仍触发枭姬�
   const locked = defineSkill({
     id: 'test:locked',
     name: '不能自弃',
-    effects: [],
-    modifiers: [modify(cardQueries.prohibitDiscard, (_ctx, input) => input.actor === input.owner)],
+    triggers: [],
+    modifiers: [
+      modify(cardQueries.prohibitDiscard, (_ctx, { input }) => input.actor === input.owner),
+    ],
   });
   const game = cardGame({
     hands: { a: [], b: [card('victim', 'peach')] },
@@ -223,12 +223,11 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
 
 it('首六武将完整初始化，主公奖励叠加目录体力，空武将引用不会被当作机制角色', async () => {
   expect(standardGenerals).toHaveLength(25);
-  const match = createOfflineMatch(
-    6,
-    42,
-    'standard:identity',
-    standardGenerals.slice(0, 6).map((general) => general.id),
-  );
+  const match = createOfflineMatch({
+    seed: 42,
+    preset: 'standard:identity',
+    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
+  });
   await match.prepare();
   for (const [index, player] of match.initial.players.entries()) {
     const general = standardGenerals[index]!;
@@ -237,39 +236,17 @@ it('首六武将完整初始化，主公奖励叠加目录体力，空武将引�
       general.maxHp + (roleOf(match.room.world, player.id) === 'lord' ? 1 : 0),
     );
   }
-  expect(() => createOfflineMatch(2, 42, 'standard:identity', ['', 'standard:guanyu'])).toThrow(
-    /Unknown general/,
-  );
+  expect(() =>
+    createOfflineMatch({ seed: 42, preset: 'standard:identity', lineup: ['', 'standard:guanyu'] }),
+  ).toThrow(/Unknown general/);
   match.room.abort('done');
 });
 
 it('六名真实武将全部由基础 AI 经正式决策走到身份胜负', async () => {
-  const match = createOfflineMatch(
-    6,
-    42,
-    'standard:identity',
-    standardGenerals.slice(0, 6).map((general) => general.id),
-  );
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 2000; step++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
-      if (answer.kind === 'unsupported') throw new Error(answer.reason);
-      expect(
-        answer.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, answer.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({
+    seed: 42,
+    preset: 'standard:identity',
+    lineup: standardGenerals.slice(0, 6).map((general) => general.id),
+  });
+  await playMatch(match, { steps: 2000 });
 }, 60_000);

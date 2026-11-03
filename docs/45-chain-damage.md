@@ -4,7 +4,7 @@
 
 ## 项目采用的传播规则
 
-本地 FreeKill 在 [ChangeHp](../freekill/ltk/server/events/hp.lua) 中解除连环并收集其他连环角色，在 DamageFinished 后以最终伤害值逐个传播；noname 在 [连环规则](../noname/resources/app/noname/library/index.js) 的 damageAfter 中收集当时仍连环的角色。这两种快照时机并不等价，尤其是受伤后技能会改变连环状态时。
+本地 FreeKill 在 [ChangeHp](../../freekill/ltk/server/events/hp.lua) 中解除连环并收集其他连环角色，在 DamageFinished 后以最终伤害值逐个传播；noname 在 [连环规则](../../noname/resources/app/noname/library/index.js) 的 damageAfter 中收集当时仍连环的角色。这两种快照时机并不等价，尤其是受伤后技能会改变连环状态时。
 
 本项目明确选择以下规则，不混用两种目标收集时机：
 
@@ -20,12 +20,12 @@
 
 [chain.ts](../src/rules/combat/chain.ts) 提供四个普通入口：
 
-| 入口                                     | 行为                                               |
-| ---------------------------------------- | -------------------------------------------------- |
-| `isChained(world, player)`               | 读取公开权威状态，不依赖 UI 或第二份角色列表       |
-| `chainChange(ctx, player, value)`        | 构造可组合 Change；自身不提交，也不开窗口          |
-| `setChained(ctx, player, value, reason)` | 返回 FlowResult；实际变化才提交并开放 chainChanged |
-| `chainChanged`                           | 只读的 player/before/after/reason 变更窗口         |
+| 入口                                     | 行为                                                    |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `isChained(world, player)`               | 读取公开权威状态，不依赖 UI 或第二份角色列表            |
+| `chainChange(ctx, player, value)`        | 构造可组合 Change；自身不提交，也不开窗口               |
+| `setChained(ctx, player, value, reason)` | 直接返回 ChainResult；实际变化才提交并开放 chainChanged |
+| `chainChanged`                           | 只读的 player/before/after/reason 变更窗口              |
 
 `setChained` 区分 changed、unchanged 和 unavailable。死亡角色或终局不再设置，未知角色/非法值报作者错误。纯查询和关闭的 Context 不能改变状态。
 
@@ -58,15 +58,13 @@ origin: { kind: 'chain', damage: root.id }
 默认只有 fire/thunder 传导。其他属性是否传导由本笔伤害明确指定；普通代码也可使某次火焰伤害不传导：
 
 ```ts
-ctx.unwrap(
-  await damage(ctx, {
-    from: self.owner,
-    to: target,
-    amount: 1,
-    nature: 'my-pack:ice',
-    conducts: true,
-  }),
-);
+await damage(ctx, {
+  from: self.owner,
+  to: target,
+  amount: 1,
+  nature: 'my-pack:ice',
+  conducts: true,
+});
 ```
 
 conducts 决定本次伤害是否解除连环及产生传播，不把所有非 normal 属性自动视作连环伤害。
@@ -86,7 +84,7 @@ await resolveAttack(ctx, effect, book, 'standard:jink', (at, hit) =>
 );
 ```
 
-默认行为不变；自定义函数同样返回 FlowResult，局部中止沿既有 unwrap 契约传播。这是函数组合入口，不是属性策略配置表。
+默认行为不变；自定义函数同样直接返回领域值，局部中止默认沿调用链传播。这是函数组合入口，不是属性策略配置表。
 
 ## 可运行演武与验证
 

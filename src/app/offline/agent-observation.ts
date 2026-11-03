@@ -34,25 +34,27 @@ export interface AgentObservation {
 
 /** 与画面投影分离：AI 只收到本人手牌/私有池、公开装备/体力和有权知道的身份。 */
 export function observeAgent(match: RoleMatch, actor: string): AgentObservation {
-  const world = match.room.world;
-  const card = (id: string): AgentCard => {
-    const value = match.room.inspect((ctx) => match.book.face(ctx, id));
-    const equipment = match.book.definition(value.name).equipment;
-    return { ...value, slot: equipment?.slot ?? null, range: equipment?.range ?? 0 };
-  };
-  return immutable({
-    actor,
-    hand: world.zone(`${actor}:hand`).cards.map(card),
-    pools: privateCardPools(world, actor).flatMap((pool) => pool.cards.map(card)),
-    players: world.snapshot.players.map((player) => ({
-      ...player,
-      chained: isChained(world, player.id),
-      shield: shieldOf(world, player.id),
-      gender: genderOf(world, player.id),
-      kingdom: kingdomOf(world, player.id),
-      role: match.progress ? knownRole(world, actor, player.id) : null,
-      handCount: world.zone(`${player.id}:hand`).cards.length,
-      equipment: world.zone(`${player.id}:equipment`).cards.map(card),
-    })),
+  return match.room.inspect((ctx) => {
+    const world = ctx.world;
+    const card = (id: string): AgentCard => {
+      const value = match.book.face(ctx, id);
+      const equipment = match.book.definition(value.name).equipment;
+      return { ...value, slot: equipment?.slot ?? null, range: equipment?.range ?? 0 };
+    };
+    return immutable({
+      actor,
+      hand: world.zone(`${actor}:hand`).cards.map(card),
+      pools: privateCardPools(world, actor).flatMap((pool) => pool.cards.map(card)),
+      players: world.snapshot.players.map((player) => ({
+        ...player,
+        chained: isChained(world, player.id),
+        shield: shieldOf(world, player.id),
+        gender: genderOf(world, player.id),
+        kingdom: kingdomOf(world, player.id),
+        role: match.progress ? knownRole(world, actor, player.id) : null,
+        handCount: world.zone(`${player.id}:hand`).cards.length,
+        equipment: world.zone(`${player.id}:equipment`).cards.map(card),
+      })),
+    });
   });
 }

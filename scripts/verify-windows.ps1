@@ -1,35 +1,44 @@
-param(
-  [ValidateSet('debug', 'release')]
-  [string]$BuildKind = 'release'
+﻿param(
+  [ValidateSet('debug', 'release')][string]$BuildKind = 'release',
+  [switch]$Network,
+  [string]$ExecutablePath
 )
 
-# 只启动并关闭本脚本拥有的程序；不复用旧 CDP 端点作为当前构建的证据。
+# 仅控制本次创建的原生进程；内容直接来自程序源码，没有安装/数据库恢复步骤。
 $ErrorActionPreference = 'Stop'
 $verifyRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-& node (Join-Path $verifyRoot 'scripts/build-content.mjs') (Join-Path $verifyRoot 'examples/content/harbor/index.ts') (Join-Path $verifyRoot '.artifacts/content/harbor.sgs.mjs')
-if ($LASTEXITCODE -ne 0) { throw 'Content example build failed.' }
-& node (Join-Path $verifyRoot 'scripts/build-content.mjs') (Join-Path $verifyRoot 'examples/content/gallery/index.ts') (Join-Path $verifyRoot '.artifacts/content/gallery.sgs')
-if ($LASTEXITCODE -ne 0) { throw 'Resource bundle example build failed.' }
-$executable = (Resolve-Path -LiteralPath (Join-Path $verifyRoot "src-tauri/target/$BuildKind/sgs-ng.exe")).Path
+$launchPath = if ($ExecutablePath) { $ExecutablePath } else { Join-Path $verifyRoot "src-tauri/target/$BuildKind/sgs-ng.exe" }
+$executable = (Resolve-Path -LiteralPath $launchPath).Path
+$workingDirectory = Split-Path -Parent $executable
 $port = if ($BuildKind -eq 'release') { 9224 } else { 9223 }
-$nativeProfile = Join-Path $verifyRoot ('.artifacts/ui/webview-profile-' + $BuildKind + '-' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $nativeProfile -Force | Out-Null
-if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
-  throw "Port $port is already in use; close its owner before verifying this build."
+$peerPort = $port + 2
+foreach ($candidatePort in @($port, $peerPort)) {
+  if (Get-NetTCPConnection -LocalPort $candidatePort -State Listen -ErrorAction SilentlyContinue) { throw "Port $candidatePort is occupied." }
 }
-
+$runRoot = Join-Path $verifyRoot ('.artifacts/native/' + $BuildKind + '-' + [Guid]::NewGuid().ToString('N'))
+$nativeProfile = Join-Path $runRoot 'owner'
+New-Item -ItemType Directory -Path $nativeProfile -Force | Out-Null
+$profiles = @($nativeProfile)
 $variables = @{
-  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
+  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port --mute-audio"
+  WEBVIEW2_USER_DATA_FOLDER = $nativeProfile
   SGS_NATIVE_BUILD = $BuildKind
   SGS_NATIVE_EXE = $executable
   SGS_NATIVE_CDP = "http://127.0.0.1:$port"
   SGS_NATIVE_PID = $null
   SGS_NATIVE_PROFILE = $nativeProfile
-  WEBVIEW2_USER_DATA_FOLDER = $nativeProfile
+  SGS_NATIVE_PEER_CDP = "http://127.0.0.1:$peerPort"
 }
 $previous = @{}
 $owned = $null
-$profileChecks = @()
+$peer = $null
+$checks = @()
+function Stop-Owned($process) {
+  if ($process -and !$process.HasExited -and $process.Path -eq $executable) {
+    Stop-Process -Id $process.Id
+    if (!$process.WaitForExit(10000)) { throw 'Owned native process did not exit.' }
+  }
+}
 function Assert-NativeProfile($client) {
   $processes = @(Get-CimInstance Win32_Process)
   $descendants = [Collections.Generic.HashSet[uint32]]::new()
@@ -45,23 +54,22 @@ function Assert-NativeProfile($client) {
     if ($process.CommandLine -match '--user-data-dir=(?:"([^"]+)"|(\S+))') {
       $actual = [IO.Path]::GetFullPath($(if ($Matches[1]) { $Matches[1] } else { $Matches[2] }))
       if ($actual.Equals($nativeProfile, [StringComparison]::OrdinalIgnoreCase) -or $actual.StartsWith($nativeProfile + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-        return [ordered]@{ processId=$client.Id; webviewProcessId=$process.ProcessId; actualDataDirectory=$actual }
+        return [ordered]@{ processId=$client.Id; executablePath=$client.Path; webviewProcessId=$process.ProcessId; actualDataDirectory=$actual }
       }
     }
   }
-  throw 'WebView2 did not use the isolated verification profile; refusing to change content storage.'
+  throw 'WebView2 did not use the isolated verification profile; refusing to operate a shared profile.'
 }
 function Wait-NativeCdp($client) {
   $deadline = (Get-Date).AddSeconds(20)
   do {
     if ($client.HasExited) { throw 'The native application exited before opening CDP.' }
+    if ((Get-Date) -ge $deadline) { throw 'The native CDP page did not become available.' }
     try {
-      $null = Invoke-RestMethod -Uri "http://127.0.0.1:$port/json/version" -TimeoutSec 1
-      return
-    } catch {
-      if ((Get-Date) -ge $deadline) { throw 'The native CDP endpoint did not become available.' }
-      Start-Sleep -Milliseconds 200
-    }
+      $pages = @(Invoke-RestMethod -Uri "http://127.0.0.1:$port/json/list" -TimeoutSec 1)
+      if (@($pages | Where-Object { $_.url -like '*tauri.localhost*' }).Count) { return }
+    } catch {}
+    Start-Sleep -Milliseconds 200
   } while ($true)
 }
 Push-Location -LiteralPath $verifyRoot
@@ -70,47 +78,58 @@ try {
     $previous[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
     [Environment]::SetEnvironmentVariable($key, $variables[$key], 'Process')
   }
-  $owned = Start-Process -FilePath $executable -WorkingDirectory $verifyRoot -WindowStyle Hidden -PassThru
+  $owned = Start-Process -FilePath $executable -WorkingDirectory $workingDirectory -WindowStyle Hidden -PassThru
   Wait-NativeCdp $owned
-  $profileChecks += Assert-NativeProfile $owned
+  $checks += Assert-NativeProfile $owned
   [Environment]::SetEnvironmentVariable('SGS_NATIVE_PID', [string]$owned.Id, 'Process')
-  & node scripts/smoke-native.mjs
-  if ($LASTEXITCODE -ne 0) { throw 'Native behavior verification failed.' }
-  Stop-Process -Id $owned.Id
-  if (!$owned.WaitForExit(10000)) { throw 'The first native process did not terminate.' }
-  $deadline = (Get-Date).AddSeconds(10)
-  while (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
-    if ((Get-Date) -ge $deadline) { throw 'The old native CDP listener did not close.' }
-    Start-Sleep -Milliseconds 200
+  if ($Network) {
+    $nativeProfile = Join-Path $runRoot 'peer'
+    $profiles += $nativeProfile
+    New-Item -ItemType Directory -Path $nativeProfile | Out-Null
+    $port = $peerPort
+    [Environment]::SetEnvironmentVariable('WEBVIEW2_USER_DATA_FOLDER', $nativeProfile, 'Process')
+    [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', "--remote-debugging-port=$port --mute-audio", 'Process')
+    $peer = Start-Process -FilePath $executable -WorkingDirectory $workingDirectory -WindowStyle Hidden -PassThru
+    Wait-NativeCdp $peer
+    $checks += Assert-NativeProfile $peer
+    & node scripts/smoke-native.mjs --network
+    if ($LASTEXITCODE -ne 0) { throw 'Native room verification failed.' }
+    $proofPath = Join-Path $verifyRoot ".artifacts/validation/native-source-network-$BuildKind.json"
+    $proof = Get-Content -LiteralPath $proofPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Stop-Owned $owned
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+      $remaining = Get-CimInstance Win32_Process -Filter "ProcessId=$($proof.result.hosting.ProcessId)" | Where-Object {
+        $_.ParentProcessId -eq $proof.result.hosting.ParentProcessId -and $_.ExecutablePath -eq $proof.result.hosting.ExecutablePath
+      }
+      if (!$remaining) { break }
+      Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $deadline)
+    if ($remaining -or (Get-NetTCPConnection -LocalPort $proof.result.hosting.port -State Listen -ErrorAction SilentlyContinue)) { throw 'Hosting child or port survived owner exit.' }
+    $proof.result | Add-Member -NotePropertyName ownerExitCleanup -NotePropertyValue $true
+    $proof | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $proofPath -Encoding utf8
+  } else {
+    & node scripts/smoke-native.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Native offline verification failed.' }
+    Stop-Owned $owned
+    $deadline = (Get-Date).AddSeconds(10)
+    while (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
+      if ((Get-Date) -ge $deadline) { throw 'Previous native CDP listener survived exit.' }
+      Start-Sleep -Milliseconds 100
+    }
+    $owned = Start-Process -FilePath $executable -WorkingDirectory $workingDirectory -WindowStyle Hidden -PassThru
+    Wait-NativeCdp $owned
+    $checks += Assert-NativeProfile $owned
+    [Environment]::SetEnvironmentVariable('SGS_NATIVE_PID', [string]$owned.Id, 'Process')
+    & node scripts/smoke-native.mjs --restart
+    if ($LASTEXITCODE -ne 0) { throw 'Native process restart verification failed.' }
   }
-  $owned = Start-Process -FilePath $executable -WorkingDirectory $verifyRoot -WindowStyle Hidden -PassThru
-  Wait-NativeCdp $owned
-  $profileChecks += Assert-NativeProfile $owned
-  [Environment]::SetEnvironmentVariable('SGS_NATIVE_PID', [string]$owned.Id, 'Process')
-  & node scripts/smoke-content-restart.mjs
-  if ($LASTEXITCODE -ne 0) { throw 'Native process restart verification failed.' }
-  [ordered]@{ capturedAt=(Get-Date).ToUniversalTime().ToString('o'); buildKind=$BuildKind; isolated=$true; directory=$nativeProfile; checks=$profileChecks } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $verifyRoot ".artifacts/ui/native-profile-$BuildKind.json") -Encoding utf8
+  $scope = if ($Network) { 'network' } else { 'offline' }
+  [ordered]@{ capturedAt=(Get-Date).ToUniversalTime().ToString('o'); buildKind=$BuildKind; isolated=$true; profiles=$profiles; checks=$checks } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $verifyRoot ".artifacts/validation/native-source-profiles-$scope-$BuildKind.json") -Encoding utf8
 } finally {
-  if ($owned -and !$owned.HasExited) {
-    $current = Get-Process -Id $owned.Id -ErrorAction SilentlyContinue
-    if ($current -and $current.Path -eq $executable) { Stop-Process -Id $owned.Id; $null = $owned.WaitForExit(10000) }
-  }
-  foreach ($key in $previous.Keys) {
-    [Environment]::SetEnvironmentVariable($key, $previous[$key], 'Process')
-  }
-  # 只清理本次生成的独立目录；不触及用户正常应用数据。先校验绝对路径与使用者。
-  $profileRoot = [IO.Path]::GetFullPath((Join-Path $verifyRoot '.artifacts/ui'))
-  $profilePath = [IO.Path]::GetFullPath($nativeProfile)
-  if (!$profilePath.StartsWith($profileRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
-    [IO.Path]::GetFileName($profilePath) -notmatch '^webview-profile-(debug|release)-[0-9a-f]{32}$') { throw 'Invalid verification profile cleanup path.' }
-  $cleanupDeadline = (Get-Date).AddSeconds(5)
-  do {
-    $profileUsers = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($nativeProfile) })
-    if ($profileUsers.Count -eq 0 -or (Get-Date) -ge $cleanupDeadline) { break }
-    Start-Sleep -Milliseconds 200
-  } while ($true)
-  if ($profileUsers.Count -eq 0 -and (Test-Path -LiteralPath $profilePath)) {
-    try { Remove-Item -LiteralPath $profilePath -Recurse -Force -ErrorAction Stop } catch { Write-Warning "Temporary verification profile remains: $profilePath" }
-  }
+  Stop-Owned $owned
+  Stop-Owned $peer
+  foreach ($key in $previous.Keys) { [Environment]::SetEnvironmentVariable($key, $previous[$key], 'Process') }
+  # 保留本次隔离目录供诊断，不遍历或删除任何历史验收目录。
   Pop-Location
 }

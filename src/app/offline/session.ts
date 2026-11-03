@@ -1,10 +1,11 @@
 import type { DecisionRequest, ReplyResult } from '../../core/decisions/hub';
 import { immutable } from '../../core/model/value';
 import type { GameView, GameSelection, ChoicePreview } from '../../core/view/game';
-import { projectMatch, record, candidates } from './projection';
+import { projectMatch } from './projection';
+import { emptyPreview } from '../../core/view/game';
+import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
-import { observeAgent } from './agent-observation';
-import { decideBasic } from './basic-agent';
+import { AgentDriver } from './agent-driver';
 
 export interface LocalSessionOptions {
   /** 固定人类席位；省略时保留内容作者的手动多席演练。 */
@@ -22,9 +23,10 @@ export class LocalSession {
   #error = '';
   #view: GameView;
   #paused = false;
-  #scheduled: { key: string; handle: ReturnType<typeof setTimeout> } | null = null;
+  readonly #agent: AgentDriver;
+  #delegated = false;
+  #controlReason = '';
   readonly human: string | null;
-  readonly #aiDelay: number;
   constructor(
     private readonly match: RoleMatch,
     options: LocalSessionOptions = {},
@@ -32,10 +34,17 @@ export class LocalSession {
     this.human = options.human ?? null;
     if (this.human && !match.initial.players.some((player) => player.id === this.human))
       throw new Error('Unknown human seat.');
-    this.#aiDelay = options.aiDelayMs ?? 300;
-    if (!Number.isFinite(this.#aiDelay) || this.#aiDelay < 0) throw new Error('Invalid AI delay.');
+    this.#agent = new AgentDriver(match, options.aiDelayMs ?? 300, (update) => {
+      if (update.kind === 'unsupported' && update.player === this.human && this.#delegated) {
+        this.#delegated = false;
+        this.#controlReason = update.reason;
+      } else if (update.kind !== 'changed') {
+        this.#stop(new Error(update.reason));
+      }
+      this.#refresh();
+    });
     this.#viewer = this.human;
-    this.#view = projectMatch(match, this.#viewer, null);
+    this.#view = this.#project(this.#viewer, null);
     this.#unsubscribe = match.room.history.subscribe(() => this.#refresh());
   }
   get view(): GameView {
@@ -58,14 +67,14 @@ export class LocalSession {
       })
       .catch((error: unknown) => {
         if (this.#disposed) return;
-        this.#error = error instanceof Error ? error.message : String(error);
+        this.#error ||= error instanceof Error ? error.message : String(error);
         this.#refresh();
       });
   }
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#clearTimer();
+    this.#agent.update(null);
     this.#unsubscribe();
     this.#listeners.clear();
     this.match.room.abort('Local session closed.');
@@ -76,7 +85,7 @@ export class LocalSession {
     if (this.human) {
       if (this.view.status !== 'running') return;
       this.#paused = true;
-      this.#clearTimer();
+      this.#agent.update(null);
     }
     this.#viewer = null;
     this.#refresh();
@@ -91,85 +100,100 @@ export class LocalSession {
   #request(): DecisionRequest | null {
     return this.match.room.decisions.pending[0] ?? null;
   }
+  #project(viewer: string | null, request: DecisionRequest | null, focus = viewer): GameView {
+    try {
+      return projectMatch(this.match, viewer, request, this.#error, focus);
+    } catch (error) {
+      this.#stop(error);
+      return projectMatch(this.match, viewer, null, this.#error, focus);
+    }
+  }
+  #stop(error: unknown): void {
+    this.#error ||= error instanceof Error ? error.message : String(error);
+    this.#agent.update(null);
+    try {
+      this.match.room.abort(this.#error);
+    } catch (cleanupError) {
+      this.#error += `; ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`;
+    }
+  }
+  #interact<T>(body: () => T, failed: () => T): T {
+    try {
+      return body();
+    } catch (error) {
+      this.#stop(error);
+      // 预览可能从 Svelte 派生值发起，不能在同一栈内通知组件修改状态。
+      queueMicrotask(() => this.#refresh());
+      return failed();
+    }
+  }
   #refresh(): void {
     if (this.#disposed) return;
-    const request = this.#request();
+    let request: DecisionRequest | null;
+    try {
+      request = this.#request();
+    } catch (error) {
+      this.#stop(error);
+      request = null;
+    }
     if (this.human) {
       this.#viewer = this.#paused ? null : this.human;
       const humanRequest =
-        !this.#paused && request?.player === this.human && request.kind !== 'seat-ready'
+        !this.#paused &&
+        !this.#delegated &&
+        request?.player === this.human &&
+        request.kind !== 'seat-ready'
           ? request
           : null;
       this.#view = immutable({
-        ...projectMatch(this.match, this.#viewer, humanRequest, this.#error, this.human),
-        automated: request && request.player !== this.human ? request.player : null,
+        ...this.#project(this.#viewer, humanRequest, this.human),
+        automated:
+          !this.#error && request && (request.player !== this.human || this.#delegated)
+            ? request.player
+            : null,
         paused: this.#paused,
+        control: { delegated: this.#delegated, reason: this.#controlReason },
       });
-      this.#schedule(request);
+      const automated =
+        request &&
+        (request.kind === 'seat-ready' || request.player !== this.human || this.#delegated);
+      this.#agent.update(
+        automated && !this.#paused && !this.#error && !this.match.result ? request : null,
+      );
     } else {
       if (request && (request.kind === 'seat-ready' || request.player !== this.#viewer))
         this.#viewer = null;
-      this.#view = projectMatch(this.match, this.#viewer, request, this.#error);
+      this.#view = this.#project(this.#viewer, request);
     }
     for (const listener of this.#listeners) listener(this.#view);
   }
-  #clearTimer(): void {
-    if (this.#scheduled) clearTimeout(this.#scheduled.handle);
-    this.#scheduled = null;
-  }
-  #schedule(request: DecisionRequest | null): void {
-    const automated = request && (request.kind === 'seat-ready' || request.player !== this.human);
-    if (!automated || this.#paused || this.#error || this.match.result) {
-      this.#clearTimer();
-      return;
-    }
-    const key = `${request.id}:${request.token}`;
-    if (this.#scheduled?.key === key) return;
-    this.#clearTimer();
-    this.#scheduled = {
-      key,
-      handle: setTimeout(() => {
-        this.#scheduled = null;
-        if (this.#disposed || this.#paused || this.#error) return;
-        const current = this.#request();
-        if (!current || `${current.id}:${current.token}` !== key) {
-          this.#refresh();
-          return;
-        }
-        try {
-          const hub = this.match.room.decisions;
-          const answer = decideBasic(observeAgent(this.match, current.player), current, (input) =>
-            hub.preview(current.id, input),
-          );
-          if (answer.kind === 'unsupported') throw new Error(answer.reason);
-          const result =
-            answer.kind === 'cancel'
-              ? hub.cancel(current.id, current.token)
-              : hub.submit(current.id, current.token, answer.value);
-          if (result.kind === 'rejected' && result.reason !== 'closed' && result.reason !== 'stale')
-            throw new Error(`基础 AI 提交失败：${result.message}`);
-          this.#refresh();
-        } catch (error) {
-          this.#error = error instanceof Error ? error.message : String(error);
-          this.match.room.abort(this.#error);
-          this.#refresh();
-        }
-      }, this.#aiDelay),
-    };
+  /** 控制权交接不关闭决策，也不回滚已提交的动作。 */
+  setDelegated(enabled: boolean): ReplyResult {
+    if (!this.human || this.#disposed || this.view.status !== 'running') return this.#closed();
+    this.#delegated = enabled;
+    this.#controlReason = '';
+    this.#refresh();
+    return { kind: 'accepted' };
   }
   confirmSeat(key: string): void {
     if (this.human) return;
-    const request = this.#request();
-    if (!request || key !== `${request.id}:${request.token}` || this.#disposed) return;
-    this.#viewer = request.player;
-    if (request.kind === 'seat-ready')
-      this.match.room.decisions.submit(request.id, request.token, true);
-    this.#refresh();
+    this.#interact(
+      () => {
+        const request = this.#request();
+        if (!request || key !== `${request.id}:${request.token}` || this.#disposed) return;
+        this.#viewer = request.player;
+        if (request.kind === 'seat-ready')
+          this.match.room.decisions.submit(request.id, request.token, true);
+        this.#refresh();
+      },
+      () => undefined,
+    );
   }
   #authorized(id: string, token: number): DecisionRequest | null {
     const request = this.#request();
     return !this.#disposed &&
       !this.#paused &&
+      !this.#delegated &&
       request?.id === id &&
       request.token === token &&
       request.player === this.#viewer &&
@@ -177,86 +201,32 @@ export class LocalSession {
       ? request
       : null;
   }
-  #input(request: DecisionRequest, selection: GameSelection): unknown {
-    // Svelte 的草稿可能是 Proxy；跨执行边界只提交复制后的普通数组。
-    const cards = [...selection.cards];
-    const targets = [...selection.targets];
-    if (request.kind === 'cards-targets') return { cards, targets };
-    const data = record(request.data);
-    const offers = Array.isArray(data.offers) ? data.offers : [];
-    const raw = offers.find((item: unknown) => record(item).id === selection.offer) as unknown;
-    const offer = record(raw);
-    const source = record(offer.choice);
-    if (offer.kind === 'active') return { skill: source.instance, action: source.action };
-    const choice =
-      offer.kind === 'physical'
-        ? { kind: 'physical', card: source.card }
-        : {
-            kind: 'viewAs',
-            instance: source.instance,
-            recipe: source.recipe,
-            materials: cards,
-          };
-    return request.kind === 'play-action' ? { choice, targets } : choice;
-  }
   inspect(
     id: string | undefined,
     token: number | undefined,
     selection: GameSelection,
   ): ChoicePreview {
-    const empty: ChoicePreview = {
-      valid: false,
-      reason: '请选择手牌或技能',
-      cards: [],
-      targets: [],
-      targetCount: { min: 0, max: 0 },
-      fixedTargets: [],
-    };
-    if (!id || token === undefined) return empty;
-    const request = this.#authorized(id, token);
-    if (!request) return { ...empty, reason: '请先完成席位交接' };
-    if (request.kind === 'choose-option' || request.kind === 'trigger-order')
-      return { ...empty, reason: '请选择上方的一项' };
-    if (request.kind === 'invoke') return { ...empty, reason: '请选择是否发动技能' };
-    if (request.kind === 'arrange') return { ...empty, reason: '请在排序面板中调整并确认' };
-    const preview = this.match.room.decisions.preview(id, this.#input(request, selection));
-    if (!preview) return { ...empty, reason: '选择已结束' };
-    const feedback = record(preview.feedback);
-    const data = record(request.data);
-    const range = record(feedback.targetCount ?? data.targetCount);
-    return immutable({
-      valid: preview.valid,
-      reason: preview.valid
-        ? '选择完成，可以确认'
-        : this.#reason(request, selection, preview.reason),
-      cards: candidates(feedback.cards),
-      fixedTargets: Array.isArray(feedback.fixedTargets)
-        ? feedback.fixedTargets.filter((id): id is string => typeof id === 'string')
-        : [],
-      targets: candidates(feedback.targets),
-      targetCount: {
-        min: typeof range.min === 'number' ? range.min : 0,
-        max: range.max === 'all' ? 'all' : typeof range.max === 'number' ? range.max : 0,
+    if (!id || token === undefined) return emptyPreview();
+    return this.#interact(
+      () => {
+        const request = this.#authorized(id, token);
+        return request
+          ? inspectSelection(this.match, request, selection)
+          : emptyPreview('请先完成席位交接');
       },
-    });
-  }
-  #reason(request: DecisionRequest, selection: GameSelection, reason: string): string {
-    if (request.kind === 'cards-targets') return '按上方提示完成选择';
-    if (!selection.offer) return '请选择手牌或技能';
-    const map: Readonly<Record<string, string>> = {
-      'Invalid target count or duplicate targets.': '请选择符合数量要求的目标',
-      'Illegal target.': '此目标不符合当前牌的条件',
-      'Usage limit reached.': '本阶段使用次数已达上限',
-      'Card does not satisfy this response.': '此牌不能用于当前响应',
-      'Selection is incomplete.': '尚未选择足够的牌或目标',
-      'Invalid recipe materials.': '请按技能要求选择材料',
-      'Active skill is no longer available.': '此技能当前不能发动',
-    };
-    return map[reason] ?? reason;
+      () => emptyPreview(this.#error),
+    );
   }
   reply(id: string, token: number, selection: GameSelection): ReplyResult {
-    const request = this.#authorized(id, token);
-    return request ? this.answer(id, token, this.#input(request, selection)) : this.#closed();
+    return this.#interact(
+      () => {
+        const request = this.#authorized(id, token);
+        return request
+          ? this.answer(id, token, selectionInput(request, selection))
+          : this.#closed();
+      },
+      () => this.#closed(),
+    );
   }
   /** 专用面板仍通过同一份规则校验预览；不把执行侧闭包交给组件。 */
   inspectAnswer(
@@ -264,23 +234,41 @@ export class LocalSession {
     token: number,
     value: unknown,
   ): { readonly valid: boolean; readonly reason: string } {
-    if (!this.#authorized(id, token)) return { valid: false, reason: '选择已结束或当前不可操作' };
-    const result = this.match.room.decisions.preview(id, value);
-    return result
-      ? { valid: result.valid, reason: result.reason }
-      : { valid: false, reason: '选择已结束' };
+    return this.#interact(
+      () => {
+        if (!this.#authorized(id, token))
+          return { valid: false, reason: '选择已结束或当前不可操作' };
+        const result = this.match.room.decisions.preview(id, value);
+        return result
+          ? { valid: result.valid, reason: result.reason }
+          : { valid: false, reason: '选择已结束' };
+      },
+      () => ({ valid: false, reason: this.#error }),
+    );
   }
   answer(id: string, token: number, value: unknown): ReplyResult {
-    if (!this.#authorized(id, token)) return this.#closed();
-    const result = this.match.room.decisions.submit(id, token, value);
-    this.#refresh();
-    return result;
+    return this.#interact(
+      () => {
+        if (!this.#authorized(id, token)) return this.#closed();
+        const result = this.match.room.decisions.submit(id, token, value);
+        if (result.kind === 'accepted') this.#controlReason = '';
+        this.#refresh();
+        return result;
+      },
+      () => this.#closed(),
+    );
   }
   cancel(id: string, token: number): ReplyResult {
-    if (!this.#authorized(id, token)) return this.#closed();
-    const result = this.match.room.decisions.cancel(id, token);
-    this.#refresh();
-    return result;
+    return this.#interact(
+      () => {
+        if (!this.#authorized(id, token)) return this.#closed();
+        const result = this.match.room.decisions.cancel(id, token);
+        if (result.kind === 'accepted') this.#controlReason = '';
+        this.#refresh();
+        return result;
+      },
+      () => this.#closed(),
+    );
   }
   #closed(): ReplyResult {
     return { kind: 'rejected', reason: 'closed', message: '此席位的选择已关闭或尚未交接。' };

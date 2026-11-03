@@ -393,7 +393,7 @@ it('额外目标查询按加法组合，不改变自动目标牌的手动选择�
   const bonus = defineSkill({
     id: 'probe:targets',
     name: '追加目标',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.extraTargets, () => 1)],
   });
   const game = cardGame({

@@ -1,5 +1,7 @@
 import type { Cause, Journal } from '../history/journal';
 import { immutable } from '../model/value';
+import type { DeepReadonly } from '../model/value';
+import type { WorldReader } from '../model/state';
 import type { Scope } from '../runtime/scope';
 
 export type Validation<T> =
@@ -15,7 +17,9 @@ export interface DecisionSpec {
 }
 
 /** 一次活跃选择的执行侧定义，闭包不进入展示/传输描述。 */
-export interface Decision<T> extends DecisionSpec {
+export interface Decision<T> extends Omit<DecisionSpec, 'data'> {
+  /** 静态展示数据可省略；提供 describe 时以其实时结果为准。 */
+  readonly data?: unknown;
   readonly describe?: () => unknown;
   readonly feedback?: (input: unknown) => unknown;
   readonly available?: () => boolean;
@@ -23,19 +27,14 @@ export interface Decision<T> extends DecisionSpec {
 }
 
 /** 可展示的数据与运行中的校验闭包分开；这里不携带 validate 或实体写入器。 */
-export interface DecisionRequest {
+export interface DecisionRequest extends DecisionSpec {
   readonly id: string;
   readonly token: number;
   readonly revision: number;
-  readonly player: string;
-  readonly kind: string;
-  readonly prompt: string;
-  readonly data: unknown;
-  readonly optional: boolean;
 }
 
 export type DecisionResult<T> =
-  | { readonly kind: 'chosen'; readonly value: T }
+  | { readonly kind: 'chosen'; readonly value: DeepReadonly<T> }
   | { readonly kind: 'cancelled' | 'unavailable' | 'aborted' };
 
 export type ReplyResult =
@@ -63,9 +62,9 @@ export class DecisionHub {
 
   constructor(
     private readonly roomId: string,
-    private readonly revision: () => number,
+    private readonly world: WorldReader,
     private readonly journal: Journal,
-    private readonly query: <T>(body: () => T) => T,
+    private readonly query: <T>(body: () => T, cause: Cause) => T,
     private readonly fault: (error: unknown, cause: Cause) => void,
   ) {}
 
@@ -79,28 +78,39 @@ export class DecisionHub {
   open<T>(spec: Decision<T>, scope: Scope, cause: Cause): Promise<DecisionResult<T>> {
     scope.assertActive();
     if (this.#stopped !== null) return Promise.resolve({ kind: 'unavailable' });
-    if (spec.available && !this.query(spec.available))
-      return Promise.resolve({ kind: 'unavailable' });
-    const request = immutable({
+    // 固定本次请求的方法与接收者；方法内部仍可读取实时草案与候选。
+    const { player, available, describe, validate, feedback } = this.query(() => {
+      const player = spec.player;
+      this.world.player(player);
+      return {
+        player,
+        available: spec.available?.bind(spec) ?? (() => true),
+        describe: spec.describe?.bind(spec) ?? (() => spec.data ?? null),
+        validate: spec.validate.bind(spec),
+        feedback: spec.feedback?.bind(spec),
+      };
+    }, cause);
+    if (!this.query(available, cause)) return Promise.resolve({ kind: 'unavailable' });
+    const request = this.#snapshot(cause, () => ({
       id: `${this.roomId}:decision:${++this.#nextId}`,
       token: 1,
-      revision: this.revision(),
-      player: spec.player,
+      revision: this.world.snapshot.revision,
+      player,
       kind: spec.kind,
       prompt: spec.prompt,
-      data: spec.describe ? this.query(spec.describe) : spec.data,
+      data: this.query(describe, cause),
       optional: spec.optional,
-    });
+    }));
 
     return new Promise((resolve) => {
       const detach = scope.onClose(() => entry.close({ kind: 'aborted' }));
       const entry: Pending = {
         cause,
         request,
-        validate: (input) => this.query(() => spec.validate(input)),
-        available: () => this.query(spec.available ?? (() => true)),
-        describe: () => this.query(spec.describe ?? (() => spec.data)),
-        feedback: (input) => this.query(() => spec.feedback?.(input) ?? null),
+        validate: (input) => this.query(() => validate(input), cause),
+        available: () => this.query(available, cause),
+        describe: () => this.query(describe, cause),
+        feedback: (input) => this.query(() => feedback?.(input) ?? null, cause),
         close: (result) => {
           if (!this.#pending.delete(request.id)) return;
           detach();
@@ -130,12 +140,12 @@ export class DecisionHub {
         entry.close({ kind: 'unavailable' });
         return;
       }
-      entry.request = immutable({
+      entry.request = this.#snapshot(entry.cause, () => ({
         ...entry.request,
         token: entry.request.token + 1,
-        revision: this.revision(),
+        revision: this.world.snapshot.revision,
         data: entry.describe(),
-      });
+      }));
     } catch (error) {
       this.fault(error, entry.cause);
       throw error;
@@ -156,14 +166,17 @@ export class DecisionHub {
     try {
       const request = this.#current(entry);
       if (!request) return null;
-      const result = entry.validate(input);
-      const available = entry.available();
-      return {
-        request,
-        valid: result.ok && available,
-        reason: !result.ok ? result.reason : available ? '' : 'No legal completion.',
-        feedback: immutable(entry.feedback(input)),
-      };
+      return this.#snapshot(entry.cause, () => {
+        const result = entry.validate(input);
+        const available = entry.available();
+        const { ok } = result;
+        return {
+          request,
+          valid: ok && available,
+          reason: !ok ? result.reason : available ? '' : 'No legal completion.',
+          feedback: entry.feedback(input),
+        };
+      });
     } catch (error) {
       this.fault(error, entry.cause);
       throw error;
@@ -181,10 +194,14 @@ export class DecisionHub {
         entry.close({ kind: 'unavailable' });
         return this.#reject('invalid', 'No legal completion.');
       }
-      const result = entry.validate(input);
+      const result = this.#snapshot(entry.cause, (): Validation<unknown> => {
+        const checked = entry.validate(input);
+        return checked.ok
+          ? { ok: true, value: checked.value }
+          : { ok: false, reason: checked.reason };
+      });
       if (!result.ok) return this.#reject('invalid', result.reason);
-      const value = immutable(result.value);
-      entry.close({ kind: 'chosen', value });
+      entry.close({ kind: 'chosen', value: result.value });
       return { kind: 'accepted' };
     } catch (error) {
       this.fault(error, entry.cause);
@@ -203,8 +220,13 @@ export class DecisionHub {
     return { kind: 'accepted' };
   }
 
+  /** 读取与复制共用止写边界；getter 也不能在 callback 返回后重入规则操作。 */
+  #snapshot<T>(cause: Cause, read: () => T): DeepReadonly<T> {
+    return this.query(() => immutable(read()), cause);
+  }
+
   #current(entry: Pending): DecisionRequest | null {
-    if (entry.request.revision !== this.revision()) this.invalidate(entry.request.id);
+    if (entry.request.revision !== this.world.snapshot.revision) this.invalidate(entry.request.id);
     return this.#pending.has(entry.request.id) ? entry.request : null;
   }
 

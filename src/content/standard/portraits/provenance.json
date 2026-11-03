@@ -1,180 +1,180 @@
 {
-  "usage": "Private project reference assets supplied by the user; original bytes copied unchanged, no redistribution permission asserted.",
+  "usage": "User-supplied local FreeKill portraits; original bytes retained for this private project.",
   "images": [
     {
       "id": "standard:guanyu",
-      "source": "noname/resources/app/image/character/guanyu.jpg",
+      "source": "freekill/packages/standard/image/generals/guanyu.jpg",
       "file": "guanyu.jpg",
-      "bytes": 273401,
-      "sha256": "2fd8ffecf64070f5eb11fee2e6485b06cea90f0163d6a56a346df3e363a4c352"
+      "bytes": 18776,
+      "sha256": "cd28f83894b83b84e024a2c602d89840f42a186953cab6d8de50abc48576a85e"
     },
     {
       "id": "standard:huanggai",
-      "source": "noname/resources/app/image/character/huanggai.jpg",
+      "source": "freekill/packages/standard/image/generals/huanggai.jpg",
       "file": "huanggai.jpg",
-      "bytes": 262147,
-      "sha256": "037591d57ff96a1dcf234e2b3ae6a62197e6c18573bc856714c0d87e85ff4233"
+      "bytes": 19247,
+      "sha256": "13b79482c2fed46ad3e8f656b3c3ea0013b9afaed79ba66c85fc8ec020ade1ac"
     },
     {
       "id": "standard:sunshangxiang",
-      "source": "noname/resources/app/image/character/sunshangxiang.jpg",
+      "source": "freekill/packages/standard/image/generals/sunshangxiang.jpg",
       "file": "sunshangxiang.jpg",
-      "bytes": 250689,
-      "sha256": "d6e99b100574b79336111a4dd970c68f7fba3e65a6ae099d0d49675327c0471a"
+      "bytes": 15640,
+      "sha256": "f4a56abbe046b5ab9d3c54a4c7a87b3bc7a907bb4d0fde35e41fe750c81951d4"
     },
     {
       "id": "standard:zhaoyun",
-      "source": "noname/resources/app/image/character/zhaoyun.jpg",
+      "source": "freekill/packages/standard/image/generals/zhaoyun.jpg",
       "file": "zhaoyun.jpg",
-      "bytes": 292613,
-      "sha256": "391ceaca9de745410b5ce40fd3e91f9b045f7fcdb27d30a29fd5a947083bdf99"
+      "bytes": 13552,
+      "sha256": "e36b39e2db88389e8669052fe299fbe1355399d54e28528c5a98f679c2f7a7b2"
     },
     {
       "id": "standard:zhangfei",
-      "source": "noname/resources/app/image/character/zhangfei.jpg",
+      "source": "freekill/packages/standard/image/generals/zhangfei.jpg",
       "file": "zhangfei.jpg",
-      "bytes": 208526,
-      "sha256": "c0649bd0b7e01edc53c30bc6b06330e5d9612b143d0504aa6b0ff4aed921a035"
+      "bytes": 13974,
+      "sha256": "96bf019e9ba81f715d47e5d71ccee7321c2e1f395db7d3171722b62edbae9ba6"
     },
     {
       "id": "standard:ganning",
-      "source": "noname/resources/app/image/character/ganning.jpg",
+      "source": "freekill/packages/standard/image/generals/ganning.jpg",
       "file": "ganning.jpg",
-      "bytes": 287158,
-      "sha256": "9bfb5af00b30ea9049bbe4b4f3845ffb9289ac3fb6d400764736b8ed23354fbe"
+      "bytes": 23875,
+      "sha256": "93bb293da386edb218e7fc1ad1183bcced2f2174a89929867d932f48f3d95906"
     },
     {
       "id": "standard:xiahoudun",
-      "source": "noname/resources/app/image/character/xiahoudun.jpg",
+      "source": "freekill/packages/standard/image/generals/xiahoudun.jpg",
       "file": "xiahoudun.jpg",
-      "bytes": 296929,
-      "sha256": "b1140dcec5e327e0c2ea7077818c0513b49e5b71da6e27148f0f05f9b0d10161"
+      "bytes": 21016,
+      "sha256": "85c4f04ad88a288711d4a8f5d0170664e9cc279a80c78194ee64a0a5bbfa40d0"
     },
     {
       "id": "standard:xuchu",
-      "source": "noname/resources/app/image/character/xuzhu.jpg",
+      "source": "freekill/packages/standard/image/generals/xuchu.jpg",
       "file": "xuchu.jpg",
-      "bytes": 255701,
-      "sha256": "8be4a3cc0360c9a3375fdfeb0050cd508cb66207963c3e4178a8b201a26322a4"
+      "bytes": 18615,
+      "sha256": "030c2c6aa60e413250f667d3011ea0863bddf56cddc33a441511dbe2cf05470a"
     },
     {
       "id": "standard:zhenji",
-      "source": "noname/resources/app/image/character/zhenji.jpg",
+      "source": "freekill/packages/standard/image/generals/zhenji.jpg",
       "file": "zhenji.jpg",
-      "bytes": 279268,
-      "sha256": "7b50da395225cc05dce9d499a7e89089920583aa090b27fdd29dbe16294237f0"
+      "bytes": 20712,
+      "sha256": "ad57f8bb2b8a912a48643dd2a8d1d165f62a32c9a596994e49a8239297c05745"
     },
     {
       "id": "standard:simayi",
-      "source": "noname/resources/app/image/character/simayi.jpg",
+      "source": "freekill/packages/standard/image/generals/simayi.jpg",
       "file": "simayi.jpg",
-      "bytes": 243318,
-      "sha256": "ac1534eaa0e7096765a49d4cebb49da101e0cb8c20127a53a79232dc678c581b"
+      "bytes": 14781,
+      "sha256": "0b7cd4da3c71245c4d41cd08302e8099d3071fc549e0258dc19bc9eeb084fd64"
     },
     {
       "id": "standard:guojia",
-      "source": "noname/resources/app/image/character/guojia.jpg",
+      "source": "freekill/packages/standard/image/generals/guojia.jpg",
       "file": "guojia.jpg",
-      "bytes": 252387,
-      "sha256": "90bb11e2e3331e624112a23783637905380112f3b5b5bd51c41934c4b7268e18"
+      "bytes": 18042,
+      "sha256": "5a5bc31eb3136b285591d14642ecdca54eb7adc7226c46ba28b9383a82687b63"
     },
     {
       "id": "standard:caocao",
-      "source": "noname/resources/app/image/character/caocao.jpg",
+      "source": "freekill/packages/standard/image/generals/caocao.jpg",
       "file": "caocao.jpg",
-      "bytes": 284096,
-      "sha256": "f197f695a0daf4a90f36d3b8ad25ffe7e58d1353b03b74018568ef9f730f8316"
+      "bytes": 20626,
+      "sha256": "e44d3628a7eeab313bcf6a6ddbdd70a3c2f850ba73affc17d0a42770e0679cf0"
     },
     {
       "id": "standard:zhangliao",
-      "source": "noname/resources/app/image/character/zhangliao.jpg",
+      "source": "freekill/packages/standard/image/generals/zhangliao.jpg",
       "file": "zhangliao.jpg",
-      "bytes": 245194,
-      "sha256": "2ee33e46842a3efd14cd11de094af10b214cf72446926090c026155f0539567d"
+      "bytes": 15233,
+      "sha256": "995fa815251c6210d525fdc56f2e30de723ab38584705a9fec6a32f1554caa58"
     },
     {
       "id": "standard:liubei",
-      "source": "noname/resources/app/image/character/liubei.jpg",
+      "source": "freekill/packages/standard/image/generals/liubei.jpg",
       "file": "liubei.jpg",
-      "bytes": 265533,
-      "sha256": "624d9fedd5d83858d1d62819317eab34bd9a245a5a539b48d51de61f75d00186"
+      "bytes": 19336,
+      "sha256": "bbcd276e3ab753bdd74e816a69363a114bb146286eeae14cdefa201157a4bba9"
     },
     {
       "id": "standard:huatuo",
-      "source": "noname/resources/app/image/character/huatuo.jpg",
+      "source": "freekill/packages/standard/image/generals/huatuo.jpg",
       "file": "huatuo.jpg",
-      "bytes": 230616,
-      "sha256": "0b544c57e829c076d0bc540f71eb3698c9426fcafe07b99decfe8d67db5ec883"
+      "bytes": 13871,
+      "sha256": "cd07d9dbed0ae0b2ea75824b89b5ce7697621bacf84f669161d55d1bcd0c80b4"
     },
     {
       "id": "standard:sunquan",
-      "source": "noname/resources/app/image/character/sunquan.jpg",
+      "source": "freekill/packages/standard/image/generals/sunquan.jpg",
       "file": "sunquan.jpg",
-      "bytes": 263598,
-      "sha256": "f52a7e92f5a9b3f134b353637046071b8bf9e24751691128ff86379c83ca4dd1"
+      "bytes": 23855,
+      "sha256": "3894c0f1a3bb722455e940c90278482077828c6b4b1fe5f762358ca6aeee0f4e"
     },
     {
       "id": "standard:lvmeng",
-      "source": "noname/resources/app/image/character/lvmeng.jpg",
+      "source": "freekill/packages/standard/image/generals/lvmeng.jpg",
       "file": "lvmeng.jpg",
-      "bytes": 197507,
-      "sha256": "5a4de880787e8325aefa1f25804d0ff3cf99b68889893200786483c255b5260e"
+      "bytes": 11330,
+      "sha256": "7917b145daac3de1615ee804d871130ba111c93d3c16b98a412eb5d0c02dc422"
     },
     {
       "id": "standard:luxun",
-      "source": "noname/resources/app/image/character/luxun.jpg",
+      "source": "freekill/packages/standard/image/generals/luxun.jpg",
       "file": "luxun.jpg",
-      "bytes": 265907,
-      "sha256": "e44f50b310ab7c40f625bd04b51327fbec1d44f48e7b7dab55de5c7c14446ac1"
+      "bytes": 17056,
+      "sha256": "f39f45647427aaaf24fba77adbe0c34bc54d8672db00d8e48643ff63c1e59dd7"
     },
     {
       "id": "standard:huangyueying",
-      "source": "noname/resources/app/image/character/huangyueying.jpg",
+      "source": "freekill/packages/standard/image/generals/huangyueying.jpg",
       "file": "huangyueying.jpg",
-      "bytes": 200263,
-      "sha256": "90a6b80e13fa3a37cba82b6682ba6b838e822bfc4e870a76e22a2f35104c3ef1"
+      "bytes": 12337,
+      "sha256": "8a0bc01cf7e8bb0bc3231afc4bcfa419c5e4ef30d9376445599944ff8b9e708e"
     },
     {
       "id": "standard:lvbu",
-      "source": "noname/resources/app/image/character/lvbu.jpg",
+      "source": "freekill/packages/standard/image/generals/lvbu.jpg",
       "file": "lvbu.jpg",
-      "bytes": 262586,
-      "sha256": "53b84c31aac54d77ed0a091855cc8dd1880b51a3e4d7640f5347472b0a110ded"
+      "bytes": 18094,
+      "sha256": "dbe05222475095c2f4211e01197106e49dfdd5c5d469b940e5b1dc58002af789"
     },
     {
       "id": "standard:daqiao",
-      "source": "noname/resources/app/image/character/daqiao.jpg",
+      "source": "freekill/packages/standard/image/generals/daqiao.jpg",
       "file": "daqiao.jpg",
-      "bytes": 246836,
-      "sha256": "85f08254854aeffa6425959902f2fb5646fac002882ec37833ab4c5c16f1e390"
+      "bytes": 18359,
+      "sha256": "5f84a55188cbc47fadd0b61ef5dd4cca626d3b514ddd216618f1b44ad640189e"
     },
     {
       "id": "standard:machao",
-      "source": "noname/resources/app/image/character/machao.jpg",
+      "source": "freekill/packages/standard/image/generals/machao.jpg",
       "file": "machao.jpg",
-      "bytes": 244790,
-      "sha256": "3fb90413880158b18864d77c6086d5cdb8be5e74e7c65f7ea2926a0c9e321eed"
+      "bytes": 17011,
+      "sha256": "aec3cdb758515d91e9c29b0651b3e8d38c3726ceed18d402e1ecf3b69c034505"
     },
     {
       "id": "standard:zhouyu",
-      "source": "noname/resources/app/image/character/zhouyu.jpg",
+      "source": "freekill/packages/standard/image/generals/zhouyu.jpg",
       "file": "zhouyu.jpg",
-      "bytes": 247039,
-      "sha256": "590213bd0cf547b50a491170a68de11b3178f2701de1e8adce982a1ab58368fc"
+      "bytes": 19010,
+      "sha256": "c8e2d9bd86070ec2212f4fc15931e51b10c8326553188a937c18d660f17402c2"
     },
     {
       "id": "standard:diaochan",
-      "source": "noname/resources/app/image/character/diaochan.jpg",
+      "source": "freekill/packages/standard/image/generals/diaochan.jpg",
       "file": "diaochan.jpg",
-      "bytes": 276064,
-      "sha256": "d0ed3ec281faf0738e370e0d8a0a96d825ccdbb4f729cf773ed3b4228421e8b4"
+      "bytes": 18818,
+      "sha256": "cc4f7df648aae8b828ee2cb7ecac1b2e02381ad47110eb13d0039c6b2d7df722"
     },
     {
       "id": "standard:zhugeliang",
-      "source": "noname/resources/app/image/character/zhugeliang.jpg",
+      "source": "freekill/packages/standard/image/generals/zhugeliang.jpg",
       "file": "zhugeliang.jpg",
-      "bytes": 280047,
-      "sha256": "d988db58433c0aec4743a884629895148d4a6feecf62b7fe10c5996a0d28ba17"
+      "bytes": 13115,
+      "sha256": "b83f787ecf319c36e8e7974eebdf0796bd2fcfde9a56e39a73a2acae13080e3e"
     }
   ]
 }

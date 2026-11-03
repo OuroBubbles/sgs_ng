@@ -284,15 +284,9 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
     eligible: () => true,
     async run(ctx, payload) {
       request = payload;
-      expect(await payload.provide(ctx, generated('slash'))).toMatchObject({
-        value: { kind: 'unavailable' },
-      });
-      expect(await payload.provide(ctx, generated())).toMatchObject({
-        value: { kind: 'used', actor: 'b' },
-      });
-      expect(await payload.provide(ctx, generated())).toMatchObject({
-        value: { kind: 'unavailable' },
-      });
+      expect(await payload.provide(ctx, generated('slash'))).toMatchObject({ kind: 'unavailable' });
+      expect(await payload.provide(ctx, generated())).toMatchObject({ kind: 'used', actor: 'b' });
+      expect(await payload.provide(ctx, generated())).toMatchObject({ kind: 'unavailable' });
     },
   });
   game.room.on(costPaid, {
@@ -305,9 +299,7 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
       (receipt.declaration.card as { name: string }).name === 'standard:jink',
     async run(ctx) {
       reentered++;
-      expect(await request.provide(ctx, generated())).toMatchObject({
-        value: { kind: 'unavailable' },
-      });
+      expect(await request.provide(ctx, generated())).toMatchObject({ kind: 'unavailable' });
     },
   });
   await use(game, slash());
@@ -317,15 +309,11 @@ it('供牌拒绝错误名称；支付后效重入和重复供牌均不重复宣�
   expect(reentered).toBe(1);
   await game.room.run('expired', async (ctx) => {
     expect(request.available(ctx)).toBe(false);
-    expect(await request.provide(ctx, generated())).toMatchObject({
-      value: { kind: 'unavailable' },
-    });
+    expect(await request.provide(ctx, generated())).toMatchObject({ kind: 'unavailable' });
   });
   const other = cardGame();
   await other.room.run('foreign', async (ctx) => {
-    expect(await request.provide(ctx, generated())).toMatchObject({
-      value: { kind: 'unavailable' },
-    });
+    expect(await request.provide(ctx, generated())).toMatchObject({ kind: 'unavailable' });
   });
 });
 
@@ -370,9 +358,7 @@ it('规则供牌入口不变成玩家伪造 generated 回复的入口，活跃�
     async run(_ctx, request) {
       await foreign.room.run('foreign', async (at) => {
         expect(request.available(at)).toBe(false);
-        expect(await request.provide(at, generated())).toMatchObject({
-          value: { kind: 'unavailable' },
-        });
+        expect(await request.provide(at, generated())).toMatchObject({ kind: 'unavailable' });
       });
     },
   });
@@ -419,7 +405,7 @@ it('委托环被有界拒绝，失败委托仍可回退原角色供牌', async (
     eligible: (_ctx, r) => r.actors.length < 3,
     async run(ctx, r) {
       expect(await r.delegate(ctx, r.actor === 'b' ? 'c' : 'b')).toMatchObject({
-        value: { kind: 'unavailable' },
+        kind: 'unavailable',
       });
     },
   });
@@ -465,12 +451,13 @@ it('同一窗口可选择技能顺序，供牌后其余候选失效；选择说�
   const supplier = defineSkill({
     id: 'probe:supplier',
     name: '直接供闪',
-    effects: [
+    triggers: [
       on(responseRequested, {
         id: 'supply',
         order: 'choose',
-        when: (ctx, r, self) => r.actor === self.owner && r.canProvide(ctx, generated()),
-        async run(ctx, r) {
+        when: (ctx, { payload: r, self }) =>
+          r.actor === self.owner && r.canProvide(ctx, generated()),
+        async run(ctx, { payload: r }) {
           await r.provide(ctx, generated());
         },
       }),
@@ -504,11 +491,13 @@ it('复用防具代码的普通角色技能不被误当成实际装备来源', a
   const game = cardGame({
     equipment: { a: [card('sword', 'qinggang_sword')] },
     draw: red,
-    skills: (book) => {
-      const skill = eightDiagram.equipment!.skill!;
-      const ability = typeof skill === 'function' ? skill(book) : skill;
-      return [defineSkill({ ...ability, id: borrowedId })];
-    },
+    skills: [
+      (book) => {
+        const skill = eightDiagram.equipment!.skill!;
+        const ability = typeof skill === 'function' ? skill(book) : skill;
+        return [defineSkill({ ...ability, id: borrowedId })];
+      },
+    ],
   });
   await game.room.run('grant', async (ctx) => {
     await game.skills.grant(ctx, {

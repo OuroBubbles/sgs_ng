@@ -1,5 +1,4 @@
 import {
-  defineSkill,
   on,
   modify,
   cardQueries,
@@ -21,51 +20,58 @@ import {
   moveCards,
   isGameOver,
 } from '../../sdk';
-import type { CardBook, Context, PhaseView, SkillHandle, UseIntent, JointChoice } from '../../sdk';
+import type {
+  CardBook,
+  Context,
+  PhaseView,
+  SkillHandle,
+  UseIntent,
+  JointChoice,
+  ActiveInput,
+} from '../../sdk';
+import type { SkillDefinition } from '../../sdk';
 
-export const mashu = defineSkill({
+export const mashu = {
   id: 'standard:mashu',
   name: '马术',
   description: '锁定技，你计算与其他角色的距离时减一。',
-  effects: [],
   modifiers: [
-    modify(cardQueries.distanceCorrection, (_ctx, input, self) =>
+    modify(cardQueries.distanceCorrection, (_ctx, { input, self }) =>
       input.from === self.owner && input.to !== self.owner ? -1 : undefined,
     ),
   ],
-});
+} satisfies SkillDefinition;
 
 export function tieqi(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'standard:tieqi',
     name: '铁骑',
     description:
       '当你指定杀的目标后，可以判定。若结果为红色，该角色不能以闪响应这次杀，八卦阵和护驾供闪也不能绕过。',
-    effects: [
+    triggers: [
       on(targetSpecified, {
-        id: 'red-judgment',
         order: 'choose',
-        when: (_ctx, { effect }, self) =>
+        when: (_ctx, { payload: { effect }, self }) =>
           effect.actor === self.owner &&
           effect.card.name === 'standard:slash' &&
           effect.state === 'targeting',
-        async run(ctx, { effect }, self) {
+        async run(ctx, { payload: { effect }, self }) {
           const accepted = await invoke(
             ctx,
             self,
             '是否发动【铁骑】进行判定？',
             (at) => effect.state === 'targeting' && at.world.player(effect.target).alive,
           );
-          if (accepted.kind === 'aborted') return ctx.abort(accepted.reason);
-          if (!accepted.value) return;
+
+          if (!accepted) return;
           const judgment = await judge(ctx, book, {
             player: self.owner,
             reason: self.skill,
             match: (_at, card) => card.color === 'red',
           });
-          if (judgment.kind === 'aborted') return ctx.abort(judgment.reason);
+
           if (
-            judgment.value.matched &&
+            judgment.matched &&
             effect.state === 'targeting' &&
             ctx.world.player(effect.target).alive &&
             !isGameOver(ctx.world)
@@ -74,46 +80,44 @@ export function tieqi(book: CardBook) {
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }
 
-export const yingzi = defineSkill({
+export const yingzi = {
   id: 'standard:yingzi',
   name: '英姿',
   description: '摸牌阶段，你可以多摸一张牌。',
-  effects: [
+  triggers: [
     on(drawing, {
-      id: 'extra-phase-draw',
       order: 'choose',
-      when: (_ctx, draft, self) =>
+      when: (_ctx, { payload: draft, self }) =>
         draft.input.player === self.owner && draft.phase?.kind === 'draw',
-      async run(ctx, draft, self) {
+      async run(ctx, { payload: draft, self }) {
         const accepted = await invoke(ctx, self, '是否发动【英姿】多摸一张牌？');
-        if (accepted.kind === 'aborted') return ctx.abort(accepted.reason);
-        if (accepted.value) draft.setCount(draft.count + 1, self.skill);
+
+        if (accepted) draft.setCount(draft.count + 1, self.skill);
       },
     }),
   ],
-});
+} satisfies SkillDefinition;
 
-export const biyue = defineSkill({
+export const biyue = {
   id: 'standard:biyue',
   name: '闭月',
   description: '结束阶段，你可以摸一张牌。',
-  effects: [
+  triggers: [
     on(phaseStarted, {
-      id: 'finish-draw',
       order: 'choose',
-      when: (_ctx, phase, self) => phase.owner === self.owner && phase.kind === 'finish',
-      async run(ctx, _phase, self) {
+      when: (_ctx, { payload: phase, self }) =>
+        phase.owner === self.owner && phase.kind === 'finish',
+      async run(ctx, { self }) {
         const accepted = await invoke(ctx, self, '是否发动【闭月】摸一张牌？');
-        if (accepted.kind === 'aborted') return ctx.abort(accepted.reason);
-        if (accepted.value && ctx.world.player(self.owner).alive && !isGameOver(ctx.world))
-          await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
+
+        if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
       },
     }),
   ],
-});
+} satisfies SkillDefinition;
 
 const limit = (self: SkillHandle, phase: PhaseView) => ({
   key: self.skill,
@@ -129,10 +133,8 @@ const suitOptions = [
   { id: 'club', label: '♣ 梅花' },
   { id: 'diamond', label: '♦ 方块' },
 ] as const;
-function fanjianSelection(ctx: Context, self: SkillHandle, phase: PhaseView) {
+function fanjianSelection(ctx: Context, { self, phase }: ActiveInput) {
   return new JointSelection({
-    cards: () => [],
-    cardCount: { min: 0, max: 0 },
     targetCount: { min: 1, max: 1 },
     targets: () =>
       live(ctx, self, phase) && ownedCards(ctx.world, self.owner).length
@@ -142,42 +144,28 @@ function fanjianSelection(ctx: Context, self: SkillHandle, phase: PhaseView) {
         : [],
   });
 }
-export const fanjian = defineSkill({
+export const fanjian = {
   id: 'standard:fanjian',
   name: '反间',
   description:
     '出牌阶段限一次，令一名其他角色猜一种花色，再正面朝上获得你的一张手牌。若花色不同，你对其造成一点伤害。手牌由目标暗选。',
-  effects: [],
   active: [
     {
       id: 'guess-suit',
-      label: '反间',
-      available: (ctx, self, phase) =>
-        used(ctx.world, self.owner, limit(self, phase)) === 0 &&
-        fanjianSelection(ctx, self, phase).inspect({ cards: [], targets: [] }).valid,
-      async run(ctx, self, phase, book) {
-        const model = fanjianSelection(ctx, self, phase);
-        const choice = await ctx.ask(
-          model.decision(self.owner, '反间：选择一名其他角色猜花色并获得你的手牌', true, {
-            reason: self.skill,
-            cancelLabel: '取消发动',
-          }),
-        );
-        if (choice.kind !== 'chosen') return;
-        const target = choice.value.targets[0]!;
+      available: (ctx, { self, phase }) => used(ctx.world, self.owner, limit(self, phase)) === 0,
+      selection: fanjianSelection,
+      async run(ctx, { self, phase, book, choice, selection: model }) {
+        const target = choice.targets[0]!;
         const paid = await pay(ctx, {
-          actor: self.owner,
           skill: self,
-          cards: [],
-          to: 'discard',
           reason: self.skill,
           limit: limit(self, phase),
-          legal: () => model.validate(choice.value).ok,
+          legal: () => model.validate(choice).ok,
           factKind: 'skill.invoked',
           declaration: { label: self.name, targets: [target] },
         });
-        if (paid.kind === 'aborted') return ctx.abort(paid.reason);
-        if (paid.value.kind !== 'paid') return;
+
+        if (paid.kind !== 'paid') return;
         const available = () =>
           ctx.world.player(target).alive &&
           ctx.world.player(self.owner).alive &&
@@ -201,15 +189,15 @@ export const fanjian = defineSkill({
           reason: self.skill,
           prompt: '反间：暗选对方的一张手牌，正面朝上获得',
         });
-        if (selected.kind === 'aborted') return ctx.abort(selected.reason);
-        if (selected.value.kind !== 'chosen' || !available()) return;
-        const card = ctx.world.card(selected.value.card);
+
+        if (selected.kind !== 'chosen' || !available()) return;
+        const card = ctx.world.card(selected.card);
         const destination = ctx.world.snapshot.zones.find(
           (zone) => zone.owner === target && zone.kind === 'hand',
         )!;
-        const given = await moveCards(
+        await moveCards(
           ctx,
-          [{ cards: [card.id], from: selected.value.from, to: destination.id, place: 'bottom' }],
+          [{ cards: [card.id], from: selected.from, to: destination.id, place: 'bottom' }],
           self.skill,
           {
             kind: 'cards.given',
@@ -223,7 +211,7 @@ export const fanjian = defineSkill({
             },
           },
         );
-        if (given.kind === 'aborted') return ctx.abort(given.reason);
+
         // 牌已交出；获得/失去牌后效不会撤销猜错的结果，也不要求来源仍持有技能或存活。
         if (
           book.face(ctx, card.id).suit !== guess.value &&
@@ -234,7 +222,7 @@ export const fanjian = defineSkill({
       },
     },
   ],
-});
+} satisfies SkillDefinition;
 function duelIntent(from: string, to: string): UseIntent {
   return {
     actor: from,
@@ -249,7 +237,7 @@ function duelIntent(from: string, to: string): UseIntent {
     prohibitedCounters: ['standard:nullification'],
   };
 }
-function lijianSelection(ctx: Context, self: SkillHandle, phase: PhaseView, book: CardBook) {
+function lijianSelection(ctx: Context, { self, phase, book }: ActiveInput) {
   const cards = () =>
     ownedCards(ctx.world, self.owner, ['hand', 'equipment']).filter((card) =>
       book.canDiscard(ctx, { actor: self.owner, owner: self.owner, card, reason: self.skill }),
@@ -280,11 +268,10 @@ function lijianSelection(ctx: Context, self: SkillHandle, phase: PhaseView, book
   };
   return new JointSelection({
     cards: () => cards().map((id) => ({ id, label: ctx.world.card(id).name })),
-    targets: () => targets().map((id) => ({ id, label: id })),
+    targets,
     cardCount: { min: 1, max: 1 },
     targetCount: { min: 2, max: 2 },
     constraints: {
-      partial: () => null,
       canComplete,
       complete: (choice) =>
         validPair(choice.targets[0]!, choice.targets[1]!)
@@ -293,47 +280,31 @@ function lijianSelection(ctx: Context, self: SkillHandle, phase: PhaseView, book
     },
   });
 }
-export const lijian = defineSkill({
+export const lijian = {
   id: 'standard:lijian',
   name: '离间',
   description:
     '出牌阶段限一次，弃置一张手牌或装备，选择两名其他男性角色。后选角色视为对先选角色使用一张不能被无懈可击的决斗。',
-  effects: [],
   active: [
     {
       id: 'forced-duel',
-      label: '离间',
-      available: (ctx, self, phase, book) =>
-        used(ctx.world, self.owner, limit(self, phase)) === 0 &&
-        lijianSelection(ctx, self, phase, book).inspect({ cards: [], targets: [] }).valid,
-      async run(ctx, self, phase, book) {
-        const model = lijianSelection(ctx, self, phase, book);
-        const choice = await ctx.ask(
-          model.decision(self.owner, '离间：弃一张牌；先选先出杀者，再选决斗发起者', true, {
-            reason: self.skill,
-            cancelLabel: '取消发动',
-          }),
-        );
-        if (choice.kind !== 'chosen') return;
+      available: (ctx, { self, phase }) => used(ctx.world, self.owner, limit(self, phase)) === 0,
+      selection: lijianSelection,
+      async run(ctx, { self, phase, book, choice, selection: model }) {
         const paid = await payDiscard(ctx, book, {
-          actor: self.owner,
           skill: self,
-          cards: choice.value.cards,
+          cards: choice.cards,
           areas: ['hand', 'equipment'],
           reason: self.skill,
           limit: limit(self, phase),
-          legal: () => !phase.turn?.ended && model.validate(choice.value).ok,
+          legal: () => !phase.turn?.ended && model.validate(choice).ok,
           factKind: 'skill.invoked',
-          declaration: { label: self.name, targets: choice.value.targets },
+          declaration: { label: self.name, targets: choice.targets },
         });
-        if (paid.kind === 'aborted') return ctx.abort(paid.reason);
-        if (paid.value.kind !== 'paid' || isGameOver(ctx.world)) return;
-        const result = await book.use(
-          ctx,
-          duelIntent(choice.value.targets[1]!, choice.value.targets[0]!),
-        );
-        if (result.kind === 'aborted') return ctx.abort(result.reason);
+
+        if (paid.kind !== 'paid' || isGameOver(ctx.world)) return;
+        await book.use(ctx, duelIntent(choice.targets[1]!, choice.targets[0]!));
       },
     },
   ],
-});
+} satisfies SkillDefinition;

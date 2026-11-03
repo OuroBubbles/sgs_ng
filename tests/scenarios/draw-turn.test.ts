@@ -42,7 +42,7 @@ it('摸牌数可在提交前修改，洗牌只补牌堆并保持已有牌堆顶�
   });
   await game.room.run('draw', async (ctx) => {
     const result = await draw(ctx, { player: 'a', count: 2, reason: 'draw-phase' });
-    expect(result).toMatchObject({ value: { kind: 'drawn', count: 3 } });
+    expect(result).toMatchObject({ kind: 'drawn', count: 3 });
   });
   expect(game.room.world.zone('a:hand').cards).toHaveLength(3);
   expect(game.room.world.zone('a:hand').cards[0]).toBe('top');
@@ -64,16 +64,11 @@ it('相同种子洗牌结果一致，不从其他处理区取牌', async () => {
   expect(a.room.history.entries).toEqual(b.room.history.entries);
   const c = cardGame();
   await c.room.run('processing', (ctx) =>
-    withProcessing(
-      ctx,
-      [{ cards: ['slash1'], from: 'a:hand' }],
-      'discard',
-      async (body, processing) => {
-        await draw(body, { player: 'b', count: 2, reason: 'empty deck' });
-        expect(processing.remaining()).toEqual(['slash1']);
-        expect(body.world.zone('b:hand').cards).toEqual([]);
-      },
-    ),
+    withProcessing(ctx, [{ cards: ['slash1'], from: 'a:hand' }], async (body, processing) => {
+      await draw(body, { player: 'b', count: 2, reason: 'empty deck' });
+      expect(processing.remaining()).toEqual(['slash1']);
+      expect(body.world.zone('b:hand').cards).toEqual([]);
+    }),
   );
 });
 
@@ -93,7 +88,8 @@ it('摸牌后效完整结束后返回，牌被后效取走也保留真实摸牌�
   });
   await game.room.run('draw', async (ctx) => {
     expect(await draw(ctx, { player: 'a', count: 2, reason: 'test' })).toMatchObject({
-      value: { cards: ['top'], count: 2 },
+      cards: ['top'],
+      count: 2,
     });
     expect(ctx.world.zone('a:hand').cards).toEqual([]);
     expect(ctx.world.zone('b:hand').cards).toEqual(['top']);
@@ -137,16 +133,14 @@ it('一次回合以真实决策走过摸牌、出牌、响应、弃牌和结束'
   expect(started).toEqual(['prepare', 'judge', 'draw', 'play', 'discard', 'finish']);
   expect(result).toMatchObject({
     value: {
-      value: {
-        phases: [
-          { exit: 'completed' },
-          { exit: 'completed' },
-          { exit: 'completed' },
-          { exit: 'completed' },
-          { exit: 'completed' },
-          { exit: 'completed' },
-        ],
-      },
+      phases: [
+        { exit: 'completed' },
+        { exit: 'completed' },
+        { exit: 'completed' },
+        { exit: 'completed' },
+        { exit: 'completed' },
+        { exit: 'completed' },
+      ],
     },
   });
   expect(game.room.world.zone('a:hand').cards).toHaveLength(4);
@@ -262,7 +256,7 @@ it('阶段开始时结束回合可停止本体与后续阶段', async () => {
   const result = await game.room.run('turn', (ctx) => runTurn(ctx, game.book, 'a'));
   expect(phases).toEqual(['prepare', 'judge', 'draw', 'play']);
   expect(game.room.decisions.pending).toEqual([]);
-  expect(result).toMatchObject({ value: { value: { ended: true } } });
+  expect(result).toMatchObject({ value: { ended: true } });
 });
 
 it('支付后死亡会停止后续阶段，正常结束会恢复对局阶段状态', async () => {
@@ -333,7 +327,7 @@ it('用牌费用后效结束回合，已宣告牌仍完整结算，再停止后�
     targets: ['b'],
   });
   expect(await running).toMatchObject({
-    value: { value: { ended: true, reason: 'stop after current use' } },
+    value: { ended: true, reason: 'stop after current use' },
   });
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.history.facts('phase.started')).toHaveLength(4);
@@ -346,7 +340,7 @@ it('阶段 body 中止仍清理并恢复阶段状态，记录明确原因', asyn
     await game.room.run('phase', (ctx) =>
       runPhase(ctx, game.book, 'a', 'draw', (body) => body.abort('explicit phase abort')),
     ),
-  ).toMatchObject({ value: { value: { exit: 'aborted', reason: 'explicit phase abort' } } });
+  ).toMatchObject({ value: { exit: 'aborted', reason: 'explicit phase abort' } });
   expect(readState(game.room.world, activePhase, activeTarget)).toBe(null);
   expect(
     game.room.history.entries.some(
@@ -401,7 +395,7 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
         changes: [current.skipChange(ctx, 'paid skip')],
         declaration: { phaseId: current.id },
       });
-      expect(result).toMatchObject({ value: { kind: 'paid' } });
+      expect(result).toMatchObject({ kind: 'paid' });
     },
   });
   await game.room.run('phase', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
@@ -425,7 +419,7 @@ it('费用失效时不提交跳过意图，阶段照常执行', async () => {
           reason: 'invalid skip',
           changes: [current.skipChange(ctx, 'should not commit')],
         }),
-      ).toMatchObject({ value: { kind: 'unavailable' } });
+      ).toMatchObject({ kind: 'unavailable' });
       expect(current.skipped).toBe(false);
     },
   });

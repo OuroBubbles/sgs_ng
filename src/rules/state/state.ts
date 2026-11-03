@@ -2,12 +2,14 @@ import type { Change, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
+import { syncQueryValue } from '../../core/runtime/query';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 
 export interface StateKey<T> {
   readonly id: string;
   readonly initial: DeepReadonly<T>;
+  /** 同步纯校验；异步返回不能被当作 true，执行侧查询与只读投影沿用各自故障策略。 */
   readonly accepts: (input: unknown) => input is T;
 }
 
@@ -22,8 +24,11 @@ export function defineState<T>(
   initial: T,
   accepts: (input: unknown) => input is T,
 ): StateKey<T> {
-  if (!id || !accepts(initial)) throw new Error('Invalid state key or initial value.');
-  return Object.freeze({ id, initial: immutable(initial) as DeepReadonly<T>, accepts });
+  if (!id) throw new Error('Invalid state key or initial value.');
+  const value = immutable(initial);
+  if (!syncQueryValue(accepts(value), `${id}.accepts`))
+    throw new Error('Invalid state key or initial value.');
+  return Object.freeze({ id, initial: value, accepts });
 }
 
 function stateId<T>(key: StateKey<T>, target: StateTarget): string {
@@ -37,9 +42,11 @@ export function readState<T>(
 ): DeepReadonly<T> {
   if (target.lifetime && !target.lifetime.belongsTo(world))
     throw new Error('Lifetime belongs to another World.');
-  const entry = world.snapshot.states.find((state) => state.id === stateId(key, target));
+  const id = stateId(key, target);
+  const entry = world.state(id);
   if (!entry) return key.initial;
-  if (!key.accepts(entry.value)) throw new Error(`Stored state does not match its key: ${key.id}`);
+  if (!syncQueryValue(key.accepts(entry.value), `${key.id}.accepts`))
+    throw new Error(`Stored state does not match its key: ${key.id}`);
   return entry.value as DeepReadonly<T>;
 }
 
@@ -52,14 +59,16 @@ export function stateChange<T>(
 ): Extract<Change, { readonly kind: 'setState' }> {
   assertLifetime(ctx, target.lifetime);
   if (target.owner !== null) ctx.world.player(target.owner);
-  if (!ctx.query(() => key.accepts(value))) throw new Error(`Invalid state value: ${key.id}`);
+  // 校验将被保存的快照；复制中的 getter 同样受纯查询的止写约束。
+  const snapshot = ctx.query(() => immutable(value));
+  if (!ctx.query(() => key.accepts(snapshot))) throw new Error(`Invalid state value: ${key.id}`);
   const state: StateEntry = {
     id: stateId(key, target),
     key: key.id,
     owner: target.owner,
     source: target.source,
     scopeId: target.lifetime?.id ?? null,
-    value: immutable(value),
+    value: snapshot,
   };
   return { kind: 'setState', state };
 }

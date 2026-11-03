@@ -1,6 +1,6 @@
 import type { Card, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { assertLifetime, withLifetime } from '../scopes/lifetime';
@@ -25,7 +25,7 @@ export interface JudgmentInput {
   readonly reason: string;
   readonly match: (ctx: Context, card: JudgmentCard) => boolean;
   /** 结果封口及公共后效后、处理区善后前执行；允许取得仍在此处的判定牌。 */
-  readonly onResult?: (ctx: Context, result: JudgmentResult) => void | Promise<void>;
+  readonly onResult?: (ctx: Context, result: JudgmentResult) => unknown;
 }
 export interface JudgmentResult {
   readonly kind: 'judged' | 'unavailable';
@@ -53,7 +53,7 @@ export interface Judgment {
   readonly reason: string;
   readonly processing: string;
   readonly card: JudgmentCard | null;
-  replace(ctx: Context, input: RetrialInput): Promise<FlowResult<'replaced' | 'unavailable'>>;
+  replace(ctx: Context, input: RetrialInput): Promise<'replaced' | 'unavailable'>;
 }
 
 export const judgmentRevealed = defineWindow<Judgment>('judgment.revealed');
@@ -76,90 +76,84 @@ export function judge(
   ctx: Context,
   book: CardBook,
   request: JudgmentInput,
-): Promise<FlowResult<JudgmentResult>> {
+): Promise<JudgmentResult> {
   const input = immutable({ player: request.player, reason: request.reason });
   const match = request.match;
   const onResult = request.onResult;
   if (!input.reason) throw new Error('Judgment requires a reason.');
   return withLifetime(ctx, 'judgment', async (host, lifetime) => {
-    const result = await withProcessing<JudgmentResult>(
-      host,
-      [],
-      'discard',
-      async (at, processing) => {
-        const target = { owner: input.player, source: lifetime.id, lifetime };
-        let open = true;
-        let sealed: JudgmentResult | null = null;
-        at.defer(() => {
-          open = false;
-        });
-        const live = () => at.world.player(input.player).alive && !isGameOver(at.world);
-        const control: Judgment = Object.freeze({
-          id: lifetime.id,
-          ...input,
-          processing: processing.zone,
-          get card() {
-            if (sealed) return sealed.card;
-            const current = readState(at.world, currentCard, target);
-            return current ? book.face(at, current.id, input.player) : null;
-          },
-          replace: (child: Context, replacement: RetrialInput) =>
-            replaceJudgment(child, control, replacement, {
-              lifetime,
-              world: at.world,
-              target,
-              open: () => open,
-              book,
-            }),
-        });
-        if (live()) {
-          if (!at.world.zone('draw').cards.length && at.world.zone('discard').cards.length) {
-            const shuffled = await reshuffle(at);
-            if (shuffled.kind === 'aborted') return at.abort(shuffled.reason);
-          }
-          const id = live() ? at.world.zone('draw').cards[0] : undefined;
-          if (id) {
-            const card = book.face(at, id, input.player);
-            const moved = await moveCards(
-              at,
-              [{ cards: [id], from: 'draw', to: processing.zone, place: 'bottom' }],
-              input.reason,
-              {
-                kind: 'judgment.revealed',
-                data: { id: control.id, ...input, processing: processing.zone, card },
-                changes: [stateChange(at, currentCard, target, card)],
-              },
-            );
-            if (moved.kind === 'aborted') return at.abort(moved.reason);
-            // 这些仍是待决判定窗口：候选后效可能令判定者死亡或结束整局，
-            // 必须在同一窗口内持续收束，不能只在两个窗口之间检查一次。
-            if (live())
-              await at.window(judgmentRevealed, control, { subject: input.player, active: live });
-            if (live())
-              await at.window(judgmentRetrial, control, { subject: input.player, active: live });
-          }
-        }
+    const result = await withProcessing<JudgmentResult>(host, [], async (at, processing) => {
+      const target = { owner: input.player, source: lifetime.id, lifetime };
+      let open = true;
+      let sealed: JudgmentResult | null = null;
+      at.defer(() => {
         open = false;
-        const card = control.card;
-        const matched = live() && card ? at.query(() => match(at, card)) : null;
-        if (matched !== null && typeof matched !== 'boolean')
-          throw new Error('Judgment match must return a boolean.');
-        sealed = immutable({
-          kind: matched === null ? 'unavailable' : 'judged',
-          id: control.id,
-          ...input,
-          processing: processing.zone,
-          card,
-          matched,
-        });
-        at.commit('judgment.finished', [], sealed);
-        await at.window(judgmentFinished, sealed, { subject: input.player });
-        if (onResult) await onResult(at, sealed);
-        return sealed;
-      },
-    );
-    if (result.kind === 'aborted') return host.abort(result.reason);
-    return result.value;
+      });
+      const live = () => at.world.player(input.player).alive && !isGameOver(at.world);
+      const control: Judgment = Object.freeze({
+        id: lifetime.id,
+        ...input,
+        processing: processing.zone,
+        get card() {
+          if (sealed) return sealed.card;
+          const current = readState(at.world, currentCard, target);
+          return current ? book.face(at, current.id, input.player) : null;
+        },
+        replace: (child: Context, replacement: RetrialInput) =>
+          replaceJudgment(child, control, replacement, {
+            lifetime,
+            world: at.world,
+            target,
+            open: () => open,
+            book,
+          }),
+      });
+      if (live()) {
+        if (!at.world.zone('draw').cards.length && at.world.zone('discard').cards.length) {
+          await reshuffle(at);
+        }
+        const id = live() ? at.world.zone('draw').cards[0] : undefined;
+        if (id) {
+          const card = book.face(at, id, input.player);
+          await moveCards(
+            at,
+            [{ cards: [id], from: 'draw', to: processing.zone, place: 'bottom' }],
+            input.reason,
+            {
+              kind: 'judgment.revealed',
+              data: { id: control.id, ...input, processing: processing.zone, card },
+              changes: [stateChange(at, currentCard, target, card)],
+            },
+          );
+
+          // 这些仍是待决判定窗口：候选后效可能令判定者死亡或结束整局，
+          // 必须在同一窗口内持续收束，不能只在两个窗口之间检查一次。
+          if (live())
+            await at.window(judgmentRevealed, control, { subject: input.player, active: live });
+          if (live())
+            await at.window(judgmentRetrial, control, { subject: input.player, active: live });
+        }
+      }
+      open = false;
+      const card = control.card;
+      const matched = live() && card ? at.query(() => match(at, card)) : null;
+      if (matched !== null && typeof matched !== 'boolean')
+        throw new Error('Judgment match must return a boolean.');
+      sealed = immutable({
+        kind: matched === null ? 'unavailable' : 'judged',
+        id: control.id,
+        ...input,
+        processing: processing.zone,
+        card,
+        matched,
+      });
+      at.commit('judgment.finished', [], sealed);
+      await at.window(judgmentFinished, sealed, { subject: input.player });
+      if (onResult) await onResult(at, sealed);
+      return sealed;
+    });
+
+    return result;
   });
 }
 
@@ -178,7 +172,7 @@ async function replaceJudgment(
     readonly open: () => boolean;
     readonly book: CardBook;
   },
-): Promise<FlowResult<'replaced' | 'unavailable'>> {
+): Promise<'replaced' | 'unavailable'> {
   const input = immutable({
     card: request.card,
     from: request.from,
@@ -224,7 +218,7 @@ async function replaceJudgment(
           declaration: { label: skill.name, judgment: judgment.id },
         })
       : null;
-    const moved = await moveCards(
+    await moveCards(
       child,
       [
         ...(displaced.length
@@ -255,7 +249,7 @@ async function replaceJudgment(
         changes: [stateChange(child, currentCard, control.target, card)],
       },
     );
-    if (moved.kind === 'aborted') return child.abort(moved.reason);
+
     if (invocation) await child.window(costPaid, invocation, { subject: invocation.actor });
     if (response && skill)
       await child.window(

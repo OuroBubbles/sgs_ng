@@ -11,7 +11,7 @@
 [cardQueries.cardFace](../src/rules/cards/face.ts) 沿用既有 modify。所有贡献读取相同的印刷 card、player 与 judgment 标记；返回 name/suit/rank/color 的部分修改，undefined 表示不贡献：
 
 ```ts
-modify(cardQueries.cardFace, (_ctx, input, self) =>
+modify(cardQueries.cardFace, (_ctx, { input, self }) =>
   input.player === self.owner && input.card.suit === 'spade'
     ? { suit: 'heart' as const }
     : undefined,
@@ -61,9 +61,9 @@ physicalCard 与实体用牌/打出通过当前牌面构建；过滤不是额外
 - [4 项作者整合场景](../tests/scenarios/face-content.test.ts)：自然种子材料、两种判定主体，以及 seed 2/17 的四人基础 AI 真实对局至胜负；核对守恒、事实重建和临时结算清理。
 - 桌面/触控浏览器与 Windows 原生新增自然起手的显示、技能说明、实际武圣支付与零交接检查，截图为 `.artifacts/ui/card-face-*.png` 与 `native-card-face-*.png`。最新全量及平台结果统一见 [STATUS](STATUS.md)。
 
-机制参考本地 [FreeKill 红颜](../freekill/packages/shzl/pkg/wind/skills/hongyan.lua)：手牌/装备与本人判定使用同一花色过滤。没有导入其过滤运行架构，也没有声称完整小乔或风包完成。
+机制参考本地 [FreeKill 红颜](../../freekill/packages/shzl/pkg/wind/skills/hongyan.lua)：手牌/装备与本人判定使用同一花色过滤。没有导入其过滤运行架构，也没有声称完整小乔或风包完成。
 
-当前标准/演武为 0.1.8，渡口保持 0.1.0 且精确依赖 standard@0.1.8；壳版本保持 0.1.0。旧外部模块按 [48](48-content-persistence.md) 保留源码并提示版本错误，需明确清空后导入随当前包交付的新模块，或重新构建源码。完整标准包审计、长期效果、复杂选择、作者资源交付与离线版验收继续推进；Android、高级托管和联机仍后置。
+当前标准/演武为 0.1.8，渡口保持 0.1.0 且精确依赖 standard@0.1.8；壳版本保持 0.1.0。旧外部模块按 [持久恢复](39-source-packages.md#持久安装与恢复) 保留源码并提示版本错误，需明确清空后导入随当前包交付的新模块，或重新构建源码。完整标准包审计、长期效果、复杂选择、作者资源交付与离线版验收继续推进；Android、高级托管和联机仍后置。
 
 本批最终单元/行为 1103 项、规则专项 1096 项通过。浏览器为原全量 170 项通过，加旧武将数量断言修正后的两端专项 2 项通过；跨轮覆盖 172 个唯一用例，说明为 `.artifacts/validation/card-face-browser-coverage.json`，原始失败与复验报告均保留，不宣称一次全量全绿。规则并行负载下的一次大乔整局超时另有原报告，停止重负载后保持原 60 秒/2400 决策预算重跑全量通过。
 

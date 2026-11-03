@@ -1,17 +1,19 @@
 import type { Change, WorldReader, WorldSeed, WorldSnapshot } from '../model/state';
 import { immutable } from '../model/value';
 
-function unique(ids: readonly string[], kind: string): void {
-  if (ids.some((id) => !id) || new Set(ids).size !== ids.length)
+function unique(ids: readonly string[], kind: string): ReadonlySet<string> {
+  const index = new Set(ids);
+  if (ids.some((id) => !id) || index.size !== ids.length)
     throw new Error(`Invalid or duplicate ${kind}.`);
+  return index;
 }
 
 function validate(state: WorldSeed): void {
-  unique(
+  const players = unique(
     state.players.map((player) => player.id),
     'player IDs',
   );
-  unique(
+  const cards = unique(
     state.cards.map((card) => card.id),
     'card IDs',
   );
@@ -31,8 +33,6 @@ function validate(state: WorldSeed): void {
     state.states.map((entry) => entry.id),
     'state IDs',
   );
-  const players = new Set(state.players.map((player) => player.id));
-  const cards = new Set(state.cards.map((card) => card.id));
   const located = new Set<string>();
 
   for (const player of state.players) {
@@ -76,15 +76,20 @@ function validate(state: WorldSeed): void {
     throw new Error('Every physical card must have exactly one location.');
 }
 
-/** 只在 Room 内持有。准备副本的代价对当前牌量足够小，先不引入可变索引/事务框架。 */
+/** 只在 Room 内持有；批次先准备并验证完整下一状态，再发布权威快照。 */
 export class World {
   #snapshot: WorldSnapshot;
   readonly reader: WorldReader;
 
   constructor(seed: WorldSeed) {
-    validate(seed);
-    this.#snapshot = immutable({ ...seed, revision: 0 });
+    const initial = immutable({ ...seed, revision: 0 });
+    validate(initial);
+    this.#snapshot = initial;
     const current = () => this.#snapshot;
+    let indexedCards = current().cards;
+    let cardIndex = new Map(indexedCards.map((card) => [card.id, card]));
+    let indexedStates = current().states;
+    let stateIndex = new Map(indexedStates.map((state) => [state.id, state]));
     this.reader = Object.freeze({
       get snapshot() {
         return current();
@@ -95,9 +100,24 @@ export class World {
         return player;
       },
       card(id: string) {
-        const card = current().cards.find((item) => item.id === id);
+        // 按实体表身份刷新；普通提交保留牌表，同 revision 换表也不会复用旧索引。
+        const cards = current().cards;
+        if (cards !== indexedCards) {
+          cardIndex = new Map(cards.map((card) => [card.id, card]));
+          indexedCards = cards;
+        }
+        const card = cardIndex.get(id);
         if (!card) throw new Error(`Unknown card: ${id}`);
         return card;
+      },
+      state(id: string) {
+        // 按表身份刷新，同 revision 换表也不会沿用旧状态。
+        const states = current().states;
+        if (states !== indexedStates) {
+          stateIndex = new Map(states.map((state) => [state.id, state]));
+          indexedStates = states;
+        }
+        return stateIndex.get(id);
       },
       zone(id: string) {
         const zone = current().zones.find((item) => item.id === id);
@@ -113,18 +133,24 @@ export class World {
   }
 
   prepare(changes: readonly Change[]): WorldSnapshot {
-    let players = [...this.#snapshot.players];
-    let skills = [...this.#snapshot.skills];
-    let states = [...this.#snapshot.states];
-    let zones = this.#snapshot.zones.map((zone) => ({ ...zone, cards: [...zone.cards] }));
+    // 仅记录事实仍推进 revision，复用已校验的不可变状态表。
+    if (!changes.length)
+      return immutable({ ...this.#snapshot, revision: this.#snapshot.revision + 1 });
+
+    // 未变化的冻结表直接复用；一次事实或状态提交不必复制整桌区域与牌序。
+    let players = this.#snapshot.players;
+    let skills = this.#snapshot.skills;
+    let states = this.#snapshot.states;
+    let zones = this.#snapshot.zones;
     const moves = changes.filter((change) => change.kind === 'move');
     const moved = new Set<string>();
+    const affected = new Set<string>();
 
     for (const change of changes) {
       if (change.kind !== 'createZone') continue;
       if (change.zone.cards.length || zones.some((zone) => zone.id === change.zone.id))
         throw new Error('Create a distinct empty zone.');
-      zones.push({ ...change.zone, cards: [] });
+      zones = [...zones, { ...change.zone, cards: [] }];
     }
 
     // 移动的前提全部针对批次前状态；交换 A/B 的牌不会受数组更新顺序影响。
@@ -136,14 +162,22 @@ export class World {
           throw new Error(`Invalid move: ${id}`);
         moved.add(id);
       }
+      if (move.cards.length) {
+        affected.add(move.from);
+        affected.add(move.to);
+      }
     }
-    for (const zone of zones) zone.cards = zone.cards.filter((id) => !moved.has(id));
-    for (const move of moves) {
-      const target = zones.find((zone) => zone.id === move.to);
-      if (!target) throw new Error(`Unknown destination: ${move.to}`);
-      if (move.place === 'top') target.cards.unshift(...move.cards);
-      else target.cards.push(...move.cards);
-    }
+    if (affected.size)
+      zones = zones.map((zone) => {
+        if (!affected.has(zone.id)) return zone;
+        const cards = zone.cards.filter((id) => !moved.has(id));
+        for (const move of moves) {
+          if (move.to !== zone.id) continue;
+          if (move.place === 'top') cards.unshift(...move.cards);
+          else cards.push(...move.cards);
+        }
+        return { ...zone, cards };
+      });
 
     for (const change of changes) {
       switch (change.kind) {
@@ -191,16 +225,16 @@ export class World {
       }
     }
 
-    const next = {
+    const next = immutable({
       ...this.#snapshot,
       revision: this.#snapshot.revision + 1,
       players,
       zones,
       skills,
       states,
-    };
+    });
     validate(next);
-    return immutable(next);
+    return next;
   }
 
   apply(prepared: WorldSnapshot): void {

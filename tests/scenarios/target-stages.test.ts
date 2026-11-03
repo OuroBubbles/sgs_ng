@@ -46,7 +46,7 @@ const probe: CardDefinition = {
   label: '目标时点探针',
   use: {
     count: { min: 1, max: 3 },
-    target: (_ctx, request, target) => target !== request.actor,
+    target: (_ctx, { request, target }) => target !== request.actor,
     resolve: () => {},
   },
 };
@@ -108,12 +108,12 @@ it('四个目标时点分别按来源座次遍历，全部结束后才进入牌�
     ...probe,
     use: {
       ...probe.use!,
-      async execute(ctx, plan, _book, resolve) {
+      async execute(ctx, { use: plan, resolveTargets: resolve }) {
         log.push('body');
         expect(
           plan.effects.every((e) => e.state === 'ready' && e.targetStage === 'confirmed'),
         ).toBe(true);
-        await resolve(ctx, (_at, effect) => {
+        await resolve(ctx, (_at, { effect }) => {
           log.push(`effect:${effect.target}`);
         });
       },
@@ -258,10 +258,10 @@ it('牌体追加的目标在实际效果前补齐四层，原目标不重开', a
     ...probe,
     use: {
       ...probe.use!,
-      async execute(ctx, plan, _book, resolve) {
+      async execute(ctx, { use: plan, resolveTargets: resolve }) {
         log.push('body');
         plan.addTarget(ctx, 'c', 'test:body');
-        await resolve(ctx, (_at, effect) => {
+        await resolve(ctx, (_at, { effect }) => {
           log.push(`effect:${effect.target}`);
         });
       },
@@ -285,7 +285,7 @@ it('生效前窗口补入较早目标，先补齐时点但不抢占当前生效�
     ...probe,
     use: {
       ...probe.use!,
-      resolve(_ctx, effect) {
+      resolve(_ctx, { effect }) {
         log.push(`effect:${effect.target}`);
       },
     },
@@ -326,7 +326,7 @@ it.each(['resolver', 'aftereffect'] as const)(
       ...probe,
       use: {
         ...probe.use!,
-        resolve(ctx, effect) {
+        resolve(ctx, { effect }) {
           log.push(`effect:${effect.target}`);
           if (point === 'resolver') append(ctx, effect);
         },
@@ -554,9 +554,9 @@ it.each([
   const ban = defineSkill({
     id: 'test:grace-ban',
     name: '拒绝五谷',
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.prohibitTarget, (_ctx, request, self) =>
+      modify(cardQueries.prohibitTarget, (_ctx, { input: request, self }) =>
         request.target === self.owner && request.card.name === 'standard:amazing_grace'
           ? true
           : undefined,
@@ -633,7 +633,7 @@ it('实际效果局部中止不会重放或撤销其他已确认目标，后续�
     ...probe,
     use: {
       ...probe.use!,
-      resolve(ctx, effect) {
+      resolve(ctx, { effect }) {
         if (effect.target === 'b') return ctx.abort('test:local');
         resolved.push(effect.target);
       },
@@ -683,7 +683,7 @@ it('已确认的后席目标在首个实际效果中死亡，只跳过生效且�
     ...probe,
     use: {
       ...probe.use!,
-      async resolve(ctx, effect) {
+      async resolve(ctx, { effect }) {
         if (effect.target === 'b')
           await kill(ctx, { player: 'c', killer: null, reason: 'rule', cause });
       },

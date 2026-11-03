@@ -1,14 +1,14 @@
 # 17 · 整牌流程、锦囊反制与共享牌池
 
-日期：2026-10-17。标准牌子集从 5 种扩到 12 种：新增无懈可击、南蛮入侵、万箭齐发、桃园结义、五谷丰登、顺手牵羊、过河拆桥。它们已进入正式规则客户端的练习牌组；不是完整 104/108 张标准包。
+状态：整牌控制流、锦囊反制与共享牌池的当前契约；内容范围和实际验证见 [STATUS](STATUS.md)。
 
 ## 一张牌的控制流
 
-[UseRules](../src/rules/cards/types.ts) 保留 `resolve(ctx, effect, book)` 处理单个目标，增加三个相互独立的能力：
+[UseRules](../src/rules/cards/types.ts) 保留 `resolve(ctx, { effect, book })` 处理单个目标，增加三个相互独立的能力：
 
 - `fixedTargets`：宣告前计算自动目标，统一过滤死亡/禁止目标；玩家回复必须不带手工目标。费用宣告记录实际目标，之后不会随存活列表变化重新生成。
 - `canResolve`：目标确认后、反制窗口前检查效果是否仍有意义；反制结束后再次检查。桃园的未受伤者仍在目标列表中，但跳过实际效果与无懈询问。
-- `execute(ctx, use, book, resolveTargets)`：整张牌的普通函数。有目标时明确调用一次 resolveTargets；可传局部目标解析函数，用闭包共享本次用牌的资源。
+- `execute(ctx, { use, book, resolveTargets })`：整张牌的普通函数。有目标时明确调用一次 resolveTargets；可传局部目标解析函数，用闭包共享本次用牌的资源。
 
 `execute` 能在一个处理区内包住全部目标、嵌套其他牌、分支或循环。无需把临时牌池塞入全局变量或 `extra_data`。只要建立过目标效果，即使全部已取消，也须调度一次，保留效果完成事实和后效。遗漏或重复调度都会报作者错误；已提交效果不回滚。调度上下文必须属于同一 World 和本次用牌的作用域路径。
 
@@ -33,9 +33,9 @@
 
 每层反制牌的材料留在自己的处理区，等待更深一层结束才完成自己。源角色或转换技能在宣告后消失，不自动吞掉已经产生的反制；终局停止新询问，当前材料仍善后。三个独立反制用牌不会被压成一个缺少身份的奇偶布尔值；奇偶结果只是嵌套正常结算的后果。
 
-当前本地热座按当前回合角色起的座次依次征询；无回合时以原牌来源为锚点。这是明确的离线调度，不宣称实现实时竞速抢答。放弃当前机会不禁止参加下一层机会。
+反制按当前回合角色起的座次依次征询；无回合时以原牌来源为锚点。这是明确的离线调度，不宣称实现实时竞速抢答。放弃当前机会不禁止参加下一层机会。
 
-`installCounterspells(room, book, names?)` 默认接受 standard:nullification，也可配置其他反制牌名称；这些牌可直接调用 resolveCounter。下一层保留同一名称集合。作者转换配方也能生成反制牌，不需要改 Room 或 CardBook 的牌名分支。CounterRequest 的相关性仍是普通纯查询函数，不变成 DSL。
+`installCounterspells(room, book, names?)` 默认接受 standard:nullification，也可配置其他反制牌名称；这些牌可直接调用 resolveCounter。下一层保留同一名称集合。作者转换配方也能生成反制牌，不需要改 Room 或 CardBook 的牌名分支。CounterRequest.relevant 保留原方法与接收者，每次在只读查询中执行；机会的 available(ctx) 在普通后效中也受同一守卫保护。异步资格令本局进入故障态，不继续结算；已经提交的费用不回滚。
 
 ## 自动目标与逐目标响应
 
@@ -75,4 +75,4 @@ UI 只显示 cards.revealed 明确公开、且当前仍在相应区域中的牌�
 
 锦囊批的练习牌堆为 128 张测试配比，后续装备批扩为 192 张（见 [18](18-equipment-queries.md)），支持复现种子，不是标准牌数量/花色/点数配比。借刀杀人仍需武器/装备语义；判定、延时锦囊、标准武将与完整包登记也仍待完成。AI、联机继续后置。
 
-参考本地 FreeKill 的 [无懈](../freekill/packages/standard_cards/pkg/skills/nullification.lua)、[五谷](../freekill/packages/standard_cards/pkg/skills/amazing_grace.lua)、[南蛮](../freekill/packages/standard_cards/pkg/skills/savage_assault.lua)、[桃园](../freekill/packages/standard_cards/pkg/skills/god_salvation.lua)、[顺手](../freekill/packages/standard_cards/pkg/skills/snatch.lua)、[拆桥](../freekill/packages/standard_cards/pkg/skills/dismantlement.lua)。只参考规则与反例，未修改参考项目。
+参考本地 FreeKill 的 [无懈](../../freekill/packages/standard_cards/pkg/skills/nullification.lua)、[五谷](../../freekill/packages/standard_cards/pkg/skills/amazing_grace.lua)、[南蛮](../../freekill/packages/standard_cards/pkg/skills/savage_assault.lua)、[桃园](../../freekill/packages/standard_cards/pkg/skills/god_salvation.lua)、[顺手](../../freekill/packages/standard_cards/pkg/skills/snatch.lua)、[拆桥](../../freekill/packages/standard_cards/pkg/skills/dismantlement.lua)。只参考规则与反例，未修改参考项目。

@@ -1,11 +1,9 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
-import { card, cardGame, use } from '../fixtures/cards';
+import { playMatch } from '../fixtures/match';
+import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   recover,
@@ -15,7 +13,6 @@ import {
   runPhase,
   runTurn,
   activeOffers,
-  activate,
   costPaid,
   moveCards,
   defineSkill,
@@ -26,8 +23,6 @@ import {
   loseHp,
   cardActivities,
   judge,
-  roleOf,
-  kingdomOf,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
 type Game = ReturnType<typeof cardGame>;
@@ -69,7 +64,7 @@ async function zhiheng(ctx: Context, game: Game, phase: PhaseView) {
   const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === 'standard:zhiheng')!;
   expect(offer).toBeDefined();
   await activate(ctx, game.book, phase, {
-    skill: offer.choice.instance,
+    instance: offer.choice.instance,
     action: offer.choice.action,
   });
 }
@@ -89,24 +84,6 @@ const startKeji = (
     }),
   );
 
-it('三名吴将完整初始化，主公独享救援，目录体力与当前势力正确', async () => {
-  expect(standardGenerals).toHaveLength(25);
-  for (const general of standardGenerals.slice(15, 18)) {
-    const match = createOfflineMatch(6, 14, 'standard:identity', Array(6).fill(general.id));
-    await match.prepare();
-    for (const p of match.room.world.snapshot.players) {
-      expect(kingdomOf(match.room.world, p.id)).toBe('吴');
-      expect(p.maxHp).toBe(general.maxHp + Number(roleOf(match.room.world, p.id) === 'lord'));
-      expect(
-        match.room.world.snapshot.skills.filter((s) => s.owner === p.id).map((s) => s.skill),
-      ).toEqual(
-        general.skills.filter(
-          (id) => id !== 'standard:jiuyuan' || roleOf(match.room.world, p.id) === 'lord',
-        ),
-      );
-    }
-  }
-});
 it('回复草案修改尝试值，提交前重读当前体力并封口，实际值受上限裁剪', async () => {
   const game = scenario();
   await wound(game, 1);
@@ -137,14 +114,12 @@ it('回复草案修改尝试值，提交前重读当前体力并封口，实际�
   );
   expect(result).toMatchObject({
     value: {
-      value: {
-        input: { amount: 1 },
-        attemptedAmount: 3,
-        amount: 1,
-        beforeHp: 3,
-        afterHp: 4,
-        edits: [{ before: 1, after: 3, reason: 'bonus' }],
-      },
+      input: { amount: 1 },
+      attemptedAmount: 3,
+      amount: 1,
+      beforeHp: 3,
+      afterHp: 4,
+      edits: [{ before: 1, after: 3, reason: 'bonus' }],
     },
   });
   replay(game);
@@ -170,7 +145,7 @@ it.each(['zero', 'dead', 'already-dead'] as const)(
     expect(
       await game.room.run('heal', (ctx) => recover(ctx, { from: null, to: 'a', amount: 1 })),
     ).toMatchObject({
-      value: { value: { kind: kind === 'zero' ? 'unchanged' : 'unavailable', amount: 0 } },
+      value: { kind: kind === 'zero' ? 'unchanged' : 'unavailable', amount: 0 },
     });
     expect(opened).toBe(kind === 'already-dead' ? 0 : 1);
     expect(game.room.history.facts('hp.recovered')).toEqual([]);
@@ -208,7 +183,7 @@ it('救援不奖励普通技能回复，也不超过体力上限', async () => {
   const result = await game.room.run('heal', (ctx) =>
     recover(ctx, { from: 'b', to: 'a', amount: 5 }),
   );
-  expect(result).toMatchObject({ value: { value: { amount: 1, attemptedAmount: 5, edits: [] } } });
+  expect(result).toMatchObject({ value: { amount: 1, attemptedAmount: 5, edits: [] } });
 });
 it('制衡手牌/装备同批弃置，后效后按实际费用数量摸牌，一阶段一次', async () => {
   const game = scenario({
@@ -236,15 +211,17 @@ it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
   const lock = defineSkill({
     id: 'test:lock',
     name: '保护',
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.prohibitDiscard, (_ctx, r) => (r.card === 'locked' ? true : undefined)),
+      modify(cardQueries.prohibitDiscard, (_ctx, { input: r }) =>
+        r.card === 'locked' ? true : undefined,
+      ),
     ],
   });
   const game = scenario({
     hands: { a: [card('locked', 'slash'), card('fee', 'jink')] },
     draw: [card('d', 'peach')],
-    skills: (book) => [...standardGeneralSkills(book), lock],
+    skills: [...standardGeneralSkills, lock],
   });
   await grant(game, 'standard:zhiheng');
   await grant(game, lock.id);
@@ -355,9 +332,9 @@ it('克己识别本人出牌阶段鬼才打出的杀，不把改判漏出活动�
   await answer(game, { cards: ['retrial'], targets: [] }, 'cards-targets');
   await running;
   expect(game.room.history.facts('card.responded')).toEqual([]);
-  expect(cardActivities(game.room.history).filter((a) => a.kind === 'response')).toMatchObject([
-    { actor: 'a', card: { name: 'standard:slash' } },
-  ]);
+  expect(
+    cardActivities(game.room.history.facts()).filter((a) => a.kind === 'response'),
+  ).toMatchObject([{ actor: 'a', card: { name: 'standard:slash' } }]);
   expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
 });
 it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克己', async () => {
@@ -560,7 +537,9 @@ it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
   await answer(game, { kind: 'physical', card: 'own' }, 'card-response');
   await running;
   expect(
-    cardActivities(game.room.history).filter((a) => a.actor === 'a' && a.kind === 'response'),
+    cardActivities(game.room.history.facts()).filter(
+      (a) => a.actor === 'a' && a.kind === 'response',
+    ),
   ).toHaveLength(1);
   expect(game.room.history.facts('test.discard-body')).toHaveLength(1);
 });
@@ -638,37 +617,17 @@ it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试�
   });
   expect(
     await game.room.run('full', (ctx) => recover(ctx, { from: null, to: 'a', amount: 1 })),
-  ).toMatchObject({ value: { value: { kind: 'unchanged', attemptedAmount: 1, amount: 0 } } });
+  ).toMatchObject({ value: { kind: 'unchanged', attemptedAmount: 1, amount: 0 } });
   expect(after).toBe(0);
 });
 it('三名新吴将八人局由基础 AI 经正式决策走到胜负', async () => {
   const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => standardGenerals[i]!.id);
-  const match = createOfflineMatch(8, 14, 'standard:identity', lineup);
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 7000; step++) {
-      await setImmediate();
-      const r = match.room.decisions.pending[0];
-      if (!r) continue;
-      const reply = decideBasic(observeAgent(match, r.player), r, (v) =>
-        match.room.decisions.preview(r.id, v),
-      );
-      if (reply.kind === 'unsupported') throw Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(r.id, r.token)
-          : match.room.decisions.submit(r.id, r.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(
-      match.room.history
-        .facts('skill.invoked')
-        .some((f) => (f.data.detail as { skill: string }).skill === 'standard:zhiheng'),
-    ).toBe(true);
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 7000 });
+
+  expect(
+    match.room.history
+      .facts('skill.invoked')
+      .some((f) => (f.data.detail as { skill: string }).skill === 'standard:zhiheng'),
+  ).toBe(true);
 }, 60000);

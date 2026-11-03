@@ -4,16 +4,16 @@
 
 ## 由实际用途决定活动
 
-本地 [FreeKill 的 SlashOffsetFunc](../freekill/lua/core/util.lua) 在抵消杀时执行 askToUseCard/useCard，[万箭齐发](../freekill/packages/standard_cards/pkg/skills/archery_attack.lua) 则执行 askToResponse/responseCard；[noname 的标准牌](../noname/resources/app/card/standard.js) 也分别请求 chooseToUse 和 chooseToRespond。之前项目将两者统一记为打出，导致禁止打出闪也错误阻止抵消杀。
+本地 [FreeKill 的 SlashOffsetFunc](../../freekill/lua/core/util.lua) 在抵消杀时执行 askToUseCard/useCard，[万箭齐发](../../freekill/packages/standard_cards/pkg/skills/archery_attack.lua) 则执行 askToResponse/responseCard；[noname 的标准牌](../../noname/resources/app/card/standard.js) 也分别请求 chooseToUse 和 chooseToRespond。之前项目将两者统一记为打出，导致禁止打出闪也错误阻止抵消杀。
 
 现在 [CardBook](../src/rules/cards/book.ts) 提供两项明确操作：
 
 ```ts
 // 万箭齐发、决斗等要求实际打出牌。
-const played = ctx.unwrap(await book.respond(ctx, actor, names, effect));
+const played = await book.respond(ctx, actor, names, effect);
 
 // 杀要求使用闪；保留供牌窗口，并执行完整 use 管线。
-const used = ctx.unwrap(await book.useResponse(ctx, actor, names, effect));
+const used = await book.useResponse(ctx, actor, names, effect);
 ```
 
 两项仍共用 responseRequested。机会的 purpose 为 use 或 response，canProvide、菜单、转换配方、最终支付按实际用途检查；具名效果禁令先过滤 names。普通使用检查 prohibitUse，实际打出检查 prohibitResponse。本人使用闪不会产生 card.responded 或 responseFinished，而会产生独立 card.used、card.finished 与 useFinished。万箭齐发仍只产生实际打出。
@@ -38,7 +38,7 @@ delegate 创建的子请求始终要求实际打出；它不会把主公的使�
 
 ResponseResult 的成功分支现在分别是 responded（实际打出者、id、card）与 used（实际使用者、id、card、完整 use，委托时另附 supplied）。`isResponseSatisfied(result)` 可判断两者；用于向祖先完成交接的子请求可以传回最终 used 结果，其中 supplied 保留实际打出。这些结果不意味着再次宣告。response.delegated 同时记录供牌者、真实打出 id 和最终结果。
 
-待决请求与忙碌仍分开；成功使用/打出后收束其他候选，失败委托仍可回退。局部中止通过 unwrap 向上延续，不被转换成“缺少闪”造成假伤害；已提交材料按原处理区善后。
+待决请求与忙碌仍分开；成功使用/打出后收束其他候选，失败委托仍可回退。局部中止默认沿调用链传播，不被转换成“缺少闪”造成假伤害；已提交材料按原处理区善后。
 
 ## 行为证据与范围
 

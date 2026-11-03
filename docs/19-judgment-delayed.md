@@ -1,6 +1,6 @@
 # 19 · 判定、改判与延时牌身份
 
-日期：2026-10-17。新增乐不思蜀、闪电，练习牌组达到 22 种。完整标准包仍待继续，当前边界与实际验证见 [STATUS](STATUS.md)。
+状态：判定、改判与延时牌的当前作者契约；内容范围和实际验证见 [STATUS](STATUS.md)。
 
 ## 分开宣告、放置和生效
 
@@ -22,7 +22,7 @@ flowchart LR
 
 ## 普通函数中的判定
 
-[judge](../src/rules/cards/judge.ts) 接受 player、reason 和普通同步 match 函数。它拥有独立 Lifetime、处理区与当前判定牌面，返回 FlowResult 中的 judged/unavailable 和匹配结果。判定牌堆不足时只洗弃牌，不借用其他处理区，也不伪造一张牌。
+[judge](../src/rules/cards/judge.ts) 接受 player、reason 和普通同步 match 函数。它拥有独立 Lifetime、处理区与当前判定牌面，直接返回 judged/unavailable 和匹配结果。判定牌堆不足时只洗弃牌，不借用其他处理区，也不伪造一张牌。
 
 ```ts
 const result = await judge(ctx, book, {
@@ -44,9 +44,9 @@ const result = await judge(ctx, book, {
 
 原区域失效返回 unavailable，不支付。非法移动拒绝整个提交；代码错误仍冻结本局，不回滚已提交的其他结算。连续改判使用同一个句柄；嵌套判定各有独立句柄和处理区，不覆盖外层。
 
-结果在 judgmentFinished 前封口。该窗口可取得仍在处理区的最终判定牌，但不能再改判。过期、跨 World 或不在祖先路径内的句柄不能编辑；保留句柄读取时得到已封口牌面。本篇最初尚未提供判定过滤；后续 [50](50-card-faces.md) 已接入纯牌面查询。
+结果在 judgmentFinished 前封口。该窗口可取得仍在处理区的最终判定牌，但不能再改判。过期、跨 World 或不在祖先路径内的句柄不能编辑；保留句柄读取时得到已封口牌面。判定过滤通过纯牌面查询接入，见 [50](50-card-faces.md)。
 
-`judge` 后续加入可选 `onResult(ctx, result)`，在公共结束窗口后、处理区善后前运行。洛神用它在普通函数循环中取得黑色判定牌，避免同原因嵌套判定被临时全局监听器误收；完整契约与反例见 [29](29-wei-judgment-effects.md)。
+`judge` 提供可选 `onResult(ctx, result)`，在公共结束窗口后、处理区善后前运行。洛神用它在普通函数循环中取得黑色判定牌，避免同原因嵌套判定被临时全局监听器误收；完整契约与反例见 [29](29-wei-judgment-effects.md)。
 
 ## 延时牌的逻辑身份
 
@@ -62,6 +62,8 @@ const result = await judge(ctx, book, {
 
 ## 判定阶段与后续阶段意图
 
+延时牌的 resolve / cancelled 统一采用 `(ctx, { effect, book, phase })`，按需解构；共享函数可标注 SDK 的 `DelayedInput`。正常生效时 effect 是可操作的 CardEffect，取消后效则是已封口的 EffectSnapshot；共用流转逻辑可接受 `DelayedInput<EffectRef>`。两个回调都可等待普通规则操作，Context 和原方法接收者保持，不必填位置占位参数。
+
 默认判定阶段开始时快照已有实例，后放先结算。每个实例执行前再检查是否仍在当前角色处。结算中移入的新实例留到下次，闪电绕回自己不会在同一阶段无限重复；跳过判定阶段也不会消耗原实例。
 
 乐不思蜀判定不为红桃时，调用 `turn.skipNext(ctx, 'play', reason)`。这是当前回合内对下一次指定阶段的意图：在该阶段的 phaseBefore 前消费，与跳过状态同次提交，到回合结束仍未消费则到期。额外同名阶段不会被同一个意图反复跳过；重复预定不会累积成不明队列。独立 runPhase 没有关联 Turn 时，不产生跨回合跳过。
@@ -74,6 +76,6 @@ moveCards 的领域声明可携带非 move Change，组成同一次提交。所�
 
 客户端只投影公开判定区、牌面、判定/改判结果和跳阶段日志。语义延时牌与底层材料分开显示；公共牌面操作只查看详情，真正选择仍使用执行侧候选。脚本化浏览器与原生检查不直接修改 World。
 
-[判定场景](../tests/scenarios/judge.test.ts) 11 项，[延时牌场景](../tests/scenarios/delayed.test.ts) 21 项，覆盖连续改判、交换、取得、嵌套、终局、反制、跳阶段、零/多材料、转化来源消失、破损清理、埋葬与事实重建。平台结果与当前总数统一见 STATUS。
+[判定场景](../tests/scenarios/judge.test.ts) 与 [延时牌场景](../tests/scenarios/delayed.test.ts) 覆盖连续改判、交换、取得、嵌套、终局、反制、跳阶段、零/多材料、转化来源消失、破损清理、埋葬与事实重建。平台结果与当前总数统一见 STATUS。
 
-参考本地 FreeKill 的 [乐不思蜀](../freekill/packages/standard_cards/pkg/skills/indulgence.lua)、[闪电](../freekill/packages/standard_cards/pkg/skills/lightning.lua) 和 [延时牌放置](../freekill/ltk/server/events/usecard.lua)。八卦阵、其余装备、标准武将和完整牌组仍待继续；AI、联机继续后置。
+参考本地 FreeKill 的 [乐不思蜀](../../freekill/packages/standard_cards/pkg/skills/indulgence.lua)、[闪电](../../freekill/packages/standard_cards/pkg/skills/lightning.lua) 和 [延时牌放置](../../freekill/ltk/server/events/usecard.lua)。项目后续方向统一见 [路线](11-offline-roadmap.md)。

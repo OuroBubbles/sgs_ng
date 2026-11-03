@@ -13,13 +13,22 @@ import {
   blockSkill,
   modify,
   defineQuery,
+  defineEffect,
   cardQueries,
   kill,
   pay,
   CardBook,
   SkillBook,
 } from '../../src/sdk';
-import type { CardDefinition, CardOffer, CardChoice, UseIntent, SemanticCard } from '../../src/sdk';
+import type {
+  CardDefinition,
+  CardOffer,
+  CardChoice,
+  UseIntent,
+  SemanticCard,
+  Context,
+  SkillModifier,
+} from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/wusheng';
 import { standardCards } from '../../src/content/standard/cards';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -49,10 +58,21 @@ function transform(offer: CardOffer, materials: readonly string[]): CardChoice {
 }
 
 it('装备自动以自己为目标，同槽替换一次提交，移牌后效立即看见新攻击范围', async () => {
-  const game = cardGame({
-    hands: { a: [card('new', 'spear')] },
-    equipment: { a: [card('old', 'crossbow')] },
+  let rangeReads = 0;
+  const spear = equipmentCard({
+    id: 'test:spear',
+    label: '丈八蛇矛',
+    slot: 'weapon',
+    get range() {
+      return ++rangeReads <= 3 ? 3 : 0;
+    },
   });
+  const game = cardGame({
+    hands: { a: [{ ...card('new', 'spear'), name: spear.id }] },
+    equipment: { a: [card('old', 'crossbow')] },
+    definitions: [spear],
+  });
+  expect(rangeReads).toBe(1);
   const observations: number[] = [];
   game.room.on(cardsMoved, {
     id: 'observe',
@@ -122,7 +142,7 @@ it('诸葛连弩允许阶段内连续用杀，卸下立即恢复已累计的次�
             targets: ['b'],
             timing: { kind: 'play', owner: 'a', phase },
           }),
-        ).toMatchObject({ value: { kind: 'used' } });
+        ).toMatchObject({ kind: 'used' });
       await moveCards(
         at,
         [{ cards: ['weapon'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
@@ -243,10 +263,8 @@ it.each([
       timing: { kind: 'effect' },
     });
     expect(result).toMatchObject({
-      value: {
-        use: {
-          card: { name: 'standard:slash', suit: 'none', color, materials: ['x', 'y'], rank: 0 },
-        },
+      use: {
+        card: { name: 'standard:slash', suit: 'none', color, materials: ['x', 'y'], rank: 0 },
       },
     });
   });
@@ -294,30 +312,40 @@ it('丈八复用同一响应管线，装备失效后转换与范围一起关闭�
       materials: ['x', 'y'],
     }).kind,
   ).toBe('accepted');
-  expect(await running).toMatchObject({ value: { value: { kind: 'responded' } } });
+  expect(await running).toMatchObject({ value: { kind: 'responded' } });
 });
 
 function lossDefinition(allowDead = false): CardDefinition {
-  return equipmentCard({
-    id: 'probe:loss',
-    label: '离场探针',
-    slot: 'armor',
-    skill: defineSkill({
-      id: 'probe:loss-ability',
-      name: '离场探针',
-      effects: [
-        on(cardsMoved, {
-          id: 'lost',
-          allowDead,
-          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          run(ctx, _moved, self) {
-            ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
-          },
-        }),
-      ],
-    }),
-  });
+  class Configuration {
+    id = 'probe:loss';
+    label = '离场探针';
+    slot = 'armor';
+    #allowDead = allowDead;
+
+    skill() {
+      return defineSkill({
+        id: 'probe:loss-ability',
+        name: '离场探针',
+        triggers: [
+          on(cardsMoved, {
+            id: 'lost',
+            allowDead: this.#allowDead,
+            retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+            when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+            run(ctx, { self }) {
+              ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
+            },
+          }),
+        ],
+      });
+    }
+  }
+  const input = new Configuration();
+  const definition = equipmentCard(input);
+  input.skill = () => {
+    throw new Error('Changed equipment factory must not run.');
+  };
+  return definition;
 }
 
 it('离场能力从移动前快照补入，支付材料后也触发，普通手牌移动不触发', async () => {
@@ -452,8 +480,10 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
   const general = defineSkill({
     id: 'probe:general',
     name: '查询',
-    effects: [],
-    modifiers: [modify(score, (_ctx, input, self) => (input.actor === self.owner ? 2 : undefined))],
+    triggers: [],
+    modifiers: [
+      modify(score, (_ctx, { input, self }) => (input.actor === self.owner ? 2 : undefined)),
+    ],
   });
   const armor = equipmentCard({
     id: 'probe:query',
@@ -462,7 +492,7 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
     skill: defineSkill({
       id: 'probe:armor',
       name: '甲',
-      effects: [],
+      triggers: [],
       modifiers: [modify(score, () => 3)],
     }),
   });
@@ -491,7 +521,7 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
   const impure = defineSkill({
     id: 'probe:impure',
     name: '非法查询',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.handLimitCorrection, (ctx) => ctx.randomInt(2))],
   });
   const broken = cardGame({ skills: [impure] });
@@ -507,11 +537,76 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
   ).rejects.toThrow('Pure queries cannot perform rule operations.');
 });
 
+it.each(['skill', 'effect', 'combine'] as const)(
+  '异步查询 %s 在组合前冻结本局，既不返回伪值也不允许延迟写入',
+  async (kind) => {
+    let current: Context | undefined;
+    const late = async (ctx: Context) => {
+      await Promise.resolve();
+      ctx.commit('late.query', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
+      return 1;
+    };
+    let combined = false;
+    const query = defineQuery<null, unknown>('probe:async-query', (left, right) => {
+      if (kind === 'combine') {
+        if (!combined) {
+          combined = true;
+          return late(current!);
+        }
+        return 0;
+      }
+      return Number(left) + Number(right);
+    });
+    // 公开的擦除类型允许普通 TypeScript 表达这些回调，不能只依赖类型检查。
+    const modifiers: SkillModifier[] =
+      kind === 'skill'
+        ? [{ query, contribution: late }]
+        : [
+            { query, contribution: () => 1 },
+            { query, contribution: () => 1 },
+          ];
+    const skill = defineSkill({ id: 'probe:async', name: '异步查询', triggers: [], modifiers });
+    const effect = defineEffect<null>({
+      id: 'probe:async-effect',
+      name: '异步效果',
+      accepts: (value): value is null => value === null,
+      create: () => ({ modifiers: [{ query, contribution: late }] }),
+    });
+    const game = cardGame({
+      skills: [
+        (book) => {
+          book.skills.effects.register([effect]);
+          return [skill];
+        },
+      ],
+    });
+    await expect(
+      game.room.run('query', async (ctx) => {
+        if (kind === 'effect')
+          await game.skills.effects.add(ctx, effect, { owner: 'a', data: null });
+        else
+          await game.skills.grant(ctx, {
+            owner: 'a',
+            skill: skill.id,
+            source: { kind: 'general', id: 'g' },
+          });
+        current = ctx;
+        game.skills.query(ctx, query, null, 0);
+        await Promise.resolve();
+      }),
+    ).rejects.toThrow('Queries cannot await');
+    expect(game.room.status).toBe('faulted');
+    expect(game.room.world.player('b').hp).toBe(4);
+    expect(game.room.history.facts('late.query')).toEqual([]);
+    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+  },
+);
+
 it('禁止目标查询阻止装备使用，不能以过滤成零目标的方式支付掉装备', async () => {
   const skill = defineSkill({
     id: 'probe:prohibit',
     name: '禁止',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitTarget, () => true)],
   });
   const game = cardGame({ hands: { a: [card('weapon', 'spear')] }, skills: [skill] });
@@ -526,7 +621,7 @@ it('禁止目标查询阻止装备使用，不能以过滤成零目标的方式�
   });
 });
 
-it('事实重建的装备无需恢复回调，重新装配目录即可得到范围与转换能力', async () => {
+it('重建和替换快照后，装备能力按当前实体与持有者派生', async () => {
   const game = cardGame({
     hands: { a: [card('weapon', 'spear'), card('x', 'jink'), card('y', 'peach')] },
   });
@@ -537,5 +632,41 @@ it('事实重建的装备无需恢复回调，重新装配目录即可得到范�
   expect(skills.bindings(restored.reader).map(({ definition }) => definition.name)).toEqual([
     '丈八蛇矛',
   ]);
+  const original = restored.reader.snapshot;
+  const changed = new World({
+    ...original,
+    cards: original.cards.map((card) =>
+      card.id === 'weapon' ? { ...card, name: 'standard:crossbow' } : card,
+    ),
+  });
+  // 同 revision、同区域表换了实体牌记录，也必须按当前牌定义派生能力。
+  expect(changed.reader.snapshot.revision).toBe(original.revision);
+  expect(changed.reader.snapshot.zones).toBe(original.zones);
+  restored.apply(changed.reader.snapshot);
+  const current = skills.bindings(restored.reader)[0]!;
+  expect(current.definition.name).toBe('诸葛连弩');
+  expect(current.definition.viewAs ?? []).toEqual([]);
+  expect(current.self.effective(restored.reader)).toBe(true);
+
+  for (const [from, to] of [
+    ['a', 'b'],
+    ['b', 'a'],
+  ]) {
+    restored.apply(
+      restored.prepare([
+        {
+          kind: 'move',
+          cards: ['weapon'],
+          from: `${from}:equipment`,
+          to: `${to}:equipment`,
+          place: 'bottom',
+        },
+      ]),
+    );
+    expect(skills.bindings(restored.reader)).toMatchObject([
+      { self: { owner: to, origin: { kind: 'equipment', id: 'weapon' } } },
+    ]);
+    expect(current.self.effective(restored.reader)).toBe(to === 'a');
+  }
   expect(game.room.history.facts('skill.changed')).toHaveLength(0);
 });

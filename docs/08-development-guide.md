@@ -1,140 +1,71 @@
 # 08 · 开发工具与工作约定
 
-日期：2026-10-16。这里记录本项目实际使用的工具与经验，不把其他同名项目的验证结果迁入本仓库。
+项目位于 `C:/workspace/sgs-ng`。遵守上级 [WORKSPACE](../../WORKSPACE.md)，先复用已有工具，项目依赖与产物留在项目内；环境配置只作用于当前进程及子进程。当前任务、交付摘要和平台覆盖只维护在 [STATUS](STATUS.md)，本页只说明可执行入口，不累积历史批次。
 
-## 本地工具
+## 日常开发与检查
 
-本机未开启管理员会话，因此采用项目内工具目录 `.tools/`。Rust、Cargo、编译器、下载缓存和 Gradle 缓存均不进入源码或格式检查范围。
+Node 24、pnpm 11.25.0；版本与依赖以 [package.json](../package.json)、[pnpm-lock.yaml](../pnpm-lock.yaml) 为准。
 
-| 工具         | 本轮配置                                                |
-| ------------ | ------------------------------------------------------- |
-| Rust / Cargo | 1.99.1，Windows MSVC host，另安装 Android targets       |
-| MSVC         | 14.44.35207，x64                                        |
-| Windows SDK  | 10.0.26100.0                                            |
-| Android JDK  | 已有 JAVA_HOME 下的 Temurin 17.0.20.1                   |
-| Android SDK  | 已有 ANDROID_HOME；本轮补齐 Platform 36、Build-Tools 36 |
-| Android NDK  | 27.2.12479018                                           |
-| JS 工具      | package.json 与 pnpm-lock.yaml 固定版本                 |
-| Rust 依赖    | src-tauri/Cargo.lock 固定本轮实际解析版本               |
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm check
+pnpm test:ui
+pnpm format:check
+```
 
-运行原生命令前由 [toolchain.ps1](../scripts/toolchain.ps1) 设置当前进程的 PATH、INCLUDE、LIB、SDK 和 NDK 路径，不修改用户或系统 PATH。普通 Node 终端没有发现 cargo，不再等于本项目没有 Rust。
+`pnpm check` 包含类型、lint、本地文档链接、单元/行为测试、标准条件审计与生产构建。先运行受影响场景，收尾完整检查；网页渲染、交互或前端资源改变时另跑 `pnpm test:ui`。规则和界面使用同一合法性入口，不以放宽超时、跳过或减少条件换通过。
+
+[牌场景夹具](../tests/fixtures/cards.ts) 用 cardSeed 生成初始数据，cardGame 才创建规则对局。固定标准牌声明在模块内复用，每局目录、装备能力与状态独立；自定义声明仍按本次输入规范化。测试需要自有目录或 World 时直接使用 cardSeed，避免先创建不用的对局。
+
+浏览器场景使用生产构建和原生 CSP，核对 console/pageerror 与实际渲染。`pnpm build` 和原生构建都会重写 `dist`，不得与使用它的浏览器验收同时执行；重型检查与图形验收串行运行。
+
+联机三种构建入口共用 `scripts/network-build.mjs` 注入源码/资源摘要，不能手工指定或沿用旧值。修改源码后重新构建双方；开发服务器的摘要在启动时固定，热更新只用于本机界面调试，联机前须重启开发服务器并重建主持端。生产验收使用冻结输入的页面与主持端，不把 HMR 后的页面当作交付证明。
+
+`pnpm docs:check` 只核对 README 与 docs 中本地链接目标，不验证远程链接、锚点或设计是否实现。Vitest JSON 可能全在一行，先读取计数和失败项，不直接输出整份报告。规则侧报告可用 `pnpm test:core` 刷新。
+
+## Windows 工具与构建
+
+原生命令使用 Windows 自带的 Windows PowerShell 5.1（`powershell.exe`）。入口的 `-ExecutionPolicy Bypass` 仅作用于本次脚本进程，不修改系统或用户策略。仓库 `.ps1` 保存为 UTF-8 BOM，编辑器约定见 [.editorconfig](../.editorconfig)；原生输出、JSON 读取使用 UTF-8，避免中文脚本或交付说明被默认代码页误读，依据见 [Microsoft 编码说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Character_Encoding)。
+
+本机工具默认复用 `C:/workspace/shared/tools/native-windows`，结构为 `cargo/`、`rustup/`、`msvc/`；可由进程变量 `SGS_NATIVE_TOOLS_ROOT` 指向另一套布局。项目 Rust 版本以 [rust-toolchain.toml](../rust-toolchain.toml) 为准，依赖由 `src-tauri/Cargo.lock` 固定。
+
+[native.ps1](../scripts/native.ps1) 在执行构建前加载 [toolchain.ps1](../scripts/toolchain.ps1)，设置子进程的编译器、SDK、Cargo 与 Rustup 路径。普通终端没有找到 cargo 不代表缺少安装；确认缺失后才使用 [bootstrap-native.ps1](../scripts/bootstrap-native.ps1)，安装共享工具时须避开其他使用者。
 
 ```powershell
-pwsh -NoProfile -File scripts/bootstrap-native.ps1
 pnpm platform:check
+# 仅在确认缺少工具时安装；默认准备 Rust 与 MSVC。
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-native.ps1
+# 调试构建可选；正式交付使用 Release。
 pnpm desktop:debug
 pnpm desktop:build
-pnpm android:init
 ```
 
-bootstrap 默认安装 Rust 与便携 MSVC；Android 包准备使用 `-Components Android`，并要求已有 JAVA_HOME/ANDROID_HOME。MSVC 提取脚本固定到 mmozeiko gist 修订 `49b58850aa5e5c1e65f090d4651ee76607883e11`，工具包从 Microsoft 官方 manifest 下载并校验。脚本保留在忽略的工具目录，不作为项目运行依赖。[工具作者说明](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977)、[Tauri 环境要求](https://v2.tauri.app/start/prerequisites/)
+`platform:check` 检查工具存在性与版本命令，缺失或版本命令失败时退出码非零；构建与实际运行仍分别验收。SDK 未配置时不把当前目录中的同名文件夹当作 SDK。
 
-## Android 的两个已知环境问题
+Windows 专用 [配置](../src-tauri/tauri.windows.conf.json) 在构建页面后执行 `pnpm host:build`，将当前 Node 24、独立主持脚本及 Node/ws 许可作为 `host/` [资源](https://v2.tauri.app/develop/resources/) 随包交付；Android 不含这些 Windows 文件。`native.ps1` 也将同样字节放到 `target/release/host` 或 `target/debug/host`，供不生成安装包的 exe 直接运行。界面通过 [Tauri 命令](https://v2.tauri.app/develop/calling-rust/) 创建和关闭自有子进程，规则仍使用现有 Node 主持端；不用额外安装运行时或 shell 插件。
 
-SDK Manager 的 Java 下载器本轮在 Build-Tools ZIP 上长时间停滞，curl 可以正常获取同一官方文件。因此提供 [install-android-archives.py](../scripts/install-android-archives.py)：仅提取两个具名包，按 Google repository2-3.xml 中的 SHA-1 校验，不删除 SDK 目录。
-
-```powershell
-curl.exe --fail --location https://dl.google.com/android/repository/build-tools_r36_windows.zip --output .tools/downloads/build-tools_r36_windows.zip
-curl.exe --fail --location https://dl.google.com/android/repository/platform-36_r02.zip --output .tools/downloads/platform-36_r02.zip
-python scripts/install-android-archives.py
-```
-
-CLI 2.12.3 生成的 Android 模板默认选择 API 37；当前验收基线固定为已安装的 API 36，通过 [configure-android.mjs](../scripts/configure-android.mjs) 重放这项配置。不能只修改被忽略的生成文件而不留下生成步骤。
-
-非管理员 Windows 会话不能创建 JNI 库符号链接。本轮 CLI 已成功编译 ARM64 `.so`，随后在 symlink 步骤退出。提供 [android-package.ps1](../scripts/android-package.ps1)：只对这个已识别错误使用普通文件复制，再跳过已经完成的 Rust Gradle task。
-
-```powershell
-pwsh -NoProfile -File scripts/android-package.ps1
-# 仅在已确认库是本次源码编译产物时，才能显式跳过 Rust 编译：
-pwsh -NoProfile -File scripts/android-package.ps1 -UseCompiledLibrary
-```
-
-这个回退不改变正式 CLI、不改 Windows Developer Mode，也不掩盖其他编译错误。本轮已成功生成 ARM64 Debug APK；`aapt dump badging` 和 `apksigner verify --verbose` 分别验证安装元数据与签名。无连接真机，现有 AVD 缺少系统镜像，尚不能证明 Android 启动与动画正常。
-
-`pnpm android:build` 已接入这条完整路径，当前产物为 ARM64 Debug APK；发布签名包另行处理。符号链接回退路径默认剥离打包副本的 native 调试符号，完整原库仍在 Cargo target；需要保留包内 native 符号时加 `-KeepNativeSymbols`。
-
-本轮打包副本从约 129.2 MB 降到 13.8 MB。Gradle 增量 ZIP 替换后可能留下旧数据空洞，脚本会移除具名的生成 APK 再重新打包；最终包约 21.0 MB。仅检查 ZIP 内库大小不足以证明实际 APK 已缩小。
+独立开发主持端用 SGS_PRACTICE=1 选择机制演武；自定义内容在普通入口中调用 createRoomOptions(setup, content) 注入。桌面入口仅通过 stdin 首行传 RoomSetup，不传源码、包图或二进制模块。stdin 后续 EOF 负责回收主持子进程，加入者不执行规则源码。
 
 ## Windows 运行验证
 
-原生 `tauri build` 成功后还要验证 WebView。使用 [验证启动器](../scripts/verify-windows.ps1)：
-
-```sh
-pnpm desktop:verify
-pnpm desktop:verify -BuildKind debug
-```
-
-启动器要求对应 exe 已构建，确认 CDP 端口空闲，以 Hidden 启动本次程序，等待端点就绪后运行 [原生场景](../scripts/smoke-native.mjs)。验收使用独立 WebView2 数据目录，核对实际子进程的 user-data-dir 后才操作内容库；随后关闭首个进程，用同一测试目录启动第二个进程，验证内容恢复和真实技能。最后关闭自己拥有且路径匹配的进程，清理测试目录并恢复临时环境变量，见 [48](48-content-persistence.md)。Release 使用 9224，Debug 使用 9223；不会复用旧端点作为新构建证据。
-
-当前脚本连接实际 `tauri.localhost` 页面，分别以四人种子 255 验证丈八安装/连弩替换，68 验证乐不思蜀判定/跳阶段，102 验证八卦发动/红判供闪，91 验证借刀准备和交武器；再验证贯石斧、青龙、方天和麒麟弓；重新加载后以两人种子 42 通过正式决策到身份胜负，最后检查 8 个 Spine 实例。脚本会放弃反制机会，成功使用无懈、五谷与青釭剑破盾另有浏览器场景。截图与 exe SHA-256 记录写到 `.artifacts/ui/native-smoke-<build>.json`。不要直接对正常应用数据目录运行该脚本；使用上述启动器，完成独立目录及进程归属检查。
-
-本批 Debug/Release 均已通过。旧 `.artifacts/p0/native-smoke.json` 是历史记录；当前结果不代替 Android 实机检查。浏览器后台模拟也不能当作 Android 系统前后台证明。
-
-## 迭代方法
-
-1. 先看 STATUS 和当前契约，再针对一个真实机制或交互缺陷修改。
-2. 参考 noname 时按功能定位源码片段，不整页输出巨大脚本或导入其对象架构。
-3. 世界状态、规则草案、UI 局部选择和已提交记录各有所有者。
-4. 纯布局与状态转换用小测试检查边界；行为与 UI 测试检查用户可观察后果。
-5. 浏览器验证使用生产构建和 Tauri 的实际 CSP，检查 console/pageerror 并审阅截图。
-6. 原生构建与前端测试分开报告；Debug、Release、APK 和真机运行分别记录。
-
-已经遇到并修复的经验：Pixi 需安装无动态求值适配以通过生产 CSP；手写 CSS 和 Canvas 两套坐标会漂移；隐藏诊断文字后，测试应观察渲染状态与 canvas，而不是要求那行文字可见；原生编译成功不能替代壳内资源与 Spine 运行验证。
-
-后续已实现首批 Flow、Window、提交等机制与规则骨架，见 [内核实施](10-kernel.md)；完整 SDK 与完整对局仍待继续。当前交互改进应让后续规则能接入，而不能把演示夹具扩展成事实上的内核。
-
-## 规则迭代的证据
-
-`pnpm check` 包含类型、lint、本地文档链接、单元/行为测试和前端构建；格式另跑 `pnpm format:check`。`pnpm docs:check` 只验证 README 与 docs 中本地链接的目标存在，不检查远程链接、锚点或设计声明是否已实现。
-
-每批先执行受影响的规则场景，再完整检查；规则源码没有接入 UI 时不重复导出原生安装包，也不沿用 P0 平台证据宣称新规则已通过双端。刷新规则报告可运行：
-
-```sh
-pnpm test:core --reporter=json --outputFile=.artifacts/validation/scenarios.json
-```
-
-Vitest JSON 报告可能全在一行，不应直接输出整行。读取 numTotalTests、numPassedTests、numFailedTests 和 success 字段即可核对计数，再针对失败项查看详情。
-
-正常胜负用 `finishGame` 与 `room.finish` 收束，调试停止用 `room.abort`；错误路径保留已提交状态。这三类出口不能为了“跑完测试”混为同一种结束。生命与身份场景中的嵌套死亡、处理材料和事实重建是后续扩展的回归基线。
-
-## 复现练习牌组场景
-
-[练习初始化测试](../tests/scenarios/practice.test.ts) 检查规则目录与牌面目录一致，并遍历种子 1–32，确认每种练习牌能进入首个出牌角色的手牌。需要定位真实 UI 场景时可输出夹具；只有开启日志时才最多搜索至种子 8192，找到全部具名场景即停止，并将该工具模式的超时设为 120 秒，另列常用组合场景，常规测试仍为 1–32：
-
 ```powershell
-$env:SGS_FIXTURE_LOG = '1'
-pnpm exec vitest run tests/scenarios/practice.test.ts --reporter=verbose
-Remove-Item Env:SGS_FIXTURE_LOG
+pnpm desktop:verify
+# 若要验证已构建的 Debug：
+pnpm desktop:verify -BuildKind debug
+# 验证客户端创建房间、另一端加入和整局：
+pnpm desktop:network
 ```
 
-当前四人局、选择“机制练习（288 张）”的可复现场景；标准＋EX 的相同种子不会得到相同起手：
+[验证启动器](../scripts/verify-windows.ps1) 要求对应 exe 已存在、CDP 端口空闲；以隐藏窗口启动自己拥有的程序，不复用旧端点。Release 使用 9224，Debug 使用 9223；双客户端的第二端分别为 9226 / 9225，主持端使用 0 自动分配可用端口。
 
-| 种子 | 开始角色 | 场景                                                     |
-| ---- | -------- | -------------------------------------------------------- |
-| 19   | 丙席     | 普通杀、选择反馈、热座基础                               |
-| 4    | 甲席     | 南蛮与无懈反制                                           |
-| 18   | 甲席     | 万箭                                                     |
-| 18   | 甲席     | 五谷公开牌池                                             |
-| 2    | 甲席     | 顺手暗选                                                 |
-| 255  | 甲席     | 丈八与连弩替换                                           |
-| 255  | 甲席     | 丈八转换                                                 |
-| 70   | 甲席     | 乐不思蜀交给乙席，判定 ♦Q 大宛后跳过出牌                |
-| 9    | 丁席     | 闪电下一回合判定 ♦K 紫骍后传递                          |
-| 366  | 甲席     | 安装八卦，乙杀甲可得到 ♦2 寒冰剑红判供闪                |
-| 2    | 甲席     | 安装仁王盾，乙可装备青釭并用黑杀攻击甲                   |
-| 173  | 甲席     | 甲装备连弩，乙使用借刀；可测试准备取消、交武器或甲使用杀 |
-| 93   | 丙席     | 贯石斧用杀，丁打闪，丙可支付两张其他牌突破               |
-| 498  | 丁席     | 青龙与两张杀，甲可闪第一张，再由丁追加用杀               |
-| 14   | 乙席     | 先安装其余装备，最后装方天；仅剩一张杀可选甲、丙、丁     |
-| 120  | 乙席     | 乙装绝影，丙可装备麒麟弓，用杀并弃置该坐骑               |
-| 3    | 乙席     | 雌雄双股剑对丙用杀，选择弃手牌、让乙摸牌或不发动         |
-| 36   | 丙席     | 寒冰剑对丁用杀，防止伤害后连续两次暗选弃牌               |
+默认验证 target 下的构建；传入 `-ExecutablePath` 可验证 ZIP 解压后的同一程序。工作目录固定为 exe 所在目录，隔离证明记录实际进程路径，用于核对便携包内的主持端和资源；两种入口复用同一组场景。
 
-浏览器场景操作真实控件，不直接修改 World。机制牌组是 288 张测试配比，不能据此推断标准包分布。默认开局改用标准＋EX 的 108 张实体牌（见 [23](23-swords-standard-deck.md)）；浏览器两人胜负场景使用标准牌组种子 27，原生两人胜负场景使用标准牌组种子 42。
+验收先核对实际 WebView2 的 user-data-dir，再操作本次独立目录。[原生场景](../scripts/smoke-native.mjs) 验证无安装的启动、内置源码选择、暂停、AI 胜负和战场释放；协调器关闭进程后启动同一 exe，检查新进程仍从标准源码开始。网络模式使用两个真实原生客户端，验证演武房间、端口冲突、请求重连、两局复用、房间重建及创建者退出后子进程回收。退出时仅关闭本次创建且路径匹配的进程，恢复临时环境；本次独立目录保留供诊断，不遍历历史目录。
 
-`pnpm build`、Windows/Android 构建都会重写 `dist`；**不能在浏览器验证使用该目录时同时构建**。本批曾因此捕获首页 404，而不是规则错误。先完成构建，再运行浏览器场景；已嵌入资源的原生 exe 验证可与浏览器场景独立运行。
+当前证明位于 .artifacts/validation 的 native-source-smoke、native-source-restart、native-source-network 及 native-source-profiles 文件，按 debug/release 区分；均须对应当前 exe。网络重连检查是页面重载后的同一请求，不宣称网络客户端跨进程恢复或跨机器互通。
 
-判定日志按牌面显示 A/J/Q/K，夹具的原始 rank 为 1/11/12/13；例如 rank 11 在 UI 中显示 J。断言应检查实际展示契约。
+联机模式从实际界面创建演武两席房间，由另一原生客户端尝试占用同一端口，核对友好拒绝且原主持进程不变，然后加入该房间。真实请求挂起时刷新持有请求的页面，返回原房间并核对同一请求和主持 PID；双方托管完成两局，再关闭并重建房间。协调器终止创建者后核对实际子进程与端口均已退出。源码摘要与三份主持资源 SHA-256 写入证明；不同协议/构建拒绝、资源原始字节及更多席位由既有规则与浏览器场景覆盖，不转记为当前原生场景已执行的步骤。
 
 ## 打包已验证的 Windows 程序
 
@@ -142,16 +73,59 @@ Remove-Item Env:SGS_FIXTURE_LOG
 pnpm desktop:package
 ```
 
-[打包脚本](../scripts/package-windows.ps1) 只使用当前 Release。它先比较原生记录中的路径、exe/演示模块 SHA-256 与错误结果，并要求匹配的真实进程重启与独立数据目录证明，再归档 exe、运行说明、Spine 许可和 harbor.sgs.mjs；随后读取真正的 ZIP 成员，核对精确成员及两份文件字节哈希，最后写入清单。脚本不构建，也不补造原生验证记录；exe 或模块更新后必须重新运行原生检查才能打包。本地模块工具见 [47](47-local-content-modules.md)，持久安装与验证契约见 [48](48-content-persistence.md)。
+[打包脚本](../scripts/package-windows.ps1) 不构建或生成运行证明。它核对当前 Release、离线/重启/双客户端原生证明与随包主持资源，再将 exe、host 下的 Node/脚本/许可及美术许可归档。解压成员逐字节核对后写入 source-candidate-manifest.json；输出 source-candidate ZIP，不覆盖旧已验收基线。未验证的构建不能进入候选包。
 
-练习牌组允许同名重复牌。检查获得/弃置时应核对前后增量、对应装备离场和公开事实，不能假设接收者原先没有同名牌。借刀夹具统一核对交出武器的离场及接收者对应牌数量加一。
+## Android 工具与构建
+
+共享根目录为 `C:/workspace/shared/tools/android`，默认使用其中的 `jdk/`（JDK 21）、`sdk/`、`gradle/`；`SGS_ANDROID_TOOLS_ROOT` 可切换布局，显式 `JAVA_HOME`、`ANDROID_HOME`、`NDK_HOME` 优先。Android 用户状态默认留在项目 `.artifacts/android-user`。不移动已有私钥、签名、用户设置或其他项目状态。
+
+```powershell
+. scripts/toolchain.ps1
+sdkmanager.bat --list_installed
+# 仅在确实缺少 Android 工具或 Rust ARM64 target 时执行：
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-native.ps1 -Components Android
+# 仅在尚未初始化生成项目时执行：
+pnpm android:init
+pnpm android:build
+```
+
+[android-package.ps1](../scripts/android-package.ps1) 固定生成 ARM64 Debug APK。正常 CLI 完成和已识别的符号链接权限错误都进入同一 JNI 打包步骤：复制原库、剥离打包副本并重打包，保留 Cargo 原库调试信息。其他编译错误直接失败，不改系统开发者设置。`-KeepNativeSymbols` 保留包内符号；`-UseCompiledLibrary` 只用于已证明属于当前源码的库，不能用来掩盖源码与旧库不一致。
+
+[configure-android.mjs](../scripts/configure-android.mjs) 重放 API 36、单次 Gradle 进程、进程内 Kotlin 编译和 Activity 复制配置；不只修改被忽略的 `gen/android`。原生适配源码是 [MainActivity.kt](../src-tauri/android/MainActivity.kt)，处理系统栏/刘海 inset 及导航模式资源变化。设备触摸坐标须加上实际 WebView 原点；不能假设是屏幕 `(0, 0)`。Tauri 参数不会自动成为 Gradle 参数，包入口负责各自参数。
+
+构建后核对签名、Manifest、ELF LOAD 对齐与 `zipalign -c -P 16 -v 4`，不只检查链接参数。模拟器的 ARM64 转译与 4 KB 页运行不能证明真机或 16 KB 设备可用；已验平台和对应 APK 摘要见 STATUS。当前 AVD 使用项目 `.artifacts/android-user/avd/`，通过进程变量 `ANDROID_AVD_HOME` 选择，不重用旧项目的 AVD 状态。
+
+## Android 运行与已知工具问题
+
+WebView 验收使用 ADB 转发其 `webview_devtools_remote_<pid>`，再通过现有 Playwright/CDP 读取与操作。连接保留真实焦点/可见性行为；后台用定时轮询，不等待被暂停的动画帧。系统前后台、对局中的旋转/导航模式切换须核对原页面、草稿、待决请求和日志；浏览器模拟后台不能代替系统切换。
+
+[MainActivity](../src-tauri/android/MainActivity.kt) 通过生命周期内的返回回调向 WebView 分发可取消的 `dialog.cancel`，否则点击可见、可操作的 `data-back-action` 按钮；无人处理时将任务移至后台。界面负责声明返回语义，原生壳不读取房间、World 或 Decision。新增弹窗须通过既有取消处理收束，新增页面须明确其返回按钮。
+
+客户端内容导入和数据库恢复已移除，旧系统选择器探针不再是现行功能验收。程序重启、前后台保持和连接恢复仍须核对实际进程与请求，同页 reload 不能代替程序重启。临时设备探针和截图留在忽略产物中，不建立第二套常规框架。
+
+遇到系统无响应时，记录当前 `boot_id`、uptime、应用启动时刻及 ANR 的进程/服务/时间，只将本次启动后的 DropBox 项作为新增故障。观察窗口应覆盖已有故障出现的时刻；层级不可读、统计文件拒读与确实出现 ANR 分开记录，采集缺口不算通过。调度与系统负载的判断参考 [Android ANR 诊断](https://developer.android.com/topic/performance/anrs/diagnose-and-fix-anrs)，没有现场复现时保留未确认结论。
+
+图形诊断同时记录启动参数与 SurfaceFlinger 的实际 GLES/renderer。旧归档探针使用的 `swiftshader_indirect` 已自 Emulator 36.4.9 起[弃用](https://developer.android.com/studio/run/emulator-acceleration)；参数替换与性能效果须单独验证，不能据此直接宣称已修复 ANR。
+
+已知工具警告：MSVC 链接器可报告创建 import library；命令行工具 19 可对较新 SDK XML 报版本警告。先看退出码和实际产物，不据警告宣称构建失败。SDK 下载器确实停滞且缺少具名组件时，才使用 [install-android-archives.py](../scripts/install-android-archives.py)：它读取共享 downloads 下的固定官方 ZIP，校验 SHA-1 后提取两个具名包。已装组件不重复下载或重装。
+
+## 复现练习牌组场景
+
+[练习初始化测试](../tests/scenarios/practice.test.ts) 常规遍历种子 1–32；开启具名夹具日志时才扩大搜索，找到全部目标即停止。需要复现输入时执行：
+
+```powershell
+$env:SGS_FIXTURE_LOG = '1'
+pnpm exec vitest run tests/scenarios/practice.test.ts --reporter=verbose
+Remove-Item Env:SGS_FIXTURE_LOG
+```
+
+机制练习使用 288 张测试配比，标准＋EX 为 108 张；相同种子不意味着相同起手。以当前工具输出和场景源码为准，不另维护一张会过期的种子表。临时探针只寻找输入，不能作为交付验收。
 
 ## 主持侧探针与界面回归
 
-原始 `Room.decisions` 接收主持侧回复，例如出牌的 `{ choice: CardChoice, targets }`；界面的 `{ offer, cards, targets }` 草稿需要先经 `LocalSession` 转换，不能直接交给原始校验器。种子探针与界面驱动如果采取不同的弃牌、反制或响应策略，会得到不同的合法后续手牌；最终界面断言应依据当前可见实体与实际规则结果。
+- 原始 `Room.decisions` 接收领域回复；界面 `{ offer, cards, targets }` 草稿须经 `LocalSession` 解释。不同弃牌/反制策略会产生不同的合法后续手牌，不能把探针结果当作 UI 必然状态。
+- 同名牌不代表同一实体；获得、弃置和装备替换核对实体 ID、前后增量与公开事实。自动推进后手牌总数可能已受下一次摸牌影响，不用暂停运行时或延长超时固定短暂总数。
+- 事实顺序读取单调编号，不用日志的倒序显示推断。支付/改判等组合事实的声明位于 `data.detail.declaration`，与普通操作的直接 detail 区分；牌面 A/J/Q/K 对应原始 rank 1/11/12/13。
+- 正常胜负用 `finishGame` / `room.finish`，调试停止用 `room.abort`；错误保留已提交状态。这些出口不能为跑完测试而互换。来源、临时材料、嵌套死亡和事实重建按领域契约验收。
 
-牌名不代表唯一实体；同名牌要明确选择实体 ID 或第一张合法材料。比较事件先后应读取日志事实编号，不能把界面的倒序排列当作发生顺序。支付/改判等组合事实的领域声明位于 `data.detail.declaration`，不要把它与普通操作事实的直接 detail 混用。
-
-自然牌局的当前回合行动序复现见 [41](41-action-order.md)；临时种子探针用于寻找输入，不作为正式运行或分发包的验收证据。
-
-自动推进的结算不一定停在断言想观察的瞬间。例如最后一次遗计保留余牌后，AI 可以结束回合，随后甲席正常摸两张；此时手牌总数不是“遗计前 + 4”。应在两次私有池中保存可见实体 ID，核对四张牌真实进入本人手牌、两次保留事实和独立发动记录，而不是延长超时、暂停运行时或断言一个短暂总数。最后一次发动前仍有人的必选决策阻挡时，可以精确检查第一次保留的增量。
+参考项目保持只读，按 [02](02-reference-analysis.md) 的具体证据定位片段。作者入口见 [05](05-authoring.md)，规则语义见 [04](04-resolution.md)；历史专题不自动成为下一步任务。

@@ -2,6 +2,8 @@
 
 状态：原始实施计划，表内项目是验收要求，不代表已实现或已通过。按后续用户要求，Demo 默认人类甲席、其他角色基础 AI；Android 构建与设备验收等桌面完成之后开展。当前执行顺序见 [11](11-offline-roadmap.md)，已验证边界见 [STATUS](STATUS.md)。
 
+当前收官范围以 [11 的判据](11-offline-roadmap.md#离线基线的收官判据) 为准；用户已后置 Spine、恢复 Android，以下原始 P0 骨骼压力验收不作为当前规则基线的前置条件。
+
 ## 可读性与工具
 
 第一批代码采用 TypeScript strict，开启 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes` 等检查。公共接口使用类型化结果，不依赖空字符串、false、null 混合表达不同失败原因。未知外部数据先验证再进入类型世界。
@@ -27,7 +29,7 @@ Prettier 统一缩进、引号、换行、尾逗号；建议 2 空格、100 列�
 | 客户端验证     | 真实输入、投影、动画与选择界面                        |
 | 平台验证       | 安装、启动、生命周期与真机性能                        |
 
-已提供 package.json、TypeScript/Svelte 检查、ESLint、Prettier、Vitest 与 Playwright 命令，并锁定依赖。P0 覆盖客户端演示；首批规则机制新增无 UI 场景测试，覆盖嵌套、决策、窗口、原子移牌、处理区与伤害骨架。完整领域场景、属性测试和平台验收仍需逐项实施，详见 [P0 记录](07-p0.md) 与 [内核实施](10-kernel.md)。
+现有入口由 package.json 和锁文件维护；内核责任见 [架构入口](03-architecture.md#内核入口)，结算不变量见 [04](04-resolution.md)。本章矩阵是验收要求，是否已验证只查 [STATUS](STATUS.md)，不从早期 P0 或批次测试数量推断当前完成情况。
 
 ## 不变量与反例矩阵
 

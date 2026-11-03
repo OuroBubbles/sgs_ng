@@ -53,16 +53,16 @@ skills.registerSnapshots(changed, (event) => event.before);
 [skillLost](../src/rules/skills/skills.ts) 匹配事件中的原实例、角色与技能，要求原来有启用授予、当前已不存在该实例，并检查当前失效状态。撤销部分来源或只是暂停授予，不等于失去整个技能；失去后重新获得的新实例也不替换旧身份。
 
 ```ts
-const lost = (ctx: Context, change: SkillChange, self: SkillHandle) =>
+const lost = (ctx: Context, { payload: change, self }: SkillTriggerInput<SkillChange>) =>
   skillLost(ctx.world, change.before, self);
 
 on(skillsChanged, {
   id: 'after-loss',
   retain: lost,
   when: lost,
-  async run(ctx, _change, self) {
-    if (ctx.unwrap(await invoke(ctx, self, '是否发动？')))
-      ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+  async run(ctx, { self }) {
+    if (await invoke(ctx, self, '是否发动？'))
+      await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
   },
 });
 ```

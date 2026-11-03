@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
@@ -8,7 +8,6 @@ import { RoleMatch } from '../../src/app/offline/role-match';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   kingdomOf,
@@ -95,7 +94,11 @@ async function factions(
 
 it('曹操、张辽初始化当前势力，身份模式只为主公授予主公技；非主公仍能查看说明', async () => {
   for (const general of standardGenerals.slice(11, 13)) {
-    const match = createOfflineMatch(6, 42, 'standard:identity', Array(6).fill(general.id));
+    const match = createOfflineMatch({
+      seed: 42,
+      preset: 'standard:identity',
+      lineup: Array(6).fill(general.id),
+    });
     await match.prepare();
     for (const player of match.room.world.snapshot.players) {
       expect(kingdomOf(match.room.world, player.id)).toBe('魏');
@@ -115,10 +118,11 @@ it('曹操、张辽初始化当前势力，身份模式只为主公授予主公�
   }
 });
 it('势力可独立变更为自定义值或无势力，投影/AI/重放读取当前状态', async () => {
-  const match = createOfflineMatch(2, 42, 'standard:identity', [
-    'standard:caocao',
-    'standard:zhaoyun',
-  ]);
+  const match = createOfflineMatch({
+    seed: 42,
+    preset: 'standard:identity',
+    lineup: ['standard:caocao', 'standard:zhaoyun'],
+  });
   await match.prepare();
   await match.room.run('change', (ctx) => {
     setKingdom(ctx, '甲席', '自定势力');
@@ -135,10 +139,12 @@ it('势力可独立变更为自定义值或无势力，投影/AI/重放读取当
         id: 'bad',
         seed: 1,
         players: [{ id: 'a', general: 'standard:caocao', kingdom: '吴' }, { id: 'b' }],
-        cards: standardCards,
+        content: {
+          cards: standardCards,
+          skills: standardGeneralSkills,
+          generals: standardGenerals,
+        },
         deck: [],
-        skills: standardGeneralSkills,
-        generals: standardGenerals,
       }),
   ).toThrow(/cannot override/);
 });
@@ -191,12 +197,10 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
   expect(events).toEqual(['start', 'end', 'start', 'body', 'end']);
   expect(result).toMatchObject({
     value: {
-      value: {
-        phases: [
-          { exit: 'replaced', phase: { skipped: false, replaced: true }, reason: 'test' },
-          { exit: 'completed' },
-        ],
-      },
+      phases: [
+        { exit: 'replaced', phase: { skipped: false, replaced: true }, reason: 'test' },
+        { exit: 'completed' },
+      ],
     },
   });
   replay(game);
@@ -229,7 +233,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
     },
   });
   expect(await game.room.run('skip', (ctx) => runPhase(ctx, game.book, 'a', 'draw'))).toMatchObject(
-    { value: { value: { exit: 'skipped', phase: { replaced: false } } } },
+    { value: { exit: 'skipped', phase: { replaced: false } } },
   );
 });
 
@@ -314,7 +318,7 @@ it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理'
     },
   });
   await game.room.run('outer', (ctx) =>
-    withProcessing(ctx, [], 'discard', async (at, pool) => {
+    withProcessing(ctx, [], async (at, pool) => {
       elsewhere = pool.zone;
       await game.book.use(at, slash());
     }),
@@ -456,7 +460,9 @@ it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供�
     async run(ctx, { effect }) {
       const result = await game.book.respond(ctx, 'a', ['standard:slash', 'standard:jink'], effect);
       expect(result).toMatchObject({
-        value: { kind: 'responded', actor: 'c', card: { name: 'standard:jink' } },
+        kind: 'responded',
+        actor: 'c',
+        card: { name: 'standard:jink' },
       });
       effect.cancel(ctx, 'mixed response probe');
     },
@@ -483,9 +489,7 @@ it('委托名称不能扩张原请求、为空或重复；失败不会支付或�
     eligible: (_ctx, request) => request.actor === 'a',
     async run(ctx, request) {
       for (const names of [[], ['standard:slash'], ['standard:jink', 'standard:jink']])
-        expect(await request.delegate(ctx, 'c', names)).toMatchObject({
-          value: { kind: 'unavailable' },
-        });
+        expect(await request.delegate(ctx, 'c', names)).toMatchObject({ kind: 'unavailable' });
     },
   });
   const running = use(game, slash());
@@ -639,11 +643,9 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
   await takeHidden(game, 'c');
   expect(await running).toMatchObject({
     value: {
-      value: {
-        exit: 'replaced',
-        reason: 'standard:tuxi',
-        phase: { skipped: false, replaced: true },
-      },
+      exit: 'replaced',
+      reason: 'standard:tuxi',
+      phase: { skipped: false, replaced: true },
     },
   });
   expect(drawn).toBe(0);
@@ -691,7 +693,7 @@ it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
     await answer(game, { cards: [], targets: ['b', 'c'] }, 'cards-targets');
     if (kind === 'lost') await takeHidden(game, 'b');
     if (kind !== 'dead-source') await takeHidden(game, 'c');
-    expect(await running).toMatchObject({ value: { value: { exit: 'replaced' } } });
+    expect(await running).toMatchObject({ value: { exit: 'replaced' } });
     expect(game.room.world.zone('draw').cards).toHaveLength(2);
     expect(game.room.history.facts('cards.drawn')).toHaveLength(0);
     replay(game);
@@ -701,13 +703,13 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
   const lock = defineSkill({
     id: 'test:protected',
     name: '禁弃',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
   const game = scenario({
     hands: { b: [card('secret-b', 'peach')] },
     equipment: { c: [card('weapon', 'spear')] },
-    skills: (book) => [...standardGeneralSkills(book), lock],
+    skills: [...standardGeneralSkills, lock],
   });
   await grant(game, 'standard:tuxi');
   await grant(game, lock.id, 'b');
@@ -722,34 +724,14 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
 
 it('含曹操、张辽的八人局，基础 AI 通过正式委托、替代摸牌和取得材料走到胜负', async () => {
   const lineup = [11, 12, 8, 9, 10, 0, 2, 5].map((index) => standardGenerals[index]!.id);
-  const match = createOfflineMatch(8, 14, 'standard:identity', lineup);
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 6000; step++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const reply = decideBasic(observeAgent(match, request.player), request, (value) =>
-        match.room.decisions.preview(request.id, value),
-      );
-      if (reply.kind === 'unsupported') throw new Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(
-      match.room.history
-        .facts('skill.invoked')
-        .some((fact) => (fact.data.detail as { skill: string }).skill === 'standard:tuxi'),
-    ).toBe(true);
-    expect(match.room.history.facts('use.materials-obtained').length).toBeGreaterThan(0);
-    expect(match.room.history.facts('response.delegated').length).toBeGreaterThan(0);
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 6000 });
+
+  expect(
+    match.room.history
+      .facts('skill.invoked')
+      .some((fact) => (fact.data.detail as { skill: string }).skill === 'standard:tuxi'),
+  ).toBe(true);
+  expect(match.room.history.facts('use.materials-obtained').length).toBeGreaterThan(0);
+  expect(match.room.history.facts('response.delegated').length).toBeGreaterThan(0);
 }, 60_000);

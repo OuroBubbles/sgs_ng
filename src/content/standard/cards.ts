@@ -15,7 +15,7 @@ export const standardCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       target: () => false,
       timings: ['counter'],
-      execute: (ctx, use, book) => resolveCounter(ctx, use, book),
+      execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
     },
   },
   {
@@ -25,12 +25,9 @@ export const standardCards: readonly CardDefinition[] = [
     counterable: true,
     use: {
       count: { min: 1, max: 1 },
-      target: (_ctx, request, target) => request.actor === target,
-      async resolve(ctx, effect) {
-        ctx.unwrap(
-          await draw(ctx, { player: effect.target, count: 2, reason: 'standard:ex_nihilo' }),
-        );
-      },
+      target: (_ctx, { request, target }) => request.actor === target,
+      resolve: (ctx, { effect }) =>
+        draw(ctx, { player: effect.target, count: 2, reason: 'standard:ex_nihilo' }),
     },
   },
   {
@@ -41,7 +38,7 @@ export const standardCards: readonly CardDefinition[] = [
     use: {
       count: { min: 1, max: 1 },
       usage: { key: 'slash', max: 1 },
-      target: (ctx, request, target, book) =>
+      target: (ctx, { request, target, book }) =>
         target !== request.actor &&
         book.withinDistance(
           ctx,
@@ -49,9 +46,8 @@ export const standardCards: readonly CardDefinition[] = [
           target,
           book.attackRange(ctx, request.actor, request.card),
         ),
-      async resolve(ctx, effect, book) {
-        await resolveAttack(ctx, effect, book, { name: 'standard:jink', purpose: 'use' });
-      },
+      resolve: (ctx, { effect, book }) =>
+        resolveAttack(ctx, effect, book, { name: 'standard:jink', purpose: 'use' }),
     },
   },
   {
@@ -72,21 +68,19 @@ export const standardCards: readonly CardDefinition[] = [
     label: '桃',
     use: {
       count: { min: 1, max: 1 },
-      target: (ctx, request, target) =>
+      target: (ctx, { request, target }) =>
         (request.timing.kind === 'rescue'
           ? target === request.timing.dying
           : target === request.actor) &&
         ctx.world.player(target).hp < ctx.world.player(target).maxHp,
-      async resolve(ctx, effect) {
+      async resolve(ctx, { effect }) {
         if (ctx.world.player(effect.target).alive)
-          ctx.unwrap(
-            await recover(ctx, {
-              from: effect.actor,
-              to: effect.target,
-              amount: 1,
-              card: effect,
-            }),
-          );
+          await recover(ctx, {
+            from: effect.actor,
+            to: effect.target,
+            amount: 1,
+            card: effect,
+          });
       },
     },
   },
@@ -97,32 +91,28 @@ export const standardCards: readonly CardDefinition[] = [
     counterable: true,
     use: {
       count: { min: 1, max: 1 },
-      target: (_ctx, request, target) => target !== request.actor,
-      async resolve(ctx, effect, book) {
+      target: (_ctx, { request, target }) => target !== request.actor,
+      async resolve(ctx, { effect, book }) {
         let responder = effect.target;
         let opponent = effect.actor;
         while (ctx.world.player(responder).alive && ctx.world.player(opponent).alive) {
           const count = book.responseTimes(ctx, effect, responder, 'standard:slash');
           let answered = count > 0;
           for (let i = 0; i < count; i++) {
-            const response = ctx.unwrap(
-              await book.respond(ctx, responder, ['standard:slash'], effect),
-            );
+            const response = await book.respond(ctx, responder, ['standard:slash'], effect);
             if (response.kind !== 'responded') {
               answered = false;
               break;
             }
           }
           if (!answered) {
-            ctx.unwrap(
-              await damage(ctx, {
-                from: opponent,
-                to: responder,
-                amount: 1,
-                nature: 'normal',
-                card: effect,
-              }),
-            );
+            await damage(ctx, {
+              from: opponent,
+              to: responder,
+              amount: 1,
+              nature: 'normal',
+              card: effect,
+            });
             break;
           }
           [responder, opponent] = [opponent, responder];

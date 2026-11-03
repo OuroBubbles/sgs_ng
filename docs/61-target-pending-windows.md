@@ -1,12 +1,10 @@
 # 61 · 目标身份与效果启动的持续资格
 
-更新：2026-10-18。继续标准用牌审计，复用已有 Window.active；没有增加事件 DSL、通用中断器或第二条目标调度路径。
+目标调度复用 Window.active，领域代码决定目标身份与持续资格。
 
-## 从层间检查补齐同窗检查
+## 目标窗口
 
-[四层目标调度](36-target-stages.md) 原本已在每层前后、每个效果前重查资格。缺口位于同一个窗口内部：第一个候选取消、移除、转移目标，杀死目标或令目标被禁止后，其余候选仍能对旧 EffectId 执行、支付费用。效果启动的 main/counter/after 组也有相同问题，仁王盾和无懈取消后仍可执行后组。
-
-修复前 [首批 47 项反例](../tests/scenarios/target-window-boundaries.test.ts) 有 35 项真实失败、12 项通过，报告为 `.artifacts/validation/target-window-before-corrected-fixtures.json`。更早的 `target-window-before.json` 为 36 失败/11 通过，额外一项来自误写回复事实名 recover.applied；修正为实际 hp.recovered 后才形成前述反例计数，没有修改回复实现来适应断言。
+[四层目标调度](36-target-stages.md)在层间及同一窗口的候选边界重查资格。取消、移除、转移、死亡、终局或动态禁止会收束旧 EffectId 的待决窗口。
 
 ## 两种待决资格
 
@@ -35,17 +33,4 @@ effectFinished、useFinished 属于已经提交的公共完成后效，保持原
 
 ## 验证入口
 
-[51 项新增规则场景](../tests/scenarios/target-window-boundaries.test.ts)：
-
-- 五个窗口乘六种失效：死亡、终局、取消、移除、转移和动态禁止，共 30 项；每项验证旧候选不再支付，已付费用保留，其他目标或新身份继续结算。
-- 五个窗口各验证来源死亡及候选局部中止，共 10 项，避免用过宽停止条件吞掉正常伤害。
-- 真实流离、仁王盾、无懈；桃园启动失效及声明阶段仍可受伤；内外杀隔离和公共完成后效，共 7 项。
-- 顺手和拆桥分别验证来源死亡、目标最后一张牌离场，共 4 项，区分各牌 canResolve 与通用存活条件。
-
-每项核对真实牌守恒、声明/处理区清理、无残留请求和有序事实重建。新失效分支由规则场景直接证明，浏览器和 Windows 原生回归只证明正式界面可操作流程，不能借正常流离或无懈画面声称复现全部反例。专项与既有目标分层、谋士、防具、武器和反制场景合计 182 项，报告为 `.artifacts/validation/target-window-after.json`；全量与交付证据以 [STATUS](STATUS.md) 为准。
-
-最终全部单元/行为 1382 项一次通过，其中规则/主持侧 1372 项来自同一报告，非独立执行。桌面/触控浏览器 188 项无跳过或重试通过，Windows Debug/Release 各 72 组实际检查及不同 PID 的内容重启恢复通过。隔离目录、原生进程和调试端口已清理；四个归档成员、实际 exe/模块字节、精确依赖与证明的核对见 `.artifacts/validation/target-window-package-audit.json`。
-
-本批标准/演武为 `0.1.19`，渡口仍 `0.1.1` 且精确依赖 standard@0.1.19，旧模块需重新构建或导入随包文件。默认标准 32 牌/25 将/108 实体，演武启用后 37 牌/30 将及五种牌堆不变；固定人类甲席、非主控基础 AI、安卓后置保持原样。完整标准分支、复杂替代额度、信息记忆与独立作者资源仍待继续验收。
-
-该批留下的组合审计是运行中候选的嵌套机会，后续 [62](62-counter-effect-eligibility.md) 已修复反制内部缺少 canResolve 与目标禁令的持续关联，并分别验证正常延时后续生效和封口后的公共后效。外层候选边界与内层机会共用纯查询，仍不承诺任意异步函数位置自动中断。
+[目标窗口场景](../tests/scenarios/target-window-boundaries.test.ts)核对各层失效、来源死亡与局部中止的正常继续、实际牌规则及内外用牌隔离。运行中的嵌套反制共用本次 resolver 的资格，见 [62](62-counter-effect-eligibility.md)。检查方法见[标准验收入口](53-standard-semantics.md#行为清单与检查)，当前结果见 [STATUS](STATUS.md)。

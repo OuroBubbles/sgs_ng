@@ -18,6 +18,7 @@ import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose } from '../fixtures/room';
 import { card, cardGame } from '../fixtures/cards';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { luoyiAftereffect } from '../../src/content/standard/wei';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 const source = { kind: 'general', id: 'test' } as const;
@@ -426,11 +427,11 @@ it('SDK 次数携带同一来源但独立身份，失去再获得技能不借新
     defineSkill({
       id: 'test:repeat',
       name: '重复',
-      effects: [
+      triggers: [
         on(window, {
           id: 'effect',
           times: () => 2,
-          async run(ctx, _data, self, o) {
+          async run(ctx, { self, occurrence: o }) {
             seen.push({ id: self.id, index: o.index });
             if (!replaced) {
               replaced = true;
@@ -479,12 +480,12 @@ it('SDK when 能区分各次身份；跳过一次不会删除本效果的全部�
     defineSkill({
       id: 'test:when',
       name: '逐次资格',
-      effects: [
+      triggers: [
         on(window, {
           id: 'point',
           times: () => 3,
-          when: (_ctx, _data, _self, o) => o.index !== 2,
-          run(_ctx, _data, _self, o) {
+          when: (_ctx, { occurrence: o }) => o.index !== 2,
+          run(_ctx, { occurrence: o }) {
             seen.push(o.index);
           },
         }),
@@ -502,7 +503,7 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
   const effect = defineSkill({
     id: 'test:death',
     name: '离场次数',
-    effects: [
+    triggers: [
       on(window, {
         id: 'point',
         times: () => 3,
@@ -629,6 +630,7 @@ function scenario() {
     hands: { a: [] },
     draw: Array.from({ length: 14 }, (_, i) => card(`x${i}`, 'peach', i === 2 ? 'spade' : 'heart')),
     skills: standardGeneralSkills,
+    effects: [luoyiAftereffect],
   });
 }
 async function grant(game: Game, skill: string) {
@@ -642,6 +644,7 @@ function clean(game: Game) {
 it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次遗计', async () => {
   const game = scenario();
   await grant(game, 'standard:yiji');
+  const yiji = game.room.world.snapshot.skills.find((skill) => skill.skill === 'standard:yiji')!;
   await grant(game, 'standard:ganglie');
   const running = game.room.run('damage', (ctx) =>
     damage(ctx, { from: 'b', to: 'a', amount: 2, nature: 'normal' }),
@@ -662,7 +665,9 @@ it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次�
   ).toEqual(['standard:yiji', 'standard:ganglie', 'standard:yiji']);
   const points = candidates(game.room, 'running').filter((e) => e.window === 'damage.received');
   expect(
-    points.filter((e) => e.source.includes('distribute-top-cards')).map((e) => e.occurrence.index),
+    points
+      .filter((e) => e.source === JSON.stringify([yiji.id, e.window]))
+      .map((e) => e.occurrence.index),
   ).toEqual([1, 2]);
   clean(game);
 });
@@ -674,6 +679,9 @@ it('枭姬拒绝第一次后，能先连营再执行第二次；不会把两次�
     skills: standardGeneralSkills,
   });
   await grant(game, 'standard:xiaoji');
+  const xiaoji = game.room.world.snapshot.skills.find(
+    (skill) => skill.skill === 'standard:xiaoji',
+  )!;
   await grant(game, 'standard:lianying');
   const running = game.room.run('lose', (ctx) =>
     moveCards(
@@ -695,8 +703,8 @@ it('枭姬拒绝第一次后，能先连营再执行第二次；不会把两次�
   expect(
     game.room.history.facts('skill.invoked').map((f) => (f.data.detail as { skill: string }).skill),
   ).toEqual(['standard:lianying', 'standard:xiaoji']);
-  const points = candidates(game.room, 'running').filter((e) =>
-    e.source.includes('lost-equipment'),
+  const points = candidates(game.room, 'running').filter(
+    (e) => e.source === JSON.stringify([xiaoji.id, e.window]),
   );
   expect(points.map((e) => [e.occurrence.index, e.occurrence.total])).toEqual([
     [1, 2],
@@ -715,7 +723,6 @@ it('遗计给空手伤害来源一张牌后，同一窗口原本不合资格的�
   await answer(game.room, true);
   await answer(game.room, { cards: ['x0'], targets: ['b'] }, 'cards-targets');
   await cancel(game.room);
-  await answer(game.room, true);
   const request = await nextRequest(game.room);
   const options = (request.data as { preview: { cards: { id: string }[] } }).preview.cards;
   expect(options).toHaveLength(1);

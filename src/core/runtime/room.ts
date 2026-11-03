@@ -6,6 +6,7 @@ import type { Change, WorldReader, WorldSeed } from '../model/state';
 import { World } from '../state/world';
 import { Random } from './random';
 import { RuleAbort, Scope } from './scope';
+import { AsyncQueryError, syncQueryValue } from './query';
 import type {
   Trigger,
   TriggerSource,
@@ -19,6 +20,7 @@ import type {
 
 export type FlowBody<T> = (ctx: Context) => T | Promise<T>;
 
+/** 主持入口与显式恢复边界的结果；普通规则函数直接返回 T。 */
 export type FlowResult<T> =
   | { readonly kind: 'resolved'; readonly value: T }
   | { readonly kind: 'aborted'; readonly reason: string };
@@ -67,27 +69,28 @@ export class Context {
     this.lifetime.assertActive();
   }
 
-  flow<T>(kind: string, body: FlowBody<T>, reason = kind): Promise<FlowResult<T>> {
+  /** 普通调用直接返回领域值；子流程中止会关闭当前作用域并继续向外传播。 */
+  flow<T>(kind: string, body: FlowBody<T>, reason = kind): Promise<T> {
+    return this.#wait(kind, async () =>
+      this.#value(await this.operations.flow(kind, body, reason)),
+    );
+  }
+
+  /** 显式恢复边界；只接住这个子作用域的规则中止，故障和整局关闭仍向外传播。 */
+  attempt<T>(kind: string, body: FlowBody<T>, reason = kind): Promise<FlowResult<T>> {
     return this.#wait(kind, () => this.operations.flow(kind, body, reason));
   }
 
-  /**
-   * 显式取出已经 await 完成的子流程结果；中止沿当前调用者的作用域继续传播。
-   * 不把业务上的 declined/unavailable 变成中止，不回滚已提交事实，也不捕获异常。
-   */
-  unwrap<T>(result: FlowResult<T>): T {
-    this.#assertIdle();
-    if (result.kind === 'aborted') return this.abort(result.reason);
-    return result.value;
-  }
-
-  window<T>(
-    type: WindowType<T>,
-    payload: T,
-    options: WindowOptions = {},
-  ): Promise<FlowResult<void>> {
-    const selection = Object.freeze({ ...options });
-    return this.#wait(type.id, () => this.operations.window(type, payload, selection));
+  window<T>(type: WindowType<T>, payload: T, options: WindowOptions = {}): Promise<void> {
+    const { subject, anchor, active } = options;
+    const selection: WindowOptions = Object.freeze({
+      ...(subject === undefined ? {} : { subject }),
+      ...(anchor === undefined ? {} : { anchor }),
+      ...(active === undefined ? {} : { active: active.bind(options) }),
+    });
+    return this.#wait(type.id, async () =>
+      this.#value(await this.operations.window(type, payload, selection)),
+    );
   }
 
   /** 最近的同类型祖先窗口；可在进入同名嵌套窗口前捕获明确的外层引用。 */
@@ -159,6 +162,13 @@ export class Context {
     if (this.#busy) throw new Error(`Concurrent rule operation while waiting for ${this.#busy}.`);
   }
 
+  #value<T>(result: FlowResult<T>): T {
+    if (result.kind === 'resolved') return result.value;
+    // 与显式 abort 相同：作者 catch 异常也不能恢复已经中止的上下文。
+    this.lifetime.close(result.reason);
+    throw new RuleAbort(result.reason);
+  }
+
   #wait<T>(kind: string, work: () => Promise<T>): Promise<T> {
     this.#assertIdle();
     this.#busy = kind;
@@ -197,11 +207,7 @@ interface Registration {
   active: boolean;
   readonly times?: (ctx: Context, payload: unknown) => number;
   readonly eligible: (ctx: Context, payload: unknown, occurrence: TriggerOccurrence) => boolean;
-  readonly run: (
-    ctx: Context,
-    payload: unknown,
-    occurrence: TriggerOccurrence,
-  ) => void | Promise<void>;
+  readonly run: (ctx: Context, payload: unknown, occurrence: TriggerOccurrence) => unknown;
 }
 interface WindowCandidate {
   readonly registration: Registration;
@@ -258,9 +264,9 @@ export class Room {
     this.#lifetime = new Scope(`${options.id}:match`, null);
     this.decisions = new DecisionHub(
       options.id,
-      () => this.world.snapshot.revision,
+      this.world,
       this.history,
-      (body) => this.#query(body),
+      (body, cause) => this.#query(body, cause),
       (error, cause) => this.#freeze(error, cause),
     );
   }
@@ -389,7 +395,9 @@ export class Room {
     };
     this.#triggers.set(entry.id, entry);
     return () => {
-      if (this.#queryDepth) throw new Error('Pure queries cannot unregister triggers.');
+      // 违规查询已冻结本局时，资源清理仍须能够注销；新规则写入仍被拒绝。
+      if (this.#queryDepth && this.#status !== 'faulted')
+        throw new Error('Pure queries cannot unregister triggers.');
       entry.active = false;
       if (this.#triggers.get(entry.id) === entry) this.#triggers.delete(entry.id);
     };
@@ -401,7 +409,8 @@ export class Room {
     const registration = {};
     this.#sources.set(source, registration);
     return () => {
-      if (this.#queryDepth) throw new Error('Pure queries cannot unregister trigger sources.');
+      if (this.#queryDepth && this.#status !== 'faulted')
+        throw new Error('Pure queries cannot unregister trigger sources.');
       if (this.#sources.get(source) === registration) this.#sources.delete(source);
     };
   }
@@ -411,7 +420,8 @@ export class Room {
     this.#assertWriting();
     const remove = this.#lifetime.onClose(cleanup);
     return () => {
-      if (this.#queryDepth) throw new Error('Pure queries cannot unregister Room cleanup.');
+      if (this.#queryDepth && this.#status !== 'faulted')
+        throw new Error('Pure queries cannot unregister Room cleanup.');
       remove();
     };
   }
@@ -422,13 +432,14 @@ export class Room {
     if (this.#queryDepth) throw new Error('Pure queries cannot perform rule operations.');
   }
 
-  #query<T>(body: () => T): T {
+  #query<T>(body: () => T, cause?: Cause): T {
     this.#queryDepth++;
     try {
-      const value = body();
-      if (value !== null && typeof value === 'object' && 'then' in value)
-        throw new Error('Queries cannot await.');
-      return value;
+      return syncQueryValue(body());
+    } catch (error) {
+      // 包括组合回调中的违规结果，须在已排队的续体恢复之前冻结执行侧。
+      if (cause && error instanceof AsyncQueryError) this.#freeze(error, cause);
+      throw error;
     } finally {
       this.#queryDepth--;
     }
@@ -469,7 +480,7 @@ export class Room {
     this.history.trace(cause, 'flow.open', { kind });
     const ctx: Context = new Context(cause, scope, this.world, this.history, {
       assertWriting: () => this.#assertWriting(),
-      query: (query) => this.#query(query),
+      query: (query) => this.#query(query, cause),
       actionOrder: (subject) => this.#actionOrder(ctx, subject),
       flow: (childKind, childBody, childReason) =>
         this.#execute(scope, cause, childKind, childBody, childReason),
@@ -481,14 +492,21 @@ export class Room {
           (child) => this.#openWindow(child, type, payload, options),
           type.id,
         ),
-      ask: (spec) => {
-        this.world.player(spec.player);
-        return this.decisions.open(spec, scope, cause);
-      },
+      ask: (spec) => this.decisions.open(spec, scope, cause),
       commit: (factKind, changes, detail) => {
-        const prepared = this.#state.prepare(changes);
-        // 事实数据的校验/复制也必须在权威状态替换之前完成。
-        const fact = this.history.commit(cause, prepared.revision, factKind, changes, detail);
+        const fact = this.#query(
+          () =>
+            this.history.prepare(
+              cause,
+              this.world.snapshot.revision + 1,
+              factKind,
+              changes,
+              detail,
+            ),
+          cause,
+        );
+        const prepared = this.#state.prepare(fact.data.changes);
+        this.history.append(fact);
         this.#state.apply(prepared);
         return fact;
       },
@@ -854,7 +872,8 @@ export class Room {
             continue;
           }
           trace(candidate, 'running');
-          await ctx.flow(
+          // 单个候选的局部中止不取消整个窗口，后续候选仍按实时资格继续。
+          await ctx.attempt(
             `trigger:${candidate.id}`,
             (child) => candidate.registration.run(child, payload, candidate.occurrence),
             candidate.registration.id,

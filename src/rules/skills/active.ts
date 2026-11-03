@@ -1,32 +1,42 @@
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import type { Validation } from '../../core/decisions/hub';
 import { immutable } from '../../core/model/value';
+import { syncQueryValue } from '../../core/runtime/query';
 import type { SkillHandle } from './skills';
 import type { CardBook } from '../cards/book';
 import { isGameOver } from '../game/end';
 import type { PhaseView } from '../turn/turn';
 import { activePhase, activeTarget } from '../turn/turn';
 import { readState } from '../state/state';
+import { JointSelection, type JointChoice } from '../../core/decisions/selection';
 
-/** 主动技能是普通流程。作者自由组织选择、支付与后效，不把所有发动压成一种表单。 */
+/** 技能的具名输入；Context 仍显式传递，来源、阶段和本局目录不注入全局对象。 */
+export interface ActiveInput {
+  readonly self: SkillHandle;
+  readonly phase: PhaseView;
+  readonly book: CardBook;
+}
+export interface ActiveRunInput extends ActiveInput {
+  readonly choice: JointChoice;
+  /** 本次执行重查使用的模型；支付前仍可读取当前候选，无需再次调用工厂。 */
+  readonly selection: JointSelection;
+}
+
+/** 发动前的牌与目标共用一个选择；提交后的支付、响应与后效仍是普通流程。 */
 export interface ActiveSkill {
   readonly id: string;
-  readonly label: string;
-  readonly available: (
-    ctx: Context,
-    self: SkillHandle,
-    phase: PhaseView,
-    book: CardBook,
-  ) => boolean;
-  readonly run: (
-    ctx: Context,
-    self: SkillHandle,
-    phase: PhaseView,
-    book: CardBook,
-  ) => void | Promise<void>;
+  /** 菜单文字；省略时使用当前技能实例的名称。 */
+  readonly label?: string | undefined;
+  /** 仅表达次数等额外发动条件；材料与目标能否完成由 selection 统一判断。 */
+  readonly available?: (ctx: Context, input: ActiveInput) => boolean;
+  /** 纯同步选择工厂；候选与约束在每次预览、提交时读取当前状态。 */
+  readonly selection?: (ctx: Context, input: ActiveInput) => JointSelection;
+  /** 等待整段技能后效，忽略其返回值；支付与结果处理由技能代码表达。 */
+  readonly run: (ctx: Context, input: ActiveRunInput) => unknown;
 }
-export interface ActiveChoice {
-  readonly skill: string;
+export interface ActiveChoice extends JointChoice {
+  /** 本局技能实例，与主动菜单 choice 的来源身份一致。 */
+  readonly instance: string;
   readonly action: string;
 }
 export interface ActiveOffer {
@@ -36,8 +46,25 @@ export interface ActiveOffer {
   readonly skill: string;
   readonly description: string;
   readonly materials: readonly string[];
-  readonly count: { readonly min: 0; readonly max: 0 };
-  readonly choice: { readonly instance: string; readonly action: string };
+  readonly count: { readonly min: number; readonly max: number | 'all' };
+  readonly choice: Pick<ActiveChoice, 'instance' | 'action'>;
+}
+
+const emptySelection = new JointSelection();
+const isRecord = (input: unknown): input is Record<string, unknown> =>
+  input !== null && typeof input === 'object';
+
+function availableSelection(ctx: Context, input: ActiveInput, action: ActiveSkill) {
+  const { self } = input;
+  if (
+    action.available !== undefined &&
+    !syncQueryValue(action.available(ctx, input), `${self.skill}/${action.id}.available`)
+  )
+    return null;
+  const model = action.selection
+    ? syncQueryValue(action.selection(ctx, input), `${self.skill}/${action.id}.selection`)
+    : emptySelection;
+  return model.available() ? model : null;
 }
 
 function open(ctx: Context, phase: PhaseView): boolean {
@@ -56,32 +83,80 @@ function open(ctx: Context, phase: PhaseView): boolean {
   );
 }
 
+interface CheckedActive {
+  readonly self: SkillHandle;
+  readonly action: ActiveSkill;
+  readonly selection: JointSelection;
+  readonly choice: ActiveChoice;
+}
+
+/** 在调用者的纯查询内解析来源和模型；草稿是否完成仍由预览或最终验证决定。 */
+function selectActive(
+  ctx: Context,
+  book: CardBook,
+  phase: PhaseView,
+  input: unknown,
+): Validation<Omit<CheckedActive, 'choice'>> {
+  if (!isRecord(input) || typeof input.instance !== 'string' || typeof input.action !== 'string')
+    return { ok: false, reason: 'Expected active skill instance and action.' };
+  const binding = book.skills.binding(ctx.world, input.instance);
+  const action = binding?.definition.active?.find((action) => action.id === input.action);
+  if (
+    !open(ctx, phase) ||
+    !binding ||
+    !action ||
+    binding.self.owner !== phase.owner ||
+    !binding.self.effective(ctx.world)
+  )
+    return { ok: false, reason: 'Active skill is no longer available.' };
+  const selection = availableSelection(ctx, { self: binding.self, phase, book }, action);
+  return selection
+    ? { ok: true, value: { self: binding.self, action, selection } }
+    : { ok: false, reason: 'Active skill is no longer available.' };
+}
+
+function checkActive(
+  ctx: Context,
+  book: CardBook,
+  phase: PhaseView,
+  input: unknown,
+): Validation<CheckedActive> {
+  return ctx.query(() => {
+    const selected = selectActive(ctx, book, phase, input);
+    if (!selected.ok) return selected;
+    const { self, action, selection } = selected.value;
+    const checked = selection.validate(input);
+    return checked.ok
+      ? {
+          ok: true,
+          value: {
+            self,
+            action,
+            selection,
+            choice: { instance: self.id, action: action.id, ...checked.value },
+          },
+        }
+      : checked;
+  });
+}
+
 export function validateActive(
   ctx: Context,
   book: CardBook,
   phase: PhaseView,
   input: unknown,
 ): Validation<ActiveChoice> {
+  const checked = checkActive(ctx, book, phase, input);
+  return checked.ok ? { ok: true, value: checked.value.choice } : checked;
+}
+
+/** 只预览当前实例的选择，不发动、不支付，也不产生额外的决策。 */
+export function inspectActive(ctx: Context, book: CardBook, phase: PhaseView, input: unknown) {
   return ctx.query(() => {
-    if (
-      !input ||
-      typeof input !== 'object' ||
-      !('skill' in input) ||
-      typeof input.skill !== 'string' ||
-      !('action' in input) ||
-      typeof input.action !== 'string'
-    )
-      return { ok: false, reason: 'Expected active skill instance and action.' };
-    const binding = book.skills.binding(ctx.world, input.skill);
-    const action = binding?.definition.active?.find((action) => action.id === input.action);
-    return open(ctx, phase) &&
-      binding &&
-      action &&
-      binding.self.owner === phase.owner &&
-      binding.self.effective(ctx.world) &&
-      action.available(ctx, binding.self, phase, book)
-      ? { ok: true, value: { skill: input.skill, action: input.action } }
-      : { ok: false, reason: 'Active skill is no longer available.' };
+    const selected = selectActive(ctx, book, phase, input);
+    if (!selected.ok) return null;
+    const { preview, ...description } = selected.value.selection.describe(input);
+    return { ...description, ...preview, fixedTargets: [] };
   });
 }
 
@@ -91,27 +166,41 @@ export function activeOffers(
   phase: PhaseView,
 ): readonly ActiveOffer[] {
   return ctx.query(() => {
-    if (!open(ctx, phase)) return [];
     return immutable(
-      book.skills.bindings(ctx.world).flatMap(({ self, definition }) => {
-        if (self.owner !== phase.owner || !self.effective(ctx.world)) return [];
-        return (definition.active ?? [])
-          .filter((action) => action.available(ctx, self, phase, book))
-          .map(
-            (action): ActiveOffer => ({
-              id: JSON.stringify(['active', self.id, action.id]),
-              kind: 'active',
-              label: action.label,
-              skill: self.skill,
-              description: definition.description ?? '',
-              materials: [],
-              count: { min: 0, max: 0 },
-              choice: { instance: self.id, action: action.id },
-            }),
-          );
-      }),
+      Array.from(
+        activeSelections(ctx, book, phase),
+        ({ self, definition, action, model }): ActiveOffer => {
+          const described = model.describe();
+          return {
+            id: JSON.stringify(['active', self.id, action.id]),
+            kind: 'active',
+            label: action.label ?? self.name,
+            skill: self.skill,
+            description: definition.description ?? '',
+            materials: described.preview.cards.map((card) => card.id),
+            count: described.cardCount,
+            choice: { instance: self.id, action: action.id },
+          };
+        },
+      ),
     );
   });
+}
+
+/** 与菜单共用来源、阶段和选择资格，只判断是否存在，不投影逐项选择。 */
+export function activeAvailable(ctx: Context, book: CardBook, phase: PhaseView): boolean {
+  return ctx.query(() => activeSelections(ctx, book, phase).next().done === false);
+}
+
+function* activeSelections(ctx: Context, book: CardBook, phase: PhaseView) {
+  if (!open(ctx, phase)) return;
+  for (const { self, definition } of book.skills.bindings(ctx.world)) {
+    if (self.owner !== phase.owner || !self.effective(ctx.world)) continue;
+    for (const action of definition.active ?? []) {
+      const model = availableSelection(ctx, { self, phase, book }, action);
+      if (model) yield { self, definition, action, model };
+    }
+  }
 }
 
 /** 执行前重查实例、所属席位和阶段；后续费用与宣告由普通技能代码明确提交。 */
@@ -120,13 +209,12 @@ export function activate(
   book: CardBook,
   phase: PhaseView,
   input: ActiveChoice,
-): Promise<FlowResult<void>> {
+): Promise<void> {
   const choice = immutable(input);
   return ctx.flow('skill.active', async (child) => {
-    if (!validateActive(child, book, phase, choice).ok) return;
-    const { self, definition } = book.skills.binding(child.world, choice.skill)!;
-    await definition
-      .active!.find((action) => action.id === choice.action)!
-      .run(child, self, phase, book);
+    const checked = checkActive(child, book, phase, choice);
+    if (!checked.ok) return;
+    const { self, action, selection } = checked.value;
+    await action.run(child, { self, phase, book, choice: checked.value.choice, selection });
   });
 }

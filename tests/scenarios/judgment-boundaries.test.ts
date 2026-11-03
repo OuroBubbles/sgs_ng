@@ -28,14 +28,12 @@ async function invalidate(ctx: Context, boundary: Boundary, player = 'a') {
   if (boundary === 'finished')
     await finishGame(ctx, { winners: ['c'], reason: 'judgment boundary' });
   else
-    ctx.unwrap(
-      await kill(ctx, {
-        player,
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      }),
-    );
+    await kill(ctx, {
+      player,
+      killer: null,
+      reason: 'rule',
+      cause: { kind: 'rule', seq: null, data: null },
+    });
 }
 function conserved(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -62,14 +60,15 @@ for (const stage of stages) {
         run: (ctx) => invalidate(ctx, boundary),
       });
       const later = vi.fn(async (ctx: Context) => {
-        ctx.unwrap(await draw(ctx, { player: 'c', count: 1, reason: 'stale judgment trigger' }));
+        await draw(ctx, { player: 'c', count: 1, reason: 'stale judgment trigger' });
       });
       game.room.on(stage, { id: 'z-later', owner: null, eligible: () => true, run: later });
       const match = vi.fn(() => true);
       await game.room.run('judge', async (ctx) => {
-        expect(
-          ctx.unwrap(await judge(ctx, game.book, { player: 'a', reason: 'probe', match })),
-        ).toMatchObject({ kind: 'unavailable', matched: null });
+        expect(await judge(ctx, game.book, { player: 'a', reason: 'probe', match })).toMatchObject({
+          kind: 'unavailable',
+          matched: null,
+        });
       });
       expect(later.mock.calls.length).toBe(0);
       expect(match).not.toHaveBeenCalled();
@@ -93,9 +92,7 @@ for (const stage of stages) {
     game.room.on(stage, { id: 'z-later', owner: null, eligible: () => true, run: later });
     await game.room.run('judge', async (ctx) => {
       expect(
-        ctx.unwrap(
-          await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
-        ),
+        await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
       ).toMatchObject({ kind: 'judged', matched: true, card: { id: 'outer' } });
     });
     expect(later).toHaveBeenCalledTimes(1);
@@ -112,14 +109,12 @@ for (const stage of stages) {
         eligible: () => true,
         async run(ctx, judgment) {
           expect(
-            ctx.unwrap(
-              await judgment.replace(ctx, {
-                card: 'replacement',
-                from: 'b:hand',
-                previousTo: 'b:hand',
-                reason: 'committed retrial',
-              }),
-            ),
+            await judgment.replace(ctx, {
+              card: 'replacement',
+              from: 'b:hand',
+              previousTo: 'b:hand',
+              reason: 'committed retrial',
+            }),
           ).toBe('replaced');
           await invalidate(ctx, boundary);
         },
@@ -128,9 +123,7 @@ for (const stage of stages) {
       game.room.on(stage, { id: 'z-later', owner: null, eligible: () => true, run: later });
       await game.room.run('judge', async (ctx) => {
         expect(
-          ctx.unwrap(
-            await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
-          ),
+          await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
         ).toMatchObject({ kind: 'unavailable', matched: null });
       });
       expect(later.mock.calls.length).toBe(0);
@@ -150,9 +143,7 @@ for (const stage of stages) {
       owner: null,
       eligible: (_ctx, judgment) => judgment.player === 'a',
       async run(ctx) {
-        inner = ctx.unwrap(
-          await judge(ctx, game.book, { player: 'b', reason: 'inner', match: () => true }),
-        );
+        inner = await judge(ctx, game.book, { player: 'b', reason: 'inner', match: () => true });
       },
     });
     game.room.on(stage, {
@@ -171,9 +162,7 @@ for (const stage of stages) {
     });
     await game.room.run('judge', async (ctx) => {
       expect(
-        ctx.unwrap(
-          await judge(ctx, game.book, { player: 'a', reason: 'outer', match: () => true }),
-        ),
+        await judge(ctx, game.book, { player: 'a', reason: 'outer', match: () => true }),
       ).toMatchObject({ kind: 'unavailable', matched: null });
     });
     expect(inner).toMatchObject({ kind: 'judged', matched: true, card: { id: 'inner' } });
@@ -194,10 +183,10 @@ for (const stage of stages) {
     const later = vi.fn();
     game.room.on(stage, { id: 'z-later', owner: null, eligible: () => true, run: later });
     expect(
-      await game.room.run('judge', async (ctx) =>
-        ctx.unwrap(
+      await game.room.run(
+        'judge',
+        async (ctx) =>
           await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
-        ),
       ),
     ).toMatchObject({ kind: 'resolved', value: { kind: 'judged', matched: true } });
     expect(later).toHaveBeenCalledTimes(1);
@@ -227,16 +216,14 @@ it.each(boundaries)('结果已封口后 %s，保留真实判定及公共完成�
   });
   await game.room.run('judge', async (ctx) => {
     expect(
-      ctx.unwrap(
-        await judge(ctx, game.book, {
-          player: 'a',
-          reason: 'probe',
-          match: () => true,
-          onResult: (_ctx, result) => {
-            continuation = result;
-          },
-        }),
-      ),
+      await judge(ctx, game.book, {
+        player: 'a',
+        reason: 'probe',
+        match: () => true,
+        onResult: (_ctx, result) => {
+          continuation = result;
+        },
+      }),
     ).toMatchObject({ kind: 'judged', matched: true, card: { id: 'outer' } });
   });
   expect(seen).toMatchObject({ kind: 'judged', matched: true, card: { id: 'outer' } });

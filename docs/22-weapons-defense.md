@@ -1,6 +1,6 @@
 # 武器、防御结果与动态目标数
 
-更新：2026-10-17。本篇记录青龙偃月刀、贯石斧、方天画戟、麒麟弓批次，当时为 30 种牌、272 张测试配比。后续双股剑/寒冰剑与标准＋EX 的 108 张实体牌见 [23](23-swords-standard-deck.md)，当前状态以 [STATUS](STATUS.md) 为准。
+本篇说明青龙偃月刀、贯石斧、方天画戟与麒麟弓的后效和装备来源。双股剑、寒冰剑与实体牌表见 [23](23-swords-standard-deck.md)，当前验证以 [STATUS](STATUS.md) 为准。
 
 ## 防御成功不是牌被取消
 
@@ -48,27 +48,22 @@ equipmentCard({
   label: '示例武器',
   slot: 'weapon',
   range: 3,
-  skill: (book) =>
-    defineSkill({
-      id: 'my:weapon-ability',
-      name: '示例武器',
-      effects: [
-        /* 普通闭包可调用 book.askUse / book.definition */
-      ],
-    }),
+  skill: (book) => ({
+    id: 'my:weapon-ability',
+    name: '示例武器',
+    triggers: [
+      /* 普通闭包可调用 book.askUse / book.definition */
+    ],
+  }),
 });
 ```
 
 简单能力仍可直接提供 SkillDefinition。工厂在本 CardBook 的完整目录建立后求值，再从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。工厂只声明能力，运行时操作留在效果回调内。
 
-`SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；联合选择可通过 `decision(..., true, { cancelLabel })` 指定取消文字，借刀复用它显示“取消用牌”。
+`SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；联合选择可通过 `decision(player, prompt, { optional: true, cancelLabel })` 指定取消文字，借刀复用它显示“取消用牌”。
 
-## 证据与未完成项
+## 验证入口
 
-- [武器规则场景](../tests/scenarios/weapons.test.ts) 本批 24 项，覆盖支付、伤害防止、来源离场/死亡、连续追杀、距离变化、武圣用刀转换、动态目标、材料耗尽、坐骑变化与状态重建。
-- [浏览器场景](../tests/browser/client.spec.ts) 从真实开局验证四件武器，使用生产构建和实际 Tauri CSP，分别检查桌面与触屏。
-- 最终计数、原生运行和归档证据见 [STATUS](STATUS.md)。常用种子与构建/验证顺序见 [开发指南](08-development-guide.md)。
+[武器场景](../tests/scenarios/weapons.test.ts)覆盖支付、伤害防止、来源离场或死亡、连续追杀、距离变化、转换材料、坐骑与事实重建；[客户端场景](../tests/browser/client.spec.ts)验证实际选择流程。当前计数、原生运行和交付只维护在 STATUS，检查方法见[标准验收入口](53-standard-semantics.md#行为清单与检查)。
 
-规则参考本地 FreeKill 的 [blade](../freekill/packages/standard_cards/pkg/skills/blade.lua)、[axe](../freekill/packages/standard_cards/pkg/skills/axe.lua)、[halberd](../freekill/packages/standard_cards/pkg/skills/halberd.lua)、[kylin_bow](../freekill/packages/standard_cards/pkg/skills/kylin_bow.lua)。没有兼容桥或旧时点别名。
-
-雌雄双股剑、寒冰剑与实体牌表已在后续批次补入。武将、额外回合及复杂技能验收仍待完成。Android 当前安装包仍为 P0，真机未验收；AI 与联机继续后置。
+规则参考本地 FreeKill 的 [blade](../../freekill/packages/standard_cards/pkg/skills/blade.lua)、[axe](../../freekill/packages/standard_cards/pkg/skills/axe.lua)、[halberd](../../freekill/packages/standard_cards/pkg/skills/halberd.lua)、[kylin_bow](../../freekill/packages/standard_cards/pkg/skills/kylin_bow.lua)。没有兼容桥或旧时点别名。

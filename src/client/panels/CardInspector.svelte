@@ -27,7 +27,8 @@
   <button class="icon-button inspector-close" aria-label="关闭牌面详情" onclick={close}>×</button>
   <div
     class="playing-card inspected-card"
-    class:red={card.suit === '♥' || card.suit === '♦'}
+    class:red={card.color === 'red' ||
+      (card.color === undefined && (card.suit === '♥' || card.suit === '♦'))}
     aria-hidden="true"
   >
     <CardFace {card} />

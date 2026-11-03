@@ -11,8 +11,6 @@ import {
 } from '../../src/content/standard/generals';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { World } from '../../src/core/state/world';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -39,10 +37,177 @@ import {
   withLifetime,
   blockSkill,
   equipmentCard,
+  JointSelection,
+  ownedCards,
+  pay,
 } from '../../src/sdk';
-import type { PhaseView } from '../../src/sdk';
+import { inspectActive, activeAvailable } from '../../src/rules/skills/active';
+import type { ActiveSkill, ActiveRunInput, Context, PhaseView } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'fixture' } as const;
+
+it('主动候选、验证和执行均拒绝异步资格或选择工厂，不能发动或在续体中写入', async () => {
+  for (const field of ['available', 'selection'] as const) {
+    for (const entry of ['offers', 'available', 'inspect', 'validate', 'activate'] as const) {
+      let lateError = '';
+      const available = (async (ctx: Context) => {
+        await Promise.resolve();
+        try {
+          ctx.commit('invalid.active.late', [], null);
+        } catch (error) {
+          lateError = (error as Error).message;
+        }
+        return false;
+      }) as unknown as NonNullable<ActiveSkill['available']>;
+      const skill = defineSkill({
+        id: 'probe:async-active',
+        name: '异步资格',
+        triggers: [],
+        active: [
+          {
+            id: 'act',
+            label: '发动',
+            available: field === 'available' ? available : () => true,
+            ...(field === 'selection'
+              ? { selection: available as unknown as NonNullable<ActiveSkill['selection']> }
+              : {}),
+            run(ctx) {
+              ctx.commit('invalid.active.run', [], null);
+            },
+          },
+        ],
+      });
+      const game = cardGame({ skills: [skill] });
+      await game.room.run('grant', (ctx) =>
+        game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
+      );
+      const choice = {
+        instance: game.room.world.snapshot.skills[0]!.id,
+        action: 'act',
+        cards: [],
+        targets: [],
+      };
+      await expect(
+        game.room.run(entry, (ctx) =>
+          runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
+            if (entry === 'offers') activeOffers(at, game.book, phase);
+            else if (entry === 'available') activeAvailable(at, game.book, phase);
+            else if (entry === 'inspect') inspectActive(at, game.book, phase, choice);
+            else if (entry === 'validate') validateActive(at, game.book, phase, choice);
+            else return activate(at, game.book, phase, choice);
+          }),
+        ),
+      ).rejects.toThrow(`Queries cannot await (probe:async-active/act.${field})`);
+      await Promise.resolve();
+      expect(game.room.status).toBe('faulted');
+      expect(lateError).toContain('Queries cannot await');
+      expect(game.room.history.facts('invalid.active.run')).toEqual([]);
+      expect(game.room.history.facts('invalid.active.late')).toEqual([]);
+      expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(
+        game.room.world.snapshot,
+      );
+    }
+  }
+});
+
+it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候选校验', async () => {
+  let latest: JointSelection | undefined;
+  let preview: JointSelection | undefined;
+  let projections = 0;
+  class Selection extends JointSelection {
+    override inspect(input: unknown) {
+      projections++;
+      return super.inspect(input);
+    }
+  }
+  class Action implements ActiveSkill {
+    id = 'act';
+    label = '发动';
+    #target = 'b';
+
+    available(ctx: Context) {
+      return ctx.world.player(this.#target).alive;
+    }
+
+    selection(ctx: Context) {
+      latest = new Selection({
+        targets: () =>
+          ctx.world.snapshot.players
+            .filter((player) => player.id === this.#target && player.alive)
+            .map((player) => ({ id: player.id, label: player.id })),
+        targetCount: { min: 1, max: 1 },
+      });
+      return latest;
+    }
+
+    async run(ctx: Context, { self, choice, selection }: ActiveRunInput) {
+      expect(selection).toBe(latest);
+      expect(selection).not.toBe(preview);
+      expect(selection.validate(choice).ok).toBe(true);
+      await ctx.flow('target-leaves', (at) =>
+        at.commit(
+          'target.left',
+          [{ kind: 'vitality', player: this.#target, hp: 0, alive: false }],
+          null,
+        ),
+      );
+      expect(selection.validate(choice).ok).toBe(false);
+      expect(
+        await pay(ctx, {
+          skill: self,
+          reason: self.skill,
+          legal: () => selection.validate(choice).ok,
+        }),
+      ).toMatchObject({ kind: 'unavailable', reason: 'Final cost conditions changed.' });
+    }
+  }
+  const action = new Action();
+  const actions = [action];
+  // 外部只冻结外层，子声明仍可变；不能拿 Object.isFrozen 代替规范化证明。
+  const raw = Object.freeze({
+    id: 'probe:live-selection',
+    name: '动态选择',
+    active: actions,
+  });
+  const skill = defineSkill(raw);
+  expect(defineSkill(skill)).toBe(skill);
+  action.label = '外部修改';
+  actions.length = 0;
+  const fresh = defineSkill(raw);
+  expect(fresh).not.toBe(skill);
+  expect(fresh.active).toEqual([]);
+  expect(() => defineSkill({ id: 'test:bad', name: '坏', active: [action, action] })).toThrow(
+    '[test:bad] Duplicate active action ID: act.',
+  );
+  action.available = () => false;
+  action.selection = () => {
+    throw new Error('Changed selection factory must not run.');
+  };
+  action.run = () => {
+    throw new Error('Changed action must not run.');
+  };
+  expect(Object.isFrozen(action)).toBe(false);
+  const game = cardGame({ skills: [skill] });
+  expect(game.skills.definition(skill.id)).toBe(skill);
+  expect(game.skills.definition(skill.id).active![0]!.label).toBe('发动');
+  const instance = await grant(game, skill.id);
+  await game.room.run('play', (ctx) =>
+    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+      const choice = { instance: instance, action: 'act', cards: [], targets: ['b'] };
+      expect(activeAvailable(at, game.book, phase)).toBe(true);
+      expect(projections).toBe(0);
+      const feedback = inspectActive(at, game.book, phase, choice);
+      expect(feedback).toMatchObject({ complete: true, selection: { targets: ['b'] } });
+      expect(feedback).not.toHaveProperty('preview');
+      expect(projections).toBe(1);
+      preview = latest;
+      await activate(at, game.book, phase, choice);
+      expect(activeAvailable(at, game.book, phase)).toBe(false);
+    }),
+  );
+  expect(game.room.history.facts('cost.paid')).toEqual([]);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+});
 
 it('装备派生的主动技能保留说明，来源离场后旧动作不能执行', async () => {
   const definition = equipmentCard({
@@ -53,12 +218,16 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
       id: 'test:ability',
       name: '装备技能',
       description: '装备的主动说明',
-      effects: [],
+      triggers: [],
       active: [
         {
           id: 'act',
-          label: '发动',
           available: () => true,
+          selection: (ctx, { self }) =>
+            new JointSelection({
+              cards: () => ownedCards(ctx.world, self.owner).map((id) => ({ id, label: id })),
+              cardCount: { min: 1, max: 1 },
+            }),
           run(ctx) {
             ctx.commit('must-not-run', [], null);
           },
@@ -67,6 +236,7 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
     }),
   });
   const game = cardGame({
+    hands: { a: [card('material', 'jink')] },
     equipment: { a: [{ ...card('equipment', 'spear'), name: definition.id }] },
     definitions: [definition],
   });
@@ -74,7 +244,32 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
     runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
       const offer = activeOffers(at, game.book, phase)[0]!;
       expect(offer.description).toBe('装备的主动说明');
-      const input = { skill: offer.choice.instance, action: offer.choice.action };
+      expect(offer.label).toBe('装备技能');
+      const input = {
+        ...offer.choice,
+        cards: ['material'],
+        targets: [],
+      };
+      expect(validateActive(at, game.book, phase, input)).toEqual({ ok: true, value: input });
+      expect(inspectActive(at, game.book, phase, { ...input, cards: [] })).toMatchObject({
+        valid: true,
+        complete: false,
+      });
+      await moveCards(
+        at,
+        [{ cards: ['material'], from: 'a:hand', to: 'discard', place: 'bottom' }],
+        'test',
+      );
+      expect(activeOffers(at, game.book, phase)).toEqual([]);
+      expect(inspectActive(at, game.book, phase, input)).toBeNull();
+      expect(validateActive(at, game.book, phase, input).ok).toBe(false);
+      await activate(at, game.book, phase, input);
+      await moveCards(
+        at,
+        [{ cards: ['material'], from: 'discard', to: 'a:hand', place: 'bottom' }],
+        'test',
+      );
+      expect(activeOffers(at, game.book, phase)).toHaveLength(1);
       expect(validateActive(at, game.book, phase, input).ok).toBe(true);
       await moveCards(
         at,
@@ -92,9 +287,8 @@ async function grant(game: Game, skill: string) {
   const result = await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill, source }),
   );
-  if (result.kind !== 'resolved' || result.value.kind !== 'resolved' || !result.value.value.after)
-    throw new Error('Grant failed.');
-  return result.value.value.after.id;
+  if (result.kind !== 'resolved' || !result.value.after) throw new Error('Grant failed.');
+  return result.value.after.id;
 }
 const startPlay = (game: Game, observer?: (phase: PhaseView) => void) =>
   game.room.run('phase', (ctx) =>
@@ -110,9 +304,22 @@ async function playRequest(game: Game) {
     return request!;
   });
 }
-async function useSkill(game: Game, skill: string, action: string) {
+async function useSkill(
+  game: Game,
+  skill: string,
+  action: string,
+  cards: readonly string[] = [],
+  targets: readonly string[] = [],
+) {
   const request = await playRequest(game);
-  expect(game.room.decisions.submit(request.id, request.token, { skill, action })).toEqual({
+  expect(
+    game.room.decisions.submit(request.id, request.token, {
+      instance: skill,
+      action,
+      cards,
+      targets,
+    }),
+  ).toEqual({
     kind: 'accepted',
   });
 }
@@ -149,30 +356,6 @@ async function setupSupport(game: Game) {
   });
   return instance;
 }
-
-it('主动定义独立冻结、重名拒绝；武将目录一次校验引用，不持有局内状态', () => {
-  const action = { id: 'one', label: '原始', available: () => true, run: () => {} };
-  const book = new SkillBook([
-    defineSkill({ id: 'test:active', name: '主动', effects: [], active: [action] }),
-  ]);
-  action.label = '外部修改';
-  expect(book.definition('test:active').active![0]!.label).toBe('原始');
-  expect(() =>
-    defineSkill({ id: 'test:bad', name: '坏', effects: [], active: [action, action] }),
-  ).toThrow(/distinct ID/);
-  const standardSkills = cardGame({ skills: standardGeneralSkills }).skills;
-  const generals = new GeneralBook(standardGenerals, standardSkills);
-  expect(generals.definition('standard:sunshangxiang')).toMatchObject({
-    maxHp: 3,
-    gender: 'female',
-    skills: [xiaoji.id, jieyin.id],
-  });
-  expect(() => new GeneralBook([...standardGenerals, standardGenerals[0]], standardSkills)).toThrow(
-    /Duplicate general/,
-  );
-  expect(() => new GeneralBook(standardGenerals, new SkillBook([]))).toThrow(/Unknown skill/);
-  expect(() => defineGeneral({ ...standardGenerals[0], maxHp: 0 })).toThrow(/Invalid general/);
-});
 
 it('零牌也提供苦肉；同一阶段可反复发动，失去体力与摸牌都由领域流程提交', async () => {
   const game = cardGame({
@@ -212,16 +395,31 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
   await game.room.run('phase', (ctx) =>
     runPhase(ctx, game.book, 'b', 'play', (at, phase) => {
       expect(
-        validateActive(at, game.book, phase, { skill: instance, action: 'lose-hp-draw' }).ok,
+        validateActive(at, game.book, phase, {
+          instance: instance,
+          action: 'lose-hp-draw',
+          cards: [],
+          targets: [],
+        }).ok,
       ).toBe(false);
       saved = phase;
     }),
   );
   await game.room.run('outside', async (ctx) => {
     expect(
-      validateActive(ctx, game.book, saved, { skill: instance, action: 'lose-hp-draw' }).ok,
+      validateActive(ctx, game.book, saved, {
+        instance: instance,
+        action: 'lose-hp-draw',
+        cards: [],
+        targets: [],
+      }).ok,
     ).toBe(false);
-    await activate(ctx, game.book, saved, { skill: instance, action: 'lose-hp-draw' });
+    await activate(ctx, game.book, saved, {
+      instance: instance,
+      action: 'lose-hp-draw',
+      cards: [],
+      targets: [],
+    });
   });
   await game.room.run('own-phase', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
@@ -272,20 +470,34 @@ it('结姻取消不支付；拒绝装备、自己和女性目标，双性男性�
   const game = supportGame();
   const instance = await setupSupport(game);
   const running = startPlay(game);
-  await useSkill(game, instance, 'discard-heal');
-  const choice = await nextRequest(game.room);
-  expect(choice.kind).toBe('cards-targets');
+  const choice = await playRequest(game);
+  const input = (value: { cards: string[]; targets: string[] }) => ({
+    instance: instance,
+    action: 'discard-heal',
+    ...value,
+  });
   for (const value of [
     { cards: ['one', 'weapon'], targets: ['b'] },
     { cards: ['one', 'two'], targets: ['a'] },
     { cards: ['one', 'two'], targets: ['c'] },
   ])
-    expect(game.room.decisions.preview(choice.id, value)?.valid).toBe(false);
+    expect(game.room.decisions.preview(choice.id, input(value))?.valid).toBe(false);
+  const snapshot = game.room.world.snapshot;
+  const facts = game.room.history.facts().length;
   expect(
-    game.room.decisions.preview(choice.id, { cards: ['one', 'two'], targets: ['d'] })?.valid,
+    game.room.decisions.submit(
+      choice.id,
+      choice.token,
+      input({ cards: ['one', 'weapon'], targets: ['b'] }),
+    ),
+  ).toMatchObject({ kind: 'rejected' });
+  expect(game.room.world.snapshot).toBe(snapshot);
+  expect(game.room.history.facts()).toHaveLength(facts);
+  expect(game.room.decisions.pending[0]).toMatchObject({ id: choice.id, token: choice.token });
+  expect(
+    game.room.decisions.preview(choice.id, input({ cards: ['one', 'two'], targets: ['d'] }))?.valid,
   ).toBe(true);
   game.room.decisions.cancel(choice.id, choice.token);
-  await pass(game);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['one', 'two']);
   expect(game.room.history.facts('skill.invoked')).toEqual([]);
@@ -315,12 +527,10 @@ it('结姻费用、次数和宣告同次提交；回复先目标后本人，一�
   const running = startPlay(game, (phase) => {
     current = phase;
   });
-  await useSkill(game, instance, 'discard-heal');
-  const choice = await nextRequest(game.room);
-  game.room.decisions.submit(choice.id, choice.token, { cards: ['one', 'two'], targets: ['b'] });
+  await useSkill(game, instance, 'discard-heal', ['one', 'two'], ['b']);
   const next = await playRequest(game);
   expect(
-    game.room.decisions.preview(next.id, { skill: instance, action: 'discard-heal' })?.valid,
+    game.room.decisions.preview(next.id, { instance: instance, action: 'discard-heal' })?.valid,
   ).toBe(false);
   await pass(game);
   await running;
@@ -346,9 +556,7 @@ it('结姻不要求本人受伤，下一独立出牌阶段重新获得次数', a
     ['three', 'four'],
   ]) {
     const running = startPlay(game);
-    await useSkill(game, instance, 'discard-heal');
-    const choice = await nextRequest(game.room);
-    game.room.decisions.submit(choice.id, choice.token, { cards, targets: ['b'] });
+    await useSkill(game, instance, 'discard-heal', cards, ['b']);
     if (cards[0] === 'one') await pass(game);
     await running;
   }
@@ -375,9 +583,7 @@ it('结姻支付后目标死亡仍消耗次数，本人按当前状态回复；�
     },
   });
   const running = startPlay(game);
-  await useSkill(game, instance, 'discard-heal');
-  const choice = await nextRequest(game.room);
-  game.room.decisions.submit(choice.id, choice.token, { cards: ['one', 'two'], targets: ['b'] });
+  await useSkill(game, instance, 'discard-heal', ['one', 'two'], ['b']);
   await running;
   expect(game.room.world.player('b').alive).toBe(false);
   expect(game.room.world.player('a').hp).toBe(3);
@@ -454,10 +660,11 @@ it('枭姬不会把装备区内部重排当作失去，首轮摸牌后失去技�
 });
 
 it('武将初始化的体力、性别、技能来源和选将事实可重建；拒绝隐式覆盖与缺失目录', async () => {
-  const match = createOfflineMatch(2, 42, 'standard:identity', [
-    'standard:sunshangxiang',
-    'standard:huanggai',
-  ]);
+  const match = createOfflineMatch({
+    seed: 42,
+    preset: 'standard:identity',
+    lineup: ['standard:sunshangxiang', 'standard:huanggai'],
+  });
   await match.prepare();
   expect(match.room.world.player('甲席').maxHp).toBe(3);
   expect(genderOf(match.room.world, '甲席')).toBe('female');
@@ -467,6 +674,11 @@ it('武将初始化的体力、性别、技能来源和选将事实可重建；�
       .filter((skill) => skill.owner === '甲席')
       .map((skill) => skill.skill),
   ).toEqual([xiaoji.id, jieyin.id]);
+  expect(() => new GeneralBook([...standardGenerals, standardGenerals[0]], match.skills)).toThrow(
+    /Duplicate general/,
+  );
+  expect(() => new GeneralBook(standardGenerals, new SkillBook([]))).toThrow(/Unknown skill/);
+  expect(() => defineGeneral({ ...standardGenerals[0], maxHp: 0 })).toThrow(/Invalid general/);
   const rebuilt = new World(rebuildWorld(match.initial, match.room.history.facts()));
   expect(generalOf(rebuilt.reader, '甲席')).toBe('standard:sunshangxiang');
   expect(
@@ -475,46 +687,20 @@ it('武将初始化的体力、性别、技能来源和选将事实可重建；�
         id: 'bad',
         seed: 1,
         players: [{ id: 'a', general: 'standard:huanggai', maxHp: 5 }, { id: 'b' }],
-        cards: [],
+        content: {
+          cards: [],
+          skills: standardGeneralSkills,
+          generals: standardGenerals,
+        },
         deck: [],
-        skills: standardGeneralSkills,
-        generals: standardGenerals,
       }),
   ).toThrow(/cannot override/);
   expect(() =>
-    createOfflineMatch(2, 42, 'standard:identity', ['unknown', 'standard:guanyu']),
+    createOfflineMatch({
+      seed: 42,
+      preset: 'standard:identity',
+      lineup: ['unknown', 'standard:guanyu'],
+    }),
   ).toThrow(/Unknown general/);
   match.room.abort('done');
 });
-
-it('三名武将与基础 AI 在真实四席局完成胜负，苦肉/主动技能沿正式入口执行', async () => {
-  const match = createOfflineMatch(4, 42, 'standard:identity', [
-    'standard:guanyu',
-    'standard:huanggai',
-    'standard:sunshangxiang',
-    'standard:huanggai',
-  ]);
-  const running = match.start();
-  try {
-    for (let decisions = 0; !match.result && decisions < 1800; decisions++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
-      if (answer.kind === 'unsupported') throw new Error(answer.reason);
-      expect(
-        answer.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, answer.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(match.room.history.facts('hp.lost').length).toBeGreaterThan(0);
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
-}, 60_000);

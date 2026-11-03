@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult, Room } from '../../core/runtime/room';
+import type { Context, Room } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import type { CardBook } from './book';
 import { effectStarting } from './book';
@@ -26,6 +26,7 @@ export interface CounterRequest {
   readonly subject: CounterSubject;
   readonly root: EffectRef;
   readonly names?: readonly string[];
+  /** 同步纯相关性；普通后效可直接查询机会，回调内部仍受只读守卫约束。 */
   readonly relevant?: (ctx: Context) => boolean;
 }
 export const counterOpening = defineWindow<CounterOpportunity>('counter.opening');
@@ -36,19 +37,20 @@ export function contestCounter(
   ctx: Context,
   book: CardBook,
   request: CounterRequest,
-): Promise<FlowResult<CounterResult>> {
+): Promise<CounterResult> {
   return withLifetime(ctx, 'counter', async (child, lifetime) => {
     const subject = immutable(request.subject);
     const root = effectReference(request.root);
     const restricted = subject.kind === 'effect' ? subject.effect : subject.use;
     const names = immutable(request.names ?? ['standard:nullification']);
+    const relevant = request.relevant?.bind(request);
     const allowedNames = names.filter((name) => !restricted.prohibitedCounters?.includes(name));
     if (!allowedNames.length) {
       const result: CounterResult = {
         kind:
           !isGameOver(child.world) &&
           child.world.player(root.target).alive &&
-          child.query(() => request.relevant?.(child) ?? true)
+          (relevant === undefined || child.query(() => relevant(child)))
             ? 'unopposed'
             : 'unavailable',
         subject,
@@ -58,7 +60,6 @@ export function contestCounter(
       await child.window(counterFinished, immutable(result), { subject: root.target });
       return immutable(result);
     }
-    const relevant = request.relevant ?? (() => true);
     const opportunity: CounterOpportunity = Object.freeze({
       depth: request.depth ?? 0,
       lifetime,
@@ -70,7 +71,7 @@ export function contestCounter(
         lifetime.active &&
         !isGameOver(at.world) &&
         at.world.player(root.target).alive &&
-        relevant(at),
+        (relevant === undefined || at.query(() => relevant(at))),
     });
     const live = () => child.query(() => opportunity.available(child));
     // 开窗后效也可能令原效果失效；持续收束本次机会，不撤销已经提交的费用。
@@ -96,9 +97,9 @@ export function contestCounter(
             ? `是否反制【${book.definition(root.card.name).label}】对 ${root.target} 的效果？`
             : `是否反制 ${subject.use.actor} 的【${book.definition(subject.use.card.name).label}】？`,
       });
-      if (used.kind === 'aborted') return child.abort(used.reason);
-      if (used.value.kind !== 'used') continue;
-      const outcome = used.value.use.outcome;
+
+      if (used.kind !== 'used') continue;
+      const outcome = used.use.outcome;
       if (
         !outcome ||
         typeof outcome !== 'object' ||
@@ -111,7 +112,7 @@ export function contestCounter(
       result = {
         kind: outcome.effective ? 'countered' : 'unopposed',
         subject,
-        by: useReference(used.value.use),
+        by: useReference(used.use),
       };
       break;
     }
@@ -138,10 +139,10 @@ export async function resolveCounter(
     relevant: opportunity.available,
     names: opportunity.names,
   });
-  if (reply.kind === 'aborted') return ctx.abort(reply.reason);
+
   return immutable({
     kind: 'counter',
-    effective: reply.value.kind === 'unopposed',
+    effective: reply.kind === 'unopposed',
     against: opportunity.subject,
   });
 }
@@ -168,8 +169,8 @@ export function installCounterspells(
         names: counterNames,
         relevant: available,
       });
-      if (result.kind === 'aborted') return ctx.abort(result.reason);
-      if (result.value.kind === 'countered' && effect.state === 'ready')
+
+      if (result.kind === 'countered' && effect.state === 'ready')
         effect.cancel(ctx, 'standard:nullification');
     },
   });

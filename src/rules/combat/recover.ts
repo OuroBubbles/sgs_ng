@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import type { EffectRef } from '../cards/types';
 import { effectReference } from '../cards/types';
@@ -34,7 +34,7 @@ export interface RecoveryDraft {
 export const recovering = defineWindow<RecoveryDraft>('hp.recovering');
 export const recovered = defineWindow<RecoveryResult>('hp.recovered');
 
-export function recover(ctx: Context, request: RecoveryInput): Promise<FlowResult<RecoveryResult>> {
+export function recover(ctx: Context, request: RecoveryInput): Promise<RecoveryResult> {
   return ctx.flow('recover', async (child) => {
     const input = immutable({
       ...request,

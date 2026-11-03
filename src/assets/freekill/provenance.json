@@ -1,0 +1,1958 @@
+{
+  "usage": "User-supplied local FreeKill resources for this private project. Original bytes and source attribution retained; no redistribution permission asserted.",
+  "resources": [
+    {
+      "source": "freekill/image/button/skill/active/normal.png",
+      "file": "ui/skill/normal.png",
+      "bytes": 6014,
+      "sha256": "af9add6d7abbed804669e48fc2600c66bfbc6b537f45c70bd6b0de5e5209e383"
+    },
+    {
+      "source": "freekill/image/button/skill/active/pressed.png",
+      "file": "ui/skill/pressed.png",
+      "bytes": 8716,
+      "sha256": "499992a6e1afa12331479e92f3f6cbec326887256249a7d5ec01c5b1129dd5ae"
+    },
+    {
+      "source": "freekill/image/button/skill/active/disabled.png",
+      "file": "ui/skill/disabled.png",
+      "bytes": 4920,
+      "sha256": "f05d01565c595b7bea5a74ec2449a97e83fcfc9da4dc0d6981613fd40a7e794f"
+    },
+    {
+      "source": "freekill/image/button/skill/locked.png",
+      "file": "ui/skill/locked.png",
+      "bytes": 2239,
+      "sha256": "9d98fa483a450d46b70716799c10c2f3fd18392953c96befced9b2466476ab80"
+    },
+    {
+      "source": "freekill/image/photo/back/wei.png",
+      "file": "ui/frames/wei.png",
+      "bytes": 5364,
+      "sha256": "69061af5f3423a804d32357add4b9e9750a55a3eb6463bb26f8ec277f81bc8df"
+    },
+    {
+      "source": "freekill/image/photo/back/shu.png",
+      "file": "ui/frames/shu.png",
+      "bytes": 5622,
+      "sha256": "b1a9bb1d439e1256c1b1860986d1475ba38b38e75ae03084b46369ef64656f3d"
+    },
+    {
+      "source": "freekill/image/photo/back/wu.png",
+      "file": "ui/frames/wu.png",
+      "bytes": 4892,
+      "sha256": "724183dafc2b6cab63ec41fde4f362137853fddf87a98c848ca41d94641097d1"
+    },
+    {
+      "source": "freekill/image/photo/back/qun.png",
+      "file": "ui/frames/qun.png",
+      "bytes": 5530,
+      "sha256": "7defafd75cba0870b8d4d835066043a3563d7e261fddb09ca4848fcadbe1bddc"
+    },
+    {
+      "source": "freekill/image/photo/back/unknown.png",
+      "file": "ui/frames/unknown.png",
+      "bytes": 5076,
+      "sha256": "70d265c2f9c6e34bb21c33201619678491eb5e27eea4cc5779e9eb08c7245be8"
+    },
+    {
+      "source": "freekill/image/photo/equipbg.png",
+      "file": "ui/equipment.png",
+      "bytes": 2172,
+      "sha256": "e5fd903db8a99bffd4ad8e2dd59c5bc1b19c2008fee16ea514c07177f729cfc0"
+    },
+    {
+      "source": "freekill/image/photo/magatama/0.png",
+      "file": "ui/hp/0.png",
+      "bytes": 761,
+      "sha256": "ba78bfbe89c1e7b174e612d38b3a4c2bee78e10c2f48e4b2a2bb0c9cfb149b03"
+    },
+    {
+      "source": "freekill/image/photo/magatama/1.png",
+      "file": "ui/hp/1.png",
+      "bytes": 738,
+      "sha256": "a0de8311da894f116b111d3d7b923d28ddde2d9afad14d180a3c20c3678893c8"
+    },
+    {
+      "source": "freekill/image/photo/magatama/2.png",
+      "file": "ui/hp/2.png",
+      "bytes": 752,
+      "sha256": "0f5c5698161c11a95a14e2f655a417d56879e6b7f62291726cddc7a6b48ee412"
+    },
+    {
+      "source": "freekill/image/photo/magatama/3.png",
+      "file": "ui/hp/3.png",
+      "bytes": 762,
+      "sha256": "9465b68fc06709439434fe86807d17221bc52a97063accbd4e1db98a9d2608b2"
+    },
+    {
+      "source": "freekill/image/photo/magatama/shield.png",
+      "file": "ui/hp/shield.png",
+      "bytes": 3164,
+      "sha256": "3195c18645fd3406114d0cfbe407636080edd692f1a5e916d6069a4f61baa7a2"
+    },
+    {
+      "source": "freekill/image/photo/handcard.png",
+      "file": "ui/photo/handcard.png",
+      "bytes": 3149,
+      "sha256": "c5615a078045e899e60b09fe1337539d4e094facf527a1c849cb9337cb541125"
+    },
+    {
+      "source": "freekill/image/photo/chain.png",
+      "file": "ui/photo/chain.png",
+      "bytes": 9187,
+      "sha256": "7f83e74be6389ab0d1eb9a3c93253b0efc575ca92264869cd8e2754657613333"
+    },
+    {
+      "source": "freekill/image/photo/disable.png",
+      "file": "ui/photo/disable.png",
+      "bytes": 1100,
+      "sha256": "93859015a3c6b496ac3a35448fb27d99800d24693fab1cd606b91263a22e7995"
+    },
+    {
+      "source": "freekill/image/photo/role/lord.png",
+      "file": "ui/role/lord.png",
+      "bytes": 3039,
+      "sha256": "969d17a3b4936df41830df2841f2691ce2138e5d70ba3fac759c99e7dd0f0716"
+    },
+    {
+      "source": "freekill/image/photo/death/lord.png",
+      "file": "ui/death/lord.png",
+      "bytes": 22459,
+      "sha256": "d726f8663a485245dba1a4e90e64e94b774a6f078039a3e5bbc99fcfc215821e"
+    },
+    {
+      "source": "freekill/image/photo/role/loyalist.png",
+      "file": "ui/role/loyalist.png",
+      "bytes": 3229,
+      "sha256": "5c5c855a693853ffb48ff6ec19fc882fee91183f45732831469acda755d7893d"
+    },
+    {
+      "source": "freekill/image/photo/death/loyalist.png",
+      "file": "ui/death/loyalist.png",
+      "bytes": 22496,
+      "sha256": "6b5abf00dc5e14e2ded7f8406b982cdbc7717be62f6596d26b26ea217f594357"
+    },
+    {
+      "source": "freekill/image/photo/role/rebel.png",
+      "file": "ui/role/rebel.png",
+      "bytes": 3262,
+      "sha256": "642065029378c398d55601e50cde7397fee1d5bbc64782c62ea9b0012b501e43"
+    },
+    {
+      "source": "freekill/image/photo/death/rebel.png",
+      "file": "ui/death/rebel.png",
+      "bytes": 22648,
+      "sha256": "46c0e75dacdfc3ef0cbe099b42a89f85e322e15b09e6422e636e91ce76fbd69d"
+    },
+    {
+      "source": "freekill/image/photo/role/renegade.png",
+      "file": "ui/role/renegade.png",
+      "bytes": 3170,
+      "sha256": "ba363ecbc7ff1e9fc0e40192323677869fc59b5f245bbe30d4660f9b288a61db"
+    },
+    {
+      "source": "freekill/image/photo/death/renegade.png",
+      "file": "ui/death/renegade.png",
+      "bytes": 22404,
+      "sha256": "dc3ea60e31bfcf707a8dd4551a373090500d6c4d5655531a5603174e0686bd43"
+    },
+    {
+      "source": "freekill/image/photo/role/unknown.png",
+      "file": "ui/role/unknown.png",
+      "bytes": 3095,
+      "sha256": "ee4d15b8d6e734e92073552d9eefd2117bdbcb3b5397dd9beedfc47088d163af"
+    },
+    {
+      "source": "freekill/image/photo/death/hidden.png",
+      "file": "ui/death/unknown.png",
+      "bytes": 15374,
+      "sha256": "5efdbf259f9b43b429f11f4e117b40f1a30ef54275791b3342333cd49c251889"
+    },
+    {
+      "source": "freekill/image/gamebg.jpg",
+      "file": "ui/gamebg.jpg",
+      "bytes": 181144,
+      "sha256": "4ae383c4e4afe5f391b03c23c3f0f148662abbee63fe9fdebb2a1d5eccf1a381"
+    },
+    {
+      "source": "freekill/image/lady.png",
+      "file": "ui/lobby/hero.png",
+      "bytes": 212634,
+      "sha256": "7c9143f6a6748cffb61668eed21e070da234ea01cfce4b3205da02c70edf6068"
+    },
+    {
+      "source": "freekill/image/button/tileicon/start_game.png",
+      "file": "ui/lobby/start.png",
+      "bytes": 2142,
+      "sha256": "0736682298e79a31b1fd1bcfc5aa8bf003dcd4b293c96e26f50aa34f70159072"
+    },
+    {
+      "source": "freekill/image/button/tileicon/create_room.png",
+      "file": "ui/lobby/room.png",
+      "bytes": 1615,
+      "sha256": "3784c8b5da918527b5a914410452ad068e6fcaf6d692b31e684a4859f0552e27"
+    },
+    {
+      "source": "freekill/image/button/tileicon/general_overview.png",
+      "file": "ui/lobby/content.png",
+      "bytes": 1898,
+      "sha256": "d1371a413de5ec1becda544adbb9dd726eec2de8b8866b86a2d1045f82b62533"
+    },
+    {
+      "source": "freekill/image/generals/0.jpg",
+      "file": "ui/photo/unknown.jpg",
+      "bytes": 25446,
+      "sha256": "91e8f48acd0fb1571fde831953b9e393a8e713ee5d837e34999e0600282ff30c"
+    },
+    {
+      "source": "freekill/fonts/FZLBGBK.ttf",
+      "file": "fonts/FZLBGBK.ttf",
+      "bytes": 12900696,
+      "sha256": "5036886a42f66ff9656663f0a7b14886ecdf8aa1fd580e692f89cef39647343e"
+    },
+    {
+      "source": "freekill/fonts/FZLE.ttf",
+      "file": "fonts/FZLE.ttf",
+      "bytes": 4966708,
+      "sha256": "7357ce87b5dfee01fb6aa75cabdef7238580c8ad825f752bdc88829b119f328d"
+    },
+    {
+      "source": "freekill/image/card/card-back.png",
+      "file": "cards/card-back.png",
+      "bytes": 18234,
+      "sha256": "6b39d4c29a078b48d21cbdf435607df94e9c304ddd54c050ce1740fa9bd4606f"
+    },
+    {
+      "source": "freekill/image/card/chosen.png",
+      "file": "cards/chosen.png",
+      "bytes": 2077,
+      "sha256": "04093dffa37fbd5db630fe955c087724ccf9bbf72d657ac5a326771ee20ec69d"
+    },
+    {
+      "source": "freekill/image/card/unknown.png",
+      "file": "cards/unknown.png",
+      "bytes": 18848,
+      "sha256": "c3d599543960de54be9657ae1669e041aa56e0ea4ee1341d7315bd6d5ec1dafc"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/amazing_grace.png",
+      "file": "cards/amazing_grace.png",
+      "bytes": 24636,
+      "sha256": "92534b7d2b5ec224ffd3c120c137371f6264b3be419a9e1821eb6d16fe1e4351"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/archery_attack.png",
+      "file": "cards/archery_attack.png",
+      "bytes": 26710,
+      "sha256": "285dce92997fcfb5e152f4736d98faf6e9e992711952c2ea633a4370066e48cb"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/axe.png",
+      "file": "cards/axe.png",
+      "bytes": 22500,
+      "sha256": "6b79d3333a0801778bdba6e20855a53a487d291ac15031cc13f888846d47687e"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/blade.png",
+      "file": "cards/blade.png",
+      "bytes": 23690,
+      "sha256": "8456d0fc65f5f82b013a7fcbce15a53380ee1febbd2174c6d54c32891337c330"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/chitu.png",
+      "file": "cards/chitu.png",
+      "bytes": 23342,
+      "sha256": "abcc6806d9bcad887eab5154bf4f48e9467c1a8a6a84b9a87bcea72899dbcf98"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/collateral.png",
+      "file": "cards/collateral.png",
+      "bytes": 26035,
+      "sha256": "16bdf82c3f7c96c67f456424839951f82bcd33586dca111135433ada5824df95"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/crossbow.png",
+      "file": "cards/crossbow.png",
+      "bytes": 23718,
+      "sha256": "f7938adb848562af00fcfd9a363555b177bcce5d7ce0e42e9e4cf1c9beb8d4ec"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/dayuan.png",
+      "file": "cards/dayuan.png",
+      "bytes": 23723,
+      "sha256": "a8134590dd9b2c9ca3f49a60d18f863487cd8569244f190fd5cada37192622bf"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/dilu.png",
+      "file": "cards/dilu.png",
+      "bytes": 21733,
+      "sha256": "270d1e444214032477c6e00b98ee151755db89adbaca2695f66ab27a0354ead9"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/dismantlement.png",
+      "file": "cards/dismantlement.png",
+      "bytes": 25120,
+      "sha256": "82bcc97bcbdd49661f89eca52c452e6aea5fc70fb27b1ca294cb3d25d8a77cdf"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/double_swords.png",
+      "file": "cards/double_swords.png",
+      "bytes": 24574,
+      "sha256": "b7f14f2fa5cbd73d2f9d29d6746c6a15aff8677c1ab0e1e950bb7ca95fb9a6b6"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/duel.png",
+      "file": "cards/duel.png",
+      "bytes": 25008,
+      "sha256": "24a546f7d9dd78be08ca756142ab2abb8f8cd3dd6bf70759df56cc372fcd4357"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/eight_diagram.png",
+      "file": "cards/eight_diagram.png",
+      "bytes": 21762,
+      "sha256": "0984acd79b611b61c9e8f36819488db357717100d0033f60c055ba5ae1b8fce4"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/ex_nihilo.png",
+      "file": "cards/ex_nihilo.png",
+      "bytes": 25482,
+      "sha256": "c533472ef32c6bb7757e889cddfd49513a70d0214b5dbd79155f15e422b39264"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/god_salvation.png",
+      "file": "cards/god_salvation.png",
+      "bytes": 27210,
+      "sha256": "f0f991778507655501eae84b0c1ad7b9edc8bb2545824082c3a3465bc45aaf23"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/halberd.png",
+      "file": "cards/halberd.png",
+      "bytes": 23461,
+      "sha256": "681732edba4de731855311cde3f306ae66d79cd89794cc109c9e9f5502df3c36"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/ice_sword.png",
+      "file": "cards/ice_sword.png",
+      "bytes": 22461,
+      "sha256": "7af662bb163bef6ffb338d6219573179ba5ddba99c243e3865653dcbe4c0270c"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/indulgence.png",
+      "file": "cards/indulgence.png",
+      "bytes": 25852,
+      "sha256": "c9efd6c45397370d2c500f3fbb71d8af37c234b18fe2bb05fc5fd4516dbda018"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/jink.png",
+      "file": "cards/jink.png",
+      "bytes": 27525,
+      "sha256": "e144cccedee9da3fdac0017a561151b574ea23449e7451ee501635c775fa1660"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/jueying.png",
+      "file": "cards/jueying.png",
+      "bytes": 22711,
+      "sha256": "ce9571f0fc39619e7bb293b816736f11ff3b22bf50a72de0e79637f2dc7a340f"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/kylin_bow.png",
+      "file": "cards/kylin_bow.png",
+      "bytes": 22430,
+      "sha256": "eb9d72a193342ad543e4eabaae267687e652acdb77b4cd6bfe57cab726901854"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/lightning.png",
+      "file": "cards/lightning.png",
+      "bytes": 18350,
+      "sha256": "d3cf82994ca73f9535f1cbd64fa8ba788c18e99c8176d90234c7a7aa9d8140bc"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/nioh_shield.png",
+      "file": "cards/nioh_shield.png",
+      "bytes": 23492,
+      "sha256": "ab9faa15683a36b19b6a291990541c982afc1404c1db4a6a8000e86dca872481"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/nullification.png",
+      "file": "cards/nullification.png",
+      "bytes": 26967,
+      "sha256": "8ecf6af10ddf805f16aec27bea2cacfaed1c33a6d608da394d1d52c876929b0e"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/peach.png",
+      "file": "cards/peach.png",
+      "bytes": 25933,
+      "sha256": "cf4d7ec455497ae3609c27e23167191f48c3ff408a96049d59d780fbeecc8d26"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/qinggang_sword.png",
+      "file": "cards/qinggang_sword.png",
+      "bytes": 22098,
+      "sha256": "61f76e311be128ede5e422281be7eb0ebc6e1936c6155897ab79dc50d3e93ae0"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/savage_assault.png",
+      "file": "cards/savage_assault.png",
+      "bytes": 25758,
+      "sha256": "eef45a835cfc086e98d196043007a2d967204ae522aee45840bbceef9b0dc516"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/slash.png",
+      "file": "cards/slash.png",
+      "bytes": 27919,
+      "sha256": "e21669d40563d73d40992f16e30ab6e202fdf2f7eef4f3d636698fc8aaaacac6"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/snatch.png",
+      "file": "cards/snatch.png",
+      "bytes": 27817,
+      "sha256": "902d2f80eae92b2f0dfc29a9d28e06d9c28248c03c859ecfba0545622d39b39f"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/spear.png",
+      "file": "cards/spear.png",
+      "bytes": 22814,
+      "sha256": "60d0b0ca5f5cdfe779f0e6e437f095faccf08f7ba826d9f66c89dd5bab87afea"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/zhuahuangfeidian.png",
+      "file": "cards/zhuahuangfeidian.png",
+      "bytes": 24605,
+      "sha256": "23c4508f73483bbc78fd8991a7b61df483e17d315d0de047a3da0fbce35e2e72"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/zixing.png",
+      "file": "cards/zixing.png",
+      "bytes": 23428,
+      "sha256": "55808dae176e9dc4683ad13b84db57dcfed1df5d7035967e766458aede5177b9"
+    },
+    {
+      "source": "freekill/image/card/suit/black.png",
+      "file": "cards/suit/black.png",
+      "bytes": 546,
+      "sha256": "1b45182ad3b0da7fa2a9cca08f64cbdcf0b5731638b0ddb116a486893c4fd55c"
+    },
+    {
+      "source": "freekill/image/card/suit/club.png",
+      "file": "cards/suit/club.png",
+      "bytes": 1017,
+      "sha256": "0b56dd9fa09fccd8c2ecd58b358c1b7be253e394d0eabb3c5a4e267b03e1a6af"
+    },
+    {
+      "source": "freekill/image/card/suit/diamond.png",
+      "file": "cards/suit/diamond.png",
+      "bytes": 847,
+      "sha256": "916e7b073b38398b59ba63861f6cccce0269f82a1d070a5b3e5021cc430a369a"
+    },
+    {
+      "source": "freekill/image/card/suit/heart.png",
+      "file": "cards/suit/heart.png",
+      "bytes": 982,
+      "sha256": "a2b92b102ea1ee7e967d3e5e528483857ff4e7c03c6c60ea6ee9bdfaff3c4e20"
+    },
+    {
+      "source": "freekill/image/card/suit/nocolor.png",
+      "file": "cards/suit/nocolor.png",
+      "bytes": 596,
+      "sha256": "3e5e7a6bbfbafd1a294603c6fe2ea033b9c18308bda6076bd3bdabbd0b83fb03"
+    },
+    {
+      "source": "freekill/image/card/suit/red.png",
+      "file": "cards/suit/red.png",
+      "bytes": 604,
+      "sha256": "1f621ae2b67fc7bcef2e9b7ad18606ca0b5e38b425e03dd6548e0014c7c76ed2"
+    },
+    {
+      "source": "freekill/image/card/suit/spade.png",
+      "file": "cards/suit/spade.png",
+      "bytes": 842,
+      "sha256": "085e85aa346afab051294ace381b18964ac22e7ec3d42ce4255bd065f1519755"
+    },
+    {
+      "source": "freekill/image/card/number/red/1.png",
+      "file": "cards/number/red/1.png",
+      "bytes": 1125,
+      "sha256": "b800130f3bcb739ff2a22a5fdced849efce4d82e27ee7e409ae17dcedbfa6f06"
+    },
+    {
+      "source": "freekill/image/card/number/red/10.png",
+      "file": "cards/number/red/10.png",
+      "bytes": 1177,
+      "sha256": "90f3b7dd50d1ade798a9524c087cbac0209505f648caa31838a4c76fecd23e3e"
+    },
+    {
+      "source": "freekill/image/card/number/red/11.png",
+      "file": "cards/number/red/11.png",
+      "bytes": 1072,
+      "sha256": "cf04e78877210f655e2632c98a8486b8d773dfe97dee2693a60454506307cc3a"
+    },
+    {
+      "source": "freekill/image/card/number/red/12.png",
+      "file": "cards/number/red/12.png",
+      "bytes": 1194,
+      "sha256": "fcbdb5c9b4d68a32f49182e86ea31923a0aa4edd7c22c102c2b3336550b8cecb"
+    },
+    {
+      "source": "freekill/image/card/number/red/13.png",
+      "file": "cards/number/red/13.png",
+      "bytes": 1061,
+      "sha256": "1830943edce17bbda2a84acf1526e8f6280f14627c7d4ce5514c748dc8220a4f"
+    },
+    {
+      "source": "freekill/image/card/number/red/2.png",
+      "file": "cards/number/red/2.png",
+      "bytes": 1092,
+      "sha256": "ed87da947a39a7177f726beda8e140acb7472c44e9eab228cdbaa3df41a4c607"
+    },
+    {
+      "source": "freekill/image/card/number/red/3.png",
+      "file": "cards/number/red/3.png",
+      "bytes": 1045,
+      "sha256": "93b13af72f9c220e88daf7bdde89ac88ff70e9d4817039dc3a464fbd7653f5e3"
+    },
+    {
+      "source": "freekill/image/card/number/red/4.png",
+      "file": "cards/number/red/4.png",
+      "bytes": 1056,
+      "sha256": "f25e7bc73d868f9c5e08f24b31d5d7128753065f637a085be98642038d9af182"
+    },
+    {
+      "source": "freekill/image/card/number/red/5.png",
+      "file": "cards/number/red/5.png",
+      "bytes": 1092,
+      "sha256": "4945594f8b795984189b73a233d9a48b76c229c2601c64284554dc146199b3f7"
+    },
+    {
+      "source": "freekill/image/card/number/red/6.png",
+      "file": "cards/number/red/6.png",
+      "bytes": 1051,
+      "sha256": "f14de176adfb83b2c95f7ab073b3a61052ace217882e40512da4f3224023594f"
+    },
+    {
+      "source": "freekill/image/card/number/red/7.png",
+      "file": "cards/number/red/7.png",
+      "bytes": 1032,
+      "sha256": "4154a924e19cc489bfe9c41019db946a701050c1289f2bd9a97d4f58b0af0628"
+    },
+    {
+      "source": "freekill/image/card/number/red/8.png",
+      "file": "cards/number/red/8.png",
+      "bytes": 1103,
+      "sha256": "c2a9b6f14da2390d72449d1418c414afd260403903d2988728546fd1e51ea073"
+    },
+    {
+      "source": "freekill/image/card/number/red/9.png",
+      "file": "cards/number/red/9.png",
+      "bytes": 1110,
+      "sha256": "8d0d3812d6e6f572d7ceeb5272a7914099968cbbdceb920b87a961b9af58614e"
+    },
+    {
+      "source": "freekill/image/card/number/black/1.png",
+      "file": "cards/number/black/1.png",
+      "bytes": 961,
+      "sha256": "675b1eca1c2ad87e8990b7b6222bb31cea1c91ef5ceaf249aa35d6237592b96d"
+    },
+    {
+      "source": "freekill/image/card/number/black/10.png",
+      "file": "cards/number/black/10.png",
+      "bytes": 985,
+      "sha256": "f1852be5f6e320dbfedf29b7bf425125f1efcdaa6c7b26acbbc6c771f836b620"
+    },
+    {
+      "source": "freekill/image/card/number/black/11.png",
+      "file": "cards/number/black/11.png",
+      "bytes": 868,
+      "sha256": "f3d29ebd4e69d49c58ab079790a7de79cc0293c0d40f85404733aee61cee8137"
+    },
+    {
+      "source": "freekill/image/card/number/black/12.png",
+      "file": "cards/number/black/12.png",
+      "bytes": 994,
+      "sha256": "e5807c0df2d809f1016372cf6b295e9883cadfc21002524e41d34622dfefd316"
+    },
+    {
+      "source": "freekill/image/card/number/black/13.png",
+      "file": "cards/number/black/13.png",
+      "bytes": 914,
+      "sha256": "31499ba58c40077eb35e4152afb4c4fee2006a2fac2993163f65de0f6fb5f46d"
+    },
+    {
+      "source": "freekill/image/card/number/black/2.png",
+      "file": "cards/number/black/2.png",
+      "bytes": 941,
+      "sha256": "011359cd8c501cd1d0d3ddf7e9137410d442fca08ae28c2bc64ca1d6a89089e0"
+    },
+    {
+      "source": "freekill/image/card/number/black/3.png",
+      "file": "cards/number/black/3.png",
+      "bytes": 921,
+      "sha256": "87744355af3f4c2862575d941eea22f6056ec0cd4d47414dc6a834f859af708d"
+    },
+    {
+      "source": "freekill/image/card/number/black/4.png",
+      "file": "cards/number/black/4.png",
+      "bytes": 922,
+      "sha256": "b4dc8f0413f314abf44c2f13742ed76bc9a6a2453026a5aef21adc34e052f854"
+    },
+    {
+      "source": "freekill/image/card/number/black/5.png",
+      "file": "cards/number/black/5.png",
+      "bytes": 918,
+      "sha256": "b4aa020551c290ca5d7944ddf476366ff11979ec3bcef9ba1fbe8ebb6cdc2c84"
+    },
+    {
+      "source": "freekill/image/card/number/black/6.png",
+      "file": "cards/number/black/6.png",
+      "bytes": 914,
+      "sha256": "b927f2fd1981e36a19cfc8411ca09e05e41e900211e5b895070e6eeb29501543"
+    },
+    {
+      "source": "freekill/image/card/number/black/7.png",
+      "file": "cards/number/black/7.png",
+      "bytes": 885,
+      "sha256": "0de2995965e528c5fe6c295026cd7f9c5e725c442c0bef8278a65f480050b2fe"
+    },
+    {
+      "source": "freekill/image/card/number/black/8.png",
+      "file": "cards/number/black/8.png",
+      "bytes": 994,
+      "sha256": "aa7be10b874477299c07297a00440a8e70bdee30ee50456523ff3a347bb61f71"
+    },
+    {
+      "source": "freekill/image/card/number/black/9.png",
+      "file": "cards/number/black/9.png",
+      "bytes": 972,
+      "sha256": "0b6cd8b053b2a8afd1ec7048b118254e5aa9aba9c92fd23bf8498fcb924d8083"
+    },
+    {
+      "source": "freekill/image/anim/playing/0.png",
+      "file": "ui/animation/playing/0.png",
+      "bytes": 19414,
+      "sha256": "e99126449c1ad3a1a66a0ba78f9828f8f305f1fbed4f2706eae1edfe78de9155"
+    },
+    {
+      "source": "freekill/image/anim/playing/1.png",
+      "file": "ui/animation/playing/1.png",
+      "bytes": 18346,
+      "sha256": "7730f7eceb40dde9348b30b8b4d5fc9357770999e4e511b39a62b6360a4201d3"
+    },
+    {
+      "source": "freekill/image/anim/playing/10.png",
+      "file": "ui/animation/playing/10.png",
+      "bytes": 19643,
+      "sha256": "6f936daaa9e30550f603e41a19b7ad9cb6f38d450fbd707266ee6ccd1b0fe9ed"
+    },
+    {
+      "source": "freekill/image/anim/playing/11.png",
+      "file": "ui/animation/playing/11.png",
+      "bytes": 19375,
+      "sha256": "e7e02414cde9fa25f57aabe84fb273d06c43a675c1babde81356266c7390c4cb"
+    },
+    {
+      "source": "freekill/image/anim/playing/2.png",
+      "file": "ui/animation/playing/2.png",
+      "bytes": 18618,
+      "sha256": "4816dace510e0f8d1289c31b035d4695e1f9d0a021f2c5717e1fd1ed3244de69"
+    },
+    {
+      "source": "freekill/image/anim/playing/3.png",
+      "file": "ui/animation/playing/3.png",
+      "bytes": 18724,
+      "sha256": "8f2ebf35a189d9378f6c88a1cbe3a22d7707b7654e9365b5907f8cb90c5bd22a"
+    },
+    {
+      "source": "freekill/image/anim/playing/4.png",
+      "file": "ui/animation/playing/4.png",
+      "bytes": 19295,
+      "sha256": "b53d27ff2431a1fde387db69647980a567363856c10be5c04174c541fd8e6e52"
+    },
+    {
+      "source": "freekill/image/anim/playing/5.png",
+      "file": "ui/animation/playing/5.png",
+      "bytes": 19228,
+      "sha256": "4fafc0ca762d04acf249999bfe12d373f3ad2182569320d839a83060845dbdfe"
+    },
+    {
+      "source": "freekill/image/anim/playing/6.png",
+      "file": "ui/animation/playing/6.png",
+      "bytes": 19595,
+      "sha256": "74c1098e989f5aa2a187811634ae7aec30274d3c9e19114095f937e8eb556e8c"
+    },
+    {
+      "source": "freekill/image/anim/playing/7.png",
+      "file": "ui/animation/playing/7.png",
+      "bytes": 19724,
+      "sha256": "9ce382ea368e4a010444ecdce8401cfaf4fdda77e03e8a0e538a65c5aa83bf63"
+    },
+    {
+      "source": "freekill/image/anim/playing/8.png",
+      "file": "ui/animation/playing/8.png",
+      "bytes": 21157,
+      "sha256": "97abd65e8fbb78a78524df94da5c89e5d775eb6e22a3e15c4752f27398e62b53"
+    },
+    {
+      "source": "freekill/image/anim/playing/9.png",
+      "file": "ui/animation/playing/9.png",
+      "bytes": 20490,
+      "sha256": "0e1967384355ae656349ca99f8c165593de26155a980b218c5d3c952c68be2fb"
+    },
+    {
+      "source": "freekill/image/anim/selected/0.png",
+      "file": "ui/animation/selected/0.png",
+      "bytes": 18838,
+      "sha256": "8b713b1a2fb218792cf3f46dd835b18c6f66d7ceef16dd0e794684cf25ab4423"
+    },
+    {
+      "source": "freekill/image/anim/selected/1.png",
+      "file": "ui/animation/selected/1.png",
+      "bytes": 18363,
+      "sha256": "1cc1148fb1ca3742e90953b29bdfc3dbb8a2edaaa3f79b5381a022f2de53cd75"
+    },
+    {
+      "source": "freekill/image/anim/selected/10.png",
+      "file": "ui/animation/selected/10.png",
+      "bytes": 18483,
+      "sha256": "3905134289b3abe1e9fad348f13f6b4abf6f1807eb53a61a9d947cdd021a1a3e"
+    },
+    {
+      "source": "freekill/image/anim/selected/11.png",
+      "file": "ui/animation/selected/11.png",
+      "bytes": 19177,
+      "sha256": "0d74c5af890b0435ef5feaf99360883b8e45682e719e4a35aadc8bb74922d9e0"
+    },
+    {
+      "source": "freekill/image/anim/selected/2.png",
+      "file": "ui/animation/selected/2.png",
+      "bytes": 17600,
+      "sha256": "caaa3f4c2afb3abd7a99ab76c9374745750decf16f27e20a840bde733f4b8805"
+    },
+    {
+      "source": "freekill/image/anim/selected/3.png",
+      "file": "ui/animation/selected/3.png",
+      "bytes": 17647,
+      "sha256": "660df0063cf3ca3ff1ba363f696b7642ff18a37fc75ae72c38fb4497ab173a69"
+    },
+    {
+      "source": "freekill/image/anim/selected/4.png",
+      "file": "ui/animation/selected/4.png",
+      "bytes": 18463,
+      "sha256": "deaf132d43b6052f904c515b4f34d09643262843075b3f1dc32a7beaee4bd013"
+    },
+    {
+      "source": "freekill/image/anim/selected/5.png",
+      "file": "ui/animation/selected/5.png",
+      "bytes": 18359,
+      "sha256": "7f25ba265141956c3f098f1526be0fa31d7097e32ce6cb1019974a9a079ed119"
+    },
+    {
+      "source": "freekill/image/anim/selected/6.png",
+      "file": "ui/animation/selected/6.png",
+      "bytes": 19632,
+      "sha256": "fa2797689fd0ed9cd1920ef9468224aa824a431f23a8f75a9267043535090c6a"
+    },
+    {
+      "source": "freekill/image/anim/selected/7.png",
+      "file": "ui/animation/selected/7.png",
+      "bytes": 20421,
+      "sha256": "9cc5fdd6eb8110531d97f36d3c539d2e598e438692b6d5f6c5885f6d9bc5cdcd"
+    },
+    {
+      "source": "freekill/image/anim/selected/8.png",
+      "file": "ui/animation/selected/8.png",
+      "bytes": 19600,
+      "sha256": "01a24743c1e1b1df9c1cc8396243eb29c8fa0eddb0f1d85b678ac8fe56c3013f"
+    },
+    {
+      "source": "freekill/image/anim/selected/9.png",
+      "file": "ui/animation/selected/9.png",
+      "bytes": 19011,
+      "sha256": "08cced9550036bff94644ed4f32d9e7d60bdfc8f4cc839c210b37144f1004547"
+    },
+    {
+      "source": "freekill/image/anim/selectable/0.png",
+      "file": "ui/animation/selectable/0.png",
+      "bytes": 10474,
+      "sha256": "fde2e39cf7f599a685ce471f230ecbe12c9d8a03f3a75da3859ad60bc9a513df"
+    },
+    {
+      "source": "freekill/image/anim/selectable/1.png",
+      "file": "ui/animation/selectable/1.png",
+      "bytes": 20467,
+      "sha256": "b903200509a13b00d1117eba78b0aeb785c33682adb2ee73cba1f490b5424c6f"
+    },
+    {
+      "source": "freekill/image/anim/selectable/2.png",
+      "file": "ui/animation/selectable/2.png",
+      "bytes": 33093,
+      "sha256": "16441cac6ce20419f19b15771f4a9b5a3d5df31da1794a2bed7e3c561df6d66d"
+    },
+    {
+      "source": "freekill/image/anim/selectable/3.png",
+      "file": "ui/animation/selectable/3.png",
+      "bytes": 35347,
+      "sha256": "e19053b8199070bbb640f2ccce046a2875782d35f9e72f606f3c4bba5b9fd826"
+    },
+    {
+      "source": "freekill/image/anim/selectable/4.png",
+      "file": "ui/animation/selectable/4.png",
+      "bytes": 37394,
+      "sha256": "937a20d303a4da49cfe0642dc61a1f194c0817c17f04711218c28e0b68e1d7bc"
+    },
+    {
+      "source": "freekill/image/anim/selectable/5.png",
+      "file": "ui/animation/selectable/5.png",
+      "bytes": 24813,
+      "sha256": "9b8da4e7c46c2193fe0d92b871a3ac1080ef4105cba983804f58d89a8da982e8"
+    },
+    {
+      "source": "freekill/image/anim/selectable/6.png",
+      "file": "ui/animation/selectable/6.png",
+      "bytes": 13031,
+      "sha256": "7faeb571bedfa26a324019c7224057ba7ddda3ac404d609b4f4d2ac15784e9a4"
+    },
+    {
+      "source": "freekill/image/anim/selectable/7.png",
+      "file": "ui/animation/selectable/7.png",
+      "bytes": 11287,
+      "sha256": "6edefee671a258af6f051b30bcee8c8d155bb722220da4f1dfd0afb268d03436"
+    },
+    {
+      "source": "freekill/image/anim/selectable/8.png",
+      "file": "ui/animation/selectable/8.png",
+      "bytes": 10677,
+      "sha256": "b4fb80ec3ce6da9d6ae8e812d22cc1f4e21a0e5178fd016d4606cd58ecce5616"
+    },
+    {
+      "source": "freekill/image/anim/selectable/9.png",
+      "file": "ui/animation/selectable/9.png",
+      "bytes": 8655,
+      "sha256": "502476405b73d298e7a7ff5304543e8be3ca8567514bfad9eff2f329ba26f90e"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/axe.png",
+      "file": "icons/axe.png",
+      "bytes": 321,
+      "sha256": "6d619b1c25574f531e06e3cf0a7862340cd211ad6f014f663e0fb2e9e246a070"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/blade.png",
+      "file": "icons/blade.png",
+      "bytes": 274,
+      "sha256": "f3b9bad3ff84459da28afc946c22992538d58ba045a8afda874ed9b25d539a10"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/crossbow.png",
+      "file": "icons/crossbow.png",
+      "bytes": 380,
+      "sha256": "c89116b5816c0351d3a05c1fd3a8def95a88853c8c59abc1133aa211ffaf0754"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/double_swords.png",
+      "file": "icons/double_swords.png",
+      "bytes": 624,
+      "sha256": "2dc16bdaec6812eb6ced8e678d11da9a671e9202de241ad2db642a3be9605201"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/eight_diagram.png",
+      "file": "icons/eight_diagram.png",
+      "bytes": 512,
+      "sha256": "66b5d702f1c184ea4f8960ad3cf254f894d629aea4c828788869e5d69d58b625"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/halberd.png",
+      "file": "icons/halberd.png",
+      "bytes": 267,
+      "sha256": "49090b7c75e862bdf90c4b2c6aa778f0e8e047cbd61cd6550741f85c48e614d5"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/horse.png",
+      "file": "icons/horse.png",
+      "bytes": 406,
+      "sha256": "b55a7df1b0c8cd95a654dfe10ea30516bba7c2fc99e3556c412fb6eed73bd8ae"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/ice_sword.png",
+      "file": "icons/ice_sword.png",
+      "bytes": 335,
+      "sha256": "6b1cbc9cc418a688e292b3a03938864c60aa5ef59a451cf0195bde148817b026"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/kylin_bow.png",
+      "file": "icons/kylin_bow.png",
+      "bytes": 238,
+      "sha256": "d18cb55e928df7c1f2ddd1f882d680cb1546939a8cb661eba36227ed16a5167d"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/nioh_shield.png",
+      "file": "icons/nioh_shield.png",
+      "bytes": 371,
+      "sha256": "9145a8e87a7ca35db083419fda1f5b96108b7adda299fb1f0e349509ea395216"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/qinggang_sword.png",
+      "file": "icons/qinggang_sword.png",
+      "bytes": 273,
+      "sha256": "a6082889919fe1156020089ca4569317d2ac64e377de188136b3c5c156c38aff"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/equipIcon/spear.png",
+      "file": "icons/spear.png",
+      "bytes": 289,
+      "sha256": "2621884d6bc80727b350ec2e1959896ccc70fbae72667dffd9f4330f6c25774f"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/delayedTrick/indulgence.png",
+      "file": "marks/indulgence.png",
+      "bytes": 3105,
+      "sha256": "922d63b8524620da717b8b171828cb2badfbf797ec3dc607c08f756df7405928"
+    },
+    {
+      "source": "freekill/packages/standard_cards/image/card/delayedTrick/lightning.png",
+      "file": "marks/lightning.png",
+      "bytes": 2998,
+      "sha256": "43712138bbc3e354e087cdd67abc04f85161c9277f01b976183dc926649f5eec"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/biyue1.mp3",
+      "file": "audio/skill/biyue1.mp3",
+      "bytes": 16553,
+      "sha256": "e9913d23ab355dc01fdee543f3cd1a731d9026e55a8ac67d7552cb119362d8c9"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/biyue2.mp3",
+      "file": "audio/skill/biyue2.mp3",
+      "bytes": 17389,
+      "sha256": "b608789f1bba4af36ab921045dcb2c6d40dc37786b231f8b4a1be204165b1561"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/fanjian1.mp3",
+      "file": "audio/skill/fanjian1.mp3",
+      "bytes": 43302,
+      "sha256": "f6fd427537f861ccf5bebdba9939d32678fd2d16a32f15edea3a64e621773e6a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/fanjian2.mp3",
+      "file": "audio/skill/fanjian2.mp3",
+      "bytes": 46646,
+      "sha256": "2f4b3ce0fa2d5f9d66ef34550c0a7b770b3d59baaf3836809a76a1412f5f187a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/fankui1.mp3",
+      "file": "audio/skill/fankui1.mp3",
+      "bytes": 27838,
+      "sha256": "5182b3bc2ebcd38e2738f2a00796496cb11a23a9329dedb0cb9a752b51da9bc7"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/fankui2.mp3",
+      "file": "audio/skill/fankui2.mp3",
+      "bytes": 42466,
+      "sha256": "bc9eb9621db28b58cbcbd195281c243b20cb5b6fb5b2ba60ee1a0245b58f12e6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/ganglie1.mp3",
+      "file": "audio/skill/ganglie1.mp3",
+      "bytes": 30764,
+      "sha256": "aa5fdf1ce2dd2aaa3a2a7e8c96aa970901fb7d4fbbbd6b0edf906a7e7148ba2d"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/ganglie2.mp3",
+      "file": "audio/skill/ganglie2.mp3",
+      "bytes": 44138,
+      "sha256": "fe35f657352725bc535e398f583194fd00d1f4fb9831133da9f34fc1299b15e5"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guanxing1.mp3",
+      "file": "audio/skill/guanxing1.mp3",
+      "bytes": 73395,
+      "sha256": "e57145926d0da027845c8e468c10cfa5ed289f08b9a3a32c62518e81872f184b"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guanxing2.mp3",
+      "file": "audio/skill/guanxing2.mp3",
+      "bytes": 55841,
+      "sha256": "028f50298da66a25757d610c2bec634fd82b774bbd01cd3939d175630c701966"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guicai1.mp3",
+      "file": "audio/skill/guicai1.mp3",
+      "bytes": 69216,
+      "sha256": "190cb626f77446d5df8cf57cf2702de9e8b82dcbc6d988e9279792acbe85ae91"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guicai2.mp3",
+      "file": "audio/skill/guicai2.mp3",
+      "bytes": 30346,
+      "sha256": "34037c26c684d0229588868dd3ba56ff1f190b8edff28805f6188c4df114adda"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guose1.mp3",
+      "file": "audio/skill/guose1.mp3",
+      "bytes": 16135,
+      "sha256": "69d1e1d23707a9dafb5381de31498ecde41c38670be7f4b418467b1ae296e798"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/guose2.mp3",
+      "file": "audio/skill/guose2.mp3",
+      "bytes": 13627,
+      "sha256": "58763f4fb908957490fc8bf9ac7b0ce84f410a087510968fa7b125bc73f0d130"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/hujia1.mp3",
+      "file": "audio/skill/hujia1.mp3",
+      "bytes": 43929,
+      "sha256": "e168414ac5d750f68e8b5330c4ab498d173e30f55b9e523521f10bd6571199bd"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/hujia2.mp3",
+      "file": "audio/skill/hujia2.mp3",
+      "bytes": 28465,
+      "sha256": "e9b0b1f3be450333b2aff8598e814213df6b8903cb86e7a77a1e63637a3410cf"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jianxiong1.mp3",
+      "file": "audio/skill/jianxiong1.mp3",
+      "bytes": 73813,
+      "sha256": "467205349f5d76c591e7965be3b246cec489cbf2a88f31d7373bb595a5a573c0"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jianxiong2.mp3",
+      "file": "audio/skill/jianxiong2.mp3",
+      "bytes": 39541,
+      "sha256": "71b0df9a436fc9f01e04c33eea4c5abc2897e89781306415024da84ee18d046a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jieyin1.mp3",
+      "file": "audio/skill/jieyin1.mp3",
+      "bytes": 29092,
+      "sha256": "986d21cb14f69c321049803bcbbd7df0e662dc709a74a5222eb4bdda024ffba2"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jieyin2.mp3",
+      "file": "audio/skill/jieyin2.mp3",
+      "bytes": 27420,
+      "sha256": "05b7aad84ae1c99d776b8c2ecfcbbf82c994d903a5d7eac67f1fe4f323116851"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jijiang1.mp3",
+      "file": "audio/skill/jijiang1.mp3",
+      "bytes": 24703,
+      "sha256": "e82346d9540663ff92a062704a552b30a2b9882b5055c050bb93483963fb75fd"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jijiang2.mp3",
+      "file": "audio/skill/jijiang2.mp3",
+      "bytes": 35152,
+      "sha256": "59729e248104a137cf3a0f68279f13a07d8a355595e2889c851a175e3fb0a82b"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jijiu1.mp3",
+      "file": "audio/skill/jijiu1.mp3",
+      "bytes": 40795,
+      "sha256": "da0df3be8f6dbf2c5cf32c91f7872d1f54ca0eba5fb2b3b22314769c67abb75a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jijiu2.mp3",
+      "file": "audio/skill/jijiu2.mp3",
+      "bytes": 65454,
+      "sha256": "913774682e296324d9b0743b3ea25429e5aacfc5113b5929f2ea0df0a84aaf18"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jiuyuan1.mp3",
+      "file": "audio/skill/jiuyuan1.mp3",
+      "bytes": 50199,
+      "sha256": "3ce06056b0203135eb7f5c46b4712a4487666c71cc0d6339b01d01a82ec8fa47"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jiuyuan2.mp3",
+      "file": "audio/skill/jiuyuan2.mp3",
+      "bytes": 30973,
+      "sha256": "0e346adb0368a0aadeda575147ef0d3205ea9e113d272f7868ab399512b7ac7e"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jizhi1.mp3",
+      "file": "audio/skill/jizhi1.mp3",
+      "bytes": 12791,
+      "sha256": "28a96132c301ba58b8d911804d9a5e4e1f935a585b64748a0aa1311142d00ff6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/jizhi2.mp3",
+      "file": "audio/skill/jizhi2.mp3",
+      "bytes": 4432,
+      "sha256": "f1594bddd383e1518ab62bf07dddde5ae0ba6a4d4c24ce3439cf5560985e7be3"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/keji1.mp3",
+      "file": "audio/skill/keji1.mp3",
+      "bytes": 42466,
+      "sha256": "771350549eca7d0919faf3ee8bf7b12ab413e4233052818f322633327904e00f"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/keji2.mp3",
+      "file": "audio/skill/keji2.mp3",
+      "bytes": 42466,
+      "sha256": "3b1c95837e9c5ed9050cb64e3b827f2c74f6cd65289c4df1133f37effa3238d3"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/kongcheng1.mp3",
+      "file": "audio/skill/kongcheng1.mp3",
+      "bytes": 31182,
+      "sha256": "312eb613ff52e74fa33734ea814b9c872cd1cdc881ab0fd2334595a2ed21c4a3"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/kongcheng2.mp3",
+      "file": "audio/skill/kongcheng2.mp3",
+      "bytes": 40377,
+      "sha256": "ee52e5b38265acd58d1ccd433e8286ed0fd65b5e195b8ae1589c7e5e855adbc5"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/kurou1.mp3",
+      "file": "audio/skill/kurou1.mp3",
+      "bytes": 41213,
+      "sha256": "f605fef5540d19290e993a483fcf9117a3e579bcd2b42da79d2fa55b106d8cf8"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/kurou2.mp3",
+      "file": "audio/skill/kurou2.mp3",
+      "bytes": 39541,
+      "sha256": "9dfdea80a8ac3afe7c889b07d92e758b2f769cc217c1c63f6c4d861820c8c5ec"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/lianying1.mp3",
+      "file": "audio/skill/lianying1.mp3",
+      "bytes": 55841,
+      "sha256": "19e4e0d170ed14056499a207276e865ed6050a78e5ab68337e60ada1b3b57dfb"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/lianying2.mp3",
+      "file": "audio/skill/lianying2.mp3",
+      "bytes": 35779,
+      "sha256": "b77c92e8fce33024e429e73eac14494ac868f6a23361f9d4edfd35340540e758"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/lijian1.mp3",
+      "file": "audio/skill/lijian1.mp3",
+      "bytes": 29510,
+      "sha256": "21f866a8adf7296fa41fd69313fad95a762c7283ba20b1b16381b2741c80462e"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/lijian2.mp3",
+      "file": "audio/skill/lijian2.mp3",
+      "bytes": 55423,
+      "sha256": "8bbdbfb53c6202a3459885edefc4bb3fe9b77298810363a93819ecca575c03ce"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/liuli1.mp3",
+      "file": "audio/skill/liuli1.mp3",
+      "bytes": 14881,
+      "sha256": "88da2550bc6ae228de77719ed6c325cc23b73c80bef745d89b7b641094e8853c"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/liuli2.mp3",
+      "file": "audio/skill/liuli2.mp3",
+      "bytes": 21986,
+      "sha256": "596994fc243aab84334a6cf942548b47cca23a9c7a07d0357d196eeda2df96eb"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/longdan1.mp3",
+      "file": "audio/skill/longdan1.mp3",
+      "bytes": 45810,
+      "sha256": "e389e27a914e766b88670e0bb00ea7e800a21bb9bde187e040d9dd1235b91164"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/longdan2.mp3",
+      "file": "audio/skill/longdan2.mp3",
+      "bytes": 40377,
+      "sha256": "ad3f3f5f66b7af63889cfb8138cb0a9030a7aec7429c933a31bf21bc9a34a8e6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/luoshen1.mp3",
+      "file": "audio/skill/luoshen1.mp3",
+      "bytes": 56677,
+      "sha256": "1b3f39d8c26255368d12c8d170b835638662a61bead4a454c5f676c60f61eb53"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/luoshen2.mp3",
+      "file": "audio/skill/luoshen2.mp3",
+      "bytes": 57095,
+      "sha256": "5d63501a652a1abdac51307129b251f2c2a9c101e9903a5b9df8f5ecf312b2dc"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/luoyi1.mp3",
+      "file": "audio/skill/luoyi1.mp3",
+      "bytes": 9030,
+      "sha256": "9ac844270970dd501349fa1305ff1e1e1ac1e6db3195c7c39c54cd12e0faca2f"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/luoyi2.mp3",
+      "file": "audio/skill/luoyi2.mp3",
+      "bytes": 44974,
+      "sha256": "d4fa1f8b70adb3d16ab1558a608254514b26437864432cefe089294203eeaf22"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/paoxiao1.mp3",
+      "file": "audio/skill/paoxiao1.mp3",
+      "bytes": 19061,
+      "sha256": "6ec94654aa7df838c2ab2303e2ac85e9361de14220108b115da93b93f4a56c52"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/paoxiao2.mp3",
+      "file": "audio/skill/paoxiao2.mp3",
+      "bytes": 34943,
+      "sha256": "5223d21b6876ba7ccfbe5c4340e22e68894f82ac218fb223e980688ba0bb374e"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qianxun1.mp3",
+      "file": "audio/skill/qianxun1.mp3",
+      "bytes": 61275,
+      "sha256": "c988bd62e18180dc5662f1fcf2f8603a52df451a7dd5f77947a3d1886c386e90"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qianxun2.mp3",
+      "file": "audio/skill/qianxun2.mp3",
+      "bytes": 52079,
+      "sha256": "5547fb92f3859252d2c2cfe06c2795d8dce8e49f7fab7121eb3bc7a73d8deea5"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qingguo1.mp3",
+      "file": "audio/skill/qingguo1.mp3",
+      "bytes": 58349,
+      "sha256": "f04d9d22596bc0286c9db49edd02df8439588fe91f53bea55e9a127d26cdd6b4"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qingguo2.mp3",
+      "file": "audio/skill/qingguo2.mp3",
+      "bytes": 56259,
+      "sha256": "904575496fcec45c71d3d677eccf5ae565b275096f90722d774fa1ca99fb42a4"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qingnang1.mp3",
+      "file": "audio/skill/qingnang1.mp3",
+      "bytes": 51244,
+      "sha256": "d7e1e36529ee573e8f9920101fe840377f53514663801025340f074ae49d46a2"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qingnang2.mp3",
+      "file": "audio/skill/qingnang2.mp3",
+      "bytes": 37451,
+      "sha256": "33c6f82d2f621eb40456113422e36acf141d4940942d7c645e391ee7498fc0fe"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qixi1.mp3",
+      "file": "audio/skill/qixi1.mp3",
+      "bytes": 13627,
+      "sha256": "1bd504baf871d0b63ec00fc53deb2fbf2286ae773dc8ad4ad68757daf00ba3e4"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/qixi2.mp3",
+      "file": "audio/skill/qixi2.mp3",
+      "bytes": 19897,
+      "sha256": "60aaa9cf7c2e1e93f2f1aa00864fb4980b7079f2d64d880fcdf0c7078a3cdbc4"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/rende1.mp3",
+      "file": "audio/skill/rende1.mp3",
+      "bytes": 25330,
+      "sha256": "a2c7551093c0c4f41c64db421a11c0de969ab503b93ca868edc80455c9d4c211"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/rende2.mp3",
+      "file": "audio/skill/rende2.mp3",
+      "bytes": 65036,
+      "sha256": "0b236ba1195fd86680a91c006cdccaab12caaf01954dc578fa4a21463d35d411"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tiandu1.mp3",
+      "file": "audio/skill/tiandu1.mp3",
+      "bytes": 16971,
+      "sha256": "6406fafebefb81adf27cebdb345070a314e704514a706b8e20ee19b468040b96"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tiandu2.mp3",
+      "file": "audio/skill/tiandu2.mp3",
+      "bytes": 6522,
+      "sha256": "01804240e0e0ce4522a6dd0afbcf5a8836ce02276098abe758eda2f4463021df"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tieqi1.mp3",
+      "file": "audio/skill/tieqi1.mp3",
+      "bytes": 34107,
+      "sha256": "eb19db62cbc230e150006c4a334aa8bc28dd14981d27ff1f3f9d75e9d0aad0b4"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tieqi2.mp3",
+      "file": "audio/skill/tieqi2.mp3",
+      "bytes": 35361,
+      "sha256": "b25bcfd5899b20b09dd17344f4cc798a4586de0f69ed12f1c4864595e1f5d56a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tuxi1.mp3",
+      "file": "audio/skill/tuxi1.mp3",
+      "bytes": 32017,
+      "sha256": "68f74389e37a18304e0d8a23fb9317e160c3c37ae7fb4f2e17b8c2170730a60a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/tuxi2.mp3",
+      "file": "audio/skill/tuxi2.mp3",
+      "bytes": 9866,
+      "sha256": "25fcf2ee6ec55cd387558bd6107c7c6945d37e15f9f086a5680492762f441b3b"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/wusheng1.mp3",
+      "file": "audio/skill/wusheng1.mp3",
+      "bytes": 43302,
+      "sha256": "78bec8df6d74458f5fcabca324974ec6e3001bd41142fbf74e602ff9f6a055c6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/wusheng2.mp3",
+      "file": "audio/skill/wusheng2.mp3",
+      "bytes": 34943,
+      "sha256": "75b82117c3dde81b2422d5e4fed9b5b092749accf8de28c7092aac29712407fa"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/wushuang1.mp3",
+      "file": "audio/skill/wushuang1.mp3",
+      "bytes": 16553,
+      "sha256": "88c5340b10e780c5e2cb3ac15b17bdb239e1c7283133b043629dfb9d2b5cd3db"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/wushuang2.mp3",
+      "file": "audio/skill/wushuang2.mp3",
+      "bytes": 43720,
+      "sha256": "1a77b4667772729d42c31e7134b700d3042a580f17c818df80fe1a27b15f7370"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/xiaoji1.mp3",
+      "file": "audio/skill/xiaoji1.mp3",
+      "bytes": 4850,
+      "sha256": "7829720b983c84f402e1539c9bc1a358843d2ed5e8df9170299bcbff954a226c"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/xiaoji2.mp3",
+      "file": "audio/skill/xiaoji2.mp3",
+      "bytes": 16553,
+      "sha256": "4104ade9f23304d7aa60e6047120c2d9dda132e76584206cbb504ef9e82435e9"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/yiji1.mp3",
+      "file": "audio/skill/yiji1.mp3",
+      "bytes": 10702,
+      "sha256": "82930ed24edfdcd10e4dd54bd1ebe607811fd32644567be31095444bba233b1e"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/yiji2.mp3",
+      "file": "audio/skill/yiji2.mp3",
+      "bytes": 19897,
+      "sha256": "4122f676020f684d967ec451a4c89ecace6896e2292b3090c98330058e2b38a6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/yingzi1.mp3",
+      "file": "audio/skill/yingzi1.mp3",
+      "bytes": 19061,
+      "sha256": "f41c4671d69ef0a13d7aa59eaec5146a5f88421b621a00342573857b237e6d20"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/yingzi2.mp3",
+      "file": "audio/skill/yingzi2.mp3",
+      "bytes": 21568,
+      "sha256": "8baf112e47da676b6a5479f28f20a8313db8209aef1580c2ce63c43617574e83"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/zhiheng1.mp3",
+      "file": "audio/skill/zhiheng1.mp3",
+      "bytes": 21150,
+      "sha256": "7c77cf3e5a23f238191145cd8e54ab47184caa40f1938efda6085c9f96ad2777"
+    },
+    {
+      "source": "freekill/packages/standard/audio/skill/zhiheng2.mp3",
+      "file": "audio/skill/zhiheng2.mp3",
+      "bytes": 7776,
+      "sha256": "3082bd5d4081c016a98d1861b554a24137ba9d49d47385508fa1ea94c4be1a57"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/caocao.mp3",
+      "file": "audio/death/caocao.mp3",
+      "bytes": 60857,
+      "sha256": "eb67925e60e27a9cdcdfa470c0db69641524acda9b6e15f561f795d21c8224d8"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/daqiao.mp3",
+      "file": "audio/death/daqiao.mp3",
+      "bytes": 46228,
+      "sha256": "130ae785f0641058722c8918536530c6b3e8a00eefe4cd0d25a417171e660e96"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/diaochan.mp3",
+      "file": "audio/death/diaochan.mp3",
+      "bytes": 98891,
+      "sha256": "97a258842238950980acb9ef108d316214efd275fb9149ae4113012d27ff27d7"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/ganning.mp3",
+      "file": "audio/death/ganning.mp3",
+      "bytes": 89278,
+      "sha256": "c93b3f037dcb5cfc97560f6f0cebe1b8da561bfcecb1a89eac8039d4e62700dc"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/guanyu.mp3",
+      "file": "audio/death/guanyu.mp3",
+      "bytes": 49154,
+      "sha256": "b46f6cb7d3b385f3ee4a78c249e3de1fe5fc005c679ec83ab0b81cdb9fba5fad"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/guojia.mp3",
+      "file": "audio/death/guojia.mp3",
+      "bytes": 67962,
+      "sha256": "59f59d4acc2f444e2201f2cd26c5713b5d498ae8a61fb34bc1b582f69c067d32"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/huanggai.mp3",
+      "file": "audio/death/huanggai.mp3",
+      "bytes": 40795,
+      "sha256": "25d0c7b416859b56cbc18cb6ec07608f874ca9958e3a01e35fed00455fb07e04"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/huangyueying.mp3",
+      "file": "audio/death/huangyueying.mp3",
+      "bytes": 13627,
+      "sha256": "cd22e23b1441049c01f331cac300dbb4d854ccb19cefe80bf79b9e63cc1cc6c7"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/huatuo.mp3",
+      "file": "audio/death/huatuo.mp3",
+      "bytes": 66290,
+      "sha256": "1a41021627869dd2b9e34d2ad25191783ed3e8e144a353fed48c5be7ea80493a"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/liubei.mp3",
+      "file": "audio/death/liubei.mp3",
+      "bytes": 62946,
+      "sha256": "c1f33143a19ae4b44a9b6ee8bd3ad9e54b8036cca9aea065fa828e7a8c8bec63"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/luxun.mp3",
+      "file": "audio/death/luxun.mp3",
+      "bytes": 31182,
+      "sha256": "d8e18f783f97a645c22b50398f99ac14d9ad19d03c21b897579a3b3d2e00a587"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/lvbu.mp3",
+      "file": "audio/death/lvbu.mp3",
+      "bytes": 14045,
+      "sha256": "74b9d22d9a47d244ff858acc56b6ae2b60bc80019744c56607a918ecb7d68092"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/lvmeng.mp3",
+      "file": "audio/death/lvmeng.mp3",
+      "bytes": 25330,
+      "sha256": "bf469be78d0a8f8e94be279cfcbf76531663d2ce677828acedc886bccd3cda9e"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/machao.mp3",
+      "file": "audio/death/machao.mp3",
+      "bytes": 36197,
+      "sha256": "4a36f78253879fe3dcd523dfa7af010880c1ee0b92878875b99ff4752f268463"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/simayi.mp3",
+      "file": "audio/death/simayi.mp3",
+      "bytes": 47482,
+      "sha256": "a8e8f9ec82da53c2d1460c30f3b8f23e1a30b98c629bfb7355b9f539c45c7d83"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/sunquan.mp3",
+      "file": "audio/death/sunquan.mp3",
+      "bytes": 65454,
+      "sha256": "18ac55780366c4652ffed75d4a59b9df4067c4e3ae23db07c35faab3822e3b6f"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/sunshangxiang.mp3",
+      "file": "audio/death/sunshangxiang.mp3",
+      "bytes": 43720,
+      "sha256": "2b60128a4efa5a35c7bddfb64de6057a094d76d9e109d115fc0342d8698612c2"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/xiahoudun.mp3",
+      "file": "audio/death/xiahoudun.mp3",
+      "bytes": 58767,
+      "sha256": "0168bfa255c4590ccae6d4c48d1f31553cf0a8bcdfe1fdf58be34bae5046dcd6"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/xuchu.mp3",
+      "file": "audio/death/xuchu.mp3",
+      "bytes": 58767,
+      "sha256": "832661d9a3dfdd85b5ffdeb14864259c6a3dd8fd3f0ace35b3ac7449d8231213"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhangfei.mp3",
+      "file": "audio/death/zhangfei.mp3",
+      "bytes": 46646,
+      "sha256": "4750a2c4f4226ad18fca71b1896d62947a848ae570933744eb2f7cbcb3f180fa"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhangliao.mp3",
+      "file": "audio/death/zhangliao.mp3",
+      "bytes": 28256,
+      "sha256": "d606b51d1c3cb39e210e8d3bc5d6c1a82fd7306f68789183d471350ec9e8a578"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhaoyun.mp3",
+      "file": "audio/death/zhaoyun.mp3",
+      "bytes": 51244,
+      "sha256": "cd975ad4f532a325bd9ee611e26a539920598d969af0e2d5714a2d9bb7d40c86"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhenji.mp3",
+      "file": "audio/death/zhenji.mp3",
+      "bytes": 107668,
+      "sha256": "cbc124a116a46cbaeaefedd9fb738790a265278bdeca935f433aa5bf611748f5"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhouyu.mp3",
+      "file": "audio/death/zhouyu.mp3",
+      "bytes": 41630,
+      "sha256": "4bdf33dbe9226a65789624d8bec8a4c143a7aea5de9188744475b8e4da1e808c"
+    },
+    {
+      "source": "freekill/packages/standard/audio/death/zhugeliang.mp3",
+      "file": "audio/death/zhugeliang.mp3",
+      "bytes": 67126,
+      "sha256": "3baf2f79a68931a0bfbab63961c6c50a8b2541394939dac312799d03257656b9"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/amazing_grace.mp3",
+      "file": "audio/card/male/amazing_grace.mp3",
+      "bytes": 11946,
+      "sha256": "c52ea9496f887537e0431ac0757fae768aa27c655956771e0b14d2986ad8b778"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/archery_attack.mp3",
+      "file": "audio/card/male/archery_attack.mp3",
+      "bytes": 12155,
+      "sha256": "207e4713e82dc42f95de153b50c2cbdd5371962c9951754d4539c4f1e0322a99"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/collateral.mp3",
+      "file": "audio/card/male/collateral.mp3",
+      "bytes": 11302,
+      "sha256": "c78b65ea2708b8d8a5a2c9482b92135dccad6cf7dbc8df5292d9f8a17e761bcc"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/dismantlement.mp3",
+      "file": "audio/card/male/dismantlement.mp3",
+      "bytes": 10884,
+      "sha256": "f060f5447d598aeb9b5a91e4049532d7b48e82cc917b3b22bee02018165bf898"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/duel.mp3",
+      "file": "audio/card/male/duel.mp3",
+      "bytes": 4824,
+      "sha256": "b6d50a9d7f9d45f0584b3b2d0f8173efa09155461c77100aca7674705400c6d6"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/ex_nihilo.mp3",
+      "file": "audio/card/male/ex_nihilo.mp3",
+      "bytes": 10049,
+      "sha256": "630aeb233463b59e82c53f49c6b94232635577d1e62ed524fd46e3406d178670"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/god_salvation.mp3",
+      "file": "audio/card/male/god_salvation.mp3",
+      "bytes": 10467,
+      "sha256": "a1d0bfaf1b8978993360a1777a179622c61d3e642e3daaa168c29c170419b802"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/indulgence.mp3",
+      "file": "audio/card/male/indulgence.mp3",
+      "bytes": 10049,
+      "sha256": "46c906ef933ecf3a6a920ebb28eacba27772e93fec10cdc987f8102883ed5128"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/jink.mp3",
+      "file": "audio/card/male/jink.mp3",
+      "bytes": 5033,
+      "sha256": "897938e30c74785439f9ab653cda44c030b2d3787afa2cdcd8db76965fb991e4"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/lightning.mp3",
+      "file": "audio/card/male/lightning.mp3",
+      "bytes": 6078,
+      "sha256": "f02dce4aeb093ecf12de0a6913c216aad0db5327c797e7afd742facc43779478"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/nullification.mp3",
+      "file": "audio/card/male/nullification.mp3",
+      "bytes": 10884,
+      "sha256": "156a1b849f66a03c13b2cc5cfffde739901a3a034cb76837abfb0f7d31650a8f"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/peach.mp3",
+      "file": "audio/card/male/peach.mp3",
+      "bytes": 33689,
+      "sha256": "311703e51fe952e284a3e76f354cb2c6bb367b15e46e8ac22543c3d9a04f74cd"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/savage_assault.mp3",
+      "file": "audio/card/male/savage_assault.mp3",
+      "bytes": 10049,
+      "sha256": "813844b980e0b4bae4e6bc936e8e20eed347011c101783c0d557719f1c0393bc"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/slash.mp3",
+      "file": "audio/card/male/slash.mp3",
+      "bytes": 5033,
+      "sha256": "952289e3665675676b78f813f60e2eb46789465bbb512238456097401de90a90"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/male/snatch.mp3",
+      "file": "audio/card/male/snatch.mp3",
+      "bytes": 11093,
+      "sha256": "6558edc7aec125b5547e415114b898e3fda5fe2e37edae5c29ddc427bd436083"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/amazing_grace.mp3",
+      "file": "audio/card/female/amazing_grace.mp3",
+      "bytes": 9230,
+      "sha256": "544569e5ff99b9d602073570fabb0b0d500728c22e3c44c561d29d0bb5ae2f5f"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/archery_attack.mp3",
+      "file": "audio/card/female/archery_attack.mp3",
+      "bytes": 9439,
+      "sha256": "75eef2e90a46bf499b29945dec1d88a8cad9944b9f2e96048750dfa55e00ffa9"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/collateral.mp3",
+      "file": "audio/card/female/collateral.mp3",
+      "bytes": 13468,
+      "sha256": "82fa08d14021ea4d3d80f72cb525c0e3108dbd35cf517a3ca59dc6e8e4132f58"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/dismantlement.mp3",
+      "file": "audio/card/female/dismantlement.mp3",
+      "bytes": 12632,
+      "sha256": "692b0a901af5d552f1f91bc0eb8becbebde3d02f74b0070b10d6db517b8fea30"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/duel.mp3",
+      "file": "audio/card/female/duel.mp3",
+      "bytes": 9497,
+      "sha256": "6103bd311e7609d8930765af00f84ddbb4b2793b98f9c646bbc6963add5e7a5a"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/ex_nihilo.mp3",
+      "file": "audio/card/female/ex_nihilo.mp3",
+      "bytes": 12632,
+      "sha256": "cf91f0f49fb24bf42be244cade28097cf23b02ed32b38ebcab9e62f393bd76e9"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/god_salvation.mp3",
+      "file": "audio/card/female/god_salvation.mp3",
+      "bytes": 12632,
+      "sha256": "884a227db22939d1944eb3154104e5c899df7cca3ac9eab423cde97c9f4e8e64"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/indulgence.mp3",
+      "file": "audio/card/female/indulgence.mp3",
+      "bytes": 13886,
+      "sha256": "c1a19979e496be70d4c95e9f4ec4655f59f8ef078737cb6c84c3138b3896aa63"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/jink.mp3",
+      "file": "audio/card/female/jink.mp3",
+      "bytes": 8243,
+      "sha256": "b15c4d8460e779c782aaff1e5843166c2ba793901bffb43a264359b2be64264a"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/lightning.mp3",
+      "file": "audio/card/female/lightning.mp3",
+      "bytes": 9706,
+      "sha256": "8b2936f343d8dc969ca37477f2b4d0a4d390a1505d6cab807dabf483fe19d136"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/nullification.mp3",
+      "file": "audio/card/female/nullification.mp3",
+      "bytes": 12841,
+      "sha256": "7fb06d5a4d2e57f7e4f31ed4859bbb3beaa33354859916d5c6a252e4a78df6dd"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/peach.mp3",
+      "file": "audio/card/female/peach.mp3",
+      "bytes": 33689,
+      "sha256": "311703e51fe952e284a3e76f354cb2c6bb367b15e46e8ac22543c3d9a04f74cd"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/savage_assault.mp3",
+      "file": "audio/card/female/savage_assault.mp3",
+      "bytes": 12005,
+      "sha256": "3568f2510d68b66fa9fb7600c8ad586067a8233ff3dec3b0b3958ac63d65bca2"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/slash.mp3",
+      "file": "audio/card/female/slash.mp3",
+      "bytes": 7825,
+      "sha256": "b19fd9dacf50c9b683384a377ec3dbce94f9bad9b6fb901102add58e2abf1637"
+    },
+    {
+      "source": "freekill/packages/standard_cards/audio/card/female/snatch.mp3",
+      "file": "audio/card/female/snatch.mp3",
+      "bytes": 13050,
+      "sha256": "02aa9a7bbb45b0822fdbe387862a69188e07be00147cddbab4f83de100115773"
+    },
+    {
+      "source": "freekill/audio/card/common/weapon.mp3",
+      "file": "audio/card/common/weapon.mp3",
+      "bytes": 5686,
+      "sha256": "754a2c9ecd9a050b138a701ca07c72bdbb23e9d1ce30a2aeb53f5272f8b8dde4"
+    },
+    {
+      "source": "freekill/audio/card/common/armor.mp3",
+      "file": "audio/card/common/armor.mp3",
+      "bytes": 6522,
+      "sha256": "b9f1b701c8c955e01bf3612fc64f288f83c5c43aa97803f9804734f368970be5"
+    },
+    {
+      "source": "freekill/audio/card/common/horse.mp3",
+      "file": "audio/card/common/horse.mp3",
+      "bytes": 20315,
+      "sha256": "93a813d47c2fcef0e4a64946c631583cfe0d1395379c7e2f9ff61e16d315e3bf"
+    },
+    {
+      "source": "freekill/audio/system/gamestart.mp3",
+      "file": "audio/system/gamestart.mp3",
+      "bytes": 42130,
+      "sha256": "603269589320f52fd88fdc9f661415cd1584f42059fc8de5e80a90b4eb6839f0"
+    },
+    {
+      "source": "freekill/audio/system/draw.mp3",
+      "file": "audio/system/draw.mp3",
+      "bytes": 32946,
+      "sha256": "0bc07b1babf8d48ff3d4ea07f2966a0c91a01fdfe8256d2b658f03aba82011f6"
+    },
+    {
+      "source": "freekill/audio/system/normal_damage.mp3",
+      "file": "audio/system/normal_damage.mp3",
+      "bytes": 9121,
+      "sha256": "c6dd2d96ea09faf959a09171e5c5fcc4f939b9529efac15bbdc40d795bd5abd3"
+    },
+    {
+      "source": "freekill/audio/system/fire_damage.mp3",
+      "file": "audio/system/fire_damage.mp3",
+      "bytes": 21660,
+      "sha256": "49589d2536d8873cf334fa7afde96974eddc5388a58997b53d567d8e94d358cb"
+    },
+    {
+      "source": "freekill/audio/system/thunder_damage.mp3",
+      "file": "audio/system/thunder_damage.mp3",
+      "bytes": 20406,
+      "sha256": "56333824006fd3825246a13051c5025a6cecff71d9ec3d203ccd496789271a84"
+    },
+    {
+      "source": "freekill/audio/system/losehp.mp3",
+      "file": "audio/system/losehp.mp3",
+      "bytes": 12883,
+      "sha256": "956e4f3082375a4aa3b49b0aeb9225c37afa29f046b5934076f82e9ae89160e8"
+    },
+    {
+      "source": "freekill/audio/system/chain.mp3",
+      "file": "audio/system/chain.mp3",
+      "bytes": 32706,
+      "sha256": "4649af0764a651d6932ff5e647234dab56d9cd88f03572d886374d9d6d770227"
+    },
+    {
+      "source": "freekill/audio/system/win.mp3",
+      "file": "audio/system/win.mp3",
+      "bytes": 26990,
+      "sha256": "af13fa377421019215b39a6dcc62c4d8947119550bf25655140c04812efc02ae"
+    },
+    {
+      "source": "freekill/audio/system/lose.mp3",
+      "file": "audio/system/lose.mp3",
+      "bytes": 27617,
+      "sha256": "6dc181ca36859246719917d38aa90a307e51eec687c3b40ee7e3012f7511e29a"
+    },
+    {
+      "source": "freekill/LICENSE",
+      "file": "SOURCE-LICENSE.txt",
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    }
+  ],
+  "portraits": [
+    {
+      "id": "standard:guanyu",
+      "source": "freekill/packages/standard/image/generals/guanyu.jpg",
+      "file": "guanyu.jpg",
+      "bytes": 18776,
+      "sha256": "cd28f83894b83b84e024a2c602d89840f42a186953cab6d8de50abc48576a85e"
+    },
+    {
+      "id": "standard:huanggai",
+      "source": "freekill/packages/standard/image/generals/huanggai.jpg",
+      "file": "huanggai.jpg",
+      "bytes": 19247,
+      "sha256": "13b79482c2fed46ad3e8f656b3c3ea0013b9afaed79ba66c85fc8ec020ade1ac"
+    },
+    {
+      "id": "standard:sunshangxiang",
+      "source": "freekill/packages/standard/image/generals/sunshangxiang.jpg",
+      "file": "sunshangxiang.jpg",
+      "bytes": 15640,
+      "sha256": "f4a56abbe046b5ab9d3c54a4c7a87b3bc7a907bb4d0fde35e41fe750c81951d4"
+    },
+    {
+      "id": "standard:zhaoyun",
+      "source": "freekill/packages/standard/image/generals/zhaoyun.jpg",
+      "file": "zhaoyun.jpg",
+      "bytes": 13552,
+      "sha256": "e36b39e2db88389e8669052fe299fbe1355399d54e28528c5a98f679c2f7a7b2"
+    },
+    {
+      "id": "standard:zhangfei",
+      "source": "freekill/packages/standard/image/generals/zhangfei.jpg",
+      "file": "zhangfei.jpg",
+      "bytes": 13974,
+      "sha256": "96bf019e9ba81f715d47e5d71ccee7321c2e1f395db7d3171722b62edbae9ba6"
+    },
+    {
+      "id": "standard:ganning",
+      "source": "freekill/packages/standard/image/generals/ganning.jpg",
+      "file": "ganning.jpg",
+      "bytes": 23875,
+      "sha256": "93bb293da386edb218e7fc1ad1183bcced2f2174a89929867d932f48f3d95906"
+    },
+    {
+      "id": "standard:xiahoudun",
+      "source": "freekill/packages/standard/image/generals/xiahoudun.jpg",
+      "file": "xiahoudun.jpg",
+      "bytes": 21016,
+      "sha256": "85c4f04ad88a288711d4a8f5d0170664e9cc279a80c78194ee64a0a5bbfa40d0"
+    },
+    {
+      "id": "standard:xuchu",
+      "source": "freekill/packages/standard/image/generals/xuchu.jpg",
+      "file": "xuchu.jpg",
+      "bytes": 18615,
+      "sha256": "030c2c6aa60e413250f667d3011ea0863bddf56cddc33a441511dbe2cf05470a"
+    },
+    {
+      "id": "standard:zhenji",
+      "source": "freekill/packages/standard/image/generals/zhenji.jpg",
+      "file": "zhenji.jpg",
+      "bytes": 20712,
+      "sha256": "ad57f8bb2b8a912a48643dd2a8d1d165f62a32c9a596994e49a8239297c05745"
+    },
+    {
+      "id": "standard:simayi",
+      "source": "freekill/packages/standard/image/generals/simayi.jpg",
+      "file": "simayi.jpg",
+      "bytes": 14781,
+      "sha256": "0b7cd4da3c71245c4d41cd08302e8099d3071fc549e0258dc19bc9eeb084fd64"
+    },
+    {
+      "id": "standard:guojia",
+      "source": "freekill/packages/standard/image/generals/guojia.jpg",
+      "file": "guojia.jpg",
+      "bytes": 18042,
+      "sha256": "5a5bc31eb3136b285591d14642ecdca54eb7adc7226c46ba28b9383a82687b63"
+    },
+    {
+      "id": "standard:caocao",
+      "source": "freekill/packages/standard/image/generals/caocao.jpg",
+      "file": "caocao.jpg",
+      "bytes": 20626,
+      "sha256": "e44d3628a7eeab313bcf6a6ddbdd70a3c2f850ba73affc17d0a42770e0679cf0"
+    },
+    {
+      "id": "standard:zhangliao",
+      "source": "freekill/packages/standard/image/generals/zhangliao.jpg",
+      "file": "zhangliao.jpg",
+      "bytes": 15233,
+      "sha256": "995fa815251c6210d525fdc56f2e30de723ab38584705a9fec6a32f1554caa58"
+    },
+    {
+      "id": "standard:liubei",
+      "source": "freekill/packages/standard/image/generals/liubei.jpg",
+      "file": "liubei.jpg",
+      "bytes": 19336,
+      "sha256": "bbcd276e3ab753bdd74e816a69363a114bb146286eeae14cdefa201157a4bba9"
+    },
+    {
+      "id": "standard:huatuo",
+      "source": "freekill/packages/standard/image/generals/huatuo.jpg",
+      "file": "huatuo.jpg",
+      "bytes": 13871,
+      "sha256": "cd07d9dbed0ae0b2ea75824b89b5ce7697621bacf84f669161d55d1bcd0c80b4"
+    },
+    {
+      "id": "standard:sunquan",
+      "source": "freekill/packages/standard/image/generals/sunquan.jpg",
+      "file": "sunquan.jpg",
+      "bytes": 23855,
+      "sha256": "3894c0f1a3bb722455e940c90278482077828c6b4b1fe5f762358ca6aeee0f4e"
+    },
+    {
+      "id": "standard:lvmeng",
+      "source": "freekill/packages/standard/image/generals/lvmeng.jpg",
+      "file": "lvmeng.jpg",
+      "bytes": 11330,
+      "sha256": "7917b145daac3de1615ee804d871130ba111c93d3c16b98a412eb5d0c02dc422"
+    },
+    {
+      "id": "standard:luxun",
+      "source": "freekill/packages/standard/image/generals/luxun.jpg",
+      "file": "luxun.jpg",
+      "bytes": 17056,
+      "sha256": "f39f45647427aaaf24fba77adbe0c34bc54d8672db00d8e48643ff63c1e59dd7"
+    },
+    {
+      "id": "standard:huangyueying",
+      "source": "freekill/packages/standard/image/generals/huangyueying.jpg",
+      "file": "huangyueying.jpg",
+      "bytes": 12337,
+      "sha256": "8a0bc01cf7e8bb0bc3231afc4bcfa419c5e4ef30d9376445599944ff8b9e708e"
+    },
+    {
+      "id": "standard:lvbu",
+      "source": "freekill/packages/standard/image/generals/lvbu.jpg",
+      "file": "lvbu.jpg",
+      "bytes": 18094,
+      "sha256": "dbe05222475095c2f4211e01197106e49dfdd5c5d469b940e5b1dc58002af789"
+    },
+    {
+      "id": "standard:daqiao",
+      "source": "freekill/packages/standard/image/generals/daqiao.jpg",
+      "file": "daqiao.jpg",
+      "bytes": 18359,
+      "sha256": "5f84a55188cbc47fadd0b61ef5dd4cca626d3b514ddd216618f1b44ad640189e"
+    },
+    {
+      "id": "standard:machao",
+      "source": "freekill/packages/standard/image/generals/machao.jpg",
+      "file": "machao.jpg",
+      "bytes": 17011,
+      "sha256": "aec3cdb758515d91e9c29b0651b3e8d38c3726ceed18d402e1ecf3b69c034505"
+    },
+    {
+      "id": "standard:zhouyu",
+      "source": "freekill/packages/standard/image/generals/zhouyu.jpg",
+      "file": "zhouyu.jpg",
+      "bytes": 19010,
+      "sha256": "c8e2d9bd86070ec2212f4fc15931e51b10c8326553188a937c18d660f17402c2"
+    },
+    {
+      "id": "standard:diaochan",
+      "source": "freekill/packages/standard/image/generals/diaochan.jpg",
+      "file": "diaochan.jpg",
+      "bytes": 18818,
+      "sha256": "cc4f7df648aae8b828ee2cb7ecac1b2e02381ad47110eb13d0039c6b2d7df722"
+    },
+    {
+      "id": "standard:zhugeliang",
+      "source": "freekill/packages/standard/image/generals/zhugeliang.jpg",
+      "file": "zhugeliang.jpg",
+      "bytes": 13115,
+      "sha256": "b83f787ecf319c36e8e7974eebdf0796bd2fcfde9a56e39a73a2acae13080e3e"
+    }
+  ]
+}

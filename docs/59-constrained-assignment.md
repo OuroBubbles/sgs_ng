@@ -1,6 +1,6 @@
 # 59 · 受限分组与角色分配
 
-2026-10-18。标准/演武内容 `0.1.17`；渡口保持 `0.1.1`，依赖 `standard@0.1.17`。默认标准仍为 32 牌、25 将和 108 张实体；演武保持 37 牌，增加筹策客后共 30 将，原有五种演武牌堆不变。
+状态：受限分组的当前契约，使用既有 ArrangementSelection 与普通纯函数。内容版本、平台与实际验证范围以 [STATUS](STATUS.md) 为准。
 
 ## 一套分组语义
 
@@ -60,11 +60,7 @@ pending、preview、submit、cancel 触发版本刷新时不再返回已经关�
 - [模型](../tests/scenarios/assignment.test.ts)：增广/上下限/动态条件/顺序/纯查询；512 种三物品三组矩阵乘 8 组额度，共 4096 问题，与独立穷举比较。
 - [刷新](../tests/scenarios/decision-refresh.test.ts)：五条读取/回复/失效路径不返回关闭请求，且只关闭一次。
 - [真实技能](../tests/scenarios/allotment.test.ts)：拒绝、合法/非法分配、原子后效、接收者/主体死亡和终局、来源撤销、权限与两局基础 AI 至胜负。
-- [外部模块](../tests/scenarios/content-modules.test.ts)：实际构建/导入演武，使用宿主模型与 Window，真实私取和分配。
+- [外部模块](../tests/scenarios/content-examples.test.ts)：实际构建/导入演武，使用宿主模型与 Window，真实私取和分配。
 - [界面](../tests/browser/allotment.spec.ts) 与 [Windows](../scripts/smoke-native.mjs)：接收限制、超额修正、暂停恢复、真实手牌/材料及非主控 AI。
 
-`assignment-refresh-before.json` 保留接收组消失后仍等待的实际反例。`allotment-browser-before-seed-fix.json` 四项超时来自种子 2 没有黑牌的夹具错误；改用实际核对的种子 4 后，8 项专项通过，不将换夹具算作规则修复。报告均在 `.artifacts/validation/`，最终全量/原生/发布包见 [STATUS](STATUS.md)。
-
-首次全量 1313/1315 通过，另两项纯回调测试因大小写 `/pure/` 未匹配实际 `Pure queries` 而失败；修正断言后重跑全量，原报告为 `assignment-full-before-assertion-case.json`。没有更改纯查询保护实现来适应断言。
-
-其他复杂参数/额度、完整信息记忆、标准全部分支及独立资源目录仍需继续。Android、完整智能托管和联机按既定顺序后置。
+最终全量检查、原生运行与交付包的范围见 [STATUS](STATUS.md)。

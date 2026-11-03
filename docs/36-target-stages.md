@@ -58,4 +58,4 @@ pending → targeting → ready → resolving → resolved / aborted
 
 [27 个目标分层场景](../tests/scenarios/target-stages.test.ts) 覆盖四层遍历/锚点、各层追加和转移、较早座次插入、牌体及生效中追加、重复身份执行顺序、取消 ready 身份、首伤后来源死亡/失去无双和武器、全目标铁骑先判定、五谷确认前/后死亡或禁令、延时生效、局部中止/终局与 World 重建。原有流离、雌雄剑和青釭反例同步采用新时序。
 
-参考 [FreeKill onAim](../freekill/ltk/server/events/usecard.lua) 的四阶段顺序及标准技能真实挂载点，参考源码未修改。后续有序分组、诸葛亮和私有余牌归还见 [37](37-arrangement-astrology.md)。这批闭合的是用牌目标分层，不代表通用窗口多 occurrence、任意模式排序、完整复杂技能或协程存档已完成。当前数量和客户端实际运行证据见 [STATUS](STATUS.md)。
+参考 [FreeKill onAim](../../freekill/ltk/server/events/usecard.lua) 的四阶段顺序及标准技能真实挂载点，参考源码未修改。后续有序分组、诸葛亮和私有余牌归还见 [37](37-arrangement-astrology.md)。这批闭合的是用牌目标分层，不代表通用窗口多 occurrence、任意模式排序、完整复杂技能或协程存档已完成。当前数量和客户端实际运行证据见 [STATUS](STATUS.md)。

@@ -26,10 +26,12 @@
 
 ## 小而可组合的纯查询
 
-[defineQuery / modify](../src/rules/skills/query.ts) 定义带类型的查询与贡献函数。`undefined` 表示不贡献，null 可以有查询自己定义的意义。查询对象标识类型身份，不依赖全局字符串注册，也不开一轮触发窗口。
+[defineQuery / modify](../src/rules/skills/query.ts) 定义带类型的查询与贡献函数。modify 的内容回调使用 `(ctx, { input, self })`，共享函数可标注 `ModifyInput<T>`；底层 `SkillModifier.contribution(ctx, input, self)` 继续支持自定义来源。`undefined` 表示不贡献，null 可以有查询自己定义的意义。查询对象标识类型身份，不依赖全局字符串注册，也不开一轮触发窗口。
+
+CardBook 的基础策略可通过 createBooks(policy) 或构造参数按需提供。distance、handLimit、attackRange、三类 prohibit、usage 与 responseTimes 均在建局时固定方法入口并保留原接收者；未提供的项使用默认策略，普通对象方法与原型方法使用相同语义。原对象不被冻结，函数内部的数据仍由调用者管理。每次查询继续读取当前 World 并组合技能修正，不缓存结果，也不以基础策略替代完整用牌或响应验证。
 
 ```ts
-modify(cardQueries.distanceCorrection, (_ctx, request, self) =>
+modify(cardQueries.distanceCorrection, (_ctx, { input: request, self }) =>
   request.from === self.owner ? -1 : undefined,
 );
 ```
@@ -58,14 +60,14 @@ TriggerSource 在开窗时取得本次 payload。装备提供者在 cardsMoved �
 `on` 的 retain 是明确的资格后备，配合 when 限定本次事实。装备能力可用以下普通谓词，两处引用同一函数：
 
 ```ts
-const lost = (ctx: Context, event: MoveResult, self: SkillHandle) =>
+const lost = (ctx: Context, { payload: event, self }: SkillTriggerInput<MoveResult>) =>
   equipmentLost(ctx.world, event, self);
 
 on(cardsMoved, {
   id: 'lost',
   retain: lost,
   when: lost,
-  run(ctx, event, self) {
+  run(ctx, { self }) {
     // 这里可继续普通 async 结算；self.origin 指向具体离场装备。
   },
 });
@@ -91,4 +93,4 @@ SemanticCard 明确记录 color、suit、rank。单材料默认继承；多材�
 
 [装备行为场景](../tests/scenarios/equipment.test.ts) 21 项；该批规则/主持侧共 208 项，加布局共 212 项。浏览器新增装备替换和丈八转换，该批两种配置合计 28 项；检查实际 CSP、控制台错误、可见选择和确认位置。原生与归档证据以 STATUS 为准。
 
-参考本地 FreeKill [连弩](../freekill/packages/standard_cards/pkg/skills/crossbow.lua)、[丈八](../freekill/packages/standard_cards/pkg/skills/spear.lua)、[标准装备定义](../freekill/packages/standard_cards/pkg/init.lua)、[虚拟牌颜色推导](../freekill/ltk/core/card.lua)，及 noname [角色装备/手牌分区](../noname/resources/app/noname/library/element/player.js)。只吸收规则与交互含义，未复制其全局对象或装备状态维护路径。
+参考本地 FreeKill [连弩](../../freekill/packages/standard_cards/pkg/skills/crossbow.lua)、[丈八](../../freekill/packages/standard_cards/pkg/skills/spear.lua)、[标准装备定义](../../freekill/packages/standard_cards/pkg/init.lua)、[虚拟牌颜色推导](../../freekill/ltk/core/card.lua)，及 noname [角色装备/手牌分区](../../noname/resources/app/noname/library/element/player.js)。只吸收规则与交互含义，未复制其全局对象或装备状态维护路径。

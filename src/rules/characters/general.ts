@@ -14,27 +14,30 @@ export interface GeneralDefinition {
   readonly skills: readonly string[];
 }
 export function defineGeneral(input: GeneralDefinition): GeneralDefinition {
+  const { id, name, kingdom, gender, maxHp } = input;
+  // 先固定声明字段与技能列表，再验证同一份数据；不复制或冻结作者对象。
+  const skills = immutable(input.skills);
   if (
-    !input.id ||
-    !input.name ||
-    !input.kingdom ||
-    !Number.isSafeInteger(input.maxHp) ||
-    input.maxHp < 1 ||
-    !['male', 'female', 'dual', 'none'].includes(input.gender) ||
-    input.skills.some((id) => !id) ||
-    new Set(input.skills).size !== input.skills.length
+    !id ||
+    !name ||
+    !kingdom ||
+    !Number.isSafeInteger(maxHp) ||
+    maxHp < 1 ||
+    !['male', 'female', 'dual', 'none'].includes(gender) ||
+    skills.some((id) => !id) ||
+    new Set(skills).size !== skills.length
   )
     throw new Error('Invalid general definition.');
-  return immutable(input);
+  return immutable({ id, name, kingdom, gender, maxHp, skills });
 }
 
 /** 目录持有不可变定义；选将只在 World 保存 ID，不复制技能实现或可漂移的显示状态。 */
 export class GeneralBook {
   readonly #definitions: ReadonlyMap<string, GeneralDefinition>;
   constructor(definitions: readonly GeneralDefinition[], skills: SkillBook) {
-    if (new Set(definitions.map((general) => general.id)).size !== definitions.length)
-      throw new Error('Duplicate general definition.');
     const entries = definitions.map(defineGeneral);
+    if (new Set(entries.map((general) => general.id)).size !== entries.length)
+      throw new Error('Duplicate general definition.');
     for (const general of entries) for (const skill of general.skills) skills.definition(skill);
     this.#definitions = new Map(entries.map((general) => [general.id, general]));
   }

@@ -59,8 +59,7 @@ export function decideBasic(
     case 'seat-ready':
       return submit(true);
     case 'invoke':
-      // 寒冰剑的替代伤害不是必然有利；基础策略优先保留伤害。
-      return submit(data.skill !== 'standard:ice_sword-ability');
+      return submit(true);
     case 'arrange': {
       const initial = object(data.initial);
       const groups = Array.isArray(initial.groups)
@@ -85,7 +84,15 @@ export function decideBasic(
       return first ? submit(first.id) : decline();
     }
     case 'cards-targets': {
-      if (data.reason === 'standard:liuli' || data.reason === 'workshop:relay') {
+      // 同一技能的发动选择与后续取牌不是同一种决策；取牌复用下方通用策略。
+      const reason = data.purpose === 'owned-card' ? undefined : data.reason;
+      if (
+        data.purpose === 'owned-card' &&
+        data.reason === 'standard:ice_sword-ability' &&
+        request.optional
+      )
+        return decline(); // 基础策略优先保留伤害，已经发动后的强制取牌仍正常完成。
+      if (reason === 'standard:liuli' || reason === 'workshop:relay') {
         const feedback = object(inspect({ cards: [], targets: [] })?.feedback);
         const previous = list(data.previousTargets);
         const cards = (Array.isArray(feedback.cards) ? feedback.cards.map(object) : [])
@@ -111,7 +118,7 @@ export function decideBasic(
         }
         return decline();
       }
-      if (data.reason === 'standard:zhiheng') {
+      if (reason === 'standard:zhiheng') {
         const feedback = object(inspect({ cards: [], targets: [] })?.feedback);
         const candidates = (Array.isArray(feedback.cards) ? feedback.cards.map(object) : [])
           .filter((item) => typeof item.id === 'string' && item.selectable === true)
@@ -121,7 +128,7 @@ export function decideBasic(
         const choice = { cards: cheap.length ? cheap : candidates.slice(0, 1), targets: [] };
         return inspect(choice)?.valid ? submit(choice) : decline();
       }
-      if (data.reason === 'standard:rende') {
+      if (reason === 'standard:rende') {
         const preview = object(inspect({ cards: [], targets: [] })?.feedback);
         const targets = (Array.isArray(preview.targets) ? preview.targets.map(object) : []).filter(
           (item) =>
@@ -135,7 +142,7 @@ export function decideBasic(
         const choice = { cards, targets: targets.slice(0, 1).map((item) => String(item.id)) };
         return inspect(choice)?.valid ? submit(choice) : decline();
       }
-      if (data.reason === 'standard:tuxi') {
+      if (reason === 'standard:tuxi') {
         const empty = { cards: [], targets: [] };
         const feedback = object(inspect(empty)?.feedback);
         const choices = (Array.isArray(feedback.targets) ? feedback.targets.map(object) : [])
@@ -148,7 +155,7 @@ export function decideBasic(
         const choice = { cards: [], targets };
         return targets.length && inspect(choice)?.valid ? submit(choice) : decline();
       }
-      if (data.reason === 'standard:guicai') {
+      if (reason === 'standard:guicai') {
         const judgment = object(data.judgment);
         const good = (card: Record<string, unknown>): boolean | null => {
           switch (judgment.reason) {
@@ -205,9 +212,7 @@ export function decideBasic(
             .sort((a, b) =>
               key === 'cards'
                 ? cost(String(a.id)) - cost(String(b.id))
-                : ['standard:jieyin', 'standard:yiji', 'standard:qingnang'].includes(
-                      String(data.reason),
-                    )
+                : ['standard:jieyin', 'standard:yiji', 'standard:qingnang'].includes(String(reason))
                   ? hostility(String(a.id)) - hostility(String(b.id))
                   : hostility(String(b.id)) - hostility(String(a.id)),
             );
@@ -289,6 +294,14 @@ export function decideBasic(
       );
     }
     if (name === 'standard:amazing_grace') return 12 - expense;
+    if (name === 'standard:collateral') {
+      const victim = observation.players.find((player) => player.id === targets.at(-1));
+      return victim
+        ? targets.slice(0, -1).reduce((sum, id) => sum + hostility(id) * 12, 0) +
+            hostility(victim.id) * (30 + Math.max(0, 4 - victim.hp) * 4) -
+            expense
+        : -100;
+    }
     if (name === 'standard:god_salvation')
       return (
         targets.reduce((sum, id) => {
@@ -365,10 +378,20 @@ export function decideBasic(
     const offer = object(raw);
     const source = object(offer.choice);
     if (offer.kind === 'active') {
-      const input = { skill: source.instance, action: source.action };
       const rating = activeScore(offer.skill);
-      if (play && rating > 0 && inspect(input)?.valid && (!best || rating > best.score))
-        best = { value: input, score: rating };
+      if (play && rating > 0) {
+        // 复用联合选择策略，只在最终提交时附上技能身份，不创建第二个请求。
+        const selected = decideBasic(
+          observation,
+          { ...request, kind: 'cards-targets', data: { reason: offer.skill } },
+          (choice) => inspect({ ...source, ...object(choice) }),
+        );
+        if (selected.kind === 'submit') {
+          const input = { ...source, ...object(selected.value) };
+          if (inspect(input)?.valid && (!best || rating > best.score))
+            best = { value: input, score: rating };
+        }
+      }
       continue;
     }
     const count = object(offer.count);

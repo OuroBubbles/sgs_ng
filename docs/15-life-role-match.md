@@ -74,8 +74,7 @@ const match = new RoleMatch({
   seed: 42,
   players: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
   deck,
-  cards: standardCards,
-  skills: [wusheng],
+  content: { cards: standardCards, skills: [wusheng] },
 });
 
 // start = prepare + play。无 UI 依赖；运行到决策时挂起。
@@ -88,10 +87,10 @@ prepare 使用局内随机源分配身份、洗牌，从主公起发四张起手
 
 每回合前有必选 `seat-ready` 准备决策，随后运行六阶段，跳过已死亡座位。手动演练需要本人确认；默认单机由主持侧自动确认并控制非主控角色，见 [26](26-basic-ai.md)。无牌、无动作时仍有这个决策边界，主持侧可以等待输入或安排节奏，避免无限空转。进度中的回合数与下一席位保存在 World；Promise、Lifetime 和闭包不属于存档，也不能靠状态重建恢复挂起流程。
 
-身份全表是执行侧状态，客户端不能直接把整份 World 当显示模型。[席位投影与决策面板](16-local-client.md) 已隐藏其他身份/手牌，并在交接时清除上一席位的私有内容。额外回合队列和完整标准内容仍待实现。
+身份全表是执行侧状态，客户端不能直接把整份 World 当显示模型。[席位投影与决策面板](16-local-client.md) 已隐藏其他身份/手牌，并在交接时清除上一席位的私有内容。额外回合与现有内容的覆盖范围见 [STATUS](STATUS.md)。
 
 ## 验证与参考
 
 本批 27 项新场景：[生命流程](../tests/scenarios/life.test.ts)、[身份与对局](../tests/scenarios/role-match.test.ts)、[正常结束](../tests/scenarios/finish.test.ts)。覆盖连续用桃、转换、用牌禁止、遗赠、埋葬原子性、同角色嵌套濒死、嵌套死亡、来源死亡、击杀奖惩、确定性初始化、空动作热座循环、真实出牌到胜负和提交事实重建。
 
-参考本地 [FreeKill 生命结算](../freekill/ltk/server/events/death.lua)、[救援游戏规则](../freekill/packages/standard/aux_skills_dir/game_rule.lua)、[身份说明](../freekill/packages/standard/i18n/zh_CN.lua)，以及 [noname content](../noname/resources/app/noname/library/element/content.js) 的 dying / die。FreeKill 在 GameOverJudge 后才开放 Death / BuryVictim；noname 的濒死队列和 DOM 死亡处理有自己的版本行为。本项目只吸收明确规则与反例，未导入其架构或声称完全兼容。参考项目文件未修改。
+参考本地 [FreeKill 生命结算](../../freekill/ltk/server/events/death.lua)、[救援游戏规则](../../freekill/packages/standard/aux_skills_dir/game_rule.lua)、[身份说明](../../freekill/packages/standard/i18n/zh_CN.lua)，以及 [noname content](../../noname/resources/app/noname/library/element/content.js) 的 dying / die。FreeKill 在 GameOverJudge 后才开放 Death / BuryVictim；noname 的濒死队列和 DOM 死亡处理有自己的版本行为。本项目只吸收明确规则与反例，未导入其架构或声称完全兼容。参考项目文件未修改。

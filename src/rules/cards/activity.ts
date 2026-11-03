@@ -1,4 +1,4 @@
-import type { HistoryReader } from '../../core/history/journal';
+import type { Fact } from '../../core/history/journal';
 import { immutable } from '../../core/model/value';
 import type { SemanticCard } from './types';
 import type { PhaseKind } from '../turn/turn';
@@ -19,12 +19,12 @@ export interface CardActivity {
   readonly phase: CardActivityPhase | null;
   readonly scopePath: readonly string[];
 }
-/** 从权威宣告事实查询活动，不依赖技能当时是否存在，也不把普通移牌视为打出。
+/** 从完整、有序的事实列表查询活动，不依赖技能当时是否存在，也不把普通移牌视为打出。
  * 改判的打出与材料交换同次提交，所以从 judgment.replaced 的 response 读取。
  * withinScope 只过滤因果后代；回合/阶段归属按宣告当时的最近领域边界分别记录。
  */
 export function cardActivities(
-  history: HistoryReader,
+  facts: readonly Fact[],
   withinScope?: string,
 ): readonly CardActivity[] {
   const turns = new Map<string, boolean>();
@@ -51,7 +51,7 @@ export function cardActivities(
   };
   return immutable(
     // 先按事实顺序建立边界，再筛选活动；祖先开始记录可能在 withinScope 之外。
-    history.facts().flatMap((fact): CardActivity[] => {
+    facts.flatMap((fact): CardActivity[] => {
       if (fact.data.kind === 'turn.started') {
         turns.set((fact.data.detail as { id: string }).id, true);
       } else if (fact.data.kind === 'phase.before' || fact.data.kind === 'phase.started') {

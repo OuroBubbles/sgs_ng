@@ -1,21 +1,21 @@
-import { cardQueries, defineSkill, modify } from '../../sdk';
+import { cardQueries, modify } from '../../sdk';
 import type { Card } from '../../sdk';
+import type { SkillDefinition } from '../../sdk';
 
 /** 红颜式过滤的普通作者代码；不修改实体，也不重写武圣或判定流程。 */
-export const vermilion = defineSkill({
+export const vermilion = {
   id: 'workshop:vermilion',
   name: '映绯',
   description:
     '锁定技，你的黑桃手牌、装备及判定牌的花色视为红桃。已宣告的牌面不因离手或失去技能而改变。',
-  effects: [],
   modifiers: [
-    modify(cardQueries.cardFace, (_ctx, input, self) =>
+    modify(cardQueries.cardFace, (_ctx, { input, self }) =>
       input.player === self.owner && input.card.suit === 'spade'
         ? { suit: 'heart' as const }
         : undefined,
     ),
   ],
-});
+} satisfies SkillDefinition;
 
 /** 全黑桃便于观察印刷牌与当前牌面差别；配比仍能完成真实基础 AI 对局。 */
 export function createFaceDeck(): readonly Card[] {

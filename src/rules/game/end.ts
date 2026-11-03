@@ -1,5 +1,5 @@
 import type { WorldReader } from '../../core/model/state';
-import { immutable } from '../../core/model/value';
+import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
@@ -16,8 +16,7 @@ export const gameResult = defineState<GameResult | null>(
     (typeof value === 'object' &&
       value !== null &&
       'winners' in value &&
-      Array.isArray(value.winners) &&
-      value.winners.every((id) => typeof id === 'string') &&
+      isStringArray(value.winners) &&
       'reason' in value &&
       typeof value.reason === 'string'),
 );

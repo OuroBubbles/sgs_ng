@@ -1,6 +1,6 @@
 # 13 · 语义牌、目标效果与响应
 
-更新：2026-10-17。已有正式用牌管线，并已接入[离线客户端](16-local-client.md)；完整标准包仍待实现；整牌流程与反制见 [17](17-tricks-counter.md)。
+状态：语义牌、目标效果与响应的当前契约；实现与验证范围见 [STATUS](STATUS.md)，整牌流程与反制见 [17](17-tricks-counter.md)。
 
 ## 实际模块
 
@@ -14,15 +14,19 @@
 
 实体牌仍恰处于一个区域，语义牌是本次操作冻结的值：牌名、花色、点数、属性、材料、转换来源。零材料和多材料都正常，不往实体牌表里塞虚拟牌。
 
-当前牌面查询见 [50](50-card-faces.md)：book.face 保留印刷牌与角色过滤的区分，实体构建与单/多材料继承使用当前牌面；武圣、急救等配方通过 materials(ctx, self, book) 查询。宣告后继续使用冻结语义牌，不按材料后来的区域和技能状态重算。
+当前牌面查询见 [50](50-card-faces.md)：book.face 保留印刷牌与角色过滤的区分，实体构建与单/多材料继承使用当前牌面；武圣、急救等配方通过 materials(ctx, { self, book }) 查询。转换的同步回调均可按需读取 self、book 和实际 purpose；make 另外取得 materials / parameters，异步 use 另外取得 intent。宣告后继续使用冻结语义牌，不按材料后来的区域和技能状态重算。
 
-physical 选择必须是本人的手牌；viewAs 从当前有效技能实例的配方构造。配方只定义可能牌名、动态材料/数量和 make 函数，不复制距离、次数、目标或响应规则。make 可以根据普通参数返回不同牌面或拒绝构造，最终必须经过牌目录和统一规则校验。
+physical 选择必须是本人的手牌；viewAs 从当前有效技能实例的配方构造。配方只定义牌面、动态材料与数量，不复制距离、次数、目标或响应规则。固定转换的 make 是普通 CardFace 值，候选牌名直接从该值取得；动态转换保留 names / make 函数，make 可以根据普通参数返回不同牌面或拒绝构造。二者共用候选、材料、用途、目标与最终用牌校验；登记时复制固定牌面，宣告后的语义牌继续冻结。
 
 规则代码也可以显式发出 generated 指令，为零/多材料生成牌，复用同一用牌过程。该指令不出现在玩家回复协议中，不能由选择回复伪造。它的材料可以来自规则明确指定的处理区，不被固定手牌入口限制。
 
 候选列出配方家族，不枚举材料组合。它不能证明任意 make/参数一定存在合法完成；复杂前缀反馈与完整选择 UI 的接入仍需继续。
 
 ## 一次用牌
+
+卡牌 `use` 回调统一采用显式 `ctx` 与具名输入，按需解构：`canUse/prepare(ctx, { request, book })`、`target(ctx, { request, target, book })`、`selection(ctx, { intent, book })`、`fixedTargets(ctx, { actor, card, book })`、`canResolve/resolve(ctx, { effect, book })`、`execute(ctx, { use, book, resolveTargets })`。共享函数或类方法可标注 SDK 导出的对应 `Card*Input` 类型。目录仍是本局同一 CardBook，不存在隐式当前牌或当前目标。
+
+`resolveTargets(ctx, resolver?)` 仍是整牌函数可调用一次的普通函数；局部 resolver 同样接收 `(ctx, { effect, book })`。整牌资源可以由普通闭包共享，查询必须同步，prepare 与执行后效可以等待。execute 的普通数据返回值保存在本次 UseSnapshot.outcome 中，undefined 按 null 处理；逐目标 resolver 的返回值被忽略。两者的返回值都不替代目标状态或中止语义。
 
 ```text
 构造牌面，校验时机/次数/目标
@@ -38,7 +42,7 @@ physical 选择必须是本人的手牌；viewAs 从当前有效技能实例的�
   → 只清理本次处理区余牌
 ```
 
-宣告前准备、附属参数和借刀的真实目标见 [21 · 准备与借刀](21-preparation-collateral.md)。
+玩家已知的附属选择通过纯同步 `UseRules.selection` 合并到出牌草稿；`book.useSelection` 将其映射为真实目标与参数，再复用完整校验。宣告前异步准备、附属参数和借刀的真实目标见 [21 · 准备与借刀](21-preparation-collateral.md)。
 
 UseId 来自本局稳定 FlowId，每个目标有独立 EffectId。初始目标按来源座次顺序执行。增删、转移和重复通过方法完成；添加目标不隐式重跑已经结算的目标。转移取消旧效果、创建新身份，并记录 fromEffectId；明确再次结算才调用 repeatTarget。
 
@@ -62,7 +66,7 @@ UseId 来自本局稳定 FlowId，每个目标有独立 EffectId。初始目标�
 
 [用牌场景](../tests/scenarios/use-card.test.ts)、[转换场景](../tests/scenarios/view-as.test.ts)、[输入快照](../tests/scenarios/action-inputs.test.ts) 覆盖目标独立响应、转移身份、显式重复、零/多材料、动态牌名、装备材料、材料被取得、来源死亡、旧回复、禁止与输入对象被外部修改。
 
-标准＋EX 的 32 种牌和 108 张实体牌已接入（见 [23](23-swords-standard-deck.md)），包含无懈反制链、装备与独立语义颜色（见 [18](18-equipment-queries.md)）、判定与延时锦囊（见 [19](19-judgment-delayed.md)）；生命救援和基础身份胜负已接入独立规则。完整武将及复杂技能仍待完成。参考本地 FreeKill 的 standard_cards 牌定义及 standard 武圣机制，代码没有兼容桥或牌/技能 ID 特判内核。
+标准＋EX 的 32 种牌和 108 张实体牌已接入（见 [23](23-swords-standard-deck.md)），包含无懈反制链、装备与独立语义颜色（见 [18](18-equipment-queries.md)）、判定与延时锦囊（见 [19](19-judgment-delayed.md)）；生命救援和基础身份胜负已接入独立规则。现有武将与复杂机制的覆盖范围见 [STATUS](STATUS.md)。参考本地 FreeKill 的 standard_cards 牌定义及 standard 武圣机制，代码没有兼容桥或牌/技能 ID 特判内核。
 
 防御成功后的追加用牌/突破、局部距离参数和动态目标数见 [22 · 武器与防御结果](22-weapons-defense.md)。
 

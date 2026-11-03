@@ -1,7 +1,8 @@
 import type { Card, WorldReader } from '../../core/model/state';
-import type { Validation } from '../../core/decisions/hub';
-import type { ChoiceCount } from '../../core/decisions/selection';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Decision, Validation } from '../../core/decisions/hub';
+import { normalizeChoiceCount } from '../../core/decisions/count';
+import type { ChoiceCount } from '../../core/decisions/count';
+import type { Context } from '../../core/runtime/room';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
 import type { CardBook, UseResult } from './book';
@@ -66,27 +67,51 @@ export type CardChoice =
       readonly origin?: { readonly actor: string; readonly card: SemanticCard };
     };
 
-export interface ViewAs {
-  readonly id: string;
-  readonly label: string;
-  readonly names: (ctx: Context, self: SkillHandle) => readonly string[];
-  readonly materials: (ctx: Context, self: SkillHandle, book: CardBook) => readonly string[];
-  readonly count: ChoiceCount | ((ctx: Context, self: SkillHandle) => ChoiceCount);
-  readonly available?: (ctx: Context, self: SkillHandle, purpose: Purpose) => boolean;
-  readonly make: (
-    ctx: Context,
-    self: SkillHandle,
-    materials: readonly string[],
-    parameters: unknown,
-  ) => CardFace | null;
-  /** 选定目标并通过初次校验后，可用普通异步代码取得实际用牌，再返回完整用牌结果。 */
-  readonly use?: (
-    ctx: Context,
-    self: SkillHandle,
-    intent: UseIntent,
-    book: CardBook,
-  ) => Promise<FlowResult<UseResult>>;
+/** 转换的显式输入；目录始终是本局实例，用途在预览与最终构牌时保持一致。 */
+export interface ViewAsInput {
+  readonly self: SkillHandle;
+  readonly book: CardBook;
+  readonly purpose: Purpose;
 }
+export interface ViewAsMakeInput extends ViewAsInput {
+  readonly materials: readonly string[];
+  readonly parameters: unknown;
+}
+export interface ViewAsUseInput extends ViewAsInput {
+  readonly purpose: 'use';
+  readonly intent: UseIntent;
+}
+
+interface ViewAsSpec {
+  readonly id: string;
+  /** 菜单文字；省略时使用当前技能实例的名称。 */
+  readonly label?: string | undefined;
+  readonly materials: (ctx: Context, input: ViewAsInput) => readonly string[];
+  readonly count: ChoiceCount | ((ctx: Context, input: ViewAsInput) => ChoiceCount);
+  readonly available?: (ctx: Context, input: ViewAsInput) => boolean;
+  /** 通过初次校验后，直接返回用牌结果或其 Promise；同步放弃与异步准备均用普通代码。 */
+  readonly use?: (ctx: Context, input: ViewAsUseInput) => UseResult | Promise<UseResult>;
+}
+
+/**
+ * 固定转换直接声明牌面，动态转换保留 names/make 与普通参数构牌。
+ * 零材料可整组省略候选和数量；需要材料时两者必须同时声明。
+ */
+export type ViewAs = Omit<ViewAsSpec, 'materials' | 'count'> &
+  (
+    | Pick<ViewAsSpec, 'materials' | 'count'>
+    | { readonly materials?: never; readonly count?: never }
+  ) &
+  (
+    | { readonly make: CardFace; readonly names?: never }
+    | {
+        readonly names: (ctx: Context, input: ViewAsInput) => readonly string[];
+        readonly make: (ctx: Context, input: ViewAsMakeInput) => CardFace | null;
+      }
+  );
+
+// 内容声明允许省略空材料维度，执行侧统一取得完整配方。
+type DefinedViewAs = ViewAs & Pick<ViewAsSpec, 'materials' | 'count'>;
 
 export type UseTiming =
   | { readonly kind: 'play'; readonly owner: string; readonly phase: Lifetime }
@@ -229,41 +254,59 @@ export interface UseSnapshot {
     readonly fromEffectId: string | null;
   }[];
 }
+/** 卡牌回调显式接收本局目录，纯查询与可等待后效共用具名输入约定。 */
+export interface CardUseInput {
+  readonly request: UseRequest;
+  readonly book: CardBook;
+}
+export interface CardTargetInput extends CardUseInput {
+  readonly target: string;
+}
+export interface CardSelectionInput {
+  readonly intent: UseIntent;
+  readonly book: CardBook;
+}
+export interface CardFixedTargetsInput {
+  readonly actor: string;
+  readonly card: SemanticCard;
+  readonly book: CardBook;
+}
+export interface CardEffectInput {
+  readonly effect: CardEffect;
+  readonly book: CardBook;
+}
+export interface CardExecuteInput {
+  readonly use: UsePlanView;
+  readonly book: CardBook;
+  readonly resolveTargets: ResolveTargets;
+}
+
 export interface UseRules {
   readonly count: ChoiceCount;
   /** 省略时接受所有规则用途；提供时也约束候选菜单，不把仅可响应的牌列入出牌阶段。 */
   readonly timings?: readonly UseTiming['kind'][];
   readonly usage?: { readonly key: string; readonly max: number };
-  readonly canUse?: (ctx: Context, request: UseRequest, book: CardBook) => string | null;
-  readonly target: (ctx: Context, request: UseRequest, target: string, book: CardBook) => boolean;
+  readonly canUse?: (ctx: Context, input: CardUseInput) => string | null;
+  readonly target: (ctx: Context, input: CardTargetInput) => boolean;
+  /** 已知选择在同一草稿内完成；纯同步地把 cards/targets 转为真实目标与参数，管线再完整校验。 */
+  readonly selection?: (
+    ctx: Context,
+    input: CardSelectionInput,
+  ) => Decision<Pick<UseIntent, 'targets' | 'parameters'>>;
   /** 宣告前的附属选择：返回已验证的普通参数；统一管线再做最终校验；取消不支付、不开放用牌窗口。 */
   readonly prepare?: (
     ctx: Context,
-    request: UseRequest,
-    book: CardBook,
+    input: CardUseInput,
   ) => Validation<unknown> | Promise<Validation<unknown>>;
   /** 自动目标在宣告前计算并冻结，玩家不再手工指定；禁止目标由统一管线过滤。 */
-  readonly fixedTargets?: (
-    ctx: Context,
-    actor: string,
-    card: SemanticCard,
-    book: CardBook,
-  ) => readonly string[];
-  readonly canResolve?: (ctx: Context, effect: CardEffect, book: CardBook) => boolean;
-  readonly resolve?: (ctx: Context, effect: CardEffect, book: CardBook) => void | Promise<void>;
+  readonly fixedTargets?: (ctx: Context, input: CardFixedTargetsInput) => readonly string[];
+  readonly canResolve?: (ctx: Context, input: CardEffectInput) => boolean;
+  readonly resolve?: TargetResolver;
   /** 整张牌的普通控制流，可用处理区包住全部目标；有目标时必须明确调用一次 resolveTargets。 */
-  readonly execute?: (
-    ctx: Context,
-    use: UsePlanView,
-    book: CardBook,
-    resolveTargets: ResolveTargets,
-  ) => unknown;
+  readonly execute?: (ctx: Context, input: CardExecuteInput) => unknown;
 }
-export type TargetResolver = (
-  ctx: Context,
-  effect: CardEffect,
-  book: CardBook,
-) => void | Promise<void>;
+/** 等待该目标的普通规则操作；返回值不替代明确的目标状态与中止语义。 */
+export type TargetResolver = (ctx: Context, input: CardEffectInput) => unknown;
 export type ResolveTargets = (at: Context, resolve?: TargetResolver) => Promise<void>;
 export interface CardDefinition {
   readonly id: string;
@@ -276,6 +319,7 @@ export interface CardDefinition {
   readonly delayed?: DelayedRules;
   readonly use?: UseRules;
 }
+/** 纯同步基础策略；建局固定方法与原接收者，缺省项使用标准策略。 */
 export interface CardPolicy {
   readonly distance: (ctx: Context, from: string, to: string, base: number) => number;
   readonly handLimit: (ctx: Context, actor: string, base: number) => number;
@@ -373,13 +417,53 @@ export function timingSnapshot(timing: UseTiming): TimingSnapshot {
       });
   }
 }
-export function viewAs(definition: ViewAs): ViewAs {
-  if (!definition.id) throw new Error('View-as recipe requires an ID.');
-  return Object.freeze({
-    ...definition,
-    count:
-      typeof definition.count === 'function'
-        ? definition.count
-        : Object.freeze({ ...definition.count }),
-  });
+// 只标记本入口固定的配方，不记住调用者的可变输入或任何局内候选。
+const definedRecipes = new WeakSet<ViewAs>();
+
+export function viewAs(definition: ViewAs): DefinedViewAs {
+  if (definedRecipes.has(definition)) return definition as DefinedViewAs;
+  const { id, label, materials, count: declaredCount, available, use, names, make } = definition;
+  if (!id) throw new Error('View-as recipe requires an ID.');
+  if ((materials === undefined) !== (declaredCount === undefined))
+    throw new Error(`[${id}] View-as materials and count must be provided together.`);
+  const count =
+    typeof declaredCount === 'function'
+      ? declaredCount.bind(definition)
+      : normalizeChoiceCount(declaredCount ?? { min: 0, max: 0 }, `${id} material`);
+  const common = {
+    id,
+    label,
+    materials: materials?.bind(definition) ?? (() => []),
+    count,
+    ...(available === undefined ? {} : { available: available.bind(definition) }),
+    ...(use === undefined ? {} : { use: use.bind(definition) }),
+  };
+  let fixed: DefinedViewAs;
+  if (typeof make === 'function') {
+    if (typeof names !== 'function') throw new Error(`[${id}] Dynamic view-as requires names.`);
+    fixed = Object.freeze({
+      ...common,
+      names: names.bind(definition),
+      make: make.bind(definition),
+    });
+  } else {
+    if (!make) throw new Error(`[${id}] Fixed view-as requires a card face.`);
+    const { name, suit, rank, nature, color } = make;
+    if (typeof name !== 'string' || !name)
+      throw new Error(`[${id}] Fixed view-as requires a card face.`);
+    if (names !== undefined)
+      throw new Error(`[${id}] Fixed view-as derives names from its card face.`);
+    fixed = Object.freeze({
+      ...common,
+      make: Object.freeze({
+        name,
+        ...(suit === undefined ? {} : { suit }),
+        ...(rank === undefined ? {} : { rank }),
+        ...(nature === undefined ? {} : { nature }),
+        ...(color === undefined ? {} : { color }),
+      }),
+    });
+  }
+  definedRecipes.add(fixed);
+  return fixed;
 }

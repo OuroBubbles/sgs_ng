@@ -46,9 +46,9 @@ const source = { kind: 'general', id: 'boundary-probe' } as const;
 const ban = defineSkill({
   id: 'probe:target-ban',
   name: '禁止目标',
-  effects: [],
+  triggers: [],
   modifiers: [
-    modify(cardQueries.prohibitTarget, (_ctx, request, self) =>
+    modify(cardQueries.prohibitTarget, (_ctx, { input: request, self }) =>
       request.target === self.owner ? true : undefined,
     ),
   ],
@@ -80,14 +80,12 @@ function create() {
 }
 
 async function die(ctx: Context, player: string) {
-  ctx.unwrap(
-    await kill(ctx, {
-      player,
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await kill(ctx, {
+    player,
+    killer: null,
+    reason: 'rule',
+    cause: { kind: 'rule', seq: null, data: null },
+  });
 }
 
 async function invalidate(
@@ -139,27 +137,25 @@ for (const [label, window] of points) {
         eligible: (_ctx, { effect }) => effect.target === 'b',
         async run(ctx, { use: plan, effect }) {
           expect(
-            ctx.unwrap(
+            (
               await pay(ctx, {
                 actor: 'c',
                 cards: ['paid'],
                 to: 'discard',
                 reason: 'already committed target candidate',
-              }),
+              })
             ).kind,
           ).toBe('paid');
           await invalidate(ctx, game, plan, effect, boundary);
         },
       });
       const later = vi.fn(async (ctx: Context) => {
-        ctx.unwrap(
-          await pay(ctx, {
-            actor: 'c',
-            cards: ['unpaid'],
-            to: 'discard',
-            reason: 'stale target candidate',
-          }),
-        );
+        await pay(ctx, {
+          actor: 'c',
+          cards: ['unpaid'],
+          to: 'discard',
+          reason: 'stale target candidate',
+        });
       });
       game.room.on(window, {
         id: 'z-later',
@@ -308,14 +304,14 @@ it('真实无懈取消决斗后，停止效果启动后组但保留完整反制�
 it('桃园启动候选已令目标满体力，canResolve 失效立即收束同窗后续候选', async () => {
   const game = cardGame({ hands: { a: [card('salvation', 'god_salvation')] } });
   await game.room.run('wound', async (ctx) => {
-    ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' }));
+    await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
   game.room.on(effectStarting, {
     id: 'a-heal-first',
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      ctx.unwrap(await recover(ctx, { from: 'c', to: 'b', amount: 2 }));
+      await recover(ctx, { from: 'c', to: 'b', amount: 2 });
     },
   });
   const later = vi.fn();
@@ -340,7 +336,7 @@ it('canResolve 只约束实际效果，不提前跳过满体力桃园目标的�
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 1, reason: 'target-stage wound' }));
+      await loseHp(ctx, { player: 'b', amount: 1, reason: 'target-stage wound' });
     },
   });
   await use(game, { ...slash, choice: { kind: 'physical', card: 'salvation' }, targets: [] });
@@ -363,12 +359,10 @@ for (const name of ['snatch', 'dismantlement']) {
         async run(ctx) {
           if (boundary === 'source-dead') await die(ctx, 'a');
           else
-            ctx.unwrap(
-              await moveCards(
-                ctx,
-                [{ cards: ['held'], from: 'b:hand', to: 'c:hand', place: 'bottom' }],
-                'last available target card moved',
-              ),
+            await moveCards(
+              ctx,
+              [{ cards: ['held'], from: 'b:hand', to: 'c:hand', place: 'bottom' }],
+              'last available target card moved',
             );
         },
       });
@@ -403,14 +397,12 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      ctx.unwrap(
-        await game.book.use(ctx, {
-          ...slash,
-          actor: 'c',
-          choice: { kind: 'physical', card: 'inner' },
-          targets: ['d'],
-        }),
-      );
+      await game.book.use(ctx, {
+        ...slash,
+        actor: 'c',
+        choice: { kind: 'physical', card: 'inner' },
+        targets: ['d'],
+      });
     },
   });
   game.room.on(targetConfirming, {

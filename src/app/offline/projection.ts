@@ -10,9 +10,10 @@ import type {
   CountView,
   CandidateView,
   PoolView,
+  CardChoiceGroupView,
 } from '../../core/view/game';
-import type { CardView } from '../../core/view/table';
-import { immutable } from '../../core/model/value';
+import type { CardView, CardChoiceView } from '../../core/view/table';
+import { immutable, isStringArray } from '../../core/model/value';
 import { activePhase, activeTurn, activeTarget } from '../../rules/turn/turn';
 import { readState } from '../../rules/state/state';
 import { knownRole } from './knowledge';
@@ -32,9 +33,7 @@ export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 }
 export function strings(value: unknown): readonly string[] {
-  return Array.isArray(value) && value.every((item): item is string => typeof item === 'string')
-    ? value
-    : [];
+  return isStringArray(value) ? value : [];
 }
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 export const roleNames: Readonly<Record<string, string>> = {
@@ -78,11 +77,15 @@ function face(match: RoleMatch, id: string, input: unknown): CardView {
   const name = text(card.name);
   const rank = typeof card.rank === 'number' ? card.rank : 0;
   const presentation = match.content?.cardViews[name];
+  const definition = match.book.definition(name);
   return {
     id,
-    name: match.book.definition(name).label,
+    name: definition.label,
     kind: presentation?.kind ?? 'other',
     description: presentation?.description ?? '请参阅当前内容定义。',
+    ...(presentation?.icon ? { icon: presentation.icon } : {}),
+    ...(presentation?.image ? { image: presentation.image } : {}),
+    ...(definition.equipment ? { slot: definition.equipment.slot } : {}),
     suit: suitNames[text(card.suit)] ?? '·',
     color:
       card.color === 'red' || card.color === 'black' || card.color === 'none'
@@ -108,7 +111,7 @@ function printedCardView(match: RoleMatch, id: string): CardView {
   return face(match, id, match.room.world.card(id));
 }
 
-export function decisionView(request: DecisionRequest): DecisionView {
+export function decisionView(match: RoleMatch, request: DecisionRequest): DecisionView {
   const base = {
     id: request.id,
     token: request.token,
@@ -135,6 +138,7 @@ export function decisionView(request: DecisionRequest): DecisionView {
                     label: text(offer.label),
                     description: text(offer.description),
                     kind: offer.kind,
+                    ...(typeof offer.skill === 'string' ? { skill: offer.skill } : {}),
                     cards: strings(offer.materials),
                     count: count(offer.count),
                     cardId: typeof choice.card === 'string' ? choice.card : null,
@@ -157,10 +161,40 @@ export function decisionView(request: DecisionRequest): DecisionView {
     }
     case 'cards-targets': {
       const preview = record(data.preview);
+      const cards = candidates(preview.cards);
+      const groups = new Map<string, { id: string; label: string; cards: CardChoiceView[] }>();
+      if (data.purpose === 'owned-card' && Array.isArray(data.ownedCards))
+        for (const raw of data.ownedCards) {
+          const item = record(raw);
+          const candidate = cards.find((card) => card.id === item.id);
+          if (!candidate) continue;
+          const area = text(item.area);
+          let group = groups.get(area);
+          if (!group) {
+            const labels: Readonly<Record<string, string>> = {
+              hand: '手牌',
+              equipment: '装备',
+              judgment: '判定区',
+            };
+            group = {
+              id: area,
+              label: `${text(data.target)} · ${labels[area] ?? '其他牌'}`,
+              cards: [],
+            };
+            groups.set(area, group);
+          }
+          group.cards.push({
+            id: candidate.id,
+            label: candidate.label,
+            face: item.face === null ? null : face(match, candidate.id, item.face),
+          });
+        }
+      const cardGroups: readonly CardChoiceGroupView[] = [...groups.values()];
       return {
         ...base,
         kind: request.kind,
-        cards: candidates(preview.cards),
+        cards,
+        ...(data.purpose === 'owned-card' ? { cardGroups } : {}),
         targets: candidates(preview.targets),
         cardCount: count(data.cardCount),
         targetCount: count(data.targetCount),
@@ -218,6 +252,7 @@ function publicHistory(
   match: RoleMatch,
   history: HistoryReader,
   world: WorldReader,
+  projectCard: (id: string) => CardView,
 ): {
   actions: PublicAction[];
   log: LogView[];
@@ -225,7 +260,16 @@ function publicHistory(
 } {
   const actions: PublicAction[] = [];
   const log: LogView[] = [];
-  const revealed = new Map<string, readonly string[]>();
+  const facts = history.facts();
+  const generalMedia = (actor: string) => {
+    const id = generalOf(world, actor);
+    return id ? match.content?.generalViews[id] : undefined;
+  };
+  const skillVoice = (actor: string, skill: string, seq: number) => {
+    const voices = generalMedia(actor)?.voices?.[skill];
+    return voices?.length ? voices[seq % voices.length] : undefined;
+  };
+  const actionUses = new Map<number, string>();
   const targetsOf = (effects: readonly unknown[], edits: readonly unknown[]) => {
     // 效果被防止/无懈不等于移除用牌目标；只有显式的目标编辑改变公开指向。
     const removed = new Set(
@@ -247,17 +291,18 @@ function publicHistory(
   const declarations = new Map(
     useDeclarations(world).map((use) => [use.id, targetsOf(use.effects, use.edits)]),
   );
-  const finishedTargets = new Map(
-    history.facts('card.finished').map((fact) => {
-      const use = record(fact.data.detail);
-      const effects = Array.isArray(use.effects) ? use.effects.map(record) : [];
-      return [text(use.id), targetsOf(effects, Array.isArray(use.edits) ? use.edits : [])];
-    }),
-  );
-  for (const fact of history.facts()) {
+  // 结果只展示最近 100 条日志和 3 个动作；从末尾解释到满足实际输出为止。
+  // 仍按当前投影解释角色、牌名与处理区，不缓存过去的 World 或格式化结果。
+  for (
+    let index = facts.length - 1;
+    index >= 0 && (log.length < 100 || actions.length < 3);
+    index--
+  ) {
+    const fact = facts[index]!;
     const detail = record(fact.data.detail);
     const input = record(detail.input);
     let message = '';
+    let audio: LogView['audio'];
     switch (fact.data.kind) {
       case 'card.used':
       case 'card.responded': {
@@ -265,18 +310,21 @@ function publicHistory(
         const semantic = record(declaration.card);
         const card = face(match, `action:${fact.seq}`, semantic);
         const actor = text(detail.actor);
+        const source = record(semantic.source);
+        const cardVoices = match.content?.cardViews[text(semantic.name)]?.voices;
+        const voice =
+          skillVoice(actor, text(source.skill), fact.seq) ??
+          cardVoices?.[genderOf(world, actor) === 'female' ? 'female' : 'male'];
+        if (voice) audio = { voice };
         const originalTargets = strings(declaration.targets);
-        const targets =
-          declarations.get(text(declaration.useId)) ??
-          finishedTargets.get(text(declaration.useId)) ??
-          strings(declaration.targets);
+        if (actions.length < 3) actionUses.set(fact.seq, text(declaration.useId));
         const responding = fact.data.kind === 'card.responded';
         const processing = world.snapshot.zones.some((zone) => zone.id === declaration.processing);
         actions.push({
           seq: fact.seq,
           actor,
           card,
-          targets,
+          targets: originalTargets,
           kind: responding ? 'response' : 'use',
           processing,
         });
@@ -293,7 +341,9 @@ function publicHistory(
           .map((id) => `【${printedCardView(match, id).name}】`)
           .join('、')}`;
         break;
-      case 'skill.invoked':
+      case 'skill.invoked': {
+        const voice = skillVoice(text(detail.actor), text(detail.skill), fact.seq);
+        if (voice) audio = { voice };
         message = `${text(detail.actor)}发动【${text(record(detail.declaration).label) || '技能'}】`;
         if (detail.skill === 'standard:rende')
           message += `，将 ${strings(detail.cards).length} 张牌交给 ${strings(record(detail.declaration).targets).join('、')}`;
@@ -302,6 +352,7 @@ function publicHistory(
           message += `，将杀从 ${text(redirect.from)} 转移给 ${text(redirect.to)}`;
         }
         break;
+      }
       case 'discard.limited':
         message = `${text(detail.actor)}有无法弃置的手牌，本阶段需弃置 ${String(detail.count)} 张（原需 ${String(detail.required)} 张）`;
         break;
@@ -324,9 +375,18 @@ function publicHistory(
         message = `${text(detail.actor)}的【仁王盾】抵消黑色杀`;
         break;
       case 'draw.completed':
+        audio = { effect: 'draw' };
         message = `${text(input.player)}摸了 ${Array.isArray(detail.cards) ? detail.cards.length : 0} 张牌`;
         break;
       case 'damage.dealt':
+        audio = {
+          effect:
+            input.nature === 'fire'
+              ? 'fire-damage'
+              : input.nature === 'thunder'
+                ? 'thunder-damage'
+                : 'damage',
+        };
         message = `${text(input.to)}受到 ${String(detail.amount)} 点${input.nature === 'normal' ? '' : input.nature === 'fire' ? '火焰' : input.nature === 'thunder' ? '雷电' : '属性'}伤害（${String(detail.beforeHp)} → ${String(detail.afterHp)}）${typeof detail.shieldLost === 'number' && detail.shieldLost > 0 ? `，护盾吸收 ${detail.shieldLost} 点` : ''}${record(input.origin).kind === 'chain' || typeof record(input.origin).chain === 'string' ? '，连环传播' : ''}${record(input.origin).kind === 'transfer' ? '，转移伤害' : ''}${detail.unchained === true ? '，解除连环' : ''}`;
         break;
       case 'damage.transferring':
@@ -336,17 +396,22 @@ function publicHistory(
         message = `${text(detail.player)}${Number(detail.amount) > 0 ? '获得' : '失去'} ${Math.abs(Number(detail.amount))} 点护盾（${String(detail.before)} → ${String(detail.after)}）`;
         break;
       case 'chain.changed':
+        audio = { effect: 'chain' };
         message = `${text(detail.player)}${detail.after === true ? '进入连环' : '解除连环'}`;
         break;
       case 'hp.recovered':
         message = `${text(input.to)}回复 ${String(detail.amount)} 点体力`;
         break;
       case 'hp.lost':
+        audio = { effect: 'lose-hp' };
         message = `${text(input.player)}失去 ${String(detail.amount)} 点体力`;
         break;
-      case 'player.died':
+      case 'player.died': {
+        const voice = generalMedia(text(detail.player))?.deathVoice;
+        if (voice) audio = { voice };
         message = `${text(detail.player)}阵亡，身份为${roleNames[roleOf(world, text(detail.player))] ?? '未知'}`;
         break;
+      }
       case 'cards.discarded':
         message = `${text(detail.actor)}弃置 ${Array.isArray(detail.cards) ? detail.cards.length : 0} 张牌`;
         break;
@@ -366,7 +431,8 @@ function publicHistory(
         if (given.visible === true) {
           const cards = strings(given.cards).map((id) => printedCardView(match, id));
           message += `，公开：${cards.map((card) => `【${card.name}】${card.suit}${card.rank}`).join('、')}`;
-          for (const card of cards)
+          // 逆序读取事实时，单条事实中的多个动作也要逆序，最终统一恢复显示顺序。
+          for (const card of [...cards].reverse())
             actions.push({
               seq: fact.seq,
               actor: text(given.actor),
@@ -391,10 +457,10 @@ function publicHistory(
         message = `${text(detail.owner)}的${record(detail.origin).kind === 'extra' ? '额外回合' : '回合'}`;
         break;
       case 'game.finished':
+        audio = { effect: 'finish' };
         message = `对局结束：${strings(detail.winners).join('、') || '无人'}获胜`;
         break;
       case 'cards.revealed':
-        revealed.set(text(detail.zone), strings(detail.cards));
         message = `公开展示 ${strings(detail.cards).length} 张牌`;
         break;
       case 'delayed.placed': {
@@ -504,7 +570,32 @@ function publicHistory(
           .join('')}`;
         break;
     }
-    if (message) log.push({ seq: fact.seq, text: message });
+    if (message && log.length < 100)
+      log.push({ seq: fact.seq, text: message, ...(audio ? { audio } : {}) });
+    if (actions.length > 3) actions.length = 3;
+  }
+  // 旧事实仍决定存活公开牌池和动作的最终目标，不能随可见日志一起截断。
+  // 只解释当前区域及三个可见动作需要的数据，保持函数无状态与 Map 的首次出现顺序。
+  const zones = new Set(world.snapshot.zones.map((zone) => zone.id));
+  const revealed = new Map<string, readonly string[]>();
+  const neededUses = new Set(actionUses.values());
+  const finishedTargets = new Map<string, readonly string[]>();
+  for (const fact of history.facts('cards.revealed')) {
+    const detail = record(fact.data.detail);
+    const zone = text(detail.zone);
+    if (zones.has(zone)) revealed.set(zone, strings(detail.cards));
+  }
+  for (const fact of history.facts('card.finished')) {
+    const use = record(fact.data.detail);
+    const id = text(use.id);
+    if (neededUses.has(id) && !declarations.has(id))
+      finishedTargets.set(
+        id,
+        targetsOf(
+          Array.isArray(use.effects) ? use.effects : [],
+          Array.isArray(use.edits) ? use.edits : [],
+        ),
+      );
   }
   const pools = [...revealed].flatMap(([zone, ids]) =>
     world.snapshot.zones.some((item) => item.id === zone)
@@ -512,12 +603,24 @@ function publicHistory(
           {
             zone,
             visibility: 'public' as const,
-            cards: ids.filter((id) => world.position(id) === zone).map((id) => cardView(match, id)),
+            cards: ids.filter((id) => world.position(id) === zone).map(projectCard),
           },
         ]
       : [],
   );
-  return { actions: actions.slice(-3), log: log.slice(-100), pools };
+  return {
+    actions: actions.reverse().map((action) => {
+      const use = actionUses.get(action.seq);
+      return use === undefined
+        ? action
+        : {
+            ...action,
+            targets: declarations.get(use) ?? finishedTargets.get(use) ?? action.targets,
+          };
+    }),
+    log: log.reverse(),
+    pools,
+  };
 }
 
 export function projectMatch(
@@ -527,104 +630,115 @@ export function projectMatch(
   error = '',
   focus: string | null = viewer,
 ): GameView {
-  const world = match.room.world;
-  const assigned = match.progress !== null;
-  const active = readState(world, activeTurn, activeTarget);
-  const phase = readState(world, activePhase, activeTarget);
-  const handoff =
-    request && (request.kind === 'seat-ready' || request.player !== viewer)
-      ? {
-          key: `${request.id}:${request.token}`,
-          player: request.player,
-          name: request.player,
-          turn: request.kind === 'seat-ready',
-          extra: request.kind === 'seat-ready' && record(request.data).extra === true,
-        }
-      : null;
-  const authorized = handoff ? null : viewer;
-  const publicData = publicHistory(match, match.room.history, world);
-  return immutable({
-    revision: world.snapshot.revision,
-    status:
-      match.room.status === 'faulted'
-        ? 'faulted'
-        : error
-          ? 'stopped'
-          : match.result
-            ? 'ended'
-            : match.progress === null
-              ? 'idle'
-              : 'running',
-    viewer: authorized,
-    automated: null,
-    paused: false,
-    deckName: match.deckName,
-    hand: authorized ? world.zone(`${authorized}:hand`).cards.map((id) => cardView(match, id)) : [],
-    players: world.snapshot.players.map((player, i) => {
-      const id = generalOf(world, player.id);
-      const general = id ? match.generals.definition(id) : null;
-      const role = assigned ? knownRole(world, authorized, player.id) : null;
+  return match.room.inspect((ctx) => {
+    const world = ctx.world;
+    const assigned = match.progress !== null;
+    const active = readState(world, activeTurn, activeTarget);
+    const phase = readState(world, activePhase, activeTarget);
+    const handoff =
+      request && (request.kind === 'seat-ready' || request.player !== viewer)
+        ? {
+            key: `${request.id}:${request.token}`,
+            player: request.player,
+            name: request.player,
+            turn: request.kind === 'seat-ready',
+            extra: request.kind === 'seat-ready' && record(request.data).extra === true,
+          }
+        : null;
+    const authorized = handoff ? null : viewer;
+    // 停止后的错误视图不再执行可能正是故障来源的牌面查询。
+    const projectCard = (id: string) =>
+      error || match.room.status === 'faulted'
+        ? printedCardView(match, id)
+        : face(match, id, match.book.face(ctx, id));
+    const publicData = publicHistory(match, match.room.history, world, projectCard);
+    return immutable({
+      revision: world.snapshot.revision,
+      status:
+        match.room.status === 'faulted'
+          ? 'faulted'
+          : error
+            ? 'stopped'
+            : match.result
+              ? 'ended'
+              : match.progress === null
+                ? 'idle'
+                : 'running',
+      viewer: authorized,
+      automated: null,
+      control: null,
+      paused: false,
+      deckName: match.deckName,
+      hand: authorized ? world.zone(`${authorized}:hand`).cards.map(projectCard) : [],
+      players: world.snapshot.players.map((player, i) => {
+        const id = generalOf(world, player.id);
+        const general = id ? match.generals.definition(id) : null;
+        const role = assigned ? knownRole(world, authorized, player.id) : null;
 
-      return {
-        ...player,
-        chained: isChained(world, player.id),
-        shield: shieldOf(world, player.id),
-        name: player.id,
-        gender: { male: '男', female: '女', dual: '双', none: '无' }[genderOf(world, player.id)],
-        kingdom: kingdomOf(world, player.id) ?? '',
-        title: general?.name ?? '',
-        ...(id && match.content?.generalViews[id]
-          ? { portrait: match.content.generalViews[id].portrait }
-          : {}),
-        self: focus === player.id,
-        color: ['#b7a16e', '#779ba3', '#b98c72', '#91a085'][i % 4]!,
-        handCount: world.zone(`${player.id}:hand`).cards.length,
-        role: role ? roleNames[role]! : null,
-        equipment: world.zone(`${player.id}:equipment`).cards.map((id) => cardView(match, id)),
-        judgment: delayedCards(world, player.id).map((entry) =>
-          face(match, entry.id, entry.source.card),
-        ),
-        skills: [
-          ...new Set([
-            ...(general?.skills ?? []),
-            ...world.snapshot.skills
-              .filter((skill) => skill.owner === player.id)
-              .map((skill) => skill.skill),
-          ]),
-        ].map((id) => {
-          const definition = match.skills.definition(id);
-          return {
-            id: definition.id,
-            name: definition.name,
-            description: definition.description ?? '',
-            effective: world.snapshot.skills.some(
-              (skill) =>
-                skill.owner === player.id && skill.skill === id && skillEffective(world, skill.id),
-            ),
-          };
-        }),
-      };
-    }),
-    decision: request && !handoff ? decisionView(request) : null,
-    handoff,
-    turn: match.progress?.turns ?? 0,
-    extraTurn: active?.origin.kind === 'extra',
-    active: active?.owner ?? null,
-    phase: phase?.kind ?? null,
-    drawCount: world.zone('draw').cards.length,
-    discardCount: world.zone('discard').cards.length,
-    ...publicData,
-    pools: [
-      ...publicData.pools,
-      ...privateCardPools(world, authorized)
-        .filter((pool) => !publicData.pools.some((publicPool) => publicPool.zone === pool.zone))
-        .map((pool) => ({
-          zone: pool.zone,
-          visibility: 'private' as const,
-          cards: pool.cards.map((id) => cardView(match, id)),
-        })),
-    ],
-    result: match.result,
-    error,
+        return {
+          ...player,
+          chained: isChained(world, player.id),
+          shield: shieldOf(world, player.id),
+          name: player.id,
+          gender: { male: '男', female: '女', dual: '双', none: '无' }[genderOf(world, player.id)],
+          kingdom: kingdomOf(world, player.id) ?? '',
+          title: general?.name ?? '',
+          ...(id && match.content?.generalViews[id]?.portrait
+            ? { portrait: match.content.generalViews[id].portrait }
+            : {}),
+          self: focus === player.id,
+          color: ['#b7a16e', '#779ba3', '#b98c72', '#91a085'][i % 4]!,
+          handCount: world.zone(`${player.id}:hand`).cards.length,
+          role: role ? roleNames[role]! : null,
+          equipment: world.zone(`${player.id}:equipment`).cards.map(projectCard),
+          judgment: delayedCards(world, player.id).map((entry) =>
+            face(match, entry.id, entry.source.card),
+          ),
+          skills: [
+            ...new Set([
+              ...(general?.skills ?? []),
+              ...world.snapshot.skills
+                .filter((skill) => skill.owner === player.id)
+                .map((skill) => skill.skill),
+            ]),
+          ].map((id) => {
+            const definition = match.skills.definition(id);
+            return {
+              id: definition.id,
+              name: definition.name,
+              description: definition.description ?? '',
+              active: Boolean(definition.active?.length || definition.viewAs?.length),
+              effective: world.snapshot.skills.some(
+                (skill) =>
+                  skill.owner === player.id &&
+                  skill.skill === id &&
+                  skillEffective(world, skill.id),
+              ),
+            };
+          }),
+        };
+      }),
+      decision: request && !handoff ? decisionView(match, request) : null,
+      handoff,
+      turn: match.progress?.turns ?? 0,
+      extraTurn: active?.origin.kind === 'extra',
+      active: active?.owner ?? null,
+      phase: phase?.kind ?? null,
+      drawCount: world.zone('draw').cards.length,
+      discardCount: world.zone('discard').cards.length,
+      ...publicData,
+      pools: [
+        ...publicData.pools,
+        ...privateCardPools(world, authorized)
+          .filter((pool) => !publicData.pools.some((publicPool) => publicPool.zone === pool.zone))
+          .map((pool) => ({
+            zone: pool.zone,
+            visibility: 'private' as const,
+            cards: pool.cards.map(projectCard),
+          })),
+      ],
+      result: match.result,
+      error,
+    });
   });
 }

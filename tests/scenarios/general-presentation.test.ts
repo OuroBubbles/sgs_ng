@@ -1,8 +1,7 @@
 import { expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { definePackage, resolvePackages } from '../../src/sdk';
-import type { ContentPackage } from '../../src/sdk';
+import { createContent } from '../../src/sdk';
 import standard from '../../src/content/standard';
 import provenance from '../../src/content/standard/portraits/provenance.json';
 import { createOfflineMatch, defaultContent } from '../../src/app/offline/practice';
@@ -18,46 +17,40 @@ const general = {
   maxHp: 4,
   skills: [],
 };
-const pack = (extra: Omit<ContentPackage, 'manifest'>) =>
-  definePackage({ manifest: { id: 'portrait', name: '立绘', version: '1' }, ...extra });
-
-it('展示声明复制冻结，选择关闭的包不泄漏资源，规则目录保持纯规则声明', () => {
-  const views = [{ id: general.id, portrait: 'data:image/png;base64,author' }];
-  const entry = pack({ generals: [general], generalViews: views });
-  views[0]!.portrait = 'changed';
-  const selected = resolvePackages([entry], ['portrait']);
-  expect(selected.generalViews[general.id]?.portrait).toBe('data:image/png;base64,author');
-  expect(Object.isFrozen(selected.generalViews[general.id])).toBe(true);
-  expect(selected.createBooks().generals.definition(general.id)).not.toHaveProperty('portrait');
-  expect(resolvePackages([entry], []).generalViews).toEqual({});
-});
-
-it('缺图允许轮廓，空路径、越界命名、重复和未知武将展示在装配前报错', () => {
-  expect(resolvePackages([pack({ generals: [general] })], ['portrait']).generalViews).toEqual({});
-  expect(() => pack({ generalViews: [{ id: general.id, portrait: ' ' }] })).toThrow(/portrait URL/);
-  expect(() => pack({ generalViews: [{ id: 'other:guest', portrait: 'guest.png' }] })).toThrow(
-    /namespace/,
+it('缺图允许轮廓，空路径、重复和未知武将展示在组合时诊断', () => {
+  expect(createContent({ generals: [general] }).generalViews).toEqual({});
+  const voiceOnly = createContent({
+    generals: [general],
+    generalViews: [{ id: general.id, deathVoice: 'guest.mp3', voices: { skill: ['skill.mp3'] } }],
+  });
+  expect(voiceOnly.generalViews[general.id]).not.toHaveProperty('portrait');
+  expect(Object.isFrozen(voiceOnly.generalViews[general.id]!.voices!.skill)).toBe(true);
+  expect(() =>
+    createContent({ generals: [general], generalViews: [{ id: general.id, portrait: ' ' }] }),
+  ).toThrow(/portrait URL/);
+  const view = { id: general.id, portrait: 'guest.jpg' };
+  expect(() => createContent({ generals: [general], generalViews: [view, view] })).toThrow(
+    /Duplicate general presentation/,
   );
-  const view = { id: general.id, portrait: 'guest.png' };
-  expect(() => pack({ generalViews: [view, view] })).toThrow(/Duplicate general presentation/);
-  expect(() => resolvePackages([pack({ generalViews: [view] })], ['portrait'])).toThrow(
-    /unknown general/,
-  );
+  expect(() => createContent({ generalViews: [view] })).toThrow(/unknown general/);
 });
 
 it('公开武将图随当前武将投影，身份和手牌权限不变，图像不进入 AI、状态或事实重建', async () => {
   const portrait = 'data:image/png;base64,only-presentation';
-  const content = resolvePackages(
-    [standard, pack({ generals: [general], generalViews: [{ id: general.id, portrait }] })],
-    ['standard', 'portrait'],
-  );
-  const match = createOfflineMatch(
-    2,
-    1,
-    'standard:identity',
-    [general.id, 'standard:guanyu'],
+  const views = [{ id: general.id, portrait }];
+  const content = createContent(standard, {
+    generals: [general],
+    generalViews: views,
+  });
+  views[0]!.portrait = 'changed';
+  expect(Object.isFrozen(content.generalViews[general.id])).toBe(true);
+  const match = createOfflineMatch({
+    seed: 1,
+    preset: 'standard:identity',
+    lineup: [general.id, 'standard:guanyu'],
     content,
-  );
+  });
+  expect(match.generals.definition(general.id)).not.toHaveProperty('portrait');
   await match.prepare();
   const view = projectMatch(match, '甲席', null);
   expect(view.players[0]).toMatchObject({ title: '来客', portrait });

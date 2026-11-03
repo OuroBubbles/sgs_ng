@@ -66,17 +66,14 @@
   background: #819773;
 }
 .target-hitbox {
+  container-type: size;
+  padding: 0;
   position: absolute;
   pointer-events: auto;
   transform: translate(-50%, -50%);
   border-radius: 5px;
 }
-.target-hitbox:hover[aria-disabled='false'] {
-  background: #debd7720;
-}
-.target-hitbox.impact {
-  animation: impact 0.7s ease-out;
-}
+
 .hand-meta i {
   color: #637059;
   font-style: normal;
@@ -251,13 +248,21 @@
   margin-left: 8px;
   font-size: 10px;
 }
+.table-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
 .table-surface {
   position: relative;
   flex: 1;
   min-height: 0;
   border: 1px solid #77886d24;
   border-radius: 5px;
-  background: radial-gradient(ellipse at 48% 42%, #31534540, transparent 70%), #13221e;
+  background:
+    url('../../assets/freekill/ui/gamebg.jpg') center / cover no-repeat,
+    #514739;
 }
 .board-canvas,
 .target-overlays {
@@ -273,7 +278,6 @@
 .battlefield {
   container: battlefield / size;
   border-radius: 5px;
-  height: clamp(310px, 44vh, 490px);
   position: absolute;
   margin: 0;
   border: 0;
@@ -291,24 +295,7 @@
   content: '';
   display: none;
 }
-.target-state {
-  position: absolute;
-  top: auto;
-  right: auto;
-  width: max-content;
-  height: auto;
-  left: 50%;
-  bottom: -2px;
-  transform: translate(-50%, 50%);
-  white-space: nowrap;
-  font-size: 9px;
-  padding: 2px 5px;
-  color: #eed39a;
-  background: #243d31;
-  border: 1px solid #95805766;
-  border-radius: 3px;
-  pointer-events: none;
-}
+
 .hand-zone {
   position: absolute;
   z-index: 3;
@@ -343,6 +330,8 @@
   font-weight: 400;
 }
 .hand-cards {
+  container-type: size;
+  --hand-card-limit: 150.9677px;
   padding-bottom: 8px;
   display: flex;
   flex: 1;
@@ -353,20 +342,17 @@
   align-items: flex-end;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 14px 3px 4px;
+  padding: 20px 3px 4px;
   scrollbar-width: thin;
 }
 .hand-cards .playing-card {
-  width: 108px;
-  height: 148px;
+  width: auto;
+  height: min(var(--hand-card-limit), 100cqh);
+  aspect-ratio: 93 / 130;
   flex: none;
 }
-.hand-cards .playing-card.unavailable:not(.chosen) {
-  filter: saturate(0.5);
-  opacity: 0.55;
-}
 .hand-cards .playing-card.chosen {
-  transform: translateY(-10px);
+  transform: translateY(-20px);
 }
 .hand-cards .card-art {
   top: 24px;
@@ -378,65 +364,9 @@
   position: absolute;
   z-index: 4;
   overflow: auto;
+  scrollbar-width: none;
 }
-.recipe-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  margin: 0;
-  width: auto;
-}
-.recipe-bar > span {
-  display: none;
-}
-.recipe-bar button {
-  padding: 7px 3px;
-  font-size: 10px;
-}
-.equipment-shelf {
-  display: contents;
-}
-.equipment-holder {
-  position: absolute;
-  z-index: 4;
-  display: flex;
-  gap: 2px;
-  padding: 0;
-  overflow: auto;
-  scrollbar-width: thin;
-}
-.equipment-holder > span {
-  display: none;
-}
-.equipment-items {
-  display: flex;
-  gap: 3px;
-  flex: none;
-  align-items: flex-start;
-}
-.equipment-items > span {
-  display: none;
-}
-.equipment-holder .playing-card.compact {
-  width: 96px;
-  height: 30px;
-}
-.equipment-holder .compact .card-name {
-  font-size: 11px;
-  bottom: 8px;
-  left: 21px;
-  width: 68px;
-}
-.own-gear {
-  flex-direction: column;
-}
-.own-gear .equipment-items {
-  flex-direction: column;
-}
-.own-gear .playing-card.compact {
-  width: 100%;
-}
+
 .choice-options {
   position: absolute;
   z-index: 5;
@@ -451,12 +381,17 @@
   background: #162b24f5;
   border: 1px solid #81906066;
 }
-.choice-options [aria-pressed='true'] {
+.choice-options .subtle-button[aria-pressed='true'] {
   border-color: #cfb275;
   background: #b6a36426;
 }
 .choice-options:empty {
   display: none;
+}
+.choice-options.owned-card-options {
+  display: block;
+  padding: 4px;
+  transform: translateY(-50%);
 }
 .decision-bar {
   border-radius: 4px;
@@ -478,6 +413,9 @@
   display: flex;
   gap: 8px;
   text-align: center;
+  justify-content: center;
+}
+.decision-bar.waiting {
   justify-content: center;
 }
 .decision-index {
@@ -532,6 +470,11 @@
 }
 .table-tools button:disabled {
   opacity: 0.4;
+}
+.table-tools button[aria-pressed='true'] {
+  color: #ead392;
+  background: #425336;
+  border-color: #c4b27d;
 }
 .journal {
   padding: 14px 0 0 25px;
@@ -613,11 +556,6 @@
   display: none;
 }
 .pile-count {
-  position: absolute;
-  top: 8px;
-  bottom: auto;
-  right: 10px;
-  z-index: 3;
   pointer-events: none;
   font-size: 10px;
   color: #b6b78c;
@@ -655,7 +593,7 @@
   scrollbar-width: thin;
 }
 .public-pools .playing-card {
-  width: calc(var(--pool-card-height) * 0.72);
+  width: calc(var(--pool-card-height) * 93 / 130);
   height: var(--pool-card-height);
   pointer-events: auto;
 }
@@ -687,14 +625,15 @@
 }
 .pool-card {
   position: relative;
+  display: flex;
 }
 .table-cards {
-  top: 54%;
+  top: 50%;
   bottom: auto;
 }
 .table-card {
-  width: 78px;
-  height: 108px;
+  width: clamp(23px, calc((100cqh - 48px) * 93 / 130), var(--table-card-width, 78px));
+  height: auto;
 }
 .lobby {
   position: absolute;
@@ -760,6 +699,42 @@
   border: 1px solid #77886d55;
   border-radius: 3px;
 }
+.network-join {
+  width: min(100%, 480px);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #77886d55;
+  text-align: left;
+}
+.room-roster {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+  max-width: 100%;
+  margin: 8px 0 14px;
+}
+.room-roster p {
+  margin: 3px 0;
+}
+.network-join summary {
+  cursor: pointer;
+  color: #d6c9a6;
+  font-size: 12px;
+}
+.network-join form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 10px 0;
+}
+.network-join label {
+  flex: 1;
+  min-width: 180px;
+}
+.network-join input {
+  max-width: none;
+}
 .setup .hand-zone,
 .setup .decision-bar,
 .setup .skills-dock,
@@ -811,6 +786,11 @@
     max-width: 155px;
     text-align: right;
   }
+  .table-state {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
   .header-actions .subtle-button {
     padding: 7px;
     font-size: 10px;
@@ -838,9 +818,8 @@
   .decision-actions .confirm-button span {
     display: none;
   }
-  .hand-cards .playing-card {
-    width: 78px;
-    height: 112px;
+  .hand-cards {
+    --hand-card-limit: 109.0323px;
   }
   .hand-cards .card-name {
     font-size: 23px;
@@ -858,22 +837,7 @@
   .hand-meta > div {
     white-space: nowrap;
   }
-  .equipment-holder .playing-card.compact {
-    height: 24px;
-  }
-  .equipment-holder .compact .card-name {
-    font-size: 10px;
-    left: 17px;
-    width: calc(100% - 18px);
-    bottom: 6px;
-  }
-  .own-gear .compact .card-rank {
-    display: none;
-  }
-  .own-gear .compact .card-name {
-    left: 2px;
-    width: calc(100% - 4px);
-  }
+
   .table-tools {
     left: 3px;
   }
@@ -888,11 +852,8 @@
   .app-footer .footer-center {
     display: none;
   }
-  .table-card {
-    width: 58px;
-    height: 82px;
-  }
   .table-cards {
+    --table-card-width: 58px;
     max-width: 80%;
   }
   .lobby {
@@ -929,9 +890,8 @@
   .hand-meta {
     height: 16px;
   }
-  .hand-cards .playing-card {
-    width: 60px;
-    height: 76px;
+  .hand-cards {
+    --hand-card-limit: 76px;
   }
   .hand-cards .card-art {
     display: none;
@@ -944,7 +904,7 @@
     font-size: 6px;
   }
   .hand-cards {
-    padding-top: 5px;
+    padding-top: 20px;
   }
   .decision-copy strong {
     font-size: 10px;
@@ -955,12 +915,8 @@
   .decision-actions button {
     padding: 8px 12px;
   }
-  .table-card {
-    width: 50px;
-    height: 68px;
-  }
   .table-cards {
-    top: 45%;
+    --table-card-width: 50px;
   }
   .lobby h1 {
     font-size: 22px;
@@ -998,7 +954,7 @@
   justify-content: center;
   gap: 14px;
 }
-.package-options {
+.content-options {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1011,42 +967,14 @@
   font-size: 11px;
   color: #a7b69e;
 }
-.package-options .practice-toggle {
+.content-options .practice-toggle {
   margin: 2px 0;
 }
 
-.lobby .content-file-input {
-  display: none;
-}
-.package-item {
+.content-choice {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-}
-.content-import,
-.content-action,
-.package-remove {
-  padding: 2px 5px;
-  color: #b7a16e;
-  border: 1px solid #4b533f;
-  border-radius: 3px;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.content-store-status {
-  margin: 0 6px;
-  color: #9aa88b;
-}
-.content-action {
-  margin-left: 4px;
-  padding: 0 4px;
-  font-size: 10px;
-}
-.package-remove {
-  border: 0;
-  font-size: 15px;
 }
 @media (max-height: 600px) and (min-width: 650px) {
   .lobby {

@@ -1,6 +1,6 @@
 # 56 · 独立效果与普通作者代码
 
-更新：2026-10-18。已接入每局独立效果目录，并将标准裸衣迁出专用 Provider。这里表示持续规则效果，与一次用牌的 CardEffect 分开；结束持续效果不自动撤回已经宣告的牌效果。复用 World 的普通状态、Window 调度和现有纯查询，没有增加新的执行内核或技能 DSL。
+更新：2026-11-03。每局独立效果目录通过普通源码组合，标准裸衣使用相同入口。这里表示持续规则效果，与一次用牌的 CardEffect 分开；结束持续效果不自动撤回已经宣告的牌效果。复用 World 的普通状态、Window 调度和现有纯查询，没有增加新的执行内核或技能 DSL。
 
 ## 来源技能、效果身份和角色归属分别表达
 
@@ -19,30 +19,44 @@ flowchart LR
 
 EffectRecord 保存 id、type、owner、origin、scopeId、data，都是普通不可变数据。owner 是候选的行动序归属，可为 null，不隐含角色存活、技能持有或来源生存。origin 是作者提供的来源快照，不是可重新发动旧技能的资格。实际技能授予仍留在 World.skills，独立效果不会伪造一条技能实例。
 
-实例存在与执行挂接有效时，EffectHandle.active 才为真。角色死亡、技能失效或撤销是否结束效果，由普通规则代码明确决定。守约示例保留宣告者死亡后的效果，在受益者死亡时主动结束；裸衣则明确要求原角色仍存活，并且当前执行的回合与记录一致。
+EffectHandle.current(world) 返回当前挂接中的实例记录；实例结束、外局或旧挂接返回 null。角色死亡、技能失效或撤销是否结束效果，由普通规则代码明确决定。守约示例保留宣告者死亡后的效果，在受益者死亡时主动结束；裸衣则明确要求原角色仍存活，并且当前执行的回合与记录一致。
 
 ## 定义和使用
 
-`defineEffect<Data>` 接受 id、name、纯 accepts、普通 create 函数和可选 onEnd。create 取得类型化句柄，返回普通 triggers/modifiers 列表；作者可以用条件、循环和闭包构造行为，用 effectOn / effectModify 连接现有窗口和查询。
+独立效果直接用普通对象声明 id、name、纯 accepts、普通 create 函数和可选 onEnd，使用 `satisfies EffectDefinition<Data>` 获得类型提示。createContent / EffectBook.register 固定声明并保留原接收者；需要主动提前规范化时仍可使用 defineEffect。
 
-句柄的 data 在实例存在时读取最新数据；结束后的普通后续保留本次绑定快照。update / end 显式传入当前 Context。行为工厂、条件、次数和查询必须保持纯；真正的异步规则后续放在 run / onEnd 中。
+create 取得类型化句柄，返回普通 triggers/modifiers 列表；作者可以用条件、循环和闭包构造行为，用 effectOn / effectModify 连接现有窗口和查询。effectOn 的 times 使用 `(ctx, { payload })`，when/run 使用 `(ctx, { payload, occurrence })`，按需解构；self 保留在 create 的类型化闭包中。结束后效使用 `onEnd(ctx, { before, reason })`，before 保留声明的数据类型。自定义 bind 也必须同步；候选收集、执行前重绑及按实例显式入窗都会在读取绑定结果前检查，不会把 Promise 当作无触发或无身份。
+
+accepts / create / onEnd 与 effectOn 的条件、次数和执行支持普通方法及原型方法，装配固定入口并保留原接收者，不冻结作者对象。defineEffect 重复接收本入口已固定的声明时直接复用；外部原对象不作缓存，方法内部读取的可变数据仍由开发者管理。实例创建继续核对登记工厂，核对使用绑定前的函数身份，避免方法绑定把同一实现误认作不同声明；同名但不同工厂仍被拒绝。
+
+句柄字段始终是本次绑定的不可变快照。行为工厂与自定义 bind 在候选执行前读取最新记录重新绑定；当前查询也按当前记录构造行为。自定义 bind 返回的 Trigger 可以使用原型字段、方法和私有字段；目录补充标签时保留其原接收者。候选的身份、组、座次与次数仍在入场时固定。
+
+| 读取方式                  | 明确含义                                                                   |
+| ------------------------- | -------------------------------------------------------------------------- |
+| self.data                 | 本次绑定时的数据；更新、结束和嵌套调用都不改写它                           |
+| self.current(ctx.world)   | 此刻仍存在的记录或 null；保留返回值就得到一次读取快照                      |
+| await update / end 的结果 | 本次实际更新后的记录 / 实际移除的记录；未发生操作时为 null，后效不倒改结果 |
+
+例如绑定时为 8，回调内更新到 12：self.data 一直为 8，current 读到 12；结束后 current 为 null，end 返回数据为 12 的记录。onEnd.before 同样指向结束提交前的记录。嵌套回调各有自己的绑定快照。作者按所需时点明确读取，不再依赖字段隐式切换，也不需要为了结束后使用数据手动绕过旧值回退。
+
+跨 await 后若需当前值，重新调用 current；若需按结束时数据结算，使用 await self.end(ctx, reason) 的返回记录。update / end 显式传入当前 Context。行为工厂、条件、次数和查询保持纯；异步后续放在 run / onEnd 中。
 
 ```ts
-const record = ctx.unwrap(
-  await book.effects.add(ctx, covenant, {
-    owner: target,
-    origin: { actor: self.owner, skill: self.skill, instance: self.id },
-    data: { target, remaining: 1 },
-  }),
-);
+const record = await book.effects.add(ctx, covenant, {
+  owner: target,
+  origin: { actor: self.owner, skill: self.skill, instance: self.id },
+  data: { target, remaining: 1 },
+});
 
-ctx.unwrap(await book.effects.update(ctx, record.id, { target, remaining: 0 }));
-ctx.unwrap(await book.effects.end(ctx, record.id, 'my-package:finished'));
+await book.effects.update(ctx, record.id, { target, remaining: 0 });
+await book.effects.end(ctx, record.id, 'covenant:finished');
 ```
 
-add 产生独立身份并提交 effect.added；update 保留身份，提交 before/after 并开放 effectChanged；end 幂等移除实例，随后提交 effect.ended、开放 effectEnded，再执行定义的 onEnd。所有流程都需 await，中止用 unwrap 延续，不把失败解释成另一个领域结果。
+add 产生独立身份并提交 effect.added；update 保留身份，提交 before/after 并开放 effectChanged；end 幂等移除实例，随后提交 effect.ended、开放 effectEnded，再执行定义的 onEnd，返回本次移除前的记录；再次结束返回 null。所有流程都需 await，中止默认向外传播，不把失败解释成另一个领域结果。
 
-返回记录是本次提交快照，后效可以再次更新或结束实例；持续资格通过 active 或当前 instances 读取。
+返回记录是本次提交快照，后效可以再次更新或结束实例；当前实例通过 current 或 instances 显式读取。
+
+prepare / add / update 先在纯查询内固定整份记录，再校验其中实际保存的 data；accepts 取得的同一份只读数据进入 World。原始 getter 不会在校验后再次读取，origin 与 data 的别名保持，复制过程也不能重入规则写操作。原始输入仍由调用者持有，后续修改不会改变已固定的记录。
 
 查询仍经 SkillBook.query 的原组合函数，undefined 表示不贡献，null 等值由查询自己定义。效果贡献不借用技能拥有者的默认存活判断；需要这一条件时，作者在查询中直接检查角色。普通自定义 EffectTrigger 绑定也受支持，显式入窗不要求 ID 采用某种可解析格式。
 
@@ -51,6 +65,8 @@ add 产生独立身份并提交 effect.added；update 保留身份，提交 befo
 add / prepare 可携带当前祖先领域的 lifetime。跨局、非祖先和已关闭领域拒绝；未传 lifetime 的效果可跨创建 Flow、阶段和回合存在，直到规则明确结束。
 
 领域到期先同步移除自己的全部状态，再执行后效。LifetimeEnd 现在同时保留 statesBefore 与原有状态 ID、skillsBefore；效果库据此生成到期结束事实，不维护另一份可漂移的实例注册表。结束窗口和 onEnd 看见的查询资格已经撤销，内外层领域及独立实例分别保留。
+
+同批到期的每个实例在自己的恢复边界中执行结束窗口与 onEnd：一项后效局部中止，其余项仍生成结束事实并结算；原领域本体的中止原因仍在善后之后向外传播。显式调用 end 的中止继续向调用者传播。代码故障或整局关闭不属于局部恢复，余项后效停止，已提交的批量移除不回滚。
 
 正常领域结束和局部中止均执行领域善后。整局 finish / abort / fault 会释放执行侧登记，令旧句柄失效；它们不会为仍保留在已提交 World 中的独立效果伪造逐项结束事实，也不承诺故障之后继续异步规则回调。
 
@@ -65,18 +81,14 @@ add / prepare 可携带当前祖先领域的 lifetime。跨局、非祖先和已
 需要与费用同次宣告时用 prepare：
 
 ```ts
-const prepared = ctx.unwrap(await book.effects.prepare(ctx, definition, input));
-const paid = ctx.unwrap(
-  await pay(ctx, {
-    actor,
-    cards: [],
-    to: 'discard',
-    reason,
-    legal: live,
-    changes: [prepared.change],
-    declaration: { effect: prepared.record },
-  }),
-);
+const prepared = await book.effects.prepare(ctx, definition, input);
+const paid = await pay(ctx, {
+  actor,
+  reason,
+  legal: live,
+  changes: [prepared.change],
+  declaration: { effect: prepared.record },
+});
 ```
 
 prepare 返回普通记录与 Change，交给调用方在 legal 中重查费用、领域与资格后提交；跨 await 的声明也由调用方重新验证。ctx.commit 提交显式 Change，不隐式重新执行验证函数。直接 add 有自己的添加窗口；与费用合并时，效果身份保存在支付宣告中，提交后效立即可以查询新效果。
@@ -87,16 +99,10 @@ prepare 返回普通记录与 Change，交给调用方在 legal 中重查费用�
 
 [守约示例](../examples/effects/covenant.ts) 用普通代码组合：受益者手牌上限加一、下次正伤害在防御窗口减一并消耗次数、受益者回合结束撤销并摸一张牌，受益者死亡则撤销且不摸牌。宣告者死亡后仍持续。这是源码/规则场景示例；标准裸衣由现有正式界面与基础 AI 使用。
 
-普通内容包可声明 `effects: [covenant]`。包解析检查命名空间和重复定义，每局创建自己的目录；未选包不安装定义。外部 .sgs.mjs 同样使用宿主 effectOn、Query 和 Window 身份，真实编译/载入后验证修改上限与减伤，不打包第二套效果库。
+普通 `ContentDefinition` 直接声明 `effects: [covenant]`，通过 `createContent(standard, { effects: [covenant] })` 组合；重复定义在装配期拒绝，每局创建自己的目录。效果不必通过技能工厂的登记副作用安装，也没有命名空间、包解析或专用文件格式要求。普通 import 共享实际 effectOn、Query 和 Window 身份，所有内容复用同一效果库。
 
-## 验证与后续
+## 验证与边界
 
-本批新增 [36 项独立效果场景](../tests/scenarios/independent-effects.test.ts)、[7 项效果包场景](../tests/scenarios/effect-packages.test.ts) 和 [1 项外部模块场景](../tests/scenarios/content-modules.test.ts)。覆盖独立/全局实例、角色死亡、嵌套领域、原子费用、同窗更新/移除/接纳、有限次数、闭包重绑、普通自定义绑定、外局/旧挂接、纯查询、结束回调、登记失败和已提交事实重建。
+[独立效果场景](../tests/scenarios/independent-effects.test.ts)、[源码组合场景](../tests/scenarios/effect-content.test.ts) 和 [绑定数据场景](../tests/scenarios/effect-binding-snapshots.test.ts) 覆盖来源失去/死亡、更新/移除、有限次数、同窗与嵌套重绑、旧挂接失效、纯查询、结束后效及事实重建。绑定数据场景同时验证“按绑定值摸 8 张”与“按结束结果摸 12 张”。
 
-动态行为的两个初版失败场景保存在 `.artifacts/validation/independent-effects-binding-before.json`；旧卸载登记失败场景为 `independent-effects-registration-before.json`。更早的 `independent-effects-boundaries.json` 包含两个测试夹具错误：无角色候选的位置、同步抛错的断言方式；不把它们算作已修复的规则缺陷。最终完整报告以 [STATUS](STATUS.md) 为准。
-
-标准/演武更新为 0.1.14，渡口仍为 0.1.0 且精确依赖 standard@0.1.14。应用壳、默认标准 32 种牌/25 将/108 实体及演武 37 牌/29 将/五种牌组不变。记录重建加重新加载定义能恢复效果解释能力，仍不恢复暂停中的协程、决策或完整对局存档。
-
-最终全部单元/行为 1266 项通过，其中规则/主持侧 1259 项从同次报告分类计数并记录哈希，不另算独立执行。桌面/触控浏览器 174 项一次通过，无跳过或重试通过；Windows Debug/Release 各通过 66 组实际 WebView2 检查及不同 PID 的内容重启恢复，控制台无错误。原生核对迁移后的裸衣实际增伤与逐次遗计，新复杂效果分支由规则/包/模块场景证明。类型、ESLint、Prettier、文档链接及两种原生构建通过，链接器保留一条 import library 提示性 warning。发布 ZIP 4,628,009 字节、精确四个成员，实际字节/哈希/依赖/清单与原生证明见 `.artifacts/validation/independent-effects-package-audit.json`；测试进程、端口及隔离目录已清理。
-
-完整标准分支、复杂替代响应额度、更多复杂效果组合和作者资源交付仍需继续；没有以这层基础能力宣布完整离线版验收。默认固定人类甲席，其他基础 AI；Android 等桌面完成后开展，完整智能托管与联机后置。
+当前完整检查和平台边界只见 [STATUS](STATUS.md)。记录重建与重新加载定义可以恢复效果解释能力，不能恢复暂停中的协程、决策或完整对局存档。旧的活动 data 回退语义与布尔 end 返回值已被替换，不保留兼容分支。

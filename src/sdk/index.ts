@@ -1,4 +1,4 @@
-/** 当前可执行的最小作者门面。设计文档中的完整技能 SDK 尚未实现。 */
+/** 内容开发门面：共享实际规则对象与操作；普通源码和未来扩展使用同一接口。 */
 export { defineWindow } from '../core/runtime/window';
 export type {
   Trigger,
@@ -51,6 +51,10 @@ export {
 } from '../rules/skills/skills';
 export type {
   SkillDefinition,
+  SkillTrigger,
+  SkillTriggerDefinition,
+  SkillTriggerInput,
+  SkillTriggerOccurrenceInput,
   SkillHandle,
   SkillBinding,
   SkillProvider,
@@ -60,9 +64,15 @@ export { defineQuery, modify } from '../rules/skills/query';
 export { genderOf, genderChange, setGender, differentGender } from '../rules/characters/gender';
 export type { Gender } from '../rules/characters/gender';
 export { kingdomOf, kingdomChange, setKingdom } from '../rules/characters/kingdom';
-export { invoke } from '../rules/skills/invoke';
+export { askInvoke, invoke } from '../rules/skills/invoke';
 export { activeOffers, validateActive, activate } from '../rules/skills/active';
-export type { ActiveSkill, ActiveChoice, ActiveOffer } from '../rules/skills/active';
+export type {
+  ActiveSkill,
+  ActiveInput,
+  ActiveRunInput,
+  ActiveChoice,
+  ActiveOffer,
+} from '../rules/skills/active';
 export { defineGeneral, GeneralBook, generalOf, generalChange } from '../rules/characters/general';
 export type { GeneralDefinition } from '../rules/characters/general';
 export { responseRequested, isResponseSatisfied } from '../rules/cards/response';
@@ -82,12 +92,15 @@ export type {
   EffectInput,
   EffectBehavior,
   EffectTrigger,
+  EffectTriggerInput,
+  EffectTriggerOccurrenceInput,
+  EffectTriggerDefinition,
   EffectModifier,
   PreparedEffect,
   EffectEnd,
 } from '../rules/effects/effects';
 export type { ResponseOpportunity } from '../rules/cards/response';
-export type { QueryType, SkillModifier } from '../rules/skills/query';
+export type { QueryType, SkillModifier, ModifyInput } from '../rules/skills/query';
 export * as cardQueries from '../rules/cards/queries';
 export type { PhysicalCardFace, CardFaceRequest, CardFaceChange } from '../rules/cards/face';
 export {
@@ -105,7 +118,7 @@ export { withCardSupply } from '../rules/cards/supply';
 export type { CardSupplyInput, SuppliedCard, SupplyResult } from '../rules/cards/supply';
 export { withLifetime, lifetimeEnded } from '../rules/scopes/lifetime';
 export type { Lifetime } from '../rules/scopes/lifetime';
-export { pay, costPaid, used } from '../rules/costs/pay';
+export { pay, payDiscard, costPaid, used } from '../rules/costs/pay';
 export type {
   UsageLimit,
   PaymentResult,
@@ -115,7 +128,7 @@ export type {
 } from '../rules/costs/pay';
 export { moveCards, cardsMoved } from '../rules/cards/move';
 export type { MoveResult, MoveDeclaration } from '../rules/cards/move';
-export { discardCards, payDiscard } from '../rules/cards/discard';
+export { discardCards } from '../rules/cards/discard';
 export type { DiscardRequest, DiscardQuery, DiscardResult } from '../rules/cards/discard';
 export { withProcessing } from '../rules/cards/processing';
 export type { Processing, ProcessingCleanup } from '../rules/cards/processing';
@@ -202,6 +215,9 @@ export type {
   CardColor,
   Nature,
   ViewAs,
+  ViewAsInput,
+  ViewAsMakeInput,
+  ViewAsUseInput,
   UseIntent,
   UseRequest,
   UseTiming,
@@ -217,6 +233,13 @@ export type {
   TimingSnapshot,
   ResolveTargets,
   TargetResolver,
+  UseRules,
+  CardUseInput,
+  CardTargetInput,
+  CardSelectionInput,
+  CardFixedTargetsInput,
+  CardEffectInput,
+  CardExecuteInput,
   TargetOptions,
   TargetStage,
 } from '../rules/cards/types';
@@ -234,7 +257,7 @@ export {
   installDelayedCards,
   resolveJudgmentPhase,
 } from '../rules/cards/delayed';
-export type { DelayedRules, DelayedCard } from '../rules/cards/delayed';
+export type { DelayedRules, DelayedInput, DelayedCard } from '../rules/cards/delayed';
 export { judge, judgmentRevealed, judgmentRetrial, judgmentFinished } from '../rules/cards/judge';
 export type {
   Judgment,
@@ -318,13 +341,12 @@ export {
   takeExtraTurn,
 } from '../rules/turn/extra';
 export type { ExtraTurn, ExtraTurnRequest } from '../rules/turn/extra';
-export { definePackage, resolvePackages } from '../content/package';
+export { createContent } from '../content/catalog';
 export type {
-  ContentPackage,
-  PackageManifest,
-  PackageVersion,
+  ContentDefinition,
+  ContentCatalog,
+  SkillEntry,
   CardPresentation,
   GeneralPresentation,
   DeckDefinition,
-  ResolvedContent,
-} from '../content/package';
+} from '../content/catalog';

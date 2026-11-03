@@ -487,7 +487,7 @@ export default [
       clause(
         'lord-and-supply',
         '身份模式授予主公技；蜀角色依行动序供杀，实际供牌打出与主公使用分别归属',
-        test('benevolence', '刘备和华佗完整初始化，主公技由身份模式授予，群势力及体力正确'),
+        test('standard-games', '标准二十五将统一初始化：目录字段、主公技能与体力奖励及事实重建'),
         test('benevolence', '激将由蜀角色打出、刘备使用：两种归属各一次，实际材料与来源可重建'),
         test('action-order', '激将依当前 b行动序供杀，真实打出者与使用者各自保留'),
         test('benevolence', '激将第一人放弃后询问下一人，只有实际供牌者支付'),
@@ -969,7 +969,7 @@ export default [
       clause(
         'actual-user',
         '仅主公本人受到其他当前吴角色实际使用桃的回复，急救也保留实际使用者；普通技能/自己桃不加成且裁剪上限',
-        test('wu-generals', '三名吴将完整初始化，主公独享救援，目录体力与当前势力正确'),
+        test('standard-games', '标准二十五将统一初始化：目录字段、主公技能与体力奖励及事实重建'),
         test('wu-generals', '救援按实际桃使用者与当前势力增加回复：wu'),
         test('wu-generals', '救援按实际桃使用者与当前势力增加回复：shu'),
         test('wu-generals', '救援按实际桃使用者与当前势力增加回复：self'),

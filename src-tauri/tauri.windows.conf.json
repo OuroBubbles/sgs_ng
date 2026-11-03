@@ -1,0 +1,13 @@
+{
+  "build": {
+    "beforeDevCommand": "pnpm host:build && pnpm dev",
+    "beforeBuildCommand": "pnpm build && pnpm host:build"
+  },
+  "bundle": {
+    "resources": {
+      "../.artifacts/desktop-host/node.exe": "host/node.exe",
+      "../.artifacts/desktop-host/main.mjs": "host/main.mjs",
+      "../.artifacts/desktop-host/LICENSE.txt": "host/LICENSE.txt"
+    }
+  }
+}

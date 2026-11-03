@@ -28,13 +28,19 @@ import {
   viewAs,
   ownedCards,
 } from '../../src/sdk';
-import type { Context, SkillHandle, WorldReader, PhaseView } from '../../src/sdk';
+import type {
+  Context,
+  SkillHandle,
+  SkillTriggerInput,
+  WorldReader,
+  PhaseView,
+} from '../../src/sdk';
 import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { availablePackages, createOfflineMatch } from '../../src/app/offline/practice';
-import { resolvePackages } from '../../src/content/package';
+import { createOfflineMatch } from '../../src/app/offline/practice';
+import { practiceContent } from '../../src/app/offline/practice';
 
 const original = { kind: 'general', id: 'original' } as const;
 const additional = { kind: 'effect', id: 'additional' } as const;
@@ -52,6 +58,26 @@ function rebuilt(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 }
 function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void>) {
+  class LostEffect {
+    id = 'lost';
+    #run = run;
+    #retained = true;
+
+    retain(
+      ctx: Context,
+      { payload: moved, self }: SkillTriggerInput<Parameters<typeof equipmentLost>[1]>,
+    ) {
+      return this.#retained && equipmentLost(ctx.world, moved, self);
+    }
+
+    when(ctx: Context, input: SkillTriggerInput<Parameters<typeof equipmentLost>[1]>) {
+      return this.retain(ctx, input);
+    }
+
+    run(ctx: Context, { self }: SkillTriggerInput<unknown>) {
+      return this.#run(ctx, self);
+    }
+  }
   return equipmentCard({
     id: 'probe:retained-armor',
     label: '离场甲',
@@ -59,14 +85,7 @@ function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void
     skill: defineSkill({
       id: 'probe:retained-armor-ability',
       name: '遗响',
-      effects: [
-        on(cardsMoved, {
-          id: 'lost',
-          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          run: (ctx, _moved, self) => run(ctx, self),
-        }),
-      ],
+      triggers: [on(cardsMoved, new LostEffect())],
     }),
   });
 }
@@ -80,8 +99,8 @@ it('离场装备能使用普通 invoke 宣告并摸牌，当前能力目录仍�
     expect(self.effective(ctx.world)).toBe(false);
     expect(skillAvailable(ctx, self)).toBe(true);
     expect(game.skills.binding(ctx.world, self.id)).toBeUndefined();
-    if (ctx.unwrap(await invoke(ctx, self, '是否发动遗响？')))
-      ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+    if (await invoke(ctx, self, '是否发动遗响？'))
+      await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
   });
   const game = cardGame({
     hands: { a: [] },
@@ -116,49 +135,43 @@ it.each(['revoke', 'expiration'] as const)(
     const respond = async (ctx: Context, self: SkillHandle) => {
       expect(self.effective(ctx.world)).toBe(false);
       expect(skillAvailable(ctx, self)).toBe(true);
-      if (ctx.unwrap(await invoke(ctx, self, '是否发动遗响？')))
+      if (await invoke(ctx, self, '是否发动遗响？'))
         ctx.commit('probe.retained', [], { instance: self.id });
     };
     const legacy = defineSkill({
       id: 'probe:legacy',
       name: '遗响',
-      effects: [
+      triggers: [
         on(skillsChanged, {
           id: 'lost',
-          retain: (ctx, change, self) => skillLost(ctx.world, change.before, self),
-          when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
-          run: (ctx, _change, self) => respond(ctx, self),
+          retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
+          when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
+          run: (ctx, { self }) => respond(ctx, self),
         }),
         on(lifetimeEnded, {
           id: 'expired',
-          retain: (ctx, ended, self) =>
+          retain: (ctx, { payload: ended, self }) =>
             ended.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          when: (ctx, ended, self) =>
+          when: (ctx, { payload: ended, self }) =>
             ended.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          run: (ctx, _ended, self) => respond(ctx, self),
+          run: (ctx, { self }) => respond(ctx, self),
         }),
       ],
     });
     const game = cardGame({ skills: [legacy] });
     const running = game.room.run('lifecycle', async (ctx) => {
       if (kind === 'revoke') {
-        ctx.unwrap(
-          await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }),
-        );
-        ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
+        await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
+        await game.skills.revoke(ctx, 'a', legacy.id, original);
       } else
-        ctx.unwrap(
-          await withLifetime(ctx, 'borrowed', async (inside, lifetime) => {
-            inside.unwrap(
-              await game.skills.grant(inside, {
-                owner: 'a',
-                skill: legacy.id,
-                source: original,
-                lifetime,
-              }),
-            );
-          }),
-        );
+        await withLifetime(ctx, 'borrowed', async (inside, lifetime) => {
+          await game.skills.grant(inside, {
+            owner: 'a',
+            skill: legacy.id,
+            source: original,
+            lifetime,
+          });
+        });
     });
     expect((await answer(game)).kind).toBe('invoke');
     await running;
@@ -173,10 +186,10 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
   const legacy = defineSkill({
     id: 'probe:no-retain',
     name: '不保留',
-    effects: [
+    triggers: [
       on(skillsChanged, {
         id: 'lost',
-        when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+        when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
         run: (ctx) => {
           ctx.commit('probe.unexpected', [], null);
         },
@@ -185,8 +198,8 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
   });
   const game = cardGame({ skills: [legacy] });
   await game.room.run('revoke', async (ctx) => {
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }));
-    ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
+    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
+    await game.skills.revoke(ctx, 'a', legacy.id, original);
   });
   expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
   rebuilt(game);
@@ -198,34 +211,18 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
   const armor = lostArmor(async (ctx, self) => {
     captured = self;
     expect(skillAvailable(outer, self)).toBe(false);
-    expect(
-      ctx.unwrap(
-        await pay(ctx, {
-          actor: 'b',
-          skill: self,
-          cards: [],
-          to: 'discard',
-          reason: 'wrong-owner',
-        }),
-      ).kind,
-    ).toBe('unavailable');
     await foreign.room.run('foreign', (at) => {
       expect(skillAvailable(at, self)).toBe(false);
     });
-    ctx.unwrap(
-      await ctx.flow('nested-cost', async (at) => {
-        const paid = at.unwrap(
-          await pay(at, {
-            actor: self.owner,
-            skill: self,
-            cards: ['fee'],
-            to: 'discard',
-            reason: self.skill,
-          }),
-        );
-        expect(paid.kind).toBe('paid');
-      }),
-    );
+    await ctx.flow('nested-cost', async (at) => {
+      const paid = await pay(at, {
+        skill: self,
+        cards: ['fee'],
+        to: 'discard',
+        reason: self.skill,
+      });
+      expect(paid.kind).toBe('paid');
+    });
   });
   const game = cardGame({
     hands: { a: [card('fee', 'jink')] },
@@ -234,27 +231,24 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
   });
   await game.room.run('loss', async (ctx) => {
     outer = ctx;
-    ctx.unwrap(
-      await moveCards(
-        ctx,
-        [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
-        'loss',
-      ),
+    await moveCards(
+      ctx,
+      [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
+      'loss',
     );
     expect(skillAvailable(ctx, captured)).toBe(false);
-    ctx.unwrap(await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' }));
+    await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' });
     expect(captured.effective(ctx.world)).toBe(true);
     expect(skillAvailable(ctx, captured)).toBe(false);
     expect(skillAvailable(ctx, game.skills.binding(ctx.world, captured.id)!.self)).toBe(true);
     expect(
-      ctx.unwrap(
+      (
         await pay(ctx, {
-          actor: 'a',
           skill: captured,
           cards: [],
           to: 'discard',
           reason: 'escaped',
-        }),
+        })
       ).kind,
     ).toBe('unavailable');
   });
@@ -267,13 +261,13 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 allowDead，�
   const legacy = defineSkill({
     id: 'probe:death',
     name: '遗言',
-    effects: [
+    triggers: [
       on(playerDied, {
         id: 'legacy',
         allowDead,
-        when: (_ctx, event, self) => event.player === self.owner,
-        async run(ctx, _event, self) {
-          if (ctx.unwrap(await invoke(ctx, self, '是否留下遗言？')))
+        when: (_ctx, { payload: event, self }) => event.player === self.owner,
+        async run(ctx, { self }) {
+          if (await invoke(ctx, self, '是否留下遗言？'))
             ctx.commit('probe.last-word', [], { owner: self.owner });
         },
       }),
@@ -297,11 +291,11 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
   const legacy = defineSkill({
     id: 'probe:partial',
     name: '遗响',
-    effects: [
+    triggers: [
       on(skillsChanged, {
         id: 'lost',
-        retain: (ctx, change, self) => skillLost(ctx.world, change.before, self),
-        when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+        retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
+        when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
         run: (ctx) => {
           ctx.commit('probe.retained', [], null);
         },
@@ -310,13 +304,13 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
   });
   const game = cardGame({ skills: [legacy] });
   await game.room.run('sources', async (ctx) => {
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }));
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: additional }));
-    ctx.unwrap(await game.skills.setEnabled(ctx, 'a', legacy.id, original, false));
-    ctx.unwrap(await game.skills.setEnabled(ctx, 'a', legacy.id, original, true));
-    ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
+    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
+    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: additional });
+    await game.skills.setEnabled(ctx, 'a', legacy.id, original, false);
+    await game.skills.setEnabled(ctx, 'a', legacy.id, original, true);
+    await game.skills.revoke(ctx, 'a', legacy.id, original);
     expect(game.room.history.facts('probe.retained')).toHaveLength(0);
-    ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, additional));
+    await game.skills.revoke(ctx, 'a', legacy.id, additional);
   });
   expect(game.room.history.facts('probe.retained')).toHaveLength(1);
   rebuilt(game);
@@ -337,12 +331,10 @@ it('当前失效仍能阻止历史来源', async () => {
         .bindings(inside.world)
         .find(({ self }) => self.origin?.id === 'armor')!;
       blockSkill(inside, binding.self, lifetime);
-      inside.unwrap(
-        await moveCards(
-          inside,
-          [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
-          'loss',
-        ),
+      await moveCards(
+        inside,
+        [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
+        'loss',
       );
     }),
   );
@@ -358,20 +350,20 @@ for (const [window, group] of [
     const legacy = defineSkill({
       id: 'probe:buried',
       name: '遗言',
-      effects: [
+      triggers: [
         on(window, {
           id: 'legacy',
           group,
           allowDead: true,
-          retain: (ctx, event, self) =>
+          retain: (ctx, { payload: event, self }) =>
             event.burial.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          when: (ctx, event, self) =>
+          when: (ctx, { payload: event, self }) =>
             event.burial.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          async run(ctx, event, self) {
+          async run(ctx, { payload: event, self }) {
             expect(event.skillsBefore).toHaveLength(0);
             expect(event.burial.skillsBefore).toHaveLength(1);
             expect(self.effective(ctx.world)).toBe(false);
-            if (ctx.unwrap(await invoke(ctx, self, '是否留下遗言？')))
+            if (await invoke(ctx, self, '是否留下遗言？'))
               ctx.commit('probe.buried', [], { instance: self.id });
           },
         }),
@@ -383,9 +375,7 @@ for (const [window, group] of [
       owner: null,
       eligible: () => true,
       async run(ctx) {
-        ctx.unwrap(
-          await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: additional }),
-        );
+        await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: additional });
       },
     });
     const running = game.room.run('death', (ctx) =>
@@ -411,13 +401,13 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
   const skill = defineSkill({
     id: 'probe:once-started',
     name: '起点',
-    effects: [
+    triggers: [
       on(window, {
         id: 'start',
         when: () => !started,
-        async run(ctx, _event, self) {
+        async run(ctx, { self }) {
           started = true;
-          if (ctx.unwrap(await invoke(ctx, self, '是否继续已开始的后效？')))
+          if (await invoke(ctx, self, '是否继续已开始的后效？'))
             ctx.commit('probe.started', [], null);
         },
       }),
@@ -425,8 +415,8 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
   });
   const game = cardGame({ skills: [skill] });
   const running = game.room.run('event', async (ctx) => {
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: skill.id, source: original }));
-    ctx.unwrap(await ctx.window(window, null));
+    await game.skills.grant(ctx, { owner: 'a', skill: skill.id, source: original });
+    await ctx.window(window, null);
   });
   await answer(game);
   await running;
@@ -436,24 +426,21 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
 
 it('后效执行中被明确失效会停止后续支付，不回滚已经完成的发动宣告', async () => {
   const armor = lostArmor(async (ctx, self) => {
-    expect(ctx.unwrap(await invoke(ctx, self, '是否发动？'))).toBe(true);
-    ctx.unwrap(
-      await withLifetime(ctx, 'block-later-payment', async (at, lifetime) => {
-        blockSkill(at, self, lifetime);
-        expect(skillAvailable(at, self)).toBe(false);
-        expect(
-          at.unwrap(
-            await pay(at, {
-              actor: 'a',
-              skill: self,
-              cards: ['fee'],
-              to: 'discard',
-              reason: 'later',
-            }),
-          ).kind,
-        ).toBe('unavailable');
-      }),
-    );
+    expect(await invoke(ctx, self, '是否发动？')).toBe(true);
+    await withLifetime(ctx, 'block-later-payment', async (at, lifetime) => {
+      blockSkill(at, self, lifetime);
+      expect(skillAvailable(at, self)).toBe(false);
+      expect(
+        (
+          await pay(at, {
+            skill: self,
+            cards: ['fee'],
+            to: 'discard',
+            reason: 'later',
+          })
+        ).kind,
+      ).toBe('unavailable');
+    });
   });
   const game = cardGame({
     hands: { a: [card('fee', 'jink')] },
@@ -512,7 +499,7 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
   const legacy = defineSkill({
     id: 'probe:impure',
     name: '错误来源',
-    effects: [
+    triggers: [
       on(skillsChanged, {
         id: 'lost',
         retain(ctx) {
@@ -526,8 +513,8 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
   const game = cardGame({ skills: [legacy] });
   await expect(
     game.room.run('impure', async (ctx) => {
-      ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }));
-      ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
+      await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
+      await game.skills.revoke(ctx, 'a', legacy.id, original);
     }),
   ).rejects.toThrow(/quer/i);
   expect(game.room.history.facts('probe.unexpected')).toHaveLength(0);
@@ -546,7 +533,7 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
           return true;
         },
       };
-      await pay(ctx, { actor: 'a', skill: self, cards: [], to: 'discard', reason: 'bad' });
+      await pay(ctx, { skill: self, cards: [], to: 'discard', reason: 'bad' });
     }),
   ).rejects.toThrow(/quer/i);
   expect(other.room.history.facts(window.id)).toHaveLength(0);
@@ -561,16 +548,16 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
     skill: defineSkill({
       id: 'probe:twice-ability',
       name: '双响',
-      effects: [
+      triggers: [
         on(cardsMoved, {
           id: 'lost',
           times: () => 2,
-          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-          async run(ctx, _moved, self, occurrence) {
+          retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+          when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+          async run(ctx, { self, occurrence }) {
             if (first) expect(skillAvailable(ctx, first)).toBe(false);
             first ??= self;
-            if (ctx.unwrap(await invoke(ctx, self, `第${occurrence.index}次？`)))
+            if (await invoke(ctx, self, `第${occurrence.index}次？`))
               ctx.commit('probe.occurrence', [], { index: occurrence.index });
           },
         }),
@@ -602,35 +589,38 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
   const legacy = defineSkill({
     id: 'probe:custom',
     name: '旧来源',
-    effects: [
+    triggers: [
       on(window, {
         id: 'retained',
-        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        async run(ctx, _event, self) {
-          if (ctx.unwrap(await invoke(ctx, self, '是否发动旧来源？')))
-            ctx.commit('probe.custom', [], null);
+        retain: (ctx, { payload: event, self }) =>
+          event.before.some((old) => skillLost(ctx.world, old, self)),
+        when: (ctx, { payload: event, self }) =>
+          event.before.some((old) => skillLost(ctx.world, old, self)),
+        async run(ctx, { self }) {
+          if (await invoke(ctx, self, '是否发动旧来源？')) ctx.commit('probe.custom', [], null);
         },
       }),
     ],
   });
   const game = cardGame({
-    skills(book) {
-      book.skills.registerSnapshots(window, (event) => event.before);
-      expect(() => book.skills.registerSnapshots(window, (event) => event.before)).toThrow(
-        'Duplicate',
-      );
-      return [legacy];
-    },
+    skills: [
+      (book) => {
+        book.skills.registerSnapshots(window, (event) => event.before);
+        expect(() => book.skills.registerSnapshots(window, (event) => event.before)).toThrow(
+          'Duplicate',
+        );
+        return [legacy];
+      },
+    ],
   });
   expect(() => game.skills.registerSnapshots(window, () => [])).toThrow('sealed');
   let before: readonly SkillInstance[];
   const running = game.room.run('custom', async (ctx) => {
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }));
+    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
     before = ctx.world.snapshot.skills;
-    ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
+    await game.skills.revoke(ctx, 'a', legacy.id, original);
     expect(game.skills.bindings(ctx.world)).toHaveLength(0);
-    ctx.unwrap(await ctx.window(window, { before }, { subject: 'a' }));
+    await ctx.window(window, { before }, { subject: 'a' });
   });
   await answer(game);
   await running;
@@ -647,7 +637,7 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
     const legacy = defineSkill({
       id: 'probe:snapshot-error',
       name: '快照错误',
-      effects: [
+      triggers: [
         on(window, {
           id: 'effect',
           run: (ctx) => {
@@ -657,20 +647,20 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
       ],
     });
     const game = cardGame({
-      skills(book) {
-        book.skills.registerSnapshots(window, (event) =>
-          kind === 'invalid-array'
-            ? (undefined as unknown as readonly SkillInstance[])
-            : event.before.map((skill) => ({ ...skill, owner: 'b' })),
-        );
-        return [legacy];
-      },
+      skills: [
+        (book) => {
+          book.skills.registerSnapshots(window, (event) =>
+            kind === 'invalid-array'
+              ? (undefined as unknown as readonly SkillInstance[])
+              : event.before.map((skill) => ({ ...skill, owner: 'b' })),
+          );
+          return [legacy];
+        },
+      ],
     });
     await expect(
       game.room.run('event', async (ctx) => {
-        ctx.unwrap(
-          await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }),
-        );
+        await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
         await ctx.window(window, { before: ctx.world.snapshot.skills });
       }),
     ).rejects.toThrow(kind === 'invalid-array' ? /array/ : /Conflicting/);
@@ -685,28 +675,32 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
   const legacy = defineSkill({
     id: 'probe:deduplicated',
     name: '同一来源',
-    effects: [
+    triggers: [
       on(window, {
         id: 'lost',
-        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        async run(ctx, _event, self) {
-          ctx.unwrap(await invoke(ctx, self, '只应询问一次'));
+        retain: (ctx, { payload: event, self }) =>
+          event.before.some((old) => skillLost(ctx.world, old, self)),
+        when: (ctx, { payload: event, self }) =>
+          event.before.some((old) => skillLost(ctx.world, old, self)),
+        async run(ctx, { self }) {
+          await invoke(ctx, self, '只应询问一次');
         },
       }),
     ],
   });
   const game = cardGame({
-    skills(book) {
-      book.skills.registerSnapshots(window, (event) => [...event.before, ...event.before]);
-      return [legacy];
-    },
+    skills: [
+      (book) => {
+        book.skills.registerSnapshots(window, (event) => [...event.before, ...event.before]);
+        return [legacy];
+      },
+    ],
   });
   const running = game.room.run('event', async (ctx) => {
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original }));
+    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
     const before = ctx.world.snapshot.skills;
-    ctx.unwrap(await game.skills.revoke(ctx, 'a', legacy.id, original));
-    ctx.unwrap(await ctx.window(window, { before }));
+    await game.skills.revoke(ctx, 'a', legacy.id, original);
+    await ctx.window(window, { before });
   });
   await answer(game);
   await running;
@@ -729,18 +723,18 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
           label: '转换杀',
           names: () => ['standard:slash'],
           count: { min: 1, max: 1 },
-          materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+          materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
           make: () => ({ name: 'standard:slash' }),
         }),
       ],
       modifiers: [modify(cardQueries.handLimitCorrection, () => 2)],
       active: [{ id: 'active', label: '主动', available: () => true, run: () => {} }],
-      effects: [
+      triggers: [
         on(cardsMoved, {
           id: 'lost',
-          retain: (ctx, event, self) => equipmentLost(ctx.world, event, self),
-          when: (ctx, event, self) => equipmentLost(ctx.world, event, self),
-          async run(ctx, _event, self) {
+          retain: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
+          when: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
+          async run(ctx, { self }) {
             expect(skillAvailable(ctx, self)).toBe(true);
             expect(game.book.handLimit(ctx, 'a')).toBe(4);
             expect(activeOffers(ctx, game.book, phase)).toHaveLength(0);
@@ -757,7 +751,7 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
                 'use',
               ).ok,
             ).toBe(false);
-            expect(ctx.unwrap(await invoke(ctx, self, '仍然可以发动离场后效？'))).toBe(true);
+            expect(await invoke(ctx, self, '仍然可以发动离场后效？')).toBe(true);
           },
         }),
       ],
@@ -773,12 +767,10 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
       phase = current;
       expect(game.book.handLimit(at, 'a')).toBe(6);
       expect(activeOffers(at, game.book, current)).toHaveLength(1);
-      at.unwrap(
-        await moveCards(
-          at,
-          [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
-          'loss',
-        ),
+      await moveCards(
+        at,
+        [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
+        'loss',
       );
     }),
   );
@@ -803,22 +795,23 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
   const definition = defineSkill({
     id: 'probe:class',
     name: '普通类',
-    effects: [
+    triggers: [
       on(window, {
         id: 'run',
-        async run(ctx, _event, self) {
+        async run(ctx, { self }) {
           expect(self.effective(ctx.world)).toBe(true);
-          if (ctx.unwrap(await invoke(ctx, self, '普通类来源？')))
-            ctx.commit('probe.class', [], null);
+          if (await invoke(ctx, self, '普通类来源？')) ctx.commit('probe.class', [], null);
         },
       }),
     ],
   });
   const game = cardGame({
-    skills(book) {
-      book.skills.addProvider({ collect: () => [{ self: new Source(), definition }] });
-      return [];
-    },
+    skills: [
+      (book) => {
+        book.skills.addProvider({ collect: () => [{ self: new Source(), definition }] });
+        return [];
+      },
+    ],
   });
   const running = game.room.run('event', (ctx) => ctx.window(window, null));
   await answer(game);
@@ -842,14 +835,13 @@ it('自定义 available 不能让本局不存在的角色发动或写入支付�
     game.room.run('unknown-owner', async (ctx) => {
       expect(skillAvailable(ctx, source)).toBe(false);
       expect(
-        ctx.unwrap(
+        (
           await pay(ctx, {
-            actor: 'unknown',
             skill: source,
             cards: [],
             to: 'discard',
             reason: source.skill,
-          }),
+          })
         ).kind,
       ).toBe('unavailable');
       await invoke(ctx, source, '不应出现的询问');
@@ -862,14 +854,13 @@ it('自定义 available 不能让本局不存在的角色发动或写入支付�
 });
 
 it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否发动为 %s', async (accept) => {
-  const content = resolvePackages(availablePackages, ['workshop']);
-  const match = createOfflineMatch(
-    2,
-    10,
-    'workshop:relics',
-    ['workshop:guest', 'standard:guanyu'],
+  const content = practiceContent;
+  const match = createOfflineMatch({
+    seed: 10,
+    preset: 'workshop:relics',
+    lineup: ['workshop:guest', 'standard:guanyu'],
     content,
-  );
+  });
   await match.prepare();
   expect(match.progress?.next).toBe('甲席');
   const before = match.room.world.zone('甲席:hand').cards.length;
@@ -878,13 +869,13 @@ it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否�
   const running = match.room.run('replacement', async (ctx) => {
     for (const card of ['relic-card-2', 'relic-card-14'])
       expect(
-        ctx.unwrap(
+        (
           await match.book.use(ctx, {
             actor: '甲席',
             choice: { kind: 'physical', card },
             targets: [],
             timing: { kind: 'effect' },
-          }),
+          })
         ).kind,
       ).toBe('used');
   });

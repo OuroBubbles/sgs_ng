@@ -148,7 +148,6 @@ try {
     status: pending.length ? 'partial' : 'complete',
     catalogueComplete: pending.length === 0,
     fullOfflineVerified: false,
-    version: read('src/content/standard/index.ts').match(/version:\s*'([^']+)'/)?.[1],
     report: values.report,
     reportSha256: inputs.get(values.report).sha256,
     ledgerSha256: ledgerInputs[0].sha256,
@@ -156,7 +155,7 @@ try {
     totalSubjects: subjects.size,
     reviewedSubjects: rows.length,
     reviewedClauses: rows.reduce((count, row) => count + row.clauses.length, 0),
-    uniqueAssertions: evidence.size,
+    uniqueScenarios: evidence.size,
     reviewed: rows,
     pending,
     inputs: [...inputs.values()]
@@ -166,7 +165,7 @@ try {
   save(report);
   console.log(
     `Standard behavior: ${report.reviewedSubjects}/${report.totalSubjects} subjects, ` +
-      `${report.reviewedClauses} reviewed clauses, ${report.uniqueAssertions} distinct passing assertions; ${pending.length} pending.`,
+      `${report.reviewedClauses} reviewed clauses, ${report.uniqueScenarios} distinct passing scenarios; ${pending.length} pending.`,
   );
   console.log(
     'Only the listed, manually reviewed clauses are checked; this is not full offline acceptance.',

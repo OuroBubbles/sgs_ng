@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { DecisionHub } from '../../src/core/decisions/hub';
 import { Scope } from '../../src/core/runtime/scope';
 import { Journal } from '../../src/core/history/journal';
+import { room } from '../fixtures/room';
 
 function setup() {
   let revision = 0;
@@ -10,9 +11,15 @@ function setup() {
   const scope = new Scope('test', null);
   const fault = vi.fn();
   const describe = vi.fn(() => ({ choices: ['yes'] }));
+  const world = room().world;
   const hub = new DecisionHub(
     'test',
-    () => revision,
+    {
+      ...world,
+      get snapshot() {
+        return { ...world.snapshot, revision };
+      },
+    },
     journal,
     (fn) => fn(),
     fault,

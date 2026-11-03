@@ -1,6 +1,6 @@
 import type { CardMove } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { moveCards, cardsMoved } from './move';
 import { withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
@@ -22,19 +22,20 @@ export type ProcessingCleanup = (
   ctx: Context,
   processing: Processing,
   exit: 'resolved' | 'aborted',
-) => void | Promise<void>;
+) => unknown;
 
 /**
  * 正常结束、正常终局和 body 子流程中止均清理余牌；故障/立即中止整局只释放运行资源。
  * 每次处理区具有独立身份。向这个 zone 显式移动牌表示将其归入本次处理。
+ * 默认将余牌弃置；特殊目的区域或领域善后放在最后一个参数。
  */
 export async function withProcessing<T>(
   ctx: Context,
   input: readonly ProcessingInput[],
-  cleanup: string | ProcessingCleanup,
   body: (ctx: Context, processing: Processing) => T | Promise<T>,
-): Promise<FlowResult<T>> {
-  const owned = await withLifetime(ctx, 'processing', async (owner, lifetime) => {
+  cleanup: string | ProcessingCleanup = 'discard',
+): Promise<T> {
+  return withLifetime(ctx, 'processing', async (owner, lifetime) => {
     const zone = `processing:${lifetime.id}`;
     const moves: readonly CardMove[] = immutable(
       input
@@ -77,7 +78,7 @@ export async function withProcessing<T>(
         return owner.world.zone(zone).cards;
       },
     });
-    const result = await owner.flow('processing.body', (child) => body(child, processing));
+    const result = await owner.attempt('processing.body', (child) => body(child, processing));
     if (typeof cleanup === 'string') {
       const remaining = processing.remaining();
       if (remaining.length)
@@ -87,14 +88,14 @@ export async function withProcessing<T>(
           'processing cleanup',
         );
     } else {
-      const cleaned = await owner.flow('processing.cleanup', (child) =>
+      const cleaned = await owner.attempt('processing.cleanup', (child) =>
         cleanup(child, processing, result.kind),
       );
       if (cleaned.kind === 'aborted') throw new Error('Processing cleanup cannot abort.');
     }
     if (processing.remaining().length) throw new Error('Processing cleanup left cards behind.');
     owner.commit('processing.closed', [{ kind: 'removeZone', zone }], { zone });
-    return result;
+    if (result.kind === 'aborted') return owner.abort(result.reason);
+    return result.value;
   });
-  return owned.kind === 'resolved' ? owned.value : owned;
 }

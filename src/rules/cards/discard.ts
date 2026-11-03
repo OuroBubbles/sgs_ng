@@ -1,11 +1,9 @@
 import type { Card, CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import type { CardBook } from './book';
 import { delayedCards } from './delayed';
 import { moveCards } from './move';
-import { pay } from '../costs/pay';
-import type { PaymentSpec, PaymentResult } from '../costs/pay';
 
 export interface DiscardRequest {
   readonly actor: string;
@@ -44,23 +42,6 @@ export function discardSubject(ctx: Context, request: DiscardRequest): DiscardQu
   return immutable({ ...identity, area: zone.kind, face: card, materials: [card.id] });
 }
 
-/** 弃牌费用复用原子 pay：选择、弃牌权限、原有条件都在支付前重查，次数与宣告不拆开。 */
-export function payDiscard(
-  ctx: Context,
-  book: CardBook,
-  spec: Omit<PaymentSpec, 'to' | 'materialAllowed'>,
-): Promise<FlowResult<PaymentResult>> {
-  return pay(ctx, {
-    ...spec,
-    to: 'discard',
-    legal: (at) =>
-      spec.cards.every((card) =>
-        book.canDiscard(at, { actor: spec.actor, owner: spec.actor, card, reason: spec.reason }),
-      ) &&
-      (spec.legal?.(at) ?? true),
-  });
-}
-
 export interface DiscardResult {
   readonly kind: 'discarded' | 'unavailable';
   readonly subjects: readonly string[];
@@ -72,7 +53,7 @@ export function discardCards(
   ctx: Context,
   book: CardBook,
   request: Omit<DiscardRequest, 'card'> & { readonly cards: readonly string[] },
-): Promise<FlowResult<DiscardResult>> {
+): Promise<DiscardResult> {
   const input = immutable(request);
   return ctx.flow('discard', async (child) => {
     const unavailable: DiscardResult = { kind: 'unavailable', subjects: input.cards, cards: [] };
@@ -100,12 +81,12 @@ export function discardCards(
         );
     }
     const cards = moves.flatMap((move) => move.cards);
-    const moved = await moveCards(child, moves, input.reason, {
+    await moveCards(child, moves, input.reason, {
       kind: 'discard.committed',
       data: { ...input, subjects: input.cards, cards },
       changes,
     });
-    if (moved.kind === 'aborted') return child.abort(moved.reason);
+
     return immutable({ kind: 'discarded', subjects: input.cards, cards });
   });
 }

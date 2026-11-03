@@ -1,6 +1,6 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
@@ -37,7 +37,7 @@ export function setChained(
   player: string,
   value: boolean,
   reason: string,
-): Promise<FlowResult<ChainResult>> {
+): Promise<ChainResult> {
   return ctx.flow('chain.change', async (at) => {
     if (typeof value !== 'boolean' || !reason.trim())
       throw new Error('Invalid chain state change.');
@@ -57,7 +57,7 @@ export function setChained(
     });
     if (kind === 'changed') {
       at.commit('chain.changed', [chainChange(at, player, value)], result);
-      at.unwrap(await at.window(chainChanged, result, { subject: player }));
+      await at.window(chainChanged, result, { subject: player });
     }
     return result;
   });

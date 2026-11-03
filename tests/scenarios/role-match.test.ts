@@ -166,7 +166,9 @@ function match(
       maxHp: options.oneHp ? 1 : 4,
     })),
     deck: options.empty ? [] : Array.from({ length: 40 }, (_, i) => card(`s${i}`, 'slash')),
-    cards: standardCards,
+    content: {
+      cards: standardCards,
+    },
     ...(options.fixed ? { roles: options.fixed } : {}),
   });
 }
@@ -244,12 +246,12 @@ it('角色预设技能在起手前授予，可由普通代码改写摸牌', asyn
   const setup = defineSkill({
     id: 'probe:setup',
     name: '准备',
-    effects: [
+    triggers: [
       on(drawing, {
         id: 'initial-hand',
-        when: (_ctx, draft, self) =>
+        when: (_ctx, { payload: draft, self }) =>
           draft.input.player === self.owner && draft.input.reason === 'match:initial-hand',
-        run: (_ctx, draft) => draft.setCount(1, 'probe:setup'),
+        run: (_ctx, { payload: draft }) => draft.setCount(1, 'probe:setup'),
       }),
     ],
   });
@@ -259,8 +261,10 @@ it('角色预设技能在起手前授予，可由普通代码改写摸牌', asyn
     players: [{ id: 'a', skills: [setup.id] }, { id: 'b' }],
     roles: ['rebel', 'lord'],
     deck: Array.from({ length: 8 }, (_, i) => card(`p${i}`, 'slash')),
-    cards: standardCards,
-    skills: [setup],
+    content: {
+      cards: standardCards,
+      skills: [setup],
+    },
   });
   await game.prepare();
   expect(roleOf(game.room.world, 'b')).toBe('lord');
@@ -281,7 +285,9 @@ it('配置与身份分配拒绝缺主公、重复座位或未知牌；结果不�
         seed: 1,
         players: [{ id: 'a' }, { id: 'a' }],
         deck: [],
-        cards: standardCards,
+        content: {
+          cards: standardCards,
+        },
       }),
   ).toThrow('player IDs');
   expect(
@@ -291,7 +297,9 @@ it('配置与身份分配拒绝缺主公、重复座位或未知牌；结果不�
         seed: 1,
         players: [{ id: 'a' }, { id: 'b' }],
         deck: [{ ...card('x', 'slash'), name: 'unknown' }],
-        cards: standardCards,
+        content: {
+          cards: standardCards,
+        },
       }),
   ).toThrow('Unknown card');
   const game = cardGame();
@@ -301,7 +309,7 @@ it('配置与身份分配拒绝缺主公、重复座位或未知牌；结果不�
     first = await finishGame(ctx, { winners: ['a'], reason: 'first' });
     expect(await finishGame(ctx, { winners: ['c'], reason: 'second' })).toEqual(first);
     expect(await draw(ctx, { player: 'a', count: 2, reason: 'after-end' })).toMatchObject({
-      value: { kind: 'unavailable' },
+      kind: 'unavailable',
     });
   });
   expect(game.room.history.facts('game.finished')).toHaveLength(1);

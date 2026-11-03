@@ -1,8 +1,25 @@
-import { definePackage, defineSkill, defineGeneral, on, useDeclared, invoke, draw } from '@sgs/sdk';
-import type { Card, CardDefinition, CardBook } from '@sgs/sdk';
+import type { ContentDefinition } from '../../../src/content/catalog';
+import { defineWindow, defineQuery, on, useDeclared, invoke, draw } from '../../../src/sdk';
+import type { Card, CardDefinition, CardBook } from '../../../src/sdk';
 import portrait from './guest.jpg';
+import type { SkillDefinition } from '../../../src/sdk';
 
-/** 普通源码模块：SDK 由构建工具保持为宿主引用，作者无需了解加载器。 */
+export interface ProvisionResult {
+  readonly actor: string;
+  readonly target: string;
+  readonly cards: readonly string[];
+}
+/** 真实备航摸牌完成后的公共后效；导出对象供其他模块直接订阅。 */
+export const provisionFinished = defineWindow<ProvisionResult>('harbor.provisionFinished');
+export const tideDrawBonus = defineQuery<{ readonly actor: string }, number>(
+  'harbor.tideDrawBonus',
+  (a, b) => a + b,
+);
+export function provisionBy(event: ProvisionResult, owner: string): boolean {
+  return event.actor === owner;
+}
+
+/** 普通源码模块：通过普通 import 共享实际规则对象。 */
 const provision: CardDefinition = {
   id: 'harbor:provision',
   label: '备航',
@@ -10,49 +27,51 @@ const provision: CardDefinition = {
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
-    target: (_ctx, request, target) => target === request.actor,
-    async resolve(ctx, effect) {
-      ctx.unwrap(await draw(ctx, { player: effect.target, count: 2, reason: provision.id }));
+    target: (_ctx, { request, target }) => target === request.actor,
+    async resolve(ctx, { effect }) {
+      const result = await draw(ctx, { player: effect.target, count: 2, reason: provision.id });
+      await ctx.window(
+        provisionFinished,
+        Object.freeze({ actor: effect.actor, target: effect.target, cards: result.cards }),
+        { subject: effect.target },
+      );
     },
   },
 };
 function tide(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'harbor:tide',
     name: '潮声',
     description: '当你使用锦囊牌时，你可以摸一张牌。',
-    effects: [
+    triggers: [
       on(useDeclared, {
-        id: 'draw',
         order: 'choose',
-        when: (_ctx, use, self) =>
+        when: (_ctx, { payload: use, self }) =>
           use.actor === self.owner && book.definition(use.card.name).type === 'trick',
-        async run(ctx, _use, self) {
-          if (ctx.unwrap(await invoke(ctx, self, '是否发动【潮声】摸一张牌？')))
-            ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+        async run(ctx, { self }) {
+          if (await invoke(ctx, self, '是否发动【潮声】摸一张牌？'))
+            await draw(ctx, {
+              player: self.owner,
+              count: 1 + book.skills.query(ctx, tideDrawBonus, { actor: self.owner }, 0),
+              reason: self.skill,
+            });
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }
-export default definePackage({
-  manifest: {
-    id: 'harbor',
-    name: '渡口',
-    version: '0.1.1',
-    requires: [{ id: 'standard', version: '0.1.20' }],
-  },
+export default {
   cards: [provision],
-  skills: (book) => [tide(book)],
+  skills: [tide],
   generals: [
-    defineGeneral({
+    {
       id: 'harbor:guest',
       name: '渡客',
       kingdom: '群',
       gender: 'male',
       maxHp: 4,
       skills: ['harbor:tide', 'standard:wusheng'],
-    }),
+    },
   ],
   generalViews: [{ id: 'harbor:guest', portrait }],
   cardViews: [
@@ -85,4 +104,4 @@ export default definePackage({
       },
     },
   ],
-});
+} satisfies ContentDefinition;

@@ -1,3 +1,4 @@
+import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import {
@@ -30,16 +31,15 @@ import type { Context, DamageInput, DamageResult, CardDefinition } from '../../s
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { availablePackages, createOfflineMatch } from '../../src/app/offline/practice';
-import { resolvePackages } from '../../src/sdk';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
+import { luoyiAftereffect } from '../../src/content/standard/wei';
+import { createOfflineMatch } from '../../src/app/offline/practice';
+import { practiceContent } from '../../src/app/offline/practice';
 
 type Game = ReturnType<typeof cardGame>;
 const hit = { from: 'a', to: 'b', amount: 2, nature: 'fire' } as const;
 async function link(game: Game, players = ['b', 'c', 'd']) {
   await game.room.run('setup-chain', async (ctx) => {
-    for (const player of players) ctx.unwrap(await setChained(ctx, player, true, 'setup'));
+    for (const player of players) await setChained(ctx, player, true, 'setup');
   });
 }
 function results(game: Game) {
@@ -65,9 +65,9 @@ it('连环是公开权威状态，实际变化才提交并开放只读窗口', a
   });
   await game.room.run('change', async (ctx) => {
     expect(isChained(ctx.world, 'b')).toBe(false);
-    expect(ctx.unwrap(await setChained(ctx, 'b', true, 'bind')).kind).toBe('changed');
-    expect(ctx.unwrap(await setChained(ctx, 'b', true, 'same')).kind).toBe('unchanged');
-    expect(ctx.unwrap(await setChained(ctx, 'b', false, 'reset')).kind).toBe('changed');
+    expect((await setChained(ctx, 'b', true, 'bind')).kind).toBe('changed');
+    expect((await setChained(ctx, 'b', true, 'same')).kind).toBe('unchanged');
+    expect((await setChained(ctx, 'b', false, 'reset')).kind).toBe('changed');
   });
   expect(changed).toEqual([true, false]);
   expect(game.room.history.facts('chain.changed')).toHaveLength(2);
@@ -164,7 +164,7 @@ it.each(['prevent', 'zero'])('起点 %s 时不解链、不传播，仍正常收�
     },
   });
   await game.room.run('hit', async (ctx) => {
-    const result = ctx.unwrap(await damage(ctx, hit));
+    const result = await damage(ctx, hit);
     expect(result.kind).toBe(kind === 'prevent' ? 'prevented' : 'zero');
     expect(result.chainPlan).toEqual([]);
     expect(result.unchained).toBe(false);
@@ -202,17 +202,15 @@ it.each(['unlink', 'kill'])(
       owner: 'b',
       eligible: (_ctx, result) => result.input.to === 'b',
       async run(ctx) {
-        ctx.unwrap(await setChained(ctx, 'a', true, 'new'));
-        if (kind === 'unlink') ctx.unwrap(await setChained(ctx, 'd', false, 'reset'));
+        await setChained(ctx, 'a', true, 'new');
+        if (kind === 'unlink') await setChained(ctx, 'd', false, 'reset');
         else
-          ctx.unwrap(
-            await kill(ctx, {
-              player: 'd',
-              killer: null,
-              reason: 'rule',
-              cause: { kind: 'rule', seq: null, data: null },
-            }),
-          );
+          await kill(ctx, {
+            player: 'd',
+            killer: null,
+            reason: 'rule',
+            cause: { kind: 'rule', seq: null, data: null },
+          });
       },
     });
     await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -255,7 +253,7 @@ it('起点收束与各传播子流程完整结束后 damage 才返回', async ()
     },
   });
   await game.room.run('hit', async (ctx) => {
-    ctx.unwrap(await damage(ctx, hit));
+    await damage(ctx, hit);
     order.push('returned');
   });
   expect(order).toEqual(['b', 'c', 'd', 'returned']);
@@ -270,7 +268,7 @@ it('嵌套新起点独立传播，外层计划重查已解除状态，不重复�
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
     async run(ctx) {
-      ctx.unwrap(await damage(ctx, { ...hit, to: 'c', amount: 1 }));
+      await damage(ctx, { ...hit, to: 'c', amount: 1 });
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -292,7 +290,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
     async run(ctx) {
       order.push('dying');
       expect(isChained(ctx.world, 'b')).toBe(false);
-      ctx.unwrap(await recover(ctx, { from: 'a', to: 'b', amount: 2 }));
+      await recover(ctx, { from: 'a', to: 'b', amount: 2 });
       order.push('saved');
     },
   });
@@ -306,7 +304,7 @@ it('濒死子流程先于传播，回复后继续，事实中的伤害与当前�
   });
   await game.room.run('hit', async (ctx) => {
     ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
-    ctx.unwrap(await damage(ctx, hit));
+    await damage(ctx, hit);
   });
   expect(order).toEqual(['dying', 'saved', 'c', 'd']);
   expect(results(game)[0]!.afterHp).toBe(-1);
@@ -322,14 +320,12 @@ it('来源在起点后效死亡，已经产生的传播仍保留来源身份', a
     owner: 'b',
     eligible: (_ctx, result) => result.input.to === 'b',
     async run(ctx) {
-      ctx.unwrap(
-        await kill(ctx, {
-          player: 'a',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        }),
-      );
+      await kill(ctx, {
+        player: 'a',
+        killer: null,
+        reason: 'rule',
+        cause: { kind: 'rule', seq: null, data: null },
+      });
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -373,7 +369,7 @@ it('起点死亡不丢失已提交的传播计划，死亡善后结束后才继�
   await link(game);
   await game.room.run('hit', async (ctx) => {
     ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
-    ctx.unwrap(await damage(ctx, hit));
+    await damage(ctx, hit);
   });
   expect(game.room.world.player('b').alive).toBe(false);
   expect(results(game).map((result) => result.input.to)).toEqual(['b', 'c', 'd']);
@@ -390,14 +386,14 @@ it('起点死亡不丢失已提交的传播计划，死亡善后结束后才继�
 const flame = defineSkill({
   id: 'probe:flame',
   name: '火策',
-  effects: [],
+  triggers: [],
   viewAs: [
     viewAs({
       id: 'fire',
       label: '火杀',
       names: () => ['standard:slash'],
       count: { min: 1, max: 1 },
-      materials: (ctx, self) =>
+      materials: (ctx, { self }) =>
         ownedCards(ctx.world, self.owner).filter(
           (id) => ctx.world.card(id).name === 'standard:slash',
         ),
@@ -410,7 +406,8 @@ function fireGame(options: Parameters<typeof cardGame>[0] = {}) {
   return cardGame({
     ...options,
     hands: { a: [card('spark', 'slash', 'heart')], ...options.hands },
-    skills: (book) => [...standardGeneralSkills(book), flame],
+    skills: [...standardGeneralSkills, flame],
+    effects: [luoyiAftereffect],
   });
 }
 async function grantFire(game: Game) {
@@ -474,7 +471,7 @@ it('真实转换火杀的裸衣只在直接伤害增伤，传播不再次叠加'
       phases: ['draw', 'play'],
       body: async (at, phase) => {
         if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
-        expect(at.unwrap(await fireSlash(game, at)).kind).toBe('used');
+        expect((await fireSlash(game, at)).kind).toBe('used');
       },
     }),
   );
@@ -508,14 +505,14 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
     skill: defineSkill({
       id: 'probe:cap-skill',
       name: '限伤',
-      effects: [
+      triggers: [
         on(damageInflicting, {
           id: 'cap',
-          when: (ctx, draft, self) =>
+          when: (ctx, { payload: draft, self }) =>
             draft.input.to === self.owner &&
             draft.input.card !== undefined &&
             equipmentEffectiveFor(ctx.world, self, draft.input.card, 'armor'),
-          run(_ctx, draft) {
+          run(_ctx, { payload: draft }) {
             draft.setAmount(Math.min(1, draft.amount), 'cap');
           },
         }),
@@ -565,14 +562,13 @@ it('传播保留原牌材料关联，曹操仍可奸雄取得处理区材料且�
 });
 
 it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连环伤害并清理材料', async () => {
-  const content = resolvePackages(availablePackages, ['workshop']);
-  const match = createOfflineMatch(
-    2,
-    4,
-    'workshop:chains',
-    ['standard:guanyu', 'standard:guanyu'],
+  const content = practiceContent;
+  const match = createOfflineMatch({
+    seed: 4,
+    preset: 'workshop:chains',
+    lineup: ['standard:guanyu', 'standard:guanyu'],
     content,
-  );
+  });
   await match.prepare();
   expect(match.progress?.next).toBe('甲席');
   for (const id of ['chain-card-7', 'chain-card-19'])
@@ -584,13 +580,13 @@ it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连�
       ['chain-card-19', ['乙席']],
     ] as const) {
       expect(
-        ctx.unwrap(
+        (
           await match.book.use(ctx, {
             actor: '甲席',
             choice: { kind: 'physical', card: id },
             targets,
             timing: { kind: 'effect' },
-          }),
+          })
         ).kind,
       ).toBe('used');
     }
@@ -614,54 +610,21 @@ it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连�
 it.each([4, 17])(
   '连环演练四人局由基础 AI 经真实选择至胜负，seed=%s',
   async (seed) => {
-    const content = resolvePackages(availablePackages, ['workshop']);
-    const match = createOfflineMatch(
-      4,
+    const content = practiceContent;
+    const match = createOfflineMatch({
       seed,
-      'workshop:chains',
-      ['standard:guanyu', 'standard:huanggai', 'standard:guojia', 'standard:caocao'],
+      preset: 'workshop:chains',
+      lineup: ['standard:guanyu', 'standard:huanggai', 'standard:guojia', 'standard:caocao'],
       content,
-    );
-    const running = match.start();
-    let decisions = 0;
-    try {
-      for (let step = 0; step < 15_000 && !match.result; step++) {
-        await setImmediate();
-        expect(match.room.status).not.toBe('faulted');
-        const request = match.room.decisions.pending[0];
-        if (!request) continue;
-        if (++decisions > 2400) throw new Error('Chain match decision budget exhausted.');
-        const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-          match.room.decisions.preview(request.id, input),
-        );
-        if (answer.kind === 'unsupported') throw new Error(answer.reason);
-        expect(
-          answer.kind === 'cancel'
-            ? match.room.decisions.cancel(request.id, request.token)
-            : match.room.decisions.submit(request.id, request.token, answer.value),
-        ).toEqual({ kind: 'accepted' });
-      }
-      expect(match.result).not.toBeNull();
-      await running;
-      expect(match.room.history.facts('chain.changed').length).toBeGreaterThan(0);
-      expect(
-        match.room.history
-          .facts('damage.dealt')
-          .some((fact) => (fact.data.detail as DamageResult).input.origin?.kind === 'chain'),
-      ).toBe(true);
-      expect(match.room.decisions.pending).toEqual([]);
-      const cards = match.room.world.snapshot.zones.flatMap((zone) => zone.cards);
-      expect(cards).toHaveLength(48);
-      expect(new Set(cards).size).toBe(48);
-      expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(
-        false,
-      );
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-    } finally {
-      if (match.room.status !== 'ended') match.room.abort('chain test stopped');
-    }
+    });
+    await playMatch(match, { steps: 15000, decisions: 2400 });
+    expect(match.room.history.facts('chain.changed').length).toBeGreaterThan(0);
+    expect(
+      match.room.history
+        .facts('damage.dealt')
+        .some((fact) => (fact.data.detail as DamageResult).input.origin?.kind === 'chain'),
+    ).toBe(true);
+    expect(match.initial.cards).toHaveLength(48);
   },
   30_000,
 );
@@ -695,23 +658,25 @@ it.each(['workshop:ice', '', '  '])(
     const conversion = defineSkill({
       id: 'probe:nature',
       name: '属性转换',
-      effects: [],
+      triggers: [],
       viewAs: [
         viewAs({
           id: 'nature',
           label: '转换',
           names: () => ['standard:slash'],
           count: { min: 1, max: 1 },
-          materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+          materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
           make: () => ({ name: 'standard:slash', nature }),
         }),
       ],
     });
     const game = cardGame({ skills: [conversion] });
     await game.room.run('build', async (ctx) => {
-      const change = ctx.unwrap(
-        await game.skills.grant(ctx, { owner: 'a', skill: conversion.id, source: grantSource }),
-      );
+      const change = await game.skills.grant(ctx, {
+        owner: 'a',
+        skill: conversion.id,
+        source: grantSource,
+      });
       const built = game.book.build(
         ctx,
         'a',
@@ -736,7 +701,7 @@ it('自定义属性攻击复用完整闪/突破流程，仅用普通伤害函数
     use: {
       count: { min: 1, max: 1 },
       target: () => true,
-      resolve: async (ctx, effect, book) => {
+      resolve: async (ctx, { effect, book }) => {
         await resolveAttack(
           ctx,
           effect,

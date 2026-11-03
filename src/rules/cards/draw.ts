@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { cardsMoved, moveCards } from './move';
 import { isGameOver } from '../game/end';
@@ -69,7 +69,7 @@ class Draft implements DrawDraft {
 }
 
 /** 丢弃区洗入牌堆底，不触及任何处理区。牌序由已提交移动记录直接重建。 */
-export function reshuffle(ctx: Context): Promise<FlowResult<readonly string[]>> {
+export function reshuffle(ctx: Context): Promise<readonly string[]> {
   return ctx.flow('reshuffle', async (child) => {
     const discard = child.world.zone('discard');
     const drawPile = child.world.zone('draw');
@@ -99,7 +99,7 @@ export function reshuffle(ctx: Context): Promise<FlowResult<readonly string[]>> 
 }
 
 /** 提交前重查摸牌者/终局资格；提交后的后效不能把已发生的摸牌改成 unavailable。 */
-export function draw(ctx: Context, request: DrawRequest): Promise<FlowResult<DrawResult>> {
+export function draw(ctx: Context, request: DrawRequest): Promise<DrawResult> {
   return ctx.flow(
     'draw',
     async (child) => {
@@ -139,18 +139,16 @@ export function draw(ctx: Context, request: DrawRequest): Promise<FlowResult<Dra
         child.world.zone('draw').cards.length < draft.count &&
         child.world.zone('discard').cards.length
       )
-        child.unwrap(await reshuffle(child));
+        await reshuffle(child);
       // 洗牌会开放移牌后效，可能嵌套摸牌、杀死摸牌者或结束整局。
       // 提交前重查资格并读取最新牌序；已提交移牌后的死亡则不抹掉真实摸牌事实。
       if (!live()) return unavailable();
       const cards = child.world.zone('draw').cards.slice(0, draft.count);
       if (cards.length)
-        child.unwrap(
-          await moveCards(
-            child,
-            [{ cards, from: 'draw', to: hand.id, place: 'bottom' }],
-            input.reason,
-          ),
+        await moveCards(
+          child,
+          [{ cards, from: 'draw', to: hand.id, place: 'bottom' }],
+          input.reason,
         );
       const result: DrawResult = immutable({
         kind: 'drawn',

@@ -1,12 +1,10 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { projectMatch } from '../../src/app/offline/projection';
 import { standardCards } from '../../src/content/standard/cards';
@@ -25,7 +23,6 @@ import {
   installCounterspells,
   kill,
   ownedCards,
-  roleOf,
   moveCards,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
@@ -61,20 +58,6 @@ function replay(game: Game) {
   expect(useDeclarations(game.room.world)).toEqual([]);
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
 }
-
-it('三名谋将初始化与当前完整目录，技能、体力与来源完整', async () => {
-  expect(standardGenerals).toHaveLength(25);
-  for (const general of standardGenerals.slice(18, 21)) {
-    const match = createOfflineMatch(6, 12, 'standard:identity', Array(6).fill(general.id));
-    await match.prepare();
-    expect(
-      match.room.world.snapshot.skills.filter((s) => s.owner === '甲席').map((s) => s.skill),
-    ).toEqual(general.skills);
-    expect(match.room.world.player('甲席').maxHp).toBe(
-      general.maxHp + Number(roleOf(match.room.world, '甲席') === 'lord'),
-    );
-  }
-});
 
 it.each([true, false])('集智普通锦囊接受=%s，在锦囊效果之前摸牌，宣告仅一次', async (accepted) => {
   const game = scenario({
@@ -201,7 +184,7 @@ it('作者新建锦囊只需声明类别，集智和奇才无需增补牌名表'
         label: '作者锦囊',
         use: {
           count: { min: 1, max: 1 },
-          target: (ctx, request, target, book) =>
+          target: (ctx, { request, target, book }) =>
             target !== request.actor && book.withinDistance(ctx, request, target, 1),
           resolve: () => {},
         },
@@ -220,9 +203,9 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
   const ban = defineSkill({
     id: 'test:ban',
     name: '禁止',
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.prohibitTarget, (_ctx, request) =>
+      modify(cardQueries.prohibitTarget, (_ctx, { input: request }) =>
         request.target === 'c' ? true : undefined,
       ),
     ],
@@ -232,7 +215,7 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
       a: [card('trick', 'snatch'), card('delay', 'indulgence'), card('delay2', 'indulgence')],
       c: [card('loot', 'jink')],
     },
-    skills: (book) => [...standardGeneralSkills(book), ban],
+    skills: [...standardGeneralSkills, ban],
   });
   await grant(game, 'standard:qicai');
   await grant(game, ban.id);
@@ -542,33 +525,8 @@ it.each(['mixed', 'all-liuli'])(
       kind === 'mixed'
         ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => standardGenerals[i]!.id)
         : Array<string>(4).fill('standard:daqiao');
-    const match = createOfflineMatch(lineup.length, 14, 'standard:identity', lineup);
-    const running = match.start();
-    try {
-      for (let step = 0; !match.result && step < 9000; step++) {
-        await setImmediate();
-        const request = match.room.decisions.pending[0];
-        if (!request) continue;
-        const reply = decideBasic(observeAgent(match, request.player), request, (value) =>
-          match.room.decisions.preview(request.id, value),
-        );
-        if (reply.kind === 'unsupported') throw new Error(reply.reason);
-        expect(
-          reply.kind === 'cancel'
-            ? match.room.decisions.cancel(request.id, request.token)
-            : match.room.decisions.submit(request.id, request.token, reply.value),
-        ).toEqual({ kind: 'accepted' });
-      }
-      expect(match.result).not.toBeNull();
-      expect(await running).toMatchObject({ kind: 'resolved' });
-      expect(useDeclarations(match.room.world)).toEqual([]);
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-    } finally {
-      match.room.abort('done');
-      await running;
-    }
+    const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+    await playMatch(match, { steps: 9000 });
   },
   60000,
 );
@@ -579,8 +537,10 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
     seed: 42,
     players: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
     roles: ['lord', 'rebel', 'loyalist', 'renegade'],
-    cards: standardCards,
-    skills: standardGeneralSkills,
+    content: {
+      cards: standardCards,
+      skills: standardGeneralSkills,
+    },
     deck: [
       card('slash', 'slash'),
       card('fee', 'jink'),
@@ -640,6 +600,15 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
   await running;
   check();
   expect(useDeclarations(match.room.world)).toEqual([]);
+  await match.room.run('later public history', (ctx) => {
+    for (let i = 0; i < 110; i++)
+      ctx.commit('draw.completed', [], { input: { player: 'a' }, cards: [] });
+  });
+  const later = projectMatch(match, 'a', null);
+  expect(
+    later.actions.find((action) => action.kind === 'use' && action.actor === 'a')!.targets,
+  ).toEqual([kind === 'redirect' ? 'c' : 'b']);
+  expect(later.log.some((entry) => entry.text === 'a使用【杀】 → b')).toBe(false);
 });
 it('人类可以支付新的费用再次流离回旧目标，每次创建独立效果身份', async () => {
   const game = liuliGame({ hands: { c: [card('fee2', 'jink')] } });

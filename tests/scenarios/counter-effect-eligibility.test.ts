@@ -26,9 +26,9 @@ const source = { kind: 'general', id: 'counter-eligibility-probe' } as const;
 const ban = defineSkill({
   id: 'probe:counter-target-ban',
   name: '禁止目标',
-  effects: [],
+  triggers: [],
   modifiers: [
-    modify(cardQueries.prohibitTarget, (_ctx, request, self) =>
+    modify(cardQueries.prohibitTarget, (_ctx, { input: request, self }) =>
       request.target === self.owner ? true : undefined,
     ),
   ],
@@ -69,29 +69,25 @@ function intent(name: string): UseIntent {
 async function change(ctx: Context, game: Game, boundary: Boundary) {
   switch (boundary) {
     case 'healed':
-      ctx.unwrap(await recover(ctx, { from: 'c', to: 'b', amount: 2 }));
+      await recover(ctx, { from: 'c', to: 'b', amount: 2 });
       return;
     case 'last-card-gone':
-      ctx.unwrap(
-        await moveCards(
-          ctx,
-          [{ cards: ['held'], from: 'b:hand', to: 'c:hand', place: 'bottom' }],
-          'target lost last card during counter',
-        ),
+      await moveCards(
+        ctx,
+        [{ cards: ['held'], from: 'b:hand', to: 'c:hand', place: 'bottom' }],
+        'target lost last card during counter',
       );
       return;
     case 'prohibited':
       await game.skills.grant(ctx, { owner: 'b', skill: ban.id, source });
       return;
     case 'source-dead':
-      ctx.unwrap(
-        await kill(ctx, {
-          player: 'a',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        }),
-      );
+      await kill(ctx, {
+        player: 'a',
+        killer: null,
+        reason: 'rule',
+        cause: { kind: 'rule', seq: null, data: null },
+      });
   }
 }
 
@@ -147,7 +143,7 @@ for (const [name, boundary] of cases) {
       const game = create(name);
       if (boundary === 'healed')
         await game.room.run('wound', async (ctx) => {
-          ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' }));
+          await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
         });
       game.room.on(counterOpening, {
         id: 'a-change-root-eligibility',
@@ -196,7 +192,7 @@ it.each(['healed', 'last-card-gone', 'source-dead'] as const)(
     const game = create('duel', 1);
     if (boundary === 'healed')
       await game.room.run('wound', async (ctx) => {
-        ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' }));
+        await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
       });
     game.room.on(counterOpening, {
       id: 'change-unrelated-condition',
@@ -217,7 +213,7 @@ it.each(['healed', 'last-card-gone', 'source-dead'] as const)(
 it('同一候选中桃园目标先治满再失去体力，不把中途的假值缓存为永久失效', async () => {
   const game = create('god_salvation', 1);
   await game.room.run('wound', async (ctx) => {
-    ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' }));
+    await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
   game.room.on(counterOpening, {
     id: 'temporarily-inapplicable',
@@ -225,7 +221,7 @@ it('同一候选中桃园目标先治满再失去体力，不把中途的假值�
     eligible: (_ctx, opportunity) => opportunity.depth === 0,
     async run(ctx) {
       await change(ctx, game, 'healed');
-      ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 1, reason: 'wounded again' }));
+      await loseHp(ctx, { player: 'b', amount: 1, reason: 'wounded again' });
     },
   });
   const { asked } = await drain(game, use(game, intent('god_salvation')));
@@ -313,7 +309,7 @@ it('延时牌后续生效使用本次 resolver 的资格，不错误套回放置
 it('反制结论封口后的公共后效治满桃园目标，不倒改已完成的反制与材料事实', async () => {
   const game = create('god_salvation', 1);
   await game.room.run('wound', async (ctx) => {
-    ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' }));
+    await loseHp(ctx, { player: 'b', amount: 2, reason: 'initial wound' });
   });
   game.room.on(counterFinished, {
     id: 'heal-after-sealed-result',

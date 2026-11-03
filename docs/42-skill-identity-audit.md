@@ -30,9 +30,9 @@
 
 本地参考在此处存在差异：
 
-- [FreeKill 标准裸衣](../freekill/packages/standard/pkg/skills/luoyi.lua) 要求 `by_user`；[伤害流程](../freekill/ltk/server/events/hp.lua) 从牌效果的使用者与实际伤害来源是否相同建立这个条件。
-- [FreeKill 决斗](../freekill/packages/standard_cards/pkg/skills/duel.lua) 保留实际胜方为伤害来源。
-- [noname 标准技能](../noname/resources/app/character/standard/skill.js) 的裸衣分支按伤害来源、牌名及非连环判断，因此允许作为决斗目标打回时受益。
+- [FreeKill 标准裸衣](../../freekill/packages/standard/pkg/skills/luoyi.lua) 要求 `by_user`；[伤害流程](../../freekill/ltk/server/events/hp.lua) 从牌效果的使用者与实际伤害来源是否相同建立这个条件。
+- [FreeKill 决斗](../../freekill/packages/standard_cards/pkg/skills/duel.lua) 保留实际胜方为伤害来源。
+- [noname 标准技能](../../noname/resources/app/character/standard/skill.js) 的裸衣分支按伤害来源、牌名及非连环判断，因此允许作为决斗目标打回时受益。
 
 本项目标准包与技能说明统一采用上述 FreeKill 条件：`DamageInput.from` 和 `EffectRef.actor` 都是本人，且牌为杀或决斗，才加一点伤害。不会为了不触发裸衣，把实际伤害来源改写为决斗使用者；响应与用牌事实也仍各自保留。
 
@@ -44,20 +44,18 @@
 
 [standard-games.test.ts](../tests/scenarios/standard-games.test.ts) 按标准目录逐将构建四人局：该武将位于甲席，其他三席使用目录的不同偏移组合，种子为 `42 + index * 17`，标准＋EX 108 张牌。没有重排起手、注入 World 或直接写胜负。测试中四席都由现有信息受限基础决策器驱动；产品默认的一名人类主控边界保持原样。
 
-每局检查：
+每局通过 [playMatch](../tests/fixtures/match.ts) 在测试清理前统一检查终局不变量；场景单独核对武将身份、108 张牌组及实际苦肉发动：
 
 - 真实准备、回合、出牌/响应/技能等决策均合法接纳，不出现未知必选决策或运行时故障，最终产生且仅产生一次真实胜负。
 - 等待整局 Promise 完成后，没有待选决策、活动回合/阶段、悬留用牌宣告、处理区或私有临时牌池。
 - 全部 108 张实体牌仍各自在唯一位置，提交事实重建结果等于当前 World。
 
-`.artifacts/validation/standard-games.json` 由测试实际生成，记录内容版本、每局武将/种子/阵容、决策数、回合数、胜负，以及确实产生过的主动/触发宣告和用牌集合；只有全部二十五局通过时 complete 才为 true。每局有决策数与测试时间上界，不把未结束的对局当作成功。
+`.artifacts/validation/standard-games.json` 由测试实际生成，记录每局武将/种子/阵容、决策数、回合数、胜负，以及确实产生过的主动/触发宣告和用牌集合；只有全部二十五局通过时 complete 才为 true。每局有决策数与测试时间上界，不把未结束的对局当作成功。
 
 武将进入并完成一局不等于其每个技能、锁定修正、转换分支和所有牌型组合都已执行；`skill.invoked` 集合尤其不能替代查询修正或转换的覆盖证据。完整分支审计继续依赖具名场景，不能用这些整局结果宣布全包验收完成。
 
-## 版本与当前证据
+## 当前证据
 
-该审计批次的标准包和演武包内容版本为 `0.1.3`；后续历史来源与当前版本见 [43](43-retained-effects.md)。每局继续记录实际内容版本。Windows 应用壳版本仍为 `0.1.0`，不能将两个版本概念混为一谈。
-
-当前全量测试、浏览器、Windows 原生运行及分发包结果见 [STATUS](STATUS.md)。本批没有开展 Android、高级托管、联机或协程恢复，也不宣布完整作者 SDK 或完整离线三国杀已完成。
+当前全量测试、浏览器与原生交付结果见 [STATUS](STATUS.md)。普通源码内容不声明分发版本；历史批次的包版本不参与当前对局或验收。
 
 浏览器和原生驱动中的逐次遗计改为核对四张私有池实体及两次保留事实。最后一次保留后，正常回合可能已经推进到甲席摸牌；不再把短暂的手牌总数作为结束状态。原理和排错记录见 [08](08-development-guide.md)。

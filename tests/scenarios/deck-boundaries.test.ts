@@ -28,14 +28,12 @@ function create() {
 async function invalidate(ctx: Context, boundary: Boundary) {
   if (boundary === 'finished') await finishGame(ctx, { winners: ['b'], reason: 'deck boundary' });
   else
-    ctx.unwrap(
-      await kill(ctx, {
-        player: 'a',
-        killer: null,
-        reason: 'rule',
-        cause: { kind: 'rule', seq: null, data: null },
-      }),
-    );
+    await kill(ctx, {
+      player: 'a',
+      killer: null,
+      reason: 'rule',
+      cause: { kind: 'rule', seq: null, data: null },
+    });
 }
 function atReshuffle(game: Game, run: (ctx: Context) => Promise<void>) {
   game.room.on(cardsMoved, {
@@ -72,9 +70,11 @@ it.each(['dead', 'finished'] as const)(
       },
     });
     await game.room.run('draw', async (ctx) => {
-      expect(ctx.unwrap(await draw(ctx, { player: 'a', count: 3, reason: 'probe' }))).toMatchObject(
-        { kind: 'unavailable', count: 3, cards: [] },
-      );
+      expect(await draw(ctx, { player: 'a', count: 3, reason: 'probe' })).toMatchObject({
+        kind: 'unavailable',
+        count: 3,
+        cards: [],
+      });
     });
     expect(game.room.world.zone('a:hand').cards).toEqual([]);
     expect(game.room.world.zone('draw').cards).toHaveLength(3);
@@ -100,9 +100,10 @@ it.each(['dead', 'finished'] as const)(
       },
     });
     await game.room.run('draw', async (ctx) => {
-      expect(ctx.unwrap(await draw(ctx, { player: 'a', count: 3, reason: 'probe' }))).toMatchObject(
-        { kind: 'unavailable', cards: [] },
-      );
+      expect(await draw(ctx, { player: 'a', count: 3, reason: 'probe' })).toMatchObject({
+        kind: 'unavailable',
+        cards: [],
+      });
     });
     expect(windows).toBe(0);
     expect(game.room.history.facts('deck.reshuffled')).toHaveLength(0);
@@ -134,9 +135,12 @@ it.each(['dead', 'finished'] as const)(
       },
     });
     await game.room.run('draw', async (ctx) => {
-      expect(ctx.unwrap(await draw(ctx, { player: 'a', count: 1, reason: 'probe' }))).toMatchObject(
-        { kind: 'unavailable', count: 2, cards: [], edits: [{ reason: 'first' }] },
-      );
+      expect(await draw(ctx, { player: 'a', count: 1, reason: 'probe' })).toMatchObject({
+        kind: 'unavailable',
+        count: 2,
+        cards: [],
+        edits: [{ reason: 'first' }],
+      });
     });
     expect(later).toBe(false);
     expect(game.room.history.facts('deck.reshuffled')).toHaveLength(0);
@@ -147,11 +151,11 @@ it.each(['dead', 'finished'] as const)(
 it('洗牌后嵌套摸牌消耗牌顶，外层读取最新牌序与余量，不借旧牌顶', async () => {
   const game = create();
   atReshuffle(game, async (ctx) => {
-    const nested = ctx.unwrap(await draw(ctx, { player: 'b', count: 1, reason: 'nested' }));
+    const nested = await draw(ctx, { player: 'b', count: 1, reason: 'nested' });
     expect(nested.cards).toEqual(['top']);
   });
   await game.room.run('draw', async (ctx) => {
-    const result = ctx.unwrap(await draw(ctx, { player: 'a', count: 3, reason: 'outer' }));
+    const result = await draw(ctx, { player: 'a', count: 3, reason: 'outer' });
     expect(result.kind).toBe('drawn');
     expect(result.count).toBe(3);
     expect([...result.cards].sort()).toEqual(['x', 'y']);
@@ -181,9 +185,11 @@ it.each(['dead', 'finished'] as const)(
       },
     });
     await game.room.run('draw', async (ctx) => {
-      expect(ctx.unwrap(await draw(ctx, { player: 'a', count: 1, reason: 'probe' }))).toMatchObject(
-        { kind: 'drawn', count: 1, cards: ['top'] },
-      );
+      expect(await draw(ctx, { player: 'a', count: 1, reason: 'probe' })).toMatchObject({
+        kind: 'drawn',
+        count: 1,
+        cards: ['top'],
+      });
     });
     expect(game.room.history.facts('draw.completed')).toHaveLength(1);
     expect(after).toBe(1);
@@ -199,12 +205,10 @@ it.each(['dead', 'finished'] as const)(
     atReshuffle(game, (ctx) => invalidate(ctx, boundary));
     let called = false;
     await game.room.run('pool', async (ctx) => {
-      ctx.unwrap(
-        await withPrivateTopCards(ctx, { player: 'a', count: 3, reason: 'probe' }, (_at, pool) => {
-          called = true;
-          expect(pool.remaining()).toEqual([]);
-        }),
-      );
+      await withPrivateTopCards(ctx, { player: 'a', count: 3, reason: 'probe' }, (_at, pool) => {
+        called = true;
+        expect(pool.remaining()).toEqual([]);
+      });
     });
     expect(called).toBe(true);
     expect(game.room.world.zone('draw').cards).toHaveLength(3);
@@ -217,12 +221,10 @@ it('公开牌池在洗牌后终局不取走牌，body 收到空池且处理区�
   atReshuffle(game, (ctx) => invalidate(ctx, 'finished'));
   let called = false;
   await game.room.run('reveal', async (ctx) => {
-    ctx.unwrap(
-      await withRevealedCards(ctx, { count: 3, reason: 'probe' }, (_at, pool) => {
-        called = true;
-        expect(pool.remaining()).toEqual([]);
-      }),
-    );
+    await withRevealedCards(ctx, { count: 3, reason: 'probe' }, (_at, pool) => {
+      called = true;
+      expect(pool.remaining()).toEqual([]);
+    });
   });
   expect(called).toBe(true);
   expect(game.room.world.zone('draw').cards).toHaveLength(3);
@@ -239,9 +241,7 @@ it.each(['dead', 'finished'] as const)(
     atReshuffle(game, (ctx) => invalidate(ctx, boundary));
     await game.room.run('judge', async (ctx) => {
       expect(
-        ctx.unwrap(
-          await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
-        ),
+        await judge(ctx, game.book, { player: 'a', reason: 'probe', match: () => true }),
       ).toMatchObject({ kind: 'unavailable', card: null, matched: null });
     });
     expect(game.room.history.facts('judgment.revealed')).toHaveLength(0);
@@ -266,7 +266,7 @@ it('摸牌数草案在洗牌后效阶段已封口，不能迟改本次请求', a
     return Promise.resolve();
   });
   await game.room.run('draw', async (ctx) => {
-    const result = ctx.unwrap(await draw(ctx, { player: 'a', count: 3, reason: 'probe' }));
+    const result = await draw(ctx, { player: 'a', count: 3, reason: 'probe' });
     expect(result.count).toBe(3);
     expect(result.cards).toHaveLength(3);
   });

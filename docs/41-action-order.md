@@ -4,7 +4,7 @@
 
 ## 参考与问题
 
-本地 [FreeKill 触发循环](../freekill/lua/core/trigger_event.lua) 从 `room.current` 开始遍历；本地 [noname 用牌流程](../noname/resources/app/noname/library/element/content.js) 以 `_status.currentPhase || player` 排序目标。它们帮助确认“谁正在行动”与“当前事件属于谁”需要分开，不意味着新内核复制其事件架构或已完成全包语义验收。
+本地 [FreeKill 触发循环](../../freekill/lua/core/trigger_event.lua) 从 `room.current` 开始遍历；本地 [noname 用牌流程](../../noname/resources/app/noname/library/element/content.js) 以 `_status.currentPhase || player` 排序目标。它们帮助确认“谁正在行动”与“当前事件属于谁”需要分开，不意味着新内核复制其事件架构或已完成全包语义验收。
 
 旧实现中，窗口有的显式从来源开始，有的从目标开始，无主体窗口使用首席；反制、救援和主公技又分别读取回合状态。用牌目标还单独按来源旋转。这些分支在“回合角色、用牌者、响应者相同”的常见局面里看不出区别，却不能构成统一的模式规则。
 

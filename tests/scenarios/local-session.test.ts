@@ -3,20 +3,105 @@ import { LocalSession } from '../../src/app/offline/session';
 import { RoleMatch, matchPrepared } from '../../src/app/offline/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { wusheng } from '../../src/content/standard/wusheng';
-import { moveCards, finishGame, useDeclared } from '../../src/sdk';
+import {
+  moveCards,
+  finishGame,
+  useDeclared,
+  defineQuery,
+  defineSkill,
+  modify,
+  cardQueries,
+} from '../../src/sdk';
+import type { SkillHandle } from '../../src/sdk';
 import type { GameSelection, GameView } from '../../src/core/view/game';
 import { card } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
+import { rebuildWorld } from '../../src/core/history/rebuild';
+import { createOfflineMatch } from '../../src/app/offline/practice';
+import type { Context } from '../../src/sdk';
+import type { Validation } from '../../src/core/decisions/hub';
 
 const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
+
+it('本地预览与回复把规则故障留在主持侧，返回不可操作结果并保留原始错误', async () => {
+  for (const fault of ['throw', 'async'] as const) {
+    for (const entry of ['inspect', 'inspectAnswer', 'reply', 'answer'] as const) {
+      const match = createOfflineMatch({ count: 2, seed: 42 });
+      const session = new LocalSession(match, { human: '甲席' });
+      let at: Context;
+      let lateError = '';
+      const validate =
+        fault === 'throw'
+          ? () => {
+              throw new Error('probe:invalid-selection');
+            }
+          : ((async () => {
+              await Promise.resolve();
+              try {
+                at.commit('invalid.preview.late', [], null);
+              } catch (error) {
+                lateError = (error as Error).message;
+              }
+              return { ok: true, value: null };
+            }) as unknown as () => Validation<unknown>);
+      const settled = match.room
+        .run('ask', (ctx) => {
+          at = ctx;
+          return ctx.ask({
+            player: '甲席',
+            kind: 'cards-targets',
+            prompt: '故障选择',
+            data: {},
+            optional: false,
+            validate,
+          });
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+      try {
+        const request = await nextRequest(match.room);
+        let response: unknown;
+        expect(() => {
+          if (entry === 'inspect') response = session.inspect(request.id, request.token, empty());
+          else if (entry === 'reply') response = session.reply(request.id, request.token, empty());
+          else response = session[entry](request.id, request.token, {});
+        }).not.toThrow();
+        expect(response).toMatchObject(
+          entry === 'inspect' || entry === 'inspectAnswer'
+            ? { valid: false }
+            : { kind: 'rejected', reason: 'closed' },
+        );
+        const message = fault === 'throw' ? 'probe:invalid-selection' : 'Queries cannot await';
+        expect(((await settled) as Error).message).toContain(message);
+        expect(session.view.error).toContain(message);
+        expect(session.view.status).toBe('faulted');
+        expect(session.view.decision).toBeNull();
+        expect(session.view.automated).toBeNull();
+        expect(match.room.decisions.pending).toEqual([]);
+        expect(match.room.history.entries.filter((entry) => entry.type === 'fault')).toHaveLength(
+          1,
+        );
+        expect(match.room.history.facts()).toEqual([]);
+        if (fault === 'async') expect(lateError).toContain(message);
+      } finally {
+        session.dispose();
+        await settled;
+      }
+    }
+  }
+});
 function game(options: { wounded?: boolean; response?: boolean } = {}) {
   const match = new RoleMatch({
     id: 'local-test',
     seed: 42,
     players: [{ id: 'a', skills: [wusheng.id] }, { id: 'b' }],
     roles: ['lord', 'rebel'],
-    cards: standardCards,
-    skills: [wusheng],
+    content: {
+      cards: standardCards,
+      skills: [wusheng],
+    },
     deck: [
       card('slash', 'slash'),
       card('private-a', 'peach', 'heart'),
@@ -86,6 +171,68 @@ it('交接前没有手牌、私有身份或请求描述；本人确认才显示�
     session.dispose();
   }
 });
+
+it.each([false, true])(
+  '资格查询先于规则执行出错=%s，仍报告原始错误和印刷牌面，保留已提交事实',
+  async (initiallyArmed) => {
+    const query = defineQuery<null, number>('probe:query-view', (a, b) => a + b);
+    let armed = false;
+    const definition = defineSkill({
+      id: 'probe:query-source',
+      name: '错误来源',
+      triggers: [],
+      // 两条实际入口分别覆盖牌面投影停止与规则执行冻结，不依赖无关查询检查来源。
+      modifiers: [modify(query, () => 1), modify(cardQueries.cardFace, () => ({}))],
+    });
+    const self: SkillHandle = {
+      id: 'probe:query-instance',
+      owner: 'a',
+      skill: definition.id,
+      name: definition.name,
+      origin: null,
+      effective: () => (armed ? (Promise.resolve(false) as unknown as boolean) : true),
+    };
+    const match = new RoleMatch({
+      id: 'query-fault-view',
+      seed: 2,
+      players: [{ id: 'a' }, { id: 'b' }],
+      roles: ['lord', 'rebel'],
+      content: {
+        cards: standardCards,
+      },
+      deck: Array.from({ length: 20 }, (_, i) => card(`fault${i}`, 'slash')),
+    });
+    await match.room.run('provider', (ctx) => {
+      match.skills.addProvider({ collect: () => [{ self, definition }] }, ctx);
+    });
+    match.room.on(matchPrepared, {
+      id: 'arm',
+      owner: null,
+      eligible: () => true,
+      run(ctx) {
+        armed = true;
+        match.skills.query(ctx, query, null, 0);
+      },
+    });
+    const session = new LocalSession(match, { human: 'a' });
+    if (initiallyArmed) armed = true;
+    session.start();
+    try {
+      const view = await waitView(session, (view) => view.error.includes('Queries cannot await'));
+      expect(view.error).toContain('probe:query-source.effective');
+      expect(view.status).toBe(initiallyArmed ? 'stopped' : 'faulted');
+      expect(view.hand).toHaveLength(4);
+      expect(view.hand.every((card) => card.name === '杀')).toBe(true);
+      expect(view.decision).toBeNull();
+      expect(match.room.history.facts('match.prepared')).toHaveLength(initiallyArmed ? 0 : 1);
+      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
+        match.room.world.snapshot,
+      );
+    } finally {
+      session.dispose();
+    }
+  },
+);
 
 it('真实杀/闪切换席位，遮住前一人手牌；旧选择不能用于下一人或回流后的请求', async () => {
   const { session, match } = game({ response: true });
@@ -283,6 +430,45 @@ it('执行侧中止不被界面误报为仍在结算或正常胜负', async () =
     expect(final.error).toBe('probe:stopped');
     expect(final.result).toBeNull();
     expect(final.decision).toBeNull();
+  } finally {
+    session.dispose();
+  }
+});
+
+it('胜负提交后清理失败保留事实，并将原始作者故障传给主持视图', async () => {
+  const { session, match } = game();
+  try {
+    match.room.on(useDeclared, {
+      id: 'terminal-cleanup-fault',
+      owner: null,
+      eligible: () => true,
+      async run(ctx) {
+        ctx.defer(() => {
+          throw new Error('作者释放故障');
+        });
+        await finishGame(ctx, { winners: ['a'], reason: 'probe' });
+      },
+    });
+    const view = await enter(session);
+    const decision = view.decision!;
+    if (!('offers' in decision)) throw new Error('Expected card decision');
+    const slash = decision.offers.find((offer) => offer.cardId === 'slash')!;
+    session.reply(decision.id, decision.token, { offer: slash.id, cards: [], targets: ['b'] });
+    const final = await waitView(
+      session,
+      (next) => next.status === 'faulted' && Boolean(next.error),
+    );
+    expect(final.error).toContain('作者释放故障');
+    expect(match.room.history.entries.find((entry) => entry.type === 'fault')?.data).toEqual({
+      message: final.error,
+    });
+    expect(final.result).toEqual({ winners: ['a'], reason: 'probe' });
+    expect(final.decision).toBeNull();
+    expect(match.room.decisions.pending).toEqual([]);
+    expect(match.room.history.facts('game.finished')).toHaveLength(1);
+    expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
+      match.room.world.snapshot,
+    );
   } finally {
     session.dispose();
   }

@@ -42,7 +42,7 @@ cards.arranged 事实保存真实顺序供状态重建；公开投影只解释�
 
 空城是现有 cardQueries.prohibitTarget 的普通修正：有效来源且本人手牌为空时，禁止成为杀/决斗目标。装备和私有临时池不算手牌，群体锦囊与响应资格不受它限制。目标时点后、实际生效前失去最后手牌由统一管线重查；决斗已经开始后打出最后一张杀，不中断已经进入 resolving 的效果。
 
-参考 [标准目录](../freekill/packages/standard/pkg/init.lua)、[观星](../freekill/packages/standard/pkg/skills/guanxing.lua)、[空城](../freekill/packages/standard/pkg/skills/kongcheng.lua)。本次实现按标准技能文本，不加入界观星的额外阶段触发或额外摸牌。参考源码未修改。
+参考 [标准目录](../../freekill/packages/standard/pkg/init.lua)、[观星](../../freekill/packages/standard/pkg/skills/guanxing.lua)、[空城](../../freekill/packages/standard/pkg/skills/kongcheng.lua)。本次实现按标准技能文本，不加入界观星的额外阶段触发或额外摸牌。参考源码未修改。
 
 ## 客户端和基础 AI
 
@@ -57,5 +57,3 @@ cards.arranged 事实保存真实顺序供状态重建；公开投影只解释�
 [34 项规则场景](../tests/scenarios/astrology.test.ts) 覆盖分组/顺序/上下限、非法和过期回复、二至八人局与存活计数、顶底真实摸牌、空池和洗牌、来源变化/实时余牌善后、投影与暂停、AI 合法回复、空城与决斗，以及混合八人标准局的真实胜负。默认测试不读取参考项目。
 
 [浏览器](../tests/browser/client.spec.ts) 增加本人排序/暂停/真实摸牌与诸葛亮 AI 两类操作，桌面和触屏共四项；[原生驱动](../scripts/smoke-native.mjs) 覆盖相同操作。当前全量测试、Windows 实际运行和归档字节证据统一见 [STATUS](STATUS.md)。
-
-后续仍需标准包系统语义审计、作者包登记与加载、复杂技能组合和更完整离线体验验收。带角色额度的分配、任意参数表单、通用多 occurrence、完整知识记忆/录像、联机和 Android 真机也未由本批证明。

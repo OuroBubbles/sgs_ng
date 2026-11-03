@@ -38,18 +38,15 @@ origin: { kind: 'transfer', damage: parent.id }
 
 ```ts
 const intent = draft.prepareTransfer(ctx, target, self.skill);
-const paid = ctx.unwrap(
-  await payDiscard(ctx, book, {
-    actor: self.owner,
-    skill: self,
-    cards: answer.value.cards,
-    areas: ['hand'],
-    reason: self.skill,
-    intent,
-    declaration: { label: self.name, ...intent.data },
-  }),
-);
-if (paid.kind === 'paid') ctx.unwrap(await intent.resolve(ctx));
+const paid = await payDiscard(ctx, book, {
+  skill: self,
+  cards: answer.value.cards,
+  areas: ['hand'],
+  reason: self.skill,
+  intent,
+  declaration: { label: self.name, ...intent.data },
+});
+if (paid.kind === 'paid') await intent.resolve(ctx);
 ```
 
 [pay](../src/rules/costs/pay.ts) 的 PaymentIntent 是执行侧普通接口：纯 `available` 在提交前重查，失败不支付；`committed` 在费用事实/状态提交后同步运行，先于 cardsMoved/costPaid。它不接受 await，不开放规则窗口；抛错或返回 Promise 时运行时故障停止，已提交费用不回滚。它是可信规则代码的同步提交边界，不是任意回调事务或持久化命令。

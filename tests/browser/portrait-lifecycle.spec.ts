@@ -7,7 +7,9 @@ test('立绘牌桌反复进入和关闭独立 Spine 渲染器后仍可重绘与�
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('/');
-  await expect(page.getByText('WebGL 战场已就绪')).toBeAttached();
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
+  await page.getByText('演练与复现', { exact: true }).click();
+  await expect(page.locator('[data-content-ready="true"]')).toBeVisible();
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:guanyu');

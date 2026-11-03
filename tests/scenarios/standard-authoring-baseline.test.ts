@@ -196,11 +196,10 @@ it.each(['wusheng', 'paoxiao'] as const)(
         };
         expect(game.book.validateUse(at, { ...intent, targets: ['c'] }).ok).toBe(false);
         expect(game.book.validateUse(at, { ...intent, targets: ['a'] }).ok).toBe(false);
-        expect(at.unwrap(await game.book.use(at, intent)).kind).toBe('used');
+        expect((await game.book.use(at, intent)).kind).toBe('used');
         const second = { ...intent, choice: choice('second') };
         expect(game.book.validateUse(at, second).ok).toBe(skill === 'paoxiao');
-        if (skill === 'paoxiao')
-          expect(at.unwrap(await game.book.use(at, second)).kind).toBe('used');
+        if (skill === 'paoxiao') expect((await game.book.use(at, second)).kind).toBe('used');
       }),
     );
     const response = await nextRequest(game.room);
@@ -237,7 +236,7 @@ it('急救在无本人回合的规则使用中可用红牌自疗，仍是实际�
       skill: 'standard:jijiu',
       source: { kind: 'general', id: 'baseline' },
     });
-    ctx.unwrap(await loseHp(ctx, { player: 'a', amount: 1, reason: 'initial wound' }));
+    await loseHp(ctx, { player: 'a', amount: 1, reason: 'initial wound' });
   });
   const instance = game.room.world.snapshot.skills[0]!.id;
   expect(

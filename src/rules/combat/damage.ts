@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import type { EffectRef, Nature } from '../cards/types';
 import { effectReference } from '../cards/types';
@@ -31,7 +31,7 @@ export interface DamageTransferIntent extends PaymentIntent {
     readonly target: string;
     readonly reason: string;
   };
-  resolve(ctx: Context): Promise<FlowResult<DamageTransferResult>>;
+  resolve(ctx: Context): Promise<DamageTransferResult>;
 }
 
 interface Continuation {
@@ -73,7 +73,7 @@ export interface DamageDraft {
   ignoreShield(reason: string): void;
   canTransfer(ctx: Context, to: string): boolean;
   prepareTransfer(ctx: Context, to: string, reason: string): DamageTransferIntent;
-  transfer(ctx: Context, to: string, reason: string): Promise<FlowResult<DamageTransferResult>>;
+  transfer(ctx: Context, to: string, reason: string): Promise<DamageTransferResult>;
 }
 
 export interface DamageResult {
@@ -202,12 +202,12 @@ class Draft implements DamageDraft {
     );
   }
 
-  transfer(ctx: Context, to: string, reason: string): Promise<FlowResult<DamageTransferResult>> {
+  transfer(ctx: Context, to: string, reason: string): Promise<DamageTransferResult> {
     return ctx.flow<DamageTransferResult>('damage.transfer', async (at) => {
       const intent = this.prepareTransfer(at, to, reason);
       if (!intent.available(at)) return { kind: 'unavailable', damage: null };
       intent.committed(at);
-      return at.unwrap(await intent.resolve(at));
+      return await intent.resolve(at);
     });
   }
 
@@ -250,27 +250,25 @@ class Draft implements DamageDraft {
           if (!declared || executed) return { kind: 'unavailable', damage: null };
           executed = true;
           const chain = chainOrigin(this.input);
-          const outcome = inside.unwrap(
-            await resolveDamage(
-              inside,
-              {
-                ...this.input,
-                to,
-                amount,
-                origin: {
-                  kind: 'transfer',
-                  damage: this.id,
-                  ...(chain === undefined ? {} : { chain }),
-                },
+          const outcome = await resolveDamage(
+            inside,
+            {
+              ...this.input,
+              to,
+              amount,
+              origin: {
+                kind: 'transfer',
+                damage: this.id,
+                ...(chain === undefined ? {} : { chain }),
               },
-              {
-                sourceSnapshot,
-                shieldBypass: this.#shieldBypass,
-                started: (id) => {
-                  this.#redirection = immutable({ to, reason, damage: id });
-                },
+            },
+            {
+              sourceSnapshot,
+              shieldBypass: this.#shieldBypass,
+              started: (id) => {
+                this.#redirection = immutable({ to, reason, damage: id });
               },
-            ),
+            },
           );
           return { kind: 'transferred', damage: outcome };
         }),
@@ -311,7 +309,7 @@ class Draft implements DamageDraft {
 }
 
 /** 提交伤害并完整处理濒死/后效，再按固定计划传导；各次有独立草案，不共享防御结果。 */
-export function damage(ctx: Context, request: DamageInput): Promise<FlowResult<DamageResult>> {
+export function damage(ctx: Context, request: DamageInput): Promise<DamageResult> {
   return resolveDamage(ctx, request);
 }
 
@@ -319,7 +317,7 @@ function resolveDamage(
   ctx: Context,
   request: DamageInput,
   continuation?: Continuation,
-): Promise<FlowResult<DamageResult>> {
+): Promise<DamageResult> {
   return ctx.flow('damage', async (child) => {
     const input = immutable({
       ...request,
@@ -416,40 +414,35 @@ function resolveDamage(
         result,
       );
       if (result.shieldLost)
-        child.unwrap(
-          await child.window(
-            shieldChanged,
-            immutable({
-              player: input.to,
-              before: result.beforeShield,
-              after: result.afterShield,
-              amount: -result.shieldLost,
-              reason: 'damage',
-              damage: result.id,
-            }),
-            { subject: input.to },
-          ),
+        await child.window(
+          shieldChanged,
+          immutable({
+            player: input.to,
+            before: result.beforeShield,
+            after: result.afterShield,
+            amount: -result.shieldLost,
+            reason: 'damage',
+            damage: result.id,
+          }),
+          { subject: input.to },
         );
       if (unchained)
-        child.unwrap(
-          await child.window(
-            chainChanged,
-            immutable({
-              player: input.to,
-              before: true,
-              after: false,
-              reason: result.id,
-            }),
-            { subject: input.to },
-          ),
+        await child.window(
+          chainChanged,
+          immutable({
+            player: input.to,
+            before: true,
+            after: false,
+            reason: result.id,
+          }),
+          { subject: input.to },
         );
       if (result.hpLoss > 0 && result.afterHp <= 0) {
-        const dying = await enterDying(child, {
+        await enterDying(child, {
           player: input.to,
           killer: input.from,
           cause: { kind: 'damage', seq: fact.seq, data: result },
         });
-        if (dying.kind === 'aborted') return child.abort(dying.reason);
       }
       if (!isGameOver(child.world)) {
         await child.window(damageDealt, result, input.from === null ? {} : { subject: input.from });
@@ -462,17 +455,15 @@ function resolveDamage(
     for (const player of result.chainPlan) {
       if (isGameOver(child.world)) break;
       if (!child.world.player(player).alive || !isChained(child.world, player)) continue;
-      child.unwrap(
-        await damage(child, {
-          from: input.from,
-          to: player,
-          amount: result.amount,
-          nature: input.nature,
-          ...(input.card === undefined ? {} : { card: input.card }),
-          ...(input.conducts === undefined ? {} : { conducts: input.conducts }),
-          origin: { kind: 'chain', damage: result.id },
-        }),
-      );
+      await damage(child, {
+        from: input.from,
+        to: player,
+        amount: result.amount,
+        nature: input.nature,
+        ...(input.card === undefined ? {} : { card: input.card }),
+        ...(input.conducts === undefined ? {} : { conducts: input.conducts }),
+        origin: { kind: 'chain', damage: result.id },
+      });
     }
     return result;
   });

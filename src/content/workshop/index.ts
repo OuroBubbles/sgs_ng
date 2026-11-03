@@ -1,11 +1,7 @@
 import {
   chooseOne,
-  defineGeneral,
-  definePackage,
-  defineSkill,
   draw,
   invoke,
-  isGameOver,
   on,
   recover,
   useDeclared,
@@ -16,11 +12,12 @@ import {
   isChained,
   setChained,
 } from '../../sdk';
-import type { Card, CardBook, CardDefinition } from '../../sdk';
+import type { Card, CardBook, CardDefinition, ContentDefinition } from '../../sdk';
 import { relay, ward } from './defense';
 import { vermilion, createFaceDeck } from './faces';
 import { insight, echo } from './learning';
 import { allotment } from './allotment';
+import type { SkillDefinition } from '../../sdk';
 
 /** 作者演示牌；复用标准锦囊与选择流程，无专用 UI 或内核分支。 */
 export const prepare: CardDefinition = {
@@ -30,8 +27,8 @@ export const prepare: CardDefinition = {
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
-    target: (_ctx, request, target) => target === request.actor,
-    async resolve(ctx, effect) {
+    target: (_ctx, { request, target }) => target === request.actor,
+    async resolve(ctx, { effect }) {
       const player = ctx.world.player(effect.target);
       const answer = await ctx.ask(
         chooseOne({
@@ -46,13 +43,8 @@ export const prepare: CardDefinition = {
       );
       if (answer.kind !== 'chosen') return ctx.abort('整备选择中止。');
       if (answer.value === 'recover')
-        ctx.unwrap(
-          await recover(ctx, { from: effect.actor, to: effect.target, amount: 1, card: effect }),
-        );
-      else
-        ctx.unwrap(
-          await draw(ctx, { player: effect.target, count: 2, reason: 'workshop:prepare' }),
-        );
+        await recover(ctx, { from: effect.actor, to: effect.target, amount: 1, card: effect });
+      else await draw(ctx, { player: effect.target, count: 2, reason: 'workshop:prepare' });
     },
   },
 };
@@ -66,16 +58,8 @@ export const bind: CardDefinition = {
   use: {
     count: { min: 1, max: 2 },
     target: () => true,
-    async resolve(ctx, effect) {
-      ctx.unwrap(
-        await setChained(
-          ctx,
-          effect.target,
-          !isChained(ctx.world, effect.target),
-          effect.card.name,
-        ),
-      );
-    },
+    resolve: (ctx, { effect }) =>
+      setChained(ctx, effect.target, !isChained(ctx.world, effect.target), effect.card.name),
   },
 };
 
@@ -87,41 +71,36 @@ export const ember: CardDefinition = {
   nature: 'fire',
   use: {
     count: { min: 1, max: 1 },
-    target: (_ctx, request, target) => target !== request.actor,
-    async resolve(ctx, effect) {
-      ctx.unwrap(
-        await damage(ctx, {
-          from: effect.actor,
-          to: effect.target,
-          amount: 1,
-          nature: effect.card.nature,
-          card: effect,
-        }),
-      );
-    },
+    target: (_ctx, { request, target }) => target !== request.actor,
+    resolve: (ctx, { effect }) =>
+      damage(ctx, {
+        from: effect.actor,
+        to: effect.target,
+        amount: 1,
+        nature: effect.card.nature,
+        card: effect,
+      }),
   },
 };
 
-/** 工厂拿到本局目录，因此跨包牌、转换锦囊也按真实牌类型判定。 */
+/** 工厂拿到本局目录，因此其他内容与转换锦囊也按真实牌类型判定。 */
 export function hearing(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'workshop:hearing',
     name: '闻策',
     description: '当你使用锦囊牌时，你可以摸一张牌。',
-    effects: [
+    triggers: [
       on(useDeclared, {
-        id: 'draw',
         order: 'choose',
-        when: (_ctx, use, self) =>
+        when: (_ctx, { payload: use, self }) =>
           use.actor === self.owner && book.definition(use.card.name).type === 'trick',
-        async run(ctx, _use, self) {
-          const accepted = ctx.unwrap(await invoke(ctx, self, '闻策：是否摸一张牌？'));
-          if (accepted && ctx.world.player(self.owner).alive && !isGameOver(ctx.world))
-            ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+        async run(ctx, { self }) {
+          const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
+          if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }
 
 /** 历史来源仍可普通 invoke；当前装备、转换与查询目录不会重新获得这件牌。 */
@@ -129,76 +108,68 @@ export const relicJade = equipmentCard({
   id: 'workshop:relic_jade',
   label: '遗玉',
   slot: 'armor',
-  skill: defineSkill({
+  skill: {
     id: 'workshop:jade-echo',
     name: '玉碎',
     description: '遗玉离开你的装备区后，你可以摸一张牌。不是装备时被弃置不会发动。',
-    effects: [
+    triggers: [
       on(cardsMoved, {
-        id: 'echo',
         order: 'choose',
-        retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-        when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-        async run(ctx, _moved, self) {
-          const accepted = ctx.unwrap(await invoke(ctx, self, '是否发动【玉碎】摸一张牌？'));
-          if (accepted && ctx.world.player(self.owner).alive && !isGameOver(ctx.world))
-            ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+        retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+        when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
+        async run(ctx, { self }) {
+          const accepted = await invoke(ctx, self, '是否发动【玉碎】摸一张牌？');
+          if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
       }),
     ],
-  }),
+  } satisfies SkillDefinition,
 });
 
-export default definePackage({
-  manifest: {
-    id: 'workshop',
-    name: '作者演武',
-    version: '0.1.20',
-    requires: [{ id: 'standard', version: '0.1.20' }],
-  },
+export default {
   cards: [prepare, relicJade, bind, ember, ward],
-  skills: (book) => [hearing(book), relay(book), vermilion, insight(book), echo, allotment(book)],
+  skills: [hearing, relay, vermilion, insight, echo, allotment],
   generals: [
-    defineGeneral({
+    {
       id: 'workshop:quartermaster',
       name: '筹策客',
       kingdom: '群',
       gender: 'male',
       maxHp: 4,
       skills: ['workshop:allotment'],
-    }),
-    defineGeneral({
+    },
+    {
       id: 'workshop:inquirer',
       name: '问道客',
       kingdom: '群',
       gender: 'male',
       maxHp: 4,
       skills: ['workshop:insight'],
-    }),
-    defineGeneral({
+    },
+    {
       id: 'workshop:vermilion_guest',
       name: '绯衣客',
       kingdom: '群',
       gender: 'female',
       maxHp: 3,
       skills: [vermilion.id, 'standard:wusheng'],
-    }),
-    defineGeneral({
+    },
+    {
       id: 'workshop:guardian',
       name: '守阵客',
       kingdom: '群',
       gender: 'female',
       maxHp: 4,
       skills: ['workshop:relay'],
-    }),
-    defineGeneral({
+    },
+    {
       id: 'workshop:guest',
       name: '演武客',
       kingdom: '群',
       gender: 'male',
       maxHp: 4,
       skills: ['workshop:hearing', 'standard:wusheng'],
-    }),
+    },
   ],
   cardViews: [
     {
@@ -276,7 +247,7 @@ export default definePackage({
     },
     {
       id: 'workshop:showcase',
-      label: '作者演武（44 张）',
+      label: '机制演武（44 张）',
       create() {
         const names = [
           ...Array<string>(12).fill('standard:slash'),
@@ -316,4 +287,4 @@ export default definePackage({
       },
     },
   ],
-});
+} satisfies ContentDefinition;

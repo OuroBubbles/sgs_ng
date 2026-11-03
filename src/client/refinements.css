@@ -16,16 +16,16 @@
 /* 桌面牌来自已提交记录；这里不拥有处理区或牌的位置状态。 */
 .table-cards {
   position: absolute;
-  top: 55%;
   left: 50%;
   display: flex;
   gap: 8px;
-  transform: translate(-50%, -12%);
+  transform: translate(-50%, -50%);
+  padding-top: 19px;
   pointer-events: none;
 }
 .table-cards-label {
   position: absolute;
-  top: -19px;
+  top: 0;
   left: 0;
   width: 100%;
   text-align: center;
@@ -44,8 +44,8 @@
   color: #b9bd9c;
 }
 .table-card {
-  width: 68px;
-  height: 98px;
+  height: auto;
+  aspect-ratio: 93 / 130;
   opacity: 0.88;
   box-shadow: 0 4px 12px #0002;
 }
@@ -108,6 +108,8 @@
 }
 .inspected-card {
   cursor: default;
+  height: auto;
+  aspect-ratio: 93 / 130;
 }
 .inspected-card:hover {
   transform: none;
@@ -189,7 +191,7 @@
   }
   .inspected-card {
     width: 85px;
-    height: 135px;
+    height: auto;
   }
   .card-rule h2 {
     font-size: 23px;
@@ -217,11 +219,6 @@
   .table-topline {
     height: 23px;
     flex: 0 0 23px;
-  }
-  .battlefield {
-    height: auto;
-    min-height: 125px;
-    flex: 1;
   }
   .hand-meta {
     display: none;

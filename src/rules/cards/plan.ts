@@ -1,5 +1,5 @@
 import type { Change, WorldReader } from '../../core/model/state';
-import { immutable } from '../../core/model/value';
+import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
@@ -41,8 +41,7 @@ const declarationKey = defineState<UseDeclaration | null>(
       'id' in value &&
       typeof value.id === 'string' &&
       'actionOrder' in value &&
-      Array.isArray(value.actionOrder) &&
-      value.actionOrder.every((id: unknown) => typeof id === 'string') &&
+      isStringArray(value.actionOrder) &&
       'effects' in value &&
       Array.isArray(value.effects)),
 );

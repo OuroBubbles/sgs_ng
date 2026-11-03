@@ -25,6 +25,22 @@ const intent = {
   targets: ['b'],
   timing: { kind: 'effect' },
 } as const;
+const root: EffectRef = {
+  useId: 'probe-use',
+  effectId: 'probe-effect',
+  actor: 'a',
+  target: 'b',
+  processing: 'discard',
+  card: {
+    name: 'standard:duel',
+    suit: 'none',
+    rank: 0,
+    color: 'none',
+    nature: 'normal',
+    source: null,
+    materials: [],
+  },
+};
 
 function create() {
   const game = cardGame({
@@ -38,14 +54,12 @@ function create() {
 }
 
 async function die(ctx: Context, player: string) {
-  ctx.unwrap(
-    await kill(ctx, {
-      player,
-      killer: null,
-      reason: 'rule',
-      cause: { kind: 'rule', seq: null, data: null },
-    }),
-  );
+  await kill(ctx, {
+    player,
+    killer: null,
+    reason: 'rule',
+    cause: { kind: 'rule', seq: null, data: null },
+  });
 }
 
 function captureEffect(game: Game) {
@@ -90,9 +104,7 @@ it.each(boundaries)(
       run: (ctx) => invalidate(ctx, boundary, captured.effect!),
     });
     const later = vi.fn(async (ctx: Context) => {
-      ctx.unwrap(
-        await pay(ctx, { actor: 'c', cards: ['cost'], to: 'discard', reason: 'stale counter' }),
-      );
+      await pay(ctx, { actor: 'c', cards: ['cost'], to: 'discard', reason: 'stale counter' });
     });
     game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
     const finished: CounterResult[] = [];
@@ -126,13 +138,13 @@ it.each(boundaries)('同窗候选已支付再令反制 %s，保留真实费用�
     eligible: () => true,
     async run(ctx) {
       expect(
-        ctx.unwrap(
+        (
           await pay(ctx, {
             actor: 'c',
             cards: ['cost'],
             to: 'discard',
             reason: 'committed counter opening cost',
-          }),
+          })
         ).kind,
       ).toBe('paid');
       await invalidate(ctx, boundary, captured.effect!);
@@ -192,14 +204,12 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
     eligible: (_ctx, opportunity) => opportunity.root.target === 'b',
     async run(ctx) {
       expect(
-        ctx.unwrap(
-          await game.book.use(ctx, {
-            ...intent,
-            actor: 'c',
-            choice: { kind: 'physical', card: 'inner' },
-            targets: ['d'],
-          }),
-        ),
+        await game.book.use(ctx, {
+          ...intent,
+          actor: 'c',
+          choice: { kind: 'physical', card: 'inner' },
+          targets: ['d'],
+        }),
       ).toMatchObject({ kind: 'used', use: { effects: [{ state: 'resolved' }] } });
     },
   });
@@ -282,46 +292,77 @@ it('反制完成是已封口公共事实，完成后效终局不重写结果或�
 
 it('没有 World 修改的相关性闭包也持续收束同窗候选', async () => {
   const game = cardGame({ hands: { a: [] } });
-  const root: EffectRef = {
-    useId: 'probe-use',
-    effectId: 'probe-effect',
-    actor: 'a',
-    target: 'b',
-    processing: 'discard',
-    card: {
-      name: 'standard:duel',
-      suit: 'none',
-      rank: 0,
-      color: 'none',
-      nature: 'normal',
-      source: null,
-      materials: [],
-    },
-  };
-  let relevant = true;
+  class Input {
+    root = root;
+    subject = { kind: 'effect' as const, effect: root };
+    write = false;
+    #relevant = true;
+
+    relevant(ctx: Context) {
+      if (this.write) ctx.commit('probe.counter-query-write', [], null);
+      return this.#relevant;
+    }
+
+    close() {
+      this.#relevant = false;
+    }
+  }
+  const input = new Input();
   const later = vi.fn();
   game.room.on(counterOpening, {
     id: 'a-change-draft',
     owner: null,
     eligible: () => true,
-    run: () => {
-      relevant = false;
+    run: (ctx, opportunity) => {
+      input.write = true;
+      expect(() => opportunity.available(ctx)).toThrow('Pure queries');
+      input.write = false;
+      input.close();
+      input.relevant = () => true;
     },
   });
   game.room.on(counterOpening, { id: 'z-later', owner: null, eligible: () => true, run: later });
   await game.room.run('counter', async (ctx) => {
-    expect(
-      ctx.unwrap(
-        await contestCounter(ctx, game.book, {
-          root,
-          subject: { kind: 'effect', effect: root },
-          relevant: () => relevant,
-        }),
-      ),
-    ).toMatchObject({ kind: 'unavailable', by: null });
+    expect(await contestCounter(ctx, game.book, input)).toMatchObject({
+      kind: 'unavailable',
+      by: null,
+    });
   });
   expect(later.mock.calls.length).toBe(0);
+  expect(game.room.history.facts('probe.counter-query-write')).toEqual([]);
   conserved(game);
+});
+
+it('反制机会在普通后效中检查相关性也拒绝异步结果，不提交越过资格的事实', async () => {
+  const game = cardGame({ hands: { a: [] } });
+  let asynchronous = false;
+  game.room.on(counterOpening, {
+    id: 'probe:read-availability',
+    owner: null,
+    eligible: () => true,
+    run: (ctx, opportunity) => {
+      asynchronous = true;
+      if (opportunity.available(ctx)) ctx.commit('probe.counter-after-async', [], null);
+    },
+  });
+  await expect(
+    game.room.run('counter', (ctx) =>
+      contestCounter(ctx, game.book, {
+        root,
+        subject: { kind: 'effect', effect: root },
+        relevant(): boolean {
+          // @ts-expect-error 模拟未经类型检查的异步相关性回调。
+          return asynchronous ? Promise.resolve(false) : true;
+        },
+      }),
+    ),
+  ).rejects.toThrow('Queries cannot await');
+  expect(game.room.status).toBe('faulted');
+  expect(game.room.history.facts('probe.counter-after-async')).toEqual([]);
+  expect(game.room.history.facts('counter.finished')).toEqual([]);
+  expect(game.room.decisions.pending).toEqual([]);
+  expect(game.room.world.snapshot.zones).toEqual(game.initial.zones);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
 it.each(boundaries)(
@@ -372,7 +413,7 @@ it('最后询问席位的反制在准备中失效，未支付时也不误报未�
             relevant = false;
             return { ok: true, value: null };
           },
-          execute: (ctx, plan, book) => resolveCounter(ctx, plan, book),
+          execute: (ctx, { use: plan, book }) => resolveCounter(ctx, plan, book),
         },
       },
     ],
@@ -393,15 +434,15 @@ it('最后询问席位的反制在准备中失效，未支付时也不误报未�
       materials: [],
     },
   };
-  const running = game.room.run('counter', async (ctx) =>
-    ctx.unwrap(
+  const running = game.room.run(
+    'counter',
+    async (ctx) =>
       await contestCounter(ctx, game.book, {
         root,
         subject: { kind: 'effect', effect: root },
         relevant: () => relevant,
         names: ['probe:prepared-counter'],
       }),
-    ),
   );
   const request = await nextRequest(game.room);
   expect(request.player).toBe('d');

@@ -23,7 +23,7 @@ it(
       }
     > = {};
     for (let seed = 1; seed <= (logging ? 8192 : 32); seed++) {
-      const game = createOfflineMatch(4, seed, 'standard:mechanics');
+      const game = createOfflineMatch({ count: 4, seed, preset: 'standard:mechanics' });
       await game.prepare();
       const first = game.progress!.next;
       const hand = [

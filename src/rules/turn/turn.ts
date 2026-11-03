@@ -1,7 +1,7 @@
 import { JointSelection } from '../../core/decisions/selection';
-import { immutable } from '../../core/model/value';
+import { immutable, isStringArray } from '../../core/model/value';
 import type { Change } from '../../core/model/state';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { parseCardChoice } from '../cards/book';
 import type { CardBook } from '../cards/book';
@@ -9,9 +9,15 @@ import { draw } from '../cards/draw';
 import { resolveJudgmentPhase } from '../cards/delayed';
 import { ownedCards } from '../cards/types';
 import type { CardChoice, UseTiming } from '../cards/types';
-import { payDiscard } from '../cards/discard';
+import { payDiscard } from '../costs/pay';
 import { isGameOver } from '../game/end';
-import { activeOffers, validateActive, activate } from '../skills/active';
+import {
+  activeOffers,
+  activeAvailable,
+  validateActive,
+  inspectActive,
+  activate,
+} from '../skills/active';
 import type { ActiveChoice } from '../skills/active';
 import { withLifetime, assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
@@ -77,7 +83,8 @@ export interface TurnResult {
   readonly reason: string | null;
   readonly phases: readonly PhaseResult[];
 }
-export type PhaseBody = (ctx: Context, phase: PhaseView, book: CardBook) => void | Promise<void>;
+/** 等待阶段体完成；阶段结果仍由阶段流程产生。 */
+export type PhaseBody = (ctx: Context, phase: PhaseView, book: CardBook) => unknown;
 const currentPhases = new WeakMap<Context['world'], PhaseView>();
 /** 只返回当前 World、当前祖先路径内仍存活的阶段；嵌套阶段返回最内层。 */
 export function currentPhase(ctx: Context): PhaseView | null {
@@ -250,75 +257,59 @@ export async function playPhase(ctx: Context, phase: PhaseView, book: CardBook):
       | {
           readonly choice: CardChoice;
           readonly targets: readonly string[];
+          readonly parameters?: unknown;
         }
     >({
       player: phase.owner,
       kind: 'play-action',
       prompt: '使用牌、发动技能，或结束出牌阶段',
-      data: null,
       describe,
       optional: true,
       available: () =>
-        book.offers(ctx, phase.owner, timing).length > 0 ||
-        activeOffers(ctx, book, phase).length > 0,
+        book.hasOffers(ctx, phase.owner, timing) || activeAvailable(ctx, book, phase),
       feedback: (input) => {
-        if (isRecord(input) && 'skill' in input) {
-          const checked = validateActive(ctx, book, phase, input);
-          return {
-            model: 'active',
-            complete: checked.ok,
-            reason: checked.ok ? '' : checked.reason,
-            targetCount: { min: 0, max: 0 },
-            fixedTargets: [],
-            targets: [],
-          };
+        if (isRecord(input) && 'instance' in input) {
+          return inspectActive(ctx, book, phase, input);
         }
-        if (
-          !isRecord(input) ||
-          !Array.isArray(input.targets) ||
-          !input.targets.every((id): id is string => typeof id === 'string')
-        )
-          return null;
+        if (!isRecord(input) || !isStringArray(input.targets)) return null;
         const choice = parseCardChoice(input.choice);
         return choice.ok
-          ? book.inspectUse(ctx, {
-              actor: phase.owner,
-              choice: choice.value,
-              targets: input.targets,
-              timing,
-            })
+          ? book
+              .useSelection(ctx, {
+                actor: phase.owner,
+                choice: choice.value,
+                timing,
+              })
+              .feedback?.({ cards: [], targets: input.targets })
           : null;
       },
       validate: (input) => {
-        if (isRecord(input) && 'skill' in input) return validateActive(ctx, book, phase, input);
-        if (
-          !isRecord(input) ||
-          !Array.isArray(input.targets) ||
-          !input.targets.every((target): target is string => typeof target === 'string')
-        )
+        if (isRecord(input) && 'instance' in input) return validateActive(ctx, book, phase, input);
+        if (!isRecord(input) || !isStringArray(input.targets))
           return { ok: false, reason: 'Expected card choice and targets.' };
         const choice = parseCardChoice(input.choice);
         if (!choice.ok) return choice;
-        const intent = { actor: phase.owner, choice: choice.value, targets: input.targets, timing };
-        const legal = book.validateUse(ctx, intent);
-        return legal.ok
-          ? { ok: true, value: { choice: choice.value, targets: input.targets } }
-          : legal;
+        const selected = book
+          .useSelection(ctx, { actor: phase.owner, choice: choice.value, timing })
+          .validate({ cards: [], targets: input.targets });
+        return selected.ok
+          ? { ok: true, value: { choice: choice.value, ...selected.value } }
+          : selected;
       },
     });
     if (answer.kind !== 'chosen') break;
-    if ('skill' in answer.value) {
-      const result = await activate(ctx, book, phase, answer.value);
-      if (result.kind === 'aborted') return ctx.abort(result.reason);
+    if ('instance' in answer.value) {
+      await activate(ctx, book, phase, answer.value);
+
       continue;
     }
-    const result = await book.use(ctx, {
+    await book.use(ctx, {
       actor: phase.owner,
       choice: answer.value.choice,
       targets: answer.value.targets,
       timing,
+      ...(answer.value.parameters === undefined ? {} : { parameters: answer.value.parameters }),
     });
-    if (result.kind === 'aborted') return ctx.abort(result.reason);
   }
 }
 
@@ -354,9 +345,7 @@ export async function defaultPhaseBody(
       if (!count) break;
       const model = new JointSelection({
         cards: () => selectable().map((id) => ({ id, label: ctx.world.card(id).name })),
-        targets: () => [],
         cardCount: { min: count, max: count },
-        targetCount: { min: 0, max: 0 },
       });
       const answer = await ctx.ask(model.decision(phase.owner, `弃置 ${count} 张手牌`));
       if (answer.kind === 'chosen')
@@ -387,88 +376,90 @@ export function runPhase(
   kind: PhaseKind,
   body: PhaseBody = defaultPhaseBody,
   turn: TurnView | null = null,
-): Promise<FlowResult<PhaseResult>> {
+): Promise<PhaseResult> {
   return ctx.flow('phase', async (host) => {
     const previous = readState(host.world, activePhase, activeTarget);
     let control: PhaseControl | null = null;
-    const result = await withLifetime(host, kind, async (child, lifetime): Promise<PhaseResult> => {
-      const phase = new PhaseControl(owner, kind, lifetime, turn, child);
-      const previousControl = currentPhases.get(child.world);
-      currentPhases.set(child.world, phase);
-      child.defer(() => {
-        if (previousControl) currentPhases.set(child.world, previousControl);
-        else currentPhases.delete(child.world);
-      });
-      child.defer(() => phase.close());
-      control = phase;
-      child.commit(
-        'phase.before',
-        [
-          stateChange(child, activePhase, activeTarget, {
-            id: phase.id,
-            owner,
-            kind,
-            stage: 'before',
-          }),
-        ],
-        phase.snapshot(),
-      );
-      if (turn && turn.owner === owner) {
-        const target = { owner, source: kind, lifetime: turn.lifetime };
-        const reason = readState(child.world, plannedSkip, target);
-        if (reason)
-          child.commit(
-            'phase.skip.planned',
-            [phase.skipChange(child, reason), stateChange(child, plannedSkip, target, null)],
-            { id: phase.id, owner, kind, reason },
-          );
-      }
-      await child.window(phaseBefore, phase, { subject: owner });
-      if (
-        !phase.skipped &&
-        (!child.world.player(owner).alive || turn?.ended || isGameOver(child.world))
-      )
-        phase.skip(
-          child,
-          !child.world.player(owner).alive
-            ? 'Owner no longer alive.'
-            : isGameOver(child.world)
-              ? 'Game finished.'
-              : 'Turn ended.',
+    const result = await host.attempt('phase.body', (at) =>
+      withLifetime(at, kind, async (child, lifetime): Promise<PhaseResult> => {
+        const phase = new PhaseControl(owner, kind, lifetime, turn, child);
+        const previousControl = currentPhases.get(child.world);
+        currentPhases.set(child.world, phase);
+        child.defer(() => {
+          if (previousControl) currentPhases.set(child.world, previousControl);
+          else currentPhases.delete(child.world);
+        });
+        child.defer(() => phase.close());
+        control = phase;
+        child.commit(
+          'phase.before',
+          [
+            stateChange(child, activePhase, activeTarget, {
+              id: phase.id,
+              owner,
+              kind,
+              stage: 'before',
+            }),
+          ],
+          phase.snapshot(),
         );
-      phase.start();
-      if (phase.skipped) {
-        child.commit('phase.skipped', [], phase.snapshot());
-        return { phase: phase.snapshot(), exit: 'skipped', reason: phase.snapshot().reason };
-      }
-      child.commit(
-        'phase.started',
-        [
-          stateChange(child, activePhase, activeTarget, {
-            id: phase.id,
-            owner,
-            kind,
-            stage: 'acting',
-          }),
-        ],
-        phase.snapshot(),
-      );
-      await child.window(phaseStarted, phase, { subject: owner });
-      phase.finishStart();
-      if (
-        !phase.replaced &&
-        child.world.player(owner).alive &&
-        !turn?.ended &&
-        !isGameOver(child.world)
-      )
-        await body(child, phase, book);
-      await child.window(phaseEnding, phase, { subject: owner });
-      return {
-        phase: phase.snapshot(),
-        exit: phase.replaced ? 'replaced' : 'completed',
-        reason: phase.snapshot().reason,
-      };
-    });
+        if (turn && turn.owner === owner) {
+          const target = { owner, source: kind, lifetime: turn.lifetime };
+          const reason = readState(child.world, plannedSkip, target);
+          if (reason)
+            child.commit(
+              'phase.skip.planned',
+              [phase.skipChange(child, reason), stateChange(child, plannedSkip, target, null)],
+              { id: phase.id, owner, kind, reason },
+            );
+        }
+        await child.window(phaseBefore, phase, { subject: owner });
+        if (
+          !phase.skipped &&
+          (!child.world.player(owner).alive || turn?.ended || isGameOver(child.world))
+        )
+          phase.skip(
+            child,
+            !child.world.player(owner).alive
+              ? 'Owner no longer alive.'
+              : isGameOver(child.world)
+                ? 'Game finished.'
+                : 'Turn ended.',
+          );
+        phase.start();
+        if (phase.skipped) {
+          child.commit('phase.skipped', [], phase.snapshot());
+          return { phase: phase.snapshot(), exit: 'skipped', reason: phase.snapshot().reason };
+        }
+        child.commit(
+          'phase.started',
+          [
+            stateChange(child, activePhase, activeTarget, {
+              id: phase.id,
+              owner,
+              kind,
+              stage: 'acting',
+            }),
+          ],
+          phase.snapshot(),
+        );
+        await child.window(phaseStarted, phase, { subject: owner });
+        phase.finishStart();
+        if (
+          !phase.replaced &&
+          child.world.player(owner).alive &&
+          !turn?.ended &&
+          !isGameOver(child.world)
+        )
+          await body(child, phase, book);
+        await child.window(phaseEnding, phase, { subject: owner });
+        return {
+          phase: phase.snapshot(),
+          exit: phase.replaced ? 'replaced' : 'completed',
+          reason: phase.snapshot().reason,
+        };
+      }),
+    );
     const phase = (control as PhaseControl | null)?.snapshot();
     if (!phase) throw new Error('Phase did not initialize.');
     const summary: PhaseResult =
@@ -487,7 +478,7 @@ export function runTurn(
   book: CardBook,
   owner: string,
   options: TurnOptions = {},
-): Promise<FlowResult<TurnResult>> {
+): Promise<TurnResult> {
   const phases = immutable(options.phases ?? phaseKinds);
   const origin = immutable(options.origin ?? { kind: 'normal' });
   const body = options.body ?? defaultPhaseBody;
@@ -495,67 +486,70 @@ export function runTurn(
     throw new Error('Invalid turn plan.');
   return ctx.flow('turn', async (host) => {
     const previous = readState(host.world, activeTurn, activeTarget);
-    const result = await withLifetime(host, 'turn', async (child, lifetime) => {
-      const target = { owner, source: null, lifetime };
-      let finalReason: string | null = null;
-      child.defer(() => {
-        finalReason = readState(child.world, turnEnd, target);
-      });
-      const turn: TurnView = Object.freeze({
-        id: lifetime.id,
-        owner,
-        lifetime,
-        origin,
-        phases,
-        get ended() {
-          return this.reason !== null;
-        },
-        get reason() {
-          return lifetime.active ? readState(child.world, turnEnd, target) : finalReason;
-        },
-        end: (at: Context, reason: string) => {
-          assertLifetime(at, lifetime);
-          if (!reason) throw new Error('Ending a turn requires a reason.');
-          if (readState(at.world, turnEnd, target) !== null) return;
-          at.commit('turn.end.declared', [stateChange(at, turnEnd, target, reason)], {
-            id: lifetime.id,
-            owner,
-            reason,
-          });
-        },
-        skipNext: (at: Context, kind: PhaseKind, reason: string) => {
-          assertLifetime(at, lifetime);
-          if (!phaseKinds.includes(kind) || !reason) throw new Error('Invalid planned phase skip.');
-          at.commit(
-            'phase.skip.scheduled',
-            [stateChange(at, plannedSkip, { owner, source: kind, lifetime }, reason)],
-            { turn: lifetime.id, owner, kind, reason },
-          );
-        },
-      });
-      child.commit(
-        'turn.started',
-        [stateChange(child, activeTurn, activeTarget, { id: turn.id, owner, origin })],
-        { id: turn.id, owner, origin, phases },
-      );
-      await child.window(turnStarted, turn, { subject: owner });
-      const results: PhaseResult[] = [];
-      for (const kind of phases) {
-        if (turn.ended || !child.world.player(owner).alive || isGameOver(child.world)) break;
-        const phase = await runPhase(child, book, owner, kind, body, turn);
-        if (phase.kind === 'aborted') return child.abort(phase.reason);
-        results.push(phase.value);
-      }
-      await child.window(turnEnding, turn, { subject: owner });
-      return immutable({
-        id: turn.id,
-        owner,
-        origin,
-        ended: turn.ended,
-        reason: turn.reason,
-        phases: results,
-      });
-    });
+    const result = await host.attempt('turn.body', (at) =>
+      withLifetime(at, 'turn', async (child, lifetime) => {
+        const target = { owner, source: null, lifetime };
+        let finalReason: string | null = null;
+        child.defer(() => {
+          finalReason = readState(child.world, turnEnd, target);
+        });
+        const turn: TurnView = Object.freeze({
+          id: lifetime.id,
+          owner,
+          lifetime,
+          origin,
+          phases,
+          get ended() {
+            return this.reason !== null;
+          },
+          get reason() {
+            return lifetime.active ? readState(child.world, turnEnd, target) : finalReason;
+          },
+          end: (at: Context, reason: string) => {
+            assertLifetime(at, lifetime);
+            if (!reason) throw new Error('Ending a turn requires a reason.');
+            if (readState(at.world, turnEnd, target) !== null) return;
+            at.commit('turn.end.declared', [stateChange(at, turnEnd, target, reason)], {
+              id: lifetime.id,
+              owner,
+              reason,
+            });
+          },
+          skipNext: (at: Context, kind: PhaseKind, reason: string) => {
+            assertLifetime(at, lifetime);
+            if (!phaseKinds.includes(kind) || !reason)
+              throw new Error('Invalid planned phase skip.');
+            at.commit(
+              'phase.skip.scheduled',
+              [stateChange(at, plannedSkip, { owner, source: kind, lifetime }, reason)],
+              { turn: lifetime.id, owner, kind, reason },
+            );
+          },
+        });
+        child.commit(
+          'turn.started',
+          [stateChange(child, activeTurn, activeTarget, { id: turn.id, owner, origin })],
+          { id: turn.id, owner, origin, phases },
+        );
+        await child.window(turnStarted, turn, { subject: owner });
+        const results: PhaseResult[] = [];
+        for (const kind of phases) {
+          if (turn.ended || !child.world.player(owner).alive || isGameOver(child.world)) break;
+          const phase = await runPhase(child, book, owner, kind, body, turn);
+
+          results.push(phase);
+        }
+        await child.window(turnEnding, turn, { subject: owner });
+        return immutable({
+          id: turn.id,
+          owner,
+          origin,
+          ended: turn.ended,
+          reason: turn.reason,
+          phases: results,
+        });
+      }),
+    );
     host.commit('turn.finished', [stateChange(host, activeTurn, activeTarget, previous)], {
       owner,
       exit: result.kind,

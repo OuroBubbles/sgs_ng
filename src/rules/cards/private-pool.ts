@@ -1,8 +1,7 @@
 import { immutable } from '../../core/model/value';
 import type { WorldReader } from '../../core/model/state';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineState, stateChange } from '../state/state';
-import { withLifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
 import { withProcessing } from './processing';
 import type { Processing, ProcessingCleanup } from './processing';
@@ -39,30 +38,31 @@ export function privateCardPools(
     });
 }
 
-/** 私取牌堆顶并暂存：不是摸牌，不进入手牌，也不公开；默认余牌弃置，可指定领域善后。 */
+/** 私取牌堆顶并暂存；可见者状态归处理区生存期所有，默认余牌弃置，可指定领域善后。 */
 export function withPrivateTopCards<T>(
   ctx: Context,
   request: PrivatePoolInput,
   body: (ctx: Context, pool: Processing) => T | Promise<T>,
   cleanup: string | ProcessingCleanup = 'discard',
-): Promise<FlowResult<T>> {
+): Promise<T> {
   const input = immutable(request);
   if (!Number.isSafeInteger(input.count) || input.count < 0 || !input.reason)
     throw new Error('Invalid private pool request.');
   ctx.world.player(input.player);
-  return withLifetime(ctx, 'private-pool', async (host, lifetime) => {
-    const result = await withProcessing(host, [], cleanup, async (at, pool) => {
+  return withProcessing(
+    ctx,
+    [],
+    async (at, pool) => {
       const live = () => at.world.player(input.player).alive && !isGameOver(at.world);
       if (live()) {
         if (
           at.world.zone('draw').cards.length < input.count &&
           at.world.zone('discard').cards.length
         ) {
-          const shuffled = await reshuffle(at);
-          if (shuffled.kind === 'aborted') return at.abort(shuffled.reason);
+          await reshuffle(at);
         }
         const cards = live() ? at.world.zone('draw').cards.slice(0, input.count) : [];
-        const moved = await moveCards(
+        await moveCards(
           at,
           cards.length ? [{ cards, from: 'draw', to: pool.zone, place: 'bottom' }] : [],
           input.reason,
@@ -73,17 +73,15 @@ export function withPrivateTopCards<T>(
               stateChange(
                 at,
                 privatePool,
-                { owner: input.player, source: pool.zone, lifetime },
+                { owner: input.player, source: pool.zone, lifetime: pool.lifetime },
                 true,
               ),
             ],
           },
         );
-        if (moved.kind === 'aborted') return at.abort(moved.reason);
       }
       return body(at, pool);
-    });
-    if (result.kind === 'aborted') return host.abort(result.reason);
-    return result.value;
-  });
+    },
+    cleanup,
+  );
 }

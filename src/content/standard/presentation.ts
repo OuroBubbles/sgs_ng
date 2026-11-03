@@ -1,5 +1,6 @@
 import type { CardKind } from '../../core/view/table';
-import type { CardPresentation } from '../package';
+import type { CardPresentation } from '../catalog';
+import { standardCardMedia } from './media';
 
 const descriptions: Readonly<
   Record<string, { readonly kind: CardKind; readonly description: string }>
@@ -146,5 +147,10 @@ const descriptions: Readonly<
 };
 
 export const standardCardViews: readonly CardPresentation[] = Object.entries(descriptions).map(
-  ([id, view]) => ({ id, kind: view.kind, description: view.description }),
+  ([id, view]) => ({
+    id,
+    kind: view.kind,
+    description: view.description,
+    ...standardCardMedia(id),
+  }),
 );

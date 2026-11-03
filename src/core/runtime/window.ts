@@ -9,14 +9,15 @@ export interface WindowType<T> {
 }
 
 export function defineWindow<T>(id: string, groups: readonly string[] = ['main']): WindowType<T> {
+  const fixedGroups = [...groups];
   if (
     !id ||
-    !groups.length ||
-    groups.some((group) => !group) ||
-    new Set(groups).size !== groups.length
+    !fixedGroups.length ||
+    fixedGroups.some((group) => !group) ||
+    new Set(fixedGroups).size !== fixedGroups.length
   )
     throw new Error('Window requires an ID and distinct named groups.');
-  return Object.freeze({ id, groups: Object.freeze([...groups]) });
+  return Object.freeze({ id, groups: Object.freeze(fixedGroups) });
 }
 
 /** 本窗口内的一次独立结算；index 从 1 开始，total 在该候选入队时固定。 */
@@ -35,7 +36,23 @@ export interface Trigger<T> {
   readonly order?: 'automatic' | 'choose';
   readonly times?: (ctx: Context, payload: T) => number;
   readonly eligible: (ctx: Context, payload: T, occurrence: TriggerOccurrence) => boolean;
-  readonly run: (ctx: Context, payload: T, occurrence: TriggerOccurrence) => void | Promise<void>;
+  /** 等待普通规则操作完整结束；返回值本身不参与窗口裁决。 */
+  readonly run: (ctx: Context, payload: T, occurrence: TriggerOccurrence) => unknown;
+}
+
+/** 目录补充展示标签时，复制声明字段并保留原方法与接收者，不冻结作者对象。 */
+export function labelTrigger<T>(trigger: Trigger<T>, label: string): Trigger<T> {
+  const { id, owner, group, order, times, eligible, run } = trigger;
+  return Object.freeze({
+    id,
+    label,
+    owner,
+    ...(group === undefined ? {} : { group }),
+    ...(order === undefined ? {} : { order }),
+    ...(times === undefined ? {} : { times: times.bind(trigger) }),
+    eligible: eligible.bind(trigger),
+    run: run.bind(trigger),
+  });
 }
 
 export interface WindowOptions {

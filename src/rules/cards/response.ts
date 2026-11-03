@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
@@ -53,13 +53,9 @@ export interface ResponseOpportunity {
   readonly result: ResponseResult | null;
   available(ctx: Context): boolean;
   canProvide(ctx: Context, choice: CardChoice): boolean;
-  provide(ctx: Context, choice: CardChoice): Promise<FlowResult<ResponseResult>>;
+  provide(ctx: Context, choice: CardChoice): Promise<ResponseResult>;
   /** 委托可收窄允许名称，但不能扩大原请求或创建空请求。 */
-  delegate(
-    ctx: Context,
-    actor: string,
-    names?: readonly string[],
-  ): Promise<FlowResult<ResponseResult>>;
+  delegate(ctx: Context, actor: string, names?: readonly string[]): Promise<ResponseResult>;
 }
 export interface ResponseIntent {
   readonly actor: string;
@@ -75,13 +71,13 @@ export type ResponseConsumer = (
   ctx: Context,
   response: Extract<ResponseResult, { kind: 'responded' }>,
   available: (ctx: Context) => boolean,
-) => Promise<FlowResult<ResponseResult>>;
+) => Promise<ResponseResult>;
 type CommitResponse = (
   ctx: Context,
   input: ResponseIntent,
   available: (ctx: Context) => boolean,
   consume?: ResponseConsumer,
-) => Promise<FlowResult<ResponseResult>>;
+) => Promise<ResponseResult>;
 interface ParentResponse {
   readonly id: string;
   readonly beneficiary: string;
@@ -101,7 +97,7 @@ export function requestResponse(
   parent?: ParentResponse,
   purpose: Purpose = 'response',
   consume?: ResponseConsumer,
-): Promise<FlowResult<ResponseResult>> {
+): Promise<ResponseResult> {
   const requested = immutable(requestedNames);
   const to = effectReference(target);
   const beneficiary = parent?.beneficiary ?? actor;
@@ -118,7 +114,7 @@ export function requestResponse(
       names.length > 0 &&
       at.world.player(actor).alive &&
       at.world.player(to.target).alive &&
-      (parent?.live(at) ?? true);
+      (parent === undefined || at.query(() => parent.live(at)));
     const pending = (at: Context) => live(at) && supplied === null;
     const available = (at: Context) => pending(at) && !busy;
     const canProvide = (at: Context, choice: CardChoice) =>
@@ -178,9 +174,9 @@ export function requestResponse(
               live,
               consume,
             );
-            if (result.kind === 'aborted') return provider.abort(result.reason);
-            if (isResponseSatisfied(result.value)) supplied = immutable(result.value);
-            return result.value;
+
+            if (isResponseSatisfied(result)) supplied = immutable(result);
+            return result;
           } finally {
             busy = false;
           }
@@ -232,10 +228,8 @@ export function requestResponse(
                         },
                         (current) => live(current) && materialsAvailable(current),
                       );
-                      if (result.kind === 'aborted') return handoff.abort(result.reason);
-                      return result.value.kind === 'used'
-                        ? { ...result.value, supplied: response }
-                        : result.value;
+
+                      return result.kind === 'used' ? { ...result, supplied: response } : result;
                     })
                 : consume;
             const result = await requestResponse(
@@ -254,20 +248,18 @@ export function requestResponse(
               'response',
               accept,
             );
-            if (result.kind === 'aborted') return delegation.abort(result.reason);
-            if (isResponseSatisfied(result.value)) {
-              supplied = immutable(result.value);
+
+            if (isResponseSatisfied(result)) {
+              supplied = immutable(result);
               delegation.commit('response.delegated', [], {
                 request: lifetime.id,
                 actor,
                 beneficiary,
-                provider:
-                  result.value.kind === 'used' ? result.value.supplied?.actor : result.value.actor,
-                response:
-                  result.value.kind === 'used' ? result.value.supplied?.id : result.value.id,
-                result: result.value,
+                provider: result.kind === 'used' ? result.supplied?.actor : result.actor,
+                response: result.kind === 'used' ? result.supplied?.id : result.id,
+                result: result,
               });
-              return result.value;
+              return result;
             }
             return { kind: 'unavailable' };
           } finally {
@@ -286,13 +278,9 @@ export function requestResponse(
       actors,
       parent: parent?.id ?? null,
     };
-    const offers = () =>
-      book.offers(
-        child,
-        actor,
-        purpose === 'use' ? { kind: 'response', opportunity: useOpportunity } : 'response',
-        names,
-      );
+    const offerPurpose =
+      purpose === 'use' ? { kind: 'response' as const, opportunity: useOpportunity } : 'response';
+    const offers = () => book.offers(child, actor, offerPurpose, names);
     child.commit('response.requested', [], snapshot);
     if (available(child))
       await child.window(responseRequested, opportunity, { subject: actor, active: pending });
@@ -304,7 +292,6 @@ export function requestResponse(
         player: actor,
         kind: 'card-response',
         prompt: `请${actor === beneficiary ? '' : `为 ${beneficiary} `}${purpose === 'use' ? '使用' : '打出'}${names.map((name) => book.definition(name).label).join('/')}`,
-        data: null,
         describe: () => ({
           to: { useId: to.useId, effectId: to.effectId },
           names,
@@ -313,7 +300,7 @@ export function requestResponse(
           offers: offers(),
         }),
         optional: true,
-        available: () => available(child) && offers().length > 0,
+        available: () => available(child) && book.hasOffers(child, actor, offerPurpose, names),
         validate: (input) => {
           const parsed = parseCardChoice(input);
           return !parsed.ok
@@ -327,8 +314,8 @@ export function requestResponse(
         result = { kind: answer.kind === 'unavailable' ? 'unavailable' : 'declined' };
       else {
         const provided = await opportunity.provide(child, answer.value);
-        if (provided.kind === 'aborted') return child.abort(provided.reason);
-        result = provided.value;
+
+        result = provided;
       }
     }
     child.commit('response.request.finished', [], { ...snapshot, result });

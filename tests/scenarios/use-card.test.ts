@@ -10,8 +10,9 @@ import {
   withLifetime,
   used,
   costPaid,
+  runPhase,
 } from '../../src/sdk';
-import type { CardEffect, UsePlanView, UseSnapshot } from '../../src/sdk';
+import type { CardDefinition, CardEffect, Context, UsePlanView, UseSnapshot } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -23,6 +24,97 @@ const slash = {
   timing: { kind: 'effect' },
 } as const;
 const stringMatcher: unknown = expect.any(String);
+
+it('目标与材料空槽返回不可用，不故障、不宣告或支付', async () => {
+  for (const field of ['targets', 'materials'] as const) {
+    const game = cardGame();
+    const missing = new Array<string>(1);
+    const result = await use(game, {
+      ...slash,
+      targets: field === 'targets' ? missing : ['b'],
+      choice:
+        field === 'targets'
+          ? slash.choice
+          : {
+              kind: 'generated',
+              reason: 'probe',
+              materials: missing,
+              face: { name: 'standard:slash', suit: 'none', color: 'none', rank: 0 },
+            },
+    });
+    expect(result).toMatchObject({ kind: 'resolved', value: { kind: 'unavailable' } });
+    expect(game.room.status).toBe('ready');
+    expect(game.room.world.position('slash1')).toBe('a:hand');
+    expect(game.room.history.facts()).toEqual([]);
+    expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
+  }
+});
+
+it('自动目标过滤、用牌条件和策略不能吞掉异步结果或留下晚到写入', async () => {
+  for (const field of [
+    'target',
+    'fixedTargets',
+    'canUse',
+    'usage',
+    'prohibitUse',
+    'prohibitResponse',
+  ] as const) {
+    let lateError = '';
+    const invalid = async (ctx: Context) => {
+      await Promise.resolve();
+      try {
+        ctx.commit('invalid.card-query.late', [], null);
+      } catch (error) {
+        lateError = (error as Error).message;
+      }
+      return false;
+    };
+    const policyField =
+      field === 'usage' || field === 'prohibitUse' || field === 'prohibitResponse';
+    const definition = {
+      id: 'probe:pure',
+      type: 'basic',
+      label: '纯查询',
+      response: true,
+      use: {
+        count: { min: 0, max: 0 },
+        usage: { key: 'probe', max: 1 },
+        target: () => true,
+        fixedTargets: () => ['b'],
+        canUse: () => null,
+        resolve: () => undefined,
+        ...(policyField ? {} : { [field]: invalid }),
+      },
+    } as unknown as CardDefinition;
+    const game = cardGame({
+      definitions: [definition],
+      hands: { a: [{ ...card('probe', 'slash'), name: definition.id }] },
+      policy: policyField ? { [field]: invalid } : {},
+    });
+    await expect(
+      game.room.run('card-query', (ctx) =>
+        runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
+          if (field === 'prohibitResponse')
+            game.book.build(at, 'a', { kind: 'physical', card: 'probe' }, 'response');
+          else
+            game.book.validateUse(at, {
+              actor: 'a',
+              choice: { kind: 'physical', card: 'probe' },
+              targets: [],
+              timing: phase.playTiming(),
+            });
+        }),
+      ),
+    ).rejects.toThrow('Queries cannot await');
+    await Promise.resolve();
+    expect(lateError).toContain('Queries cannot await');
+    expect(game.room.status).toBe('faulted');
+    expect(game.room.world.position('probe')).toBe('a:hand');
+    expect(game.room.history.facts('card.used')).toEqual([]);
+    expect(game.room.history.facts('invalid.card-query.late')).toEqual([]);
+    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+  }
+});
 
 it('杀宣告支付、伤害关联、收束与处理区善后完整结束', async () => {
   const game = cardGame();
@@ -119,7 +211,7 @@ it('出牌阶段杀次数只在宣告时记录，每次额外阶段有独立次�
         const timing = { kind: 'play', owner: 'a', phase } as const;
         expect(
           await game.book.use(play, { ...slash, choice: { kind: 'physical', card: id }, timing }),
-        ).toMatchObject({ value: { kind: 'used' } });
+        ).toMatchObject({ kind: 'used' });
         const limit = { key: 'slash', source: 'card-use', lifetime: phase, max: 1 };
         expect(used(play.world, 'a', limit)).toBe(1);
         expect(
@@ -133,7 +225,7 @@ it('出牌阶段杀次数只在宣告时记录，每次额外阶段有独立次�
             },
             timing,
           }),
-        ).toMatchObject({ value: { kind: 'unavailable', reason: 'Usage limit reached.' } });
+        ).toMatchObject({ kind: 'unavailable', reason: 'Usage limit reached.' });
       });
   });
   expect(game.room.world.player('b').hp).toBe(2);
@@ -147,14 +239,26 @@ it('冒用其他角色的出牌阶段不能宣告', async () => {
     withLifetime(ctx, 'play', async (play, phase) => {
       expect(
         await game.book.use(play, { ...slash, timing: { kind: 'play', owner: 'b', phase } }),
-      ).toMatchObject({ value: { kind: 'unavailable' } });
+      ).toMatchObject({ kind: 'unavailable' });
     }),
   );
   expect(game.room.history.facts('card.used')).toEqual([]);
 });
 
 it('技能添加的目标各自响应，防止一个目标不防止整张牌', async () => {
-  const game = cardGame({ hands: { b: [card('jink', 'jink')] }, policy: { attackRange: () => 3 } });
+  class Policy {
+    #range = 3;
+
+    attackRange() {
+      return this.#range;
+    }
+  }
+  const game = cardGame({ hands: { b: [card('jink', 'jink')] }, policy: new Policy() });
+  await game.room.run('range', (ctx) => {
+    const built = game.book.build(ctx, 'a', slash.choice, 'use');
+    if (!built.ok) throw new Error(built.reason);
+    expect(game.book.attackRange(ctx, 'a', built.value)).toBe(3);
+  });
   game.room.on(targetsConfirming, {
     id: 'extra',
     owner: 'a',
@@ -307,10 +411,19 @@ it('关闭的计划/已结算效果不能继续改写，事实快照保持冻结
 });
 
 it('需要两张闪时，第一张已经支付但不足以防止伤害', async () => {
+  class Policy {
+    #count = 2;
+
+    responseTimes() {
+      return this.#count;
+    }
+  }
+  const policy = new Policy();
   const game = cardGame({
     hands: { b: [card('jink', 'jink')] },
-    policy: { responseTimes: () => 2 },
+    policy,
   });
+  policy.responseTimes = () => 0;
   const running = use(game, slash);
   const request = await nextRequest(game.room);
   game.room.decisions.submit(request.id, request.token, { kind: 'physical', card: 'jink' });
@@ -438,9 +551,25 @@ it('多个效果重复取消同一目标是幂等的，不导致已付费对局�
 });
 
 it('距离修正经具名查询参与同一目标验证，不需要特殊杀实现', async () => {
-  const game = cardGame({
-    policy: { distance: (_ctx, from, _to, base) => (from === 'a' ? base - 1 : base) },
+  class Policy {
+    #discount = 1;
+
+    distance(ctx: Context, from: string, _to: string, base: number) {
+      return from === 'a' && ctx.world.player(from).hp === 4 ? base - this.#discount : base;
+    }
+  }
+  const policy = new Policy();
+  const game = cardGame({ policy });
+  policy.distance = () => 99;
+  expect(Object.isFrozen(policy)).toBe(false);
+  await game.room.run('live-policy', (ctx) => {
+    expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
+    ctx.commit('wound', [{ kind: 'vitality', player: 'a', hp: 3 }], null);
+    expect(game.book.distance(ctx, 'a', 'c')).toBe(2);
+    ctx.commit('recover', [{ kind: 'vitality', player: 'a', hp: 4 }], null);
+    expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
   });
   expect(await use(game, { ...slash, targets: ['c'] })).toMatchObject({ value: { kind: 'used' } });
   expect(game.room.world.player('c').hp).toBe(3);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });

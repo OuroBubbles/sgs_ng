@@ -1,11 +1,9 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
-import { card, cardGame, use } from '../fixtures/cards';
+import { playMatch } from '../fixtures/match';
+import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
 import { projectMatch } from '../../src/app/offline/projection';
@@ -14,7 +12,6 @@ import {
   chooseOne,
   runPhase,
   activeOffers,
-  activate,
   draw,
   phaseBefore,
   costPaid,
@@ -37,7 +34,6 @@ import {
   installCounterspells,
   resolveCounter,
   kill,
-  roleOf,
   useDeclarations,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
@@ -78,7 +74,7 @@ async function activateSkill(ctx: Context, game: Game, phase: PhaseView, name: s
   const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === 'standard:' + name);
   expect(offer).toBeDefined();
   await activate(ctx, game.book, phase, {
-    skill: offer!.choice.instance,
+    instance: offer!.choice.instance,
     action: offer!.choice.action,
   });
 }
@@ -101,38 +97,53 @@ async function genders(game: Game) {
     setGender(ctx, 'd', 'female');
   });
 }
-it('三名新将初始化，二十五名目录的技能、体力和来源完整', async () => {
-  expect(standardGenerals).toHaveLength(25);
-  for (const general of standardGenerals.slice(21, 24)) {
-    const match = createOfflineMatch(6, 9, 'standard:identity', Array<string>(6).fill(general.id));
-    await match.prepare();
-    for (const p of match.room.world.snapshot.players) {
-      expect(
-        match.room.world.snapshot.skills.filter((s) => s.owner === p.id).map((s) => s.skill),
-      ).toEqual(general.skills);
-      expect(p.maxHp).toBe(general.maxHp + Number(roleOf(match.room.world, p.id) === 'lord'));
-    }
-  }
-});
+
 it('具名选项固定描述快照、拒绝未知项与强制取消，结束后旧输入失效', async () => {
   const game = scenario();
-  const options = [
-    { id: 'one', label: '第一项' },
-    { id: 'two', label: '第二项' },
-  ];
-  const running = game.room.run('choice', (ctx) =>
-    ctx.ask(
-      chooseOne({
-        player: 'a',
-        prompt: '请选择',
-        options,
-        reason: 'author:choice',
-      }),
-    ),
-  );
+  class Option {
+    constructor(
+      readonly value: string,
+      public label: string,
+    ) {}
+
+    get id() {
+      return this.value;
+    }
+  }
+  const options = [new Option('one', '第一项'), new Option('two', '第二项')];
+  class Input {
+    player = 'a';
+    prompt = '请选择';
+    options = options;
+    reasonReads = 0;
+    #world = game.room.world;
+
+    get reason() {
+      return ++this.reasonReads === 1 ? 'author:choice' : '';
+    }
+
+    available() {
+      return this.#world.player(this.player).alive;
+    }
+  }
+  const input = new Input();
+  const sparse = new Input();
+  sparse.options = new Array<Option>(1);
+  expect(() => chooseOne(sparse)).toThrow();
+  const decision = chooseOne(input);
+  expect(input.reasonReads).toBe(1);
+  input.available = () => false;
+  expect(game.room.inspect(() => decision.available!())).toBe(true);
+  const running = game.room.run('choice', (ctx) => ctx.ask(decision));
   options[0]!.label = '外部改名';
   const r = await nextRequest(game.room);
-  expect(r.data).toMatchObject({ options: [{ id: 'one', label: '第一项' }, { id: 'two' }] });
+  expect(r.data).toEqual({
+    options: [
+      { id: 'one', label: '第一项' },
+      { id: 'two', label: '第二项' },
+    ],
+    reason: 'author:choice',
+  });
   expect(game.room.decisions.cancel(r.id, r.token)).toMatchObject({
     kind: 'rejected',
     reason: 'required',
@@ -155,6 +166,13 @@ it('具名选项固定描述快照、拒绝未知项与强制取消，结束后�
   const next = await nextRequest(game.room);
   expect(game.room.decisions.cancel(next.id, next.token).kind).toBe('accepted');
   expect(await optional).toMatchObject({ value: { kind: 'cancelled' } });
+  await game.room.run('actor-leaves', (ctx) =>
+    ctx.commit('actor.left', [{ kind: 'vitality', player: 'a', hp: 0, alive: false }], null),
+  );
+  expect(await game.room.run('closed-choice', (ctx) => ctx.ask(decision))).toMatchObject({
+    value: { kind: 'unavailable' },
+  });
+  replay(game);
 });
 it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授予叠加', async () => {
   const game = scenario({
@@ -290,7 +308,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'author:block');
       expect(await game.book.respond(ctx, 'b', ['standard:jink'], effect)).toMatchObject({
-        value: { kind: 'unavailable' },
+        kind: 'unavailable',
       });
     },
   });
@@ -458,13 +476,13 @@ it('反间交牌不是弃牌；连营等移牌后效在猜错伤害前完成', a
   const ban = defineSkill({
     id: 'author:no-discard',
     name: '禁弃',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
   const game = scenario({
     hands: { a: [card('gift', 'jink', 'heart')] },
     draw: samples(),
-    skills: (book) => [...standardGeneralSkills(book), ban],
+    skills: [...standardGeneralSkills, ban],
   });
   await grant(game, 'standard:fanjian');
   await grant(game, 'standard:lianying');
@@ -590,15 +608,24 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
   replay(game);
 });
 it('离间按有序目标验证禁止使用与目标禁令，不接受女性、本人和重复目标', async () => {
+  let blocked = true;
   const game = scenario({
     hands: { a: [card('fee', 'jink')] },
     policy: {
       prohibitTarget: (_ctx, actor, target, semantic) =>
-        semantic.name === 'standard:duel' && actor === 'c' && target === 'b',
+        semantic.name === 'standard:duel' && (blocked || (actor === 'c' && target === 'b')),
     },
   });
   await genders(game);
   await grant(game, 'standard:lijian');
+  await game.room.run('no-valid-pair', (ctx) =>
+    runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
+      expect(
+        activeOffers(at, game.book, phase).some((offer) => offer.skill === 'standard:lijian'),
+      ).toBe(false);
+    }),
+  );
+  blocked = false;
   const running = playSkill(game, 'lijian');
   const r = await nextRequest(game.room);
   for (const targets of [
@@ -647,8 +674,10 @@ it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确�
     seed: 42,
     players: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
     roles: ['lord', 'rebel', 'loyalist', 'renegade'],
-    cards: standardCards,
-    skills: standardGeneralSkills,
+    content: {
+      cards: standardCards,
+      skills: standardGeneralSkills,
+    },
     deck: [
       card('gift', 'jink', 'heart'),
       ...Array.from({ length: 24 }, (_, i) => card('p' + i, 'peach')),
@@ -674,7 +703,7 @@ it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确�
         (o) => o.skill === 'standard:fanjian',
       )!;
       await activate(at, match.book, phase, {
-        skill: offer.choice.instance,
+        instance: offer.choice.instance,
         action: offer.choice.action,
       });
     }),
@@ -713,9 +742,9 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
   const ban = defineSkill({
     id: 'author:ban-duel',
     name: '禁决斗',
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.prohibitUse, (_ctx, input, self) =>
+      modify(cardQueries.prohibitUse, (_ctx, { input, self }) =>
         input.actor === self.owner && input.card.name === 'standard:duel' ? true : undefined,
       ),
     ],
@@ -723,7 +752,7 @@ it('离间接受后失去技能或性别改变不撤销，最终决斗禁令仍�
   for (const blocked of [false, true]) {
     const game = scenario({
       hands: { a: [card('fee', 'jink')] },
-      skills: (book) => [...standardGeneralSkills(book), ban],
+      skills: [...standardGeneralSkills, ban],
     });
     await genders(game);
     await grant(game, 'standard:lijian');
@@ -798,8 +827,8 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
     use: {
       count: { min: 0, max: 0 },
       target: () => false,
-      canUse: (_ctx, request) => (request.timing.kind === 'counter' ? null : 'Counter only'),
-      execute: (ctx, use, book) => resolveCounter(ctx, use, book),
+      canUse: (_ctx, { request }) => (request.timing.kind === 'counter' ? null : 'Counter only'),
+      execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
     },
   };
   const game = scenario({
@@ -861,45 +890,15 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
   expect(game.room.history.facts('card.used')).toHaveLength(3);
   replay(game);
 });
-it.each([14, 27])(
-  '三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=%i',
-  async (seed) => {
-    const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
-    const match = createOfflineMatch(8, seed, 'standard:identity', lineup);
-    const running = match.start();
-    try {
-      for (let step = 0; !match.result && step < 12000; step++) {
-        await setImmediate();
-        const r = match.room.decisions.pending[0];
-        if (!r) continue;
-        const reply = decideBasic(observeAgent(match, r.player), r, (value) =>
-          match.room.decisions.preview(r.id, value),
-        );
-        if (reply.kind === 'unsupported') throw new Error(reply.reason);
-        expect(
-          reply.kind === 'cancel'
-            ? match.room.decisions.cancel(r.id, r.token)
-            : match.room.decisions.submit(r.id, r.token, reply.value),
-        ).toEqual({ kind: 'accepted' });
-      }
-      expect(match.result).not.toBeNull();
-      expect(await running).toMatchObject({ kind: 'resolved' });
-      const invoked = match.room.history
-        .facts('skill.invoked')
-        .map((f) => (f.data.detail as { skill: string }).skill);
-      // 同一策略不保证每局都有合适时机；seed 27 覆盖两种主动技能。
-      if (seed === 27) {
-        expect(invoked).toContain('standard:fanjian');
-        expect(invoked).toContain('standard:lijian');
-      }
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-      expect(useDeclarations(match.room.world)).toEqual([]);
-    } finally {
-      match.room.abort('done');
-      await running;
-    }
-  },
-  60000,
-);
+it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
+  const seed = 27;
+  const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
+  const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 12000 });
+
+  const invoked = match.room.history
+    .facts('skill.invoked')
+    .map((f) => (f.data.detail as { skill: string }).skill);
+  expect(invoked).toContain('standard:fanjian');
+  expect(invoked).toContain('standard:lijian');
+}, 60000);

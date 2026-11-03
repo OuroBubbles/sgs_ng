@@ -9,7 +9,7 @@
 查询给修正函数的 [DiscardQuery](../src/rules/cards/discard.ts) 包括区域、当前牌面与材料。card 可以是实体牌 ID，也可以是逻辑延时牌 ID：延时牌按语义牌面查询，materials 表示实时剩余材料，零材料仍有身份。延时牌的材料不能作为独立牌绕过权限；材料已部分离场、附件善后尚未执行的过渡状态也保持整体身份。权限不代替具体技能的区域、目标、距离或数量条件，这些仍由调用者提供。
 
 ```ts
-modify(cardQueries.prohibitDiscard, (_ctx, input, self) =>
+modify(cardQueries.prohibitDiscard, (_ctx, { input, self }) =>
   input.owner === self.owner && input.actor === self.owner && input.face.suit === 'heart'
     ? true
     : undefined,
@@ -33,7 +33,7 @@ modify(cardQueries.prohibitDiscard, (_ctx, input, self) =>
 
 弃牌阶段按手牌数与上限算原需数量，再取当前可弃牌数量的较小值。可弃牌不足时弃尽可弃部分；没有合法牌时不创建无法完成的必选请求。`discard.limited` 记录原需与实际数量，客户端解释原因，不显示隐藏牌面。受保护牌仍计入手牌数量；“不计入手牌上限”和“不能弃置”是不同规则。
 
-自弃过滤及不足额处理参考本地 [Room.askToDiscard](../freekill/packages/freekill-core/ltk/server/room.lua)。拆桥保留[本地标准牌](../freekill/packages/standard_cards/pkg/skills/dismantlement.lua)的非空目标条件：若结算时没有可弃牌，正常空结算，材料不退回。
+自弃过滤及不足额处理参考本地 [Room.askToDiscard](../../freekill/packages/freekill-core/ltk/server/room.lua)。拆桥保留[本地标准牌](../../freekill/packages/standard_cards/pkg/skills/dismantlement.lua)的非空目标条件：若结算时没有可弃牌，正常空结算，材料不退回。
 
 ## 新增三名武将
 
@@ -43,7 +43,7 @@ modify(cardQueries.prohibitDiscard, (_ctx, input, self) =>
 | 张飞 / 蜀 / 男 | 4        | 咆哮：取消杀的次数上限，保留累计记录；失去技能后恢复已累计的正常上限  |
 | 甘宁 / 吴 / 男 | 4        | 奇袭：一张黑色手牌或装备当过河拆桥使用；材料离场仍触发正常装备后效    |
 
-实现为 [martial.ts](../src/content/standard/martial.ts) 中的普通转换和查询修正，未复制杀、闪或拆桥逻辑。文本依据本地[龙胆](../freekill/packages/standard/pkg/skills/longdan.lua)、[咆哮](../freekill/packages/standard/pkg/skills/paoxiao.lua)、[奇袭](../freekill/packages/standard/pkg/skills/qixi.lua)。此前三名武将见 [27](27-generals-active-skills.md)。
+实现为 [martial.ts](../src/content/standard/martial.ts) 中的普通转换和查询修正，未复制杀、闪或拆桥逻辑。文本依据本地[龙胆](../../freekill/packages/standard/pkg/skills/longdan.lua)、[咆哮](../../freekill/packages/standard/pkg/skills/paoxiao.lua)、[奇袭](../../freekill/packages/standard/pkg/skills/qixi.lua)。此前三名武将见 [27](27-generals-active-skills.md)。
 
 基础 AI 自动消费这些合法转换和次数，不增加角色专用搜索。六名真实武将已通过六席全 AI 对局至身份胜负，不能据此宣称完整标准包或高级 AI 完成。
 

@@ -2,6 +2,25 @@ import { expect, it } from 'vitest';
 import { defineWindow } from '../../src/sdk';
 import { room, nextRequest } from '../fixtures/room';
 
+class WindowGuard {
+  #open: boolean;
+  constructor(open = true) {
+    this.#open = open;
+  }
+  get subject() {
+    return 'b';
+  }
+  get anchor() {
+    return 'a';
+  }
+  active() {
+    return this.#open;
+  }
+  close() {
+    this.#open = false;
+  }
+}
+
 it('窗口进入时不再继续，则不收集来源、计算次数或执行效果', async () => {
   const target = room();
   const window = defineWindow<null>('guard.closed');
@@ -21,7 +40,7 @@ it('窗口进入时不再继续，则不收集来源、计算次数或执行效�
       ran = true;
     },
   });
-  await target.run('window', (ctx) => ctx.window(window, null, { active: () => false }));
+  await target.run('window', (ctx) => ctx.window(window, null, new WindowGuard(false)));
   expect(collections).toBe(0);
   expect(ran).toBe(false);
 });
@@ -29,7 +48,7 @@ it('窗口进入时不再继续，则不收集来源、计算次数或执行效�
 it('一次效果后收束整个窗口，其他角色和后续组都不再执行', async () => {
   const target = room();
   const window = defineWindow<null>('guard.stop', ['first', 'last']);
-  let active = true;
+  const options = new WindowGuard();
   const seen: string[] = [];
   for (const [id, owner, group] of [
     ['A', 'a', 'first'],
@@ -43,18 +62,26 @@ it('一次效果后收束整个窗口，其他角色和后续组都不再执行'
       eligible: () => true,
       run() {
         seen.push(id);
-        active = false;
+        options.close();
       },
     });
-  await target.run('window', (ctx) => ctx.window(window, null, { active: () => active }));
+  await target.run('window', (ctx) => ctx.window(window, null, options));
   expect(seen).toEqual(['A']);
+  expect(Object.isFrozen(options)).toBe(false);
+  expect(target.history.entries.find((entry) => entry.type === 'window.order')?.data).toMatchObject(
+    {
+      subject: 'b',
+      anchor: 'a',
+      override: true,
+    },
+  );
   expect(target.history.entries.filter((entry) => entry.type === 'window.stopped')).toHaveLength(1);
 });
 
 it('顺序选择返回后再次检查窗口，不执行已经收束的旧选项', async () => {
   const target = room();
   const window = defineWindow<null>('guard.selection');
-  let active = true;
+  const options = new WindowGuard();
   const seen: string[] = [];
   for (const id of ['A', 'B'])
     target.on(window, {
@@ -66,9 +93,10 @@ it('顺序选择返回后再次检查窗口，不执行已经收束的旧选项'
         seen.push(id);
       },
     });
-  const running = target.run('window', (ctx) => ctx.window(window, null, { active: () => active }));
+  const running = target.run('window', (ctx) => ctx.window(window, null, options));
   const request = await nextRequest(target);
-  active = false;
+  options.active = () => true;
+  options.close();
   expect(target.decisions.submit(request.id, request.token, 'A')).toEqual({ kind: 'accepted' });
   await running;
   expect(seen).toEqual([]);

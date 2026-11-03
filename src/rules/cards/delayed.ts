@@ -1,28 +1,31 @@
 import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult, Room } from '../../core/runtime/room';
+import type { Context, Room } from '../../core/runtime/room';
 import type { PhaseView } from '../turn/turn';
 import { defineState, stateChange } from '../state/state';
 import { playerBuried } from '../combat/life';
 import { isGameOver } from '../game/end';
 import type { CardBook } from './book';
-import type { CardDefinition, CardEffect, CardUseRef, EffectSnapshot, SemanticCard } from './types';
+import type {
+  CardDefinition,
+  CardEffect,
+  CardUseRef,
+  EffectRef,
+  EffectSnapshot,
+  SemanticCard,
+} from './types';
 import { moveCards, cardsMoved } from './move';
 import { withProcessing } from './processing';
 
+/** 判定阶段的具名输入；正常生效保留可操作效果，取消后效使用已封口快照。 */
+export interface DelayedInput<Effect extends EffectRef = CardEffect> {
+  readonly effect: Effect;
+  readonly book: CardBook;
+  readonly phase: PhaseView;
+}
 export interface DelayedRules {
-  readonly resolve: (
-    ctx: Context,
-    effect: CardEffect,
-    book: CardBook,
-    phase: PhaseView,
-  ) => void | Promise<void>;
-  readonly cancelled?: (
-    ctx: Context,
-    effect: EffectSnapshot,
-    book: CardBook,
-    phase: PhaseView,
-  ) => void | Promise<void>;
+  readonly resolve: (ctx: Context, input: DelayedInput) => unknown;
+  readonly cancelled?: (ctx: Context, input: DelayedInput<EffectSnapshot>) => unknown;
 }
 export interface DelayedCard {
   readonly id: string;
@@ -83,7 +86,7 @@ export function placeDelayed(
   book: CardBook,
   source: CardUseRef,
   owner: string,
-): Promise<FlowResult<'placed' | 'unavailable'>> {
+): Promise<'placed' | 'unavailable'> {
   const input = immutable(source);
   return ctx.flow('delayed.place', async (child) => {
     if (!book.definition(input.card.name).delayed)
@@ -98,13 +101,13 @@ export function placeDelayed(
       { kind: 'createZone', zone: { id: zone, kind: 'judgment', owner, scopeId: null, cards: [] } },
       stateChange(child, binding, { owner, source: zone, lifetime: null }, input),
     ];
-    const moved = await moveCards(
+    await moveCards(
       child,
       [{ cards: input.card.materials, from: input.processing, to: zone, place: 'bottom' }],
       input.card.name,
       { kind: 'delayed.placed', data: { zone, owner, source: input }, changes },
     );
-    if (moved.kind === 'aborted') return child.abort(moved.reason);
+
     return 'placed';
   });
 }
@@ -115,15 +118,13 @@ export function moveDelayed(
   id: string,
   to: string,
 ): Promise<
-  FlowResult<
-    | {
-        readonly kind: 'moved';
-        readonly owner: string;
-        readonly card: SemanticCard;
-        readonly cards: readonly string[];
-      }
-    | { readonly kind: 'unavailable' }
-  >
+  | {
+      readonly kind: 'moved';
+      readonly owner: string;
+      readonly card: SemanticCard;
+      readonly cards: readonly string[];
+    }
+  | { readonly kind: 'unavailable' }
 > {
   return ctx.flow('delayed.move', async (child) => {
     const entry = delayedCards(child.world, undefined, true).find((entry) => entry.id === id);
@@ -134,7 +135,7 @@ export function moveDelayed(
       card: entry.source.card,
       cards: entry.cards,
     });
-    const moved = await moveCards(
+    await moveCards(
       child,
       [{ cards: entry.cards, from: entry.id, to, place: 'bottom' }],
       'delayed card removed',
@@ -147,7 +148,7 @@ export function moveDelayed(
         ],
       },
     );
-    if (moved.kind === 'aborted') return child.abort(moved.reason);
+
     return result;
   });
 }
@@ -172,20 +173,22 @@ export function delayedCard(
     type: 'trick',
     label,
     counterable: true,
-    delayed: { resolve, ...(cancelled ? { cancelled } : {}) },
+    delayed: {
+      resolve: resolve.bind(input),
+      ...(cancelled === undefined ? {} : { cancelled: cancelled.bind(input) }),
+    },
     use: {
       count: { min: self ? 0 : 1, max: self ? 0 : 1 },
-      ...(self ? { fixedTargets: (_ctx: Context, actor: string) => [actor] } : {}),
-      target: (ctx, request, target) =>
+      ...(self ? { fixedTargets: (_ctx: Context, { actor }) => [actor] } : {}),
+      target: (ctx, { request, target }) =>
         (self ? target === request.actor : target !== request.actor) &&
         !delayedCards(ctx.world, target).some(
           (entry) => entry.source.card.name === request.card.name,
         ),
-      canUse: (_ctx, request) =>
+      canUse: (_ctx, { request }) =>
         request.targets.length === 1 ? null : 'Delayed card requires a target.',
-      async resolve(ctx, effect, book) {
-        const result = await placeDelayed(ctx, book, source(effect), effect.target);
-        if (result.kind === 'aborted') return ctx.abort(result.reason);
+      async resolve(ctx, { effect, book }) {
+        await placeDelayed(ctx, book, source(effect), effect.target);
       },
     },
   };
@@ -204,8 +207,8 @@ export async function resolveJudgmentPhase(
     if (!entry) continue;
     const rules = book.definition(entry.source.card.name).delayed;
     if (!rules) throw new Error('Placed card lost its delayed definition.');
-    const resolved = await withProcessing(ctx, [], 'discard', async (at, processing) => {
-      const moved = await moveCards(
+    await withProcessing(ctx, [], async (at, processing) => {
+      await moveCards(
         at,
         [{ cards: entry.cards, from: entry.id, to: processing.zone, place: 'bottom' }],
         entry.source.card.name,
@@ -218,19 +221,18 @@ export async function resolveJudgmentPhase(
           ],
         },
       );
-      if (moved.kind === 'aborted') return at.abort(moved.reason);
+
       const result = await book.resolveDelayed(
         at,
         { ...entry.source, processing: processing.zone },
         phase.owner,
-        (child, effect) => rules.resolve(child, effect, book, phase),
+        (child, { effect }) => rules.resolve(child, { effect, book, phase }),
       );
-      if (result.kind === 'aborted') return at.abort(result.reason);
-      for (const effect of result.value.effects)
+
+      for (const effect of result.effects)
         if (effect.state === 'cancelled' && rules.cancelled)
-          await rules.cancelled(at, effect, book, phase);
+          await rules.cancelled(at, { effect, book, phase });
     });
-    if (resolved.kind === 'aborted') return ctx.abort(resolved.reason);
   }
 }
 

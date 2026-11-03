@@ -18,15 +18,15 @@
 
 ## 作者接口仍是普通代码
 
-[on](../src/rules/skills/skills.ts) 将 times 传入内核，并把 occurrence 作为 when/run 的第四个参数。旧的二、三个参数函数可以继续忽略额外参数，不需要改成模板或状态机。
+[on](../src/rules/skills/skills.ts) 将 times 传入内核，when/run 的具名输入提供 payload、self 与 occurrence，按需解构。times 在候选展开前固定次数，retain 为来源资格后备；它们的输入只包含 payload 与 self。
 
 ```ts
 on(damageReceived, {
   id: 'per-point',
   order: 'choose',
-  times: (_ctx, hit) => hit.hpLoss,
-  when: (_ctx, hit, self) => hit.input.to === self.owner,
-  async run(ctx, hit, self, occurrence) {
+  times: (_ctx, { payload: hit }) => hit.hpLoss,
+  when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
+  async run(ctx, { payload: hit, self, occurrence }) {
     // 一次独立发动；选择、费用、闭包、循环、子结算仍由普通代码表达。
     await handleOnePoint(ctx, hit, self, occurrence);
   },
@@ -51,7 +51,7 @@ trigger-order 描述继续提供稳定选项 ID 和可读 labels，重复来源�
 
 其他自愿发动的集智、铁骑、闭月也明确声明 choose；锁定修正与装备维护继续是自动项。这里没有添加随意填数值优先级的接口。洛神一次已接受发动后的连续判定仍是一次效果内的普通循环，不把每个 await 都拆成可被其他同一时点技能插入的步骤。
 
-参考 [FreeKill 触发队列](../freekill/lua/core/trigger_event.lua)、[遗计次数](../freekill/packages/standard/pkg/skills/yiji.lua)、[枭姬](../freekill/packages/standard/pkg/skills/xiaoji.lua)、[观星](../freekill/packages/standard/pkg/skills/guanxing.lua)、[洛神](../freekill/packages/standard/pkg/skills/luoshen.lua)。本实现固定窗口身份与次数，不照搬重新计算次数或全局数值优先级。
+参考 [FreeKill 触发队列](../../freekill/lua/core/trigger_event.lua)、[遗计次数](../../freekill/packages/standard/pkg/skills/yiji.lua)、[枭姬](../../freekill/packages/standard/pkg/skills/xiaoji.lua)、[观星](../../freekill/packages/standard/pkg/skills/guanxing.lua)、[洛神](../../freekill/packages/standard/pkg/skills/luoshen.lua)。本实现固定窗口身份与次数，不照搬重新计算次数或全局数值优先级。
 
 ## 证据与剩余范围
 

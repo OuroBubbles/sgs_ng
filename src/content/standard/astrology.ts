@@ -1,6 +1,5 @@
 import {
   ArrangementSelection,
-  defineSkill,
   on,
   phaseStarted,
   invoke,
@@ -11,36 +10,36 @@ import {
   cardQueries,
 } from '../../sdk';
 import type { CardBook, Context, Processing } from '../../sdk';
+import type { SkillDefinition } from '../../sdk';
 
 /** 私有区正常/局部中止的余牌回顶；不能用遗计的默认弃置善后。 */
 async function returnRemaining(ctx: Context, pool: Processing): Promise<void> {
   const cards = pool.remaining();
   if (!cards.length) return;
-  const moved = await moveCards(
+  await moveCards(
     ctx,
     [{ cards, from: pool.zone, to: 'draw', place: 'top' }],
     'standard:guanxing cleanup',
   );
-  if (moved.kind === 'aborted') return ctx.abort(moved.reason);
 }
 
 export function guanxing(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'standard:guanxing',
     name: '观星',
     description:
       '准备阶段，你可以观看牌堆顶 X 张牌（X 为存活角色数，至多 5），将任意张以任意顺序放回牌顶，其余以任意顺序置于牌底。',
-    effects: [
+    triggers: [
       on(phaseStarted, {
-        id: 'arrange-top',
         order: 'choose',
-        when: (_ctx, phase, self) => phase.owner === self.owner && phase.kind === 'prepare',
-        async run(ctx, _phase, self) {
+        when: (_ctx, { payload: phase, self }) =>
+          phase.owner === self.owner && phase.kind === 'prepare',
+        async run(ctx, { self }) {
           const invoked = await invoke(ctx, self, '观星：是否观看并整理牌堆顶？');
-          if (invoked.kind === 'aborted') return ctx.abort(invoked.reason);
-          if (!invoked.value) return;
+
+          if (!invoked) return;
           const live = (at: Context) => at.world.player(self.owner).alive && !isGameOver(at.world);
-          const result = await withPrivateTopCards(
+          await withPrivateTopCards(
             ctx,
             {
               player: self.owner,
@@ -70,7 +69,7 @@ export function guanxing(book: CardBook) {
               if (answer.kind !== 'chosen' || !live(at)) return;
               const top = answer.value.groups.find((g) => g.id === 'top')!.items;
               const bottom = answer.value.groups.find((g) => g.id === 'bottom')!.items;
-              const moved = await moveCards(
+              await moveCards(
                 at,
                 [
                   { cards: top, from: pool.zone, to: 'draw', place: 'top' },
@@ -82,24 +81,21 @@ export function guanxing(book: CardBook) {
                   data: { player: self.owner, reason: self.skill, top, bottom },
                 },
               );
-              if (moved.kind === 'aborted') return at.abort(moved.reason);
             },
             returnRemaining,
           );
-          if (result.kind === 'aborted') return ctx.abort(result.reason);
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }
 
-export const kongcheng = defineSkill({
+export const kongcheng = {
   id: 'standard:kongcheng',
   name: '空城',
   description: '锁定技，若你没有手牌，你不能成为杀或决斗的目标。装备不影响空城。',
-  effects: [],
   modifiers: [
-    modify(cardQueries.prohibitTarget, (ctx, request, self) =>
+    modify(cardQueries.prohibitTarget, (ctx, { input: request, self }) =>
       request.target === self.owner &&
       ctx.world.zone(`${self.owner}:hand`).cards.length === 0 &&
       ['standard:slash', 'standard:duel'].includes(request.card.name)
@@ -107,4 +103,4 @@ export const kongcheng = defineSkill({
         : undefined,
     ),
   ],
-});
+} satisfies SkillDefinition;

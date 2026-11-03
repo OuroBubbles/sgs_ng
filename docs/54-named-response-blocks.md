@@ -18,7 +18,7 @@ effect.blockResponses(ctx, target, 'my-package:silence');
 
 列表声明时复制到权威宣告并冻结，多条禁令取并集。空数组、空白名称、重复名称和非字符串名称拒绝整次改写，不留下半条记录。纯查询、其他局/不相关上下文和效果封口后的改写仍由原有计划/生存期守卫拒绝。
 
-铁骑的项目说明同步为“不能以闪响应这次杀”。[FreeKill 参考](../freekill/packages/standard/pkg/skills/tieqi.lua) 使用 disresponsive 实现，[noname 文本](../noname/resources/app/character/standard/translate.js) 使用“不可被闪避”措辞；本项目在开放响应名称的规则接口中按闪明确限制，不把标准杀的默认响应类型当成所有扩展请求的类型。
+铁骑的项目说明同步为“不能以闪响应这次杀”。[FreeKill 参考](../../freekill/packages/standard/pkg/skills/tieqi.lua) 使用 disresponsive 实现，[noname 文本](../../noname/resources/app/character/standard/translate.js) 使用“不可被闪避”措辞；本项目在开放响应名称的规则接口中按闪明确限制，不把标准杀的默认响应类型当成所有扩展请求的类型。
 
 ## 请求先收窄，所有实际供牌走同一入口
 
@@ -66,7 +66,7 @@ responseFinished 仍是已经提交的打出完成事件，费用、材料与后
 
 首批三个具名反例在修复前均失败，报告为 `.artifacts/validation/named-response-before.json`。随后供牌窗口场景在 18 项中单独失败，报告为 `named-response-window-before.json`；最终新增 20 项通过，报告为 `named-response-after.json`。原有相关 180 项定向场景也已通过；最新完整验证统一见 [STATUS](STATUS.md)。所有新增完成场景均核对事实重建、决策关闭和处理区清理。
 
-标准与演武内容更新为 0.1.12，渡口仍为 0.1.0 且精确依赖 standard@0.1.12，应用壳仍为 0.1.0。默认标准 32 种牌、25 将、108 实体，演武目录及现有布局保持原样。内容模块依赖与恢复按 [48](48-content-persistence.md) 处理。
+标准与演武内容更新为 0.1.12，渡口仍为 0.1.0 且精确依赖 standard@0.1.12，应用壳仍为 0.1.0。默认标准 32 种牌、25 将、108 实体，演武目录及现有布局保持原样。内容模块依赖与恢复按 [持久恢复](39-source-packages.md#持久安装与恢复) 处理。
 
 最终完整单元/行为 1198 项通过，其中 1191 项规则/主持侧从同次报告分类计数，不另算独立执行；桌面/触控浏览器 174 项一次通过。Windows Debug/Release 各通过 66 组实际 WebView2 检查和不同 PID 的内容重启恢复，控制台无错误，隔离目录及进程已清理。新的权限与供牌分支由规则场景验证，界面回归覆盖现有正式操作。类型、ESLint、Prettier、文档链接及两种原生构建均通过；链接器保留一条 import library 提示性 warning。发布 ZIP 4,617,306 字节、精确四个成员，实际字节/哈希、依赖、清单及两构建原生证明核对结果为 `.artifacts/validation/named-response-package-audit.json`。
 

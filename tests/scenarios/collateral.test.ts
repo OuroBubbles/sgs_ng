@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest';
 import {
   equip,
+  cardQueries,
+  defineSkill,
+  modify,
+  playPhase,
+  runPhase,
   installCounterspells,
   kill,
   moveCards,
@@ -51,18 +56,26 @@ function killPlayer(game: Game, target: string) {
   });
 }
 
-it('附属选择先于宣告；锦囊只以持武器者为目标，随后完整使用杀', async () => {
+it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随后完整使用杀', async () => {
   const game = create(1);
-  const running = use(game, { ...intent(), parameters: undefined });
+  const running = game.room.run('phase', (ctx) =>
+    runPhase(ctx, game.book, 'a', 'play', (at, phase) => playPhase(at, phase, game.book)),
+  );
   const request = await nextRequest(game.room);
   expect(request).toMatchObject({
     player: 'a',
-    kind: 'cards-targets',
-    data: { cancelLabel: '取消用牌' },
+    kind: 'play-action',
   });
   expect(game.room.world.position('borrow')).toBe('a:hand');
   expect(game.room.history.facts('card.used')).toHaveLength(0);
-  await answer(game, { cards: [], targets: ['c'] }, 'cards-targets');
+  expect(
+    game.room.decisions.submit(request.id, request.token, {
+      choice: intent().choice,
+      targets: ['b'],
+    }).kind,
+  ).toBe('rejected');
+  expect(game.room.decisions.pending[0]?.id).toBe(request.id);
+  await answer(game, { choice: intent().choice, targets: ['b', 'c'] }, 'play-action');
   const useRequest = await nextRequest(game.room);
   expect(useRequest).toMatchObject({
     player: 'b',
@@ -71,9 +84,10 @@ it('附属选择先于宣告；锦囊只以持武器者为目标，随后完整�
   });
   expect(game.room.history.facts('card.used')).toHaveLength(1);
   await answer(game, { kind: 'physical', card: 's0' });
-  const result = await running;
-  expect(result).toMatchObject({
-    value: { use: { parameters: { victim: 'c' }, effects: [{ target: 'b' }] } },
+  expect((await running).kind).toBe('resolved');
+  expect(game.room.history.facts('card.finished')[1]?.data.detail).toMatchObject({
+    parameters: { victim: 'c' },
+    effects: [{ target: 'b' }],
   });
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
@@ -84,10 +98,13 @@ it('附属选择先于宣告；锦囊只以持武器者为目标，随后完整�
 
 it('取消附属选择不支付、不开放反制，且没有遗留处理区', async () => {
   const game = create();
-  const running = use(game, { ...intent(), parameters: undefined });
+  const running = game.room.run('selection', async (ctx) => {
+    const { actor, choice, timing } = intent();
+    return ctx.ask(game.book.useSelection(ctx, { actor, choice, timing }));
+  });
   const request = await nextRequest(game.room);
   expect(game.room.decisions.cancel(request.id, request.token).kind).toBe('accepted');
-  expect(await running).toMatchObject({ value: { kind: 'unavailable' } });
+  expect(await running).toMatchObject({ value: { kind: 'cancelled' } });
   expect(game.room.world.position('borrow')).toBe('a:hand');
   expect(game.room.history.facts('card.used')).toHaveLength(0);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
@@ -149,7 +166,7 @@ it('没有任何合法杀目标或持武器者被禁止时，借刀不可用', a
       equipment: { b: [card('weapon', 'crossbow')] },
       policy: { prohibitTarget },
     });
-    expect(await use(game, { ...intent(), parameters: undefined })).toMatchObject({
+    expect(await use(game, intent())).toMatchObject({
       value: { kind: 'unavailable' },
     });
     expect(game.room.decisions.pending).toHaveLength(0);
@@ -284,8 +301,18 @@ it('无懈只反制持武器者上的借刀效果，不向附属目标再开一�
   expect(game.room.history.facts('collateral.weapon-taken')).toHaveLength(0);
 });
 
-it('转移真正目标保留已声明受害者，重复效果各自完整用杀', async () => {
-  for (const replace of [false, true]) {
+it('转移、重复与追加持械者保留同一受害者，各自完整用杀', async () => {
+  const extra = defineSkill({
+    id: 'probe:collateral-target',
+    name: '多目标',
+    triggers: [],
+    modifiers: [
+      modify(cardQueries.extraTargets, (_ctx, { input: use }) =>
+        use.card.name === 'standard:collateral' && use.targets.includes('b') ? 1 : undefined,
+      ),
+    ],
+  });
+  for (const mode of ['repeat', 'replace', 'additional']) {
     const game = cardGame({
       hands: {
         a: [card('borrow', 'collateral')],
@@ -293,21 +320,45 @@ it('转移真正目标保留已声明受害者，重复效果各自完整用杀'
         d: [card('d0', 'slash')],
       },
       equipment: { b: [card('bw', 'crossbow')], d: [card('dw', 'crossbow')] },
+      skills: [extra],
     });
     game.room.on(useDeclared, {
       id: 'edit',
       owner: null,
       eligible: (_ctx, use) => use.card.name === 'standard:collateral',
       run: (ctx, use) => {
-        if (replace) use.replaceTarget(ctx, use.effects[0]!.effectId, 'd', 'probe:transfer');
-        else use.repeatTarget(ctx, 'b', 'probe:repeat');
+        if (mode === 'replace')
+          use.replaceTarget(ctx, use.effects[0]!.effectId, 'd', 'probe:transfer');
+        if (mode === 'repeat') use.repeatTarget(ctx, 'b', 'probe:repeat');
       },
     });
-    const running = use(game, intent());
-    await answer(game, { kind: 'physical', card: replace ? 'd0' : 'b0' });
-    if (!replace) await answer(game, { kind: 'physical', card: 'b1' });
+    if (mode === 'additional')
+      await game.room.run('grant', (ctx) =>
+        game.skills.grant(ctx, {
+          owner: 'a',
+          skill: extra.id,
+          source: { kind: 'general', id: 'probe' },
+        }),
+      );
+    const running =
+      mode === 'additional'
+        ? game.room.run('use', (ctx) => {
+            const { actor, choice, timing } = intent();
+            const selection = game.book.useSelection(ctx, { actor, choice, timing });
+            const selected = selection.validate({ cards: [], targets: ['b', 'd', 'c'] });
+            expect(selected).toEqual({
+              ok: true,
+              value: { targets: ['b', 'd'], parameters: { victim: 'c' } },
+            });
+            if (!selected.ok) throw new Error(selected.reason);
+            return game.book.use(ctx, { actor, choice, timing, ...selected.value });
+          })
+        : use(game, intent());
+    await answer(game, { kind: 'physical', card: mode === 'replace' ? 'd0' : 'b0' });
+    if (mode !== 'replace')
+      await answer(game, { kind: 'physical', card: mode === 'additional' ? 'd0' : 'b1' });
     await running;
-    expect(game.room.world.player('c').hp).toBe(replace ? 3 : 2);
+    expect(game.room.world.player('c').hp).toBe(mode === 'replace' ? 3 : 2);
     expect(game.room.world.position('bw')).toBe('b:equipment');
     expect(game.room.world.position('dw')).toBe('d:equipment');
   }

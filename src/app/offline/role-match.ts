@@ -3,10 +3,10 @@ import { immutable } from '../../core/model/value';
 import { Room } from '../../core/runtime/room';
 import type { Context, FlowResult } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
-import { CardBook } from '../../rules/cards/book';
+import type { CardBook } from '../../rules/cards/book';
 import { draw } from '../../rules/cards/draw';
 import { moveCards } from '../../rules/cards/move';
-import type { CardDefinition, CardPolicy } from '../../rules/cards/types';
+import type { CardPolicy } from '../../rules/cards/types';
 import { installRescue } from '../../rules/combat/rescue';
 import { installCounterspells } from '../../rules/cards/counter';
 import { installDelayedCards } from '../../rules/cards/delayed';
@@ -14,8 +14,7 @@ import { resultOf } from '../../rules/game/end';
 import type { GameResult } from '../../rules/game/end';
 import { assignRoles, installRoleMode, roleRoster, roleSeats } from '../../rules/game/roles';
 import type { Role } from '../../rules/game/roles';
-import { SkillBook } from '../../rules/skills/skills';
-import type { SkillDefinition } from '../../rules/skills/skills';
+import type { SkillBook } from '../../rules/skills/skills';
 import { defineState, readState, stateChange } from '../../rules/state/state';
 import { runTurn, defaultPhaseBody } from '../../rules/turn/turn';
 import type { PhaseBody } from '../../rules/turn/turn';
@@ -25,9 +24,10 @@ import { takeExtraTurn } from '../../rules/turn/extra';
 import { genderChange } from '../../rules/characters/gender';
 import type { Gender } from '../../rules/characters/gender';
 import { kingdomChange } from '../../rules/characters/kingdom';
-import { GeneralBook, generalChange } from '../../rules/characters/general';
-import type { GeneralDefinition } from '../../rules/characters/general';
-import type { PackageVersion, ResolvedContent } from '../../content/package';
+import { generalChange } from '../../rules/characters/general';
+import type { GeneralBook } from '../../rules/characters/general';
+import { createContent } from '../../content/catalog';
+import type { ContentCatalog, ContentDefinition } from '../../content/catalog';
 
 export interface MatchPlayer {
   readonly id: string;
@@ -37,37 +37,22 @@ export interface MatchPlayer {
   readonly kingdom?: string | null;
   readonly general?: string;
 }
-interface MatchOptions {
+export interface RoleMatchOptions {
   /** 默认采用当前回合政策；只控制结算行动序，不改变物理座次和回合游标。 */
   readonly actionAnchor?: ActionAnchor;
   readonly id: string;
   readonly deckName?: string;
   readonly seed: number;
   readonly players: readonly MatchPlayer[];
-  readonly deck: readonly Card[];
+  /** 目录牌组 ID，或直接生成的实体牌表；建局统一固定并验证实际使用的快照。 */
+  readonly deck: string | readonly Card[];
+  /** 内容统一单独传入；普通定义按本局装配，预装配目录直接复用。 */
+  readonly content: ContentDefinition | ContentCatalog;
   /** 测试/预设局可固定身份，否则按基础配置用局内随机源洗牌。 */
   readonly roles?: readonly Role[];
   readonly policy?: Partial<CardPolicy>;
   readonly phaseBody?: PhaseBody;
 }
-/** 包装配与底层测试装配共用对局流程，不能同时传入两套内容目录。 */
-export type RoleMatchOptions = MatchOptions &
-  (
-    | {
-        readonly content: ResolvedContent;
-        readonly cards?: never;
-        readonly skills?: never;
-        readonly generals?: never;
-      }
-    | {
-        readonly content?: undefined;
-        readonly cards: readonly CardDefinition[];
-        readonly skills?:
-          | readonly SkillDefinition[]
-          | ((book: CardBook) => readonly SkillDefinition[]);
-        readonly generals?: readonly GeneralDefinition[];
-      }
-  );
 export interface MatchProgress {
   readonly stage: 'preparing' | 'ready' | 'playing';
   readonly turns: number;
@@ -88,21 +73,6 @@ const matchState = defineState<MatchProgress | null>(
       typeof value.next === 'string'),
 );
 const matchTarget = Object.freeze({ owner: null, source: 'match', lifetime: null });
-const contentVersions = defineState<readonly PackageVersion[]>(
-  'content:selection',
-  [],
-  (value): value is readonly PackageVersion[] =>
-    Array.isArray(value) &&
-    value.every(
-      (entry: unknown) =>
-        typeof entry === 'object' &&
-        entry !== null &&
-        'id' in entry &&
-        typeof entry.id === 'string' &&
-        'version' in entry &&
-        typeof entry.version === 'string',
-    ),
-);
 export const matchPrepared = defineWindow<{ readonly first: string }>('match.prepared');
 
 /** Fisher–Yates 只消耗 Context 随机源；最终身份/牌序都通过事实提交。 */
@@ -117,7 +87,7 @@ function shuffled<T>(ctx: Context, values: readonly T[]): T[] {
 
 /** 无渲染依赖的本地对局装配。World 持有进度；当前 Promise 只负责执行，不作为存档。 */
 export class RoleMatch {
-  readonly content: ResolvedContent | null;
+  readonly content: ContentCatalog;
   readonly deckName: string;
   readonly room: Room;
   readonly book: CardBook;
@@ -129,22 +99,23 @@ export class RoleMatch {
   #body: PhaseBody;
 
   constructor(options: RoleMatchOptions) {
-    this.deckName = options.deckName ?? '自定义牌组';
     roleRoster(options.players.length);
-    this.content = options.content ?? null;
-    if (options.content) {
-      const books = options.content.createBooks(options.policy);
-      this.skills = books.skills;
-      this.book = books.book;
-      this.generals = books.generals;
-    } else {
-      this.skills = new SkillBook();
-      this.book = new CardBook(options.cards, this.skills, options.policy);
-      this.skills.register(
-        typeof options.skills === 'function' ? options.skills(this.book) : (options.skills ?? []),
-      );
-      this.generals = new GeneralBook(options.generals ?? [], this.skills);
-    }
+    this.content =
+      'createBooks' in options.content ? options.content : createContent(options.content);
+    const requestedDeck = options.deck;
+    const deck = immutable(
+      typeof requestedDeck === 'string' ? this.content.createDeck(requestedDeck) : requestedDeck,
+    );
+    this.deckName =
+      options.deckName ??
+      (typeof requestedDeck === 'string'
+        ? this.content.decks.find((entry) => entry.id === requestedDeck)?.label
+        : undefined) ??
+      '自定义牌组';
+    const books = this.content.createBooks(options.policy);
+    this.skills = books.skills;
+    this.book = books.book;
+    this.generals = books.generals;
     this.#players = immutable(
       options.players.map((player) => {
         if (player.general === undefined) return player;
@@ -173,7 +144,7 @@ export class RoleMatch {
     )
       throw new Error('Invalid preset roles.');
     this.#body = options.phaseBody ?? defaultPhaseBody;
-    for (const card of options.deck) this.book.definition(card.name);
+    for (const card of deck) this.book.definition(card.name);
     for (const player of this.#players)
       for (const skill of player.skills ?? []) this.skills.definition(skill);
     this.initial = immutable({
@@ -183,7 +154,7 @@ export class RoleMatch {
         maxHp: player.maxHp ?? 4,
         alive: true,
       })),
-      cards: options.deck,
+      cards: deck,
       skills: [],
       states: [],
       zones: [
@@ -192,7 +163,7 @@ export class RoleMatch {
           kind: 'draw',
           owner: null,
           scopeId: null,
-          cards: options.deck.map((card) => card.id),
+          cards: deck.map((card) => card.id),
         },
         { id: 'discard', kind: 'discard', owner: null, scopeId: null, cards: [] },
         ...this.#players.flatMap((player) => [
@@ -243,11 +214,6 @@ export class RoleMatch {
   prepare(): Promise<FlowResult<void>> {
     if (this.progress !== null) throw new Error('Match has already been prepared.');
     return this.room.run('match.prepare', async (ctx) => {
-      ctx.commit(
-        'match.content',
-        [stateChange(ctx, contentVersions, matchTarget, this.content?.versions ?? [])],
-        { packages: this.content?.versions ?? [] },
-      );
       const roles = this.#roles ?? shuffled(ctx, roleRoster(this.#players.length));
       assignRoles(
         ctx,
@@ -288,20 +254,18 @@ export class RoleMatch {
         if (this.result) break;
         for (const skill of player.skills ?? []) {
           if (this.skills.definition(skill).lord && player.id !== lord) continue;
-          const granted = await this.skills.grant(ctx, {
+          await this.skills.grant(ctx, {
             owner: player.id,
             skill,
             source: { kind: 'general', id: player.general ?? `preset:${player.id}` },
           });
-          if (granted.kind === 'aborted') return ctx.abort(granted.reason);
         }
       }
       const seats = this.#players.map((player) => player.id);
       const index = seats.indexOf(lord);
       for (const id of [...seats.slice(index), ...seats.slice(0, index)]) {
         if (this.result) break;
-        const drawn = await draw(ctx, { player: id, count: 4, reason: 'match:initial-hand' });
-        if (drawn.kind === 'aborted') return ctx.abort(drawn.reason);
+        await draw(ctx, { player: id, count: 4, reason: 'match:initial-hand' });
       }
       ctx.commit(
         'match.prepared',
@@ -354,7 +318,7 @@ export class RoleMatch {
           ],
           { owner, turn: progress.turns + 1, extra },
         );
-        const turn = await runTurn(ctx, this.book, owner, {
+        await runTurn(ctx, this.book, owner, {
           body: this.#body,
           ...(extra
             ? {
@@ -363,7 +327,6 @@ export class RoleMatch {
               }
             : {}),
         });
-        if (turn.kind === 'aborted') return ctx.abort(turn.reason);
       }
       return this.result;
     });

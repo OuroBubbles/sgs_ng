@@ -1,26 +1,30 @@
-import { availablePackages } from '../../content/available';
-import { resolvePackages } from '../../content/package';
-import type { ResolvedContent } from '../../content/package';
+import { createContent } from '../../content/catalog';
+import type { ContentCatalog, ContentDefinition } from '../../content/catalog';
+import standard from '../../content/standard';
+import workshop from '../../content/workshop';
 import { RoleMatch } from './role-match';
 
-export { availablePackages };
-export const defaultContent = resolvePackages(availablePackages, ['standard']);
+export const defaultContent = createContent(standard);
+/** 机制演武也是普通源码组合；开关只选择内容，不安装或解析扩展包。 */
+export const practiceContent = createContent(standard, workshop);
 export const seatNames = ['甲席', '乙席', '丙席', '丁席', '戊席', '己席', '庚席', '辛席'];
 
-/** 客户端默认载入标准基础包；额外源码包由开局选择显式启用。 */
-export function createOfflineMatch(
-  count = 4,
-  seed = 42,
-  preset = 'standard:identity',
-  lineup: readonly string[] | null = null,
-  content: ResolvedContent = defaultContent,
-): RoleMatch {
-  if (lineup && lineup.length !== count) throw new Error('General lineup must match seat count.');
-  const deck = content.createDeck(preset);
-  const deckName = content.decks.find((deck) => deck.id === preset)!.label;
+/** 指定阵容时由其长度决定席位；练习局也可只指定人数，不保存另一份可矛盾的数量。 */
+export type OfflineMatchOptions = {
+  readonly seed?: number;
+  readonly preset?: string;
+  readonly content?: ContentDefinition | ContentCatalog;
+} & (
+  | { readonly lineup: readonly string[]; readonly count?: never }
+  | { readonly count?: number; readonly lineup?: never }
+);
+
+/** 默认规则直接从源码装配；普通配置按需填写，无位置占位或分发参与。 */
+export function createOfflineMatch(options: OfflineMatchOptions = {}): RoleMatch {
+  const { seed = 42, preset = 'standard:identity', content = defaultContent, lineup } = options;
+  const count = lineup?.length ?? options.count ?? 4;
   return new RoleMatch({
     id: 'local',
-    deckName,
     seed,
     players: Array.from({ length: count }, (_, i) => ({
       id: seatNames[i]!,
@@ -31,7 +35,7 @@ export function createOfflineMatch(
             ...(i === 0 ? { skills: ['standard:wusheng'] } : {}),
           }),
     })),
-    deck,
+    deck: preset,
     content,
   });
 }

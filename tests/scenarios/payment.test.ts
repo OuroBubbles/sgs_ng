@@ -11,9 +11,133 @@ import {
   SkillBook,
   skillEffective,
 } from '../../src/sdk';
-import type { UsageLimit, PaymentIntent } from '../../src/sdk';
+import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
+import { lianying } from '../../src/content/standard/wu';
 import { nextRequest, room, worldSeed } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+
+it('技能支付只声明来源即可确定付款人，费用原因仍由调用者显式指定', async () => {
+  const game = room();
+  const skills = new SkillBook([{ id: 'test:source', name: '来源' }]);
+  skills.attach(game);
+  await game.run('pay', async (ctx) => {
+    await skills.grant(ctx, {
+      owner: 'a',
+      skill: 'test:source',
+      source: { kind: 'general', id: 'a' },
+    });
+    const self = skills.bindings(ctx.world)[0]!.self;
+    const other = { ...self, owner: 'b', skill: 'test:other', id: 'other' };
+    let sourceReads = 0;
+    let reasonReads = 0;
+    const paid = await pay(ctx, {
+      get skill() {
+        return ++sourceReads === 1 ? self : other;
+      },
+      get reason() {
+        return ++reasonReads === 1 ? 'explicit-purpose' : 'changed-purpose';
+      },
+      cards: ['a1'],
+      to: 'discard',
+    });
+    expect(paid).toMatchObject({
+      kind: 'paid',
+      receipt: {
+        actor: 'a',
+        skill: self.skill,
+        instance: self.id,
+        reason: 'explicit-purpose',
+        cards: ['a1'],
+      },
+    });
+    expect(sourceReads).toBe(1);
+    expect(reasonReads).toBe(1);
+  });
+  expect(game.world.position('a1')).toBe('discard');
+  expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
+  const invalid = room('ambiguous');
+  const self = skills.bindings(game.world)[0]!.self;
+  await expect(
+    invalid.run('pay', (ctx) => {
+      // @ts-expect-error 技能拥有者与另行指定的付款人不能形成两个来源。
+      return pay(ctx, { actor: 'b', skill: self, reason: 'ambiguous' });
+    }),
+  ).rejects.toThrow('Payment requires exactly one actor or skill source.');
+  expect(invalid.history.facts('cost.paid')).toEqual([]);
+  expect(rebuildWorld(worldSeed(), invalid.history.facts())).toEqual(invalid.world.snapshot);
+});
+
+it('支付移牌包含接收区的提交前后快照，同步宣告的另一次变更不改写该批次', async () => {
+  const game = room();
+  const batches: MoveResult[] = [];
+  game.on(cardsMoved, {
+    id: 'observe-gift',
+    owner: 'b',
+    eligible: () => true,
+    run: (ctx, batch) => {
+      batches.push(batch);
+      expect(ctx.world.zone('b:hand').cards).toEqual(['a1']);
+    },
+  });
+  await game.run('gift', (ctx) =>
+    pay(ctx, {
+      actor: 'a',
+      cards: ['a1'],
+      to: 'b:hand',
+      reason: 'gift',
+      intent: {
+        available: () => true,
+        committed(at) {
+          at.commit(
+            'separate.intent-move',
+            [{ kind: 'move', cards: ['b1'], from: 'b:hand', to: 'draw', place: 'bottom' }],
+            null,
+          );
+        },
+      },
+    }),
+  );
+  expect(batches).toHaveLength(1);
+  expect(batches[0]!.before.find((zone) => zone.id === 'b:hand')?.cards).toEqual(['b1']);
+  expect(batches[0]!.after.find((zone) => zone.id === 'b:hand')?.cards).toEqual(['b1', 'a1']);
+  expect(game.history.facts('cost.paid')[0]!.seq).toBeLessThan(
+    game.history.facts('separate.intent-move')[0]!.seq,
+  );
+  expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
+});
+
+it.each([{ cards: ['a1'], to: 'discard' }, {}] as const)(
+  '支付配置 %j 的补充移牌同批触发真实连营，费用仍只计声明材料',
+  async (materials) => {
+    const cards = 'cards' in materials ? materials.cards : [];
+    const game = room();
+    const skills = new SkillBook([lianying]);
+    skills.attach(game);
+    await game.run('grant', (ctx) =>
+      skills.grant(ctx, { owner: 'b', skill: lianying.id, source: { kind: 'general', id: 'b' } }),
+    );
+    const running = game.run('pay-and-take', (ctx) =>
+      pay(ctx, {
+        actor: 'a',
+        ...materials,
+        reason: 'pay-and-take',
+        changes: [{ kind: 'move', cards: ['b1'], from: 'b:hand', to: 'a:hand', place: 'bottom' }],
+      }),
+    );
+    const request = await nextRequest(game);
+    expect(request).toMatchObject({ player: 'b', kind: 'invoke' });
+    expect(request.prompt).toContain('连营');
+    expect(game.world.zone('b:hand').cards).toEqual([]);
+    expect(game.world.position('b1')).toBe('a:hand');
+    expect(game.decisions.submit(request.id, request.token, true)).toEqual({ kind: 'accepted' });
+    const result = await running;
+    expect(result).toMatchObject({ kind: 'resolved', value: { kind: 'paid', receipt: { cards } } });
+    expect(game.world.zone('b:hand').cards).toEqual(['d1']);
+    expect(game.world.zone('discard').cards).toEqual(cards);
+    expect(game.history.facts('skill.invoked')).toHaveLength(1);
+    expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
+  },
+);
 
 it('意图在费用提交后、所有支付后效之前同步确定；失效意图不支付', async () => {
   const game = room();
@@ -46,14 +170,10 @@ it('意图在费用提交后、所有支付后效之前同步确定；失效意�
   };
   await game.run('pay', async (ctx) => {
     expect(
-      ctx.unwrap(
-        await pay(ctx, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'intent', intent }),
-      ).kind,
+      (await pay(ctx, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'intent', intent })).kind,
     ).toBe('paid');
     expect(
-      ctx.unwrap(
-        await pay(ctx, { actor: 'a', cards: ['a2'], to: 'discard', reason: 'intent', intent }),
-      ).kind,
+      (await pay(ctx, { actor: 'a', cards: ['a2'], to: 'discard', reason: 'intent', intent })).kind,
     ).toBe('unavailable');
   });
   expect(seen).toEqual(['declared', 'moved', 'paid']);
@@ -68,7 +188,10 @@ it.each(['throw', 'async'])(
     let after = false;
     const malformed: unknown = {
       available: () => true,
-      committed: () => Promise.reject(new Error('async intent')),
+      committed: async (ctx: import('../../src/sdk').Context) => {
+        await Promise.resolve();
+        ctx.commit('late.intent', [{ kind: 'vitality', player: 'b', hp: 1 }], {});
+      },
     };
     game.on(cardsMoved, {
       id: 'after',
@@ -99,6 +222,8 @@ it.each(['throw', 'async'])(
     ).rejects.toThrow(kind === 'async' ? 'must be synchronous' : 'intent fault');
     expect(game.status).toBe('faulted');
     expect(game.world.position('a1')).toBe('discard');
+    expect(game.world.player('b').hp).toBe(4);
+    expect(game.history.facts('late.intent')).toEqual([]);
     expect(after).toBe(false);
     expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
   },
@@ -131,7 +256,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
         limit,
         declaration: { target: 'b' },
       });
-      expect(result).toMatchObject({ kind: 'resolved', value: { kind: 'paid' } });
+      expect(result).toMatchObject({ kind: 'paid' });
       expect(used(phase.world, 'a', limit)).toBe(1);
       const again = await pay(phase, {
         actor: 'a',
@@ -140,9 +265,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
         reason: 'activate',
         limit,
       });
-      expect(again).toMatchObject({
-        value: { kind: 'unavailable', reason: 'Usage limit reached.' },
-      });
+      expect(again).toMatchObject({ kind: 'unavailable', reason: 'Usage limit reached.' });
     }),
   );
   expect(observed).toEqual([
@@ -165,7 +288,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
   expect(game.world.snapshot.states).toEqual([]);
 });
 
-it('取消选择不支付、不增加次数', async () => {
+it('取消选择不支付、不增加次数；选择接纳后目标条件改变，支付入口仍重新检查', async () => {
   const game = room();
   const running = game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
@@ -176,71 +299,64 @@ it('取消选择不支付、不增加次数', async () => {
         cardCount: { min: 1, max: 1 },
         targetCount: { min: 0, max: 0 },
       });
-      const choice = await phase.ask(model.decision('a', '支付一张牌', true));
-      if (choice.kind === 'chosen')
-        await pay(phase, {
-          actor: 'a',
-          cards: choice.value.cards,
-          to: 'discard',
-          reason: 'activate',
-          limit,
-        });
-      expect(used(phase.world, 'a', limit)).toBe(0);
+      for (const prompt of ['支付一张牌', '再次支付一张牌']) {
+        const choice = await phase.ask(model.decision('a', prompt, { optional: true }));
+        if (choice.kind === 'chosen') {
+          phase.commit('target.died', [{ kind: 'vitality', player: 'b', hp: 0, alive: false }], {});
+          const result = await pay(phase, {
+            actor: 'a',
+            cards: choice.value.cards,
+            to: 'discard',
+            reason: 'activate',
+            limit,
+            legal: (child) => child.world.player('b').alive,
+          });
+          expect(result).toMatchObject({
+            kind: 'unavailable',
+            reason: 'Final cost conditions changed.',
+          });
+        }
+        expect(used(phase.world, 'a', limit)).toBe(0);
+        expect(game.history.facts('cost.paid')).toEqual([]);
+        expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
+      }
     }),
   );
   const request = await nextRequest(game);
-  game.decisions.cancel(request.id, request.token);
+  expect(game.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
+  const retry = await nextRequest(game);
+  expect(game.decisions.submit(retry.id, retry.token, { cards: ['a1'], targets: [] })).toEqual({
+    kind: 'accepted',
+  });
   await running;
-  expect(game.history.facts('cost.paid')).toEqual([]);
-  expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
+  expect(game.world.zone('discard').cards).toEqual([]);
 });
 
-it.each([{ cards: ['a1', 'b1'] }, { cards: ['a1', 'a1'] }, { cards: ['unknown'] }])(
-  '非法材料 $cards 不产生部分支付或次数',
-  async ({ cards }) => {
-    const game = room();
-    await game.run('turn', (ctx) =>
-      withLifetime(ctx, 'phase', async (phase, lifetime) => {
-        const limit: UsageLimit = { key: 'activation', source: null, lifetime, max: 1 };
-        const result = await pay(phase, {
-          actor: 'a',
-          cards,
-          to: 'discard',
-          reason: 'activate',
-          limit,
-        });
-        expect(result).toMatchObject({ value: { kind: 'unavailable' } });
-        expect(used(phase.world, 'a', limit)).toBe(0);
-      }),
-    );
-    expect(game.world.zone('discard').cards).toEqual([]);
-    expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
-    expect(game.history.facts('cost.paid')).toEqual([]);
-    expect(game.status).toBe('ready');
-  },
-);
-
-it('选择接纳后目标条件改变，支付入口仍重新检查', async () => {
+it.each([
+  { cards: ['a1', 'b1'] },
+  { cards: ['a1', 'a1'] },
+  { cards: ['unknown'] },
+  { cards: new Array<string>(1) },
+])('非法材料 $cards 不产生部分支付或次数', async ({ cards }) => {
   const game = room();
   await game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
       const limit: UsageLimit = { key: 'activation', source: null, lifetime, max: 1 };
-      phase.commit('target.died', [{ kind: 'vitality', player: 'b', hp: 0, alive: false }], {});
       const result = await pay(phase, {
         actor: 'a',
-        cards: ['a1'],
+        cards,
         to: 'discard',
         reason: 'activate',
         limit,
-        legal: (child) => child.world.player('b').alive,
       });
-      expect(result).toMatchObject({
-        value: { kind: 'unavailable', reason: 'Final cost conditions changed.' },
-      });
+      expect(result).toMatchObject({ kind: 'unavailable' });
       expect(used(phase.world, 'a', limit)).toBe(0);
     }),
   );
   expect(game.world.zone('discard').cards).toEqual([]);
+  expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
+  expect(game.history.facts('cost.paid')).toEqual([]);
+  expect(game.status).toBe('ready');
 });
 
 it('支付后效令发动者死亡，已付材料与次数不会回滚', async () => {
@@ -263,7 +379,7 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
         reason: 'activate',
         limit,
       });
-      expect(result).toMatchObject({ value: { kind: 'paid' } });
+      expect(result).toMatchObject({ kind: 'paid' });
       expect(phase.world.player('a').alive).toBe(false);
       expect(used(phase.world, 'a', limit)).toBe(1);
     }),
@@ -272,7 +388,7 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
   expect(game.history.facts('cost.paid')).toHaveLength(1);
 });
 
-it('零材料宣告也有一次支付事实与次数，不虚构实体移动', async () => {
+it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚构实体移动', async () => {
   const game = room();
   const paid: unknown[] = [];
   game.on(costPaid, {
@@ -286,8 +402,14 @@ it('零材料宣告也有一次支付事实与次数，不虚构实体移动', a
   await game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
       const limit: UsageLimit = { key: 'zero', source: null, lifetime, max: 1 };
-      await pay(phase, { actor: 'a', cards: [], to: 'discard', reason: 'zero', limit });
+      phase.commit('remove-unused-discard', [{ kind: 'removeZone', zone: 'discard' }], null);
+      const result = await pay(phase, { actor: 'a', reason: 'zero', limit });
+      expect(result).toMatchObject({ kind: 'paid', receipt: { actor: 'a', cards: [] } });
       expect(used(phase.world, 'a', limit)).toBe(1);
+      expect(await pay(phase, { actor: 'a', reason: 'zero', limit })).toMatchObject({
+        kind: 'unavailable',
+        reason: 'Usage limit reached.',
+      });
     }),
   );
   expect(paid).toHaveLength(1);
@@ -298,11 +420,12 @@ it('零材料宣告也有一次支付事实与次数，不虚构实体移动', a
       (entry) => entry.type === 'flow.open' && entry.reason === 'cards.moved',
     ),
   ).toEqual([]);
+  expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
 });
 
 it('失去再获得技能不能绕过以技能定义为来源的本阶段次数', async () => {
   const game = room();
-  const book = new SkillBook([defineSkill({ id: 'test:limited', name: 'limited', effects: [] })]);
+  const book = new SkillBook([defineSkill({ id: 'test:limited', name: 'limited', triggers: [] })]);
   book.attach(game);
   const source = { kind: 'general', id: 'general:a' } as const;
   await game.run('turn', (ctx) =>
@@ -316,7 +439,7 @@ it('失去再获得技能不能绕过以技能定义为来源的本阶段次数'
       expect(phase.world.snapshot.skills[0]?.id).not.toBe(old);
       expect(
         await pay(phase, { actor: 'a', cards: ['a2'], to: 'discard', reason: 'activate', limit }),
-      ).toMatchObject({ value: { kind: 'unavailable' } });
+      ).toMatchObject({ kind: 'unavailable' });
     }),
   );
   expect(game.world.zone('a:hand').cards).toEqual(['a2']);
@@ -325,7 +448,7 @@ it('失去再获得技能不能绕过以技能定义为来源的本阶段次数'
 
 it('技能已失效或材料被取走时最终支付返回 unavailable', async () => {
   const game = room();
-  const book = new SkillBook([defineSkill({ id: 'test:limited', name: 'limited', effects: [] })]);
+  const book = new SkillBook([defineSkill({ id: 'test:limited', name: 'limited', triggers: [] })]);
   book.attach(game);
   const source = { kind: 'general', id: 'general:a' } as const;
   await game.run('cost', async (ctx) => {
@@ -341,8 +464,8 @@ it('技能已失效或材料被取走时最终支付返回 unavailable', async (
     };
     await book.revoke(ctx, 'a', 'test:limited', source);
     expect(
-      await pay(ctx, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'activate', skill }),
-    ).toMatchObject({ value: { kind: 'unavailable' } });
+      await pay(ctx, { cards: ['a1'], to: 'discard', reason: 'activate', skill }),
+    ).toMatchObject({ kind: 'unavailable' });
     await moveCards(
       ctx,
       [{ cards: ['a1'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],
@@ -350,7 +473,7 @@ it('技能已失效或材料被取走时最终支付返回 unavailable', async (
     );
     expect(
       await pay(ctx, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'activate' }),
-    ).toMatchObject({ value: { kind: 'unavailable' } });
+    ).toMatchObject({ kind: 'unavailable' });
   });
   expect(game.history.facts('cost.paid')).toEqual([]);
   expect(game.status).toBe('ready');

@@ -1,9 +1,11 @@
-import type { CardView, PlayerView } from './table';
+import type { CardView, CardChoiceView, PlayerView } from './table';
 export interface SkillView {
   readonly id: string;
   readonly name: string;
   readonly description: string;
   readonly effective: boolean;
+  /** 主动或转换能力常驻技能区；能否发动仍只由当前 offers 决定。 */
+  readonly active: boolean;
 }
 
 /** 纯展示数据。没有 World、历史原始 detail、执行闭包或其他席位的私有请求。 */
@@ -32,7 +34,13 @@ export interface CandidateView {
   readonly label: string;
   readonly selectable: boolean;
 }
+export interface CardChoiceGroupView {
+  readonly id: string;
+  readonly label: string;
+  readonly cards: readonly CardChoiceView[];
+}
 export interface OfferView {
+  readonly skill?: string;
   readonly description: string;
   readonly id: string;
   readonly label: string;
@@ -59,6 +67,7 @@ export type DecisionView = DecisionBase &
     | {
         readonly kind: 'cards-targets';
         readonly cards: readonly CandidateView[];
+        readonly cardGroups?: readonly CardChoiceGroupView[];
         readonly targets: readonly CandidateView[];
         readonly cardCount: CountView;
         readonly targetCount: CountView;
@@ -93,6 +102,19 @@ export interface PublicAction {
 export interface LogView {
   readonly seq: number;
   readonly text: string;
+  /** 仅由已提交的公开事实产生；选择草稿不会产生音频。 */
+  readonly audio?: {
+    readonly voice?: string;
+    readonly effect?:
+      | 'start'
+      | 'draw'
+      | 'damage'
+      | 'fire-damage'
+      | 'thunder-damage'
+      | 'lose-hp'
+      | 'chain'
+      | 'finish';
+  };
 }
 export interface GameView {
   readonly deckName: string;
@@ -100,6 +122,8 @@ export interface GameView {
   readonly status: 'idle' | 'running' | 'ended' | 'stopped' | 'faulted';
   readonly viewer: string | null;
   readonly automated: string | null;
+  /** 仅本人席位的输入控制；手动多席演练不提供托管。 */
+  readonly control: { readonly delegated: boolean; readonly reason: string } | null;
   readonly paused: boolean;
   readonly hand: readonly CardView[];
   readonly players: readonly SeatView[];
@@ -134,10 +158,23 @@ export interface ArrangementDraft {
   readonly groups: readonly { readonly id: string; readonly items: readonly string[] }[];
 }
 export interface ChoicePreview {
+  readonly prompt?: string;
   readonly valid: boolean;
   readonly reason: string;
   readonly targets: readonly CandidateView[];
   readonly cards: readonly CandidateView[];
   readonly targetCount: CountView;
   readonly fixedTargets: readonly string[];
+}
+
+/** 尚无选择或等待主持端核对时，界面不可据此提交。 */
+export function emptyPreview(reason = '请选择手牌或技能'): ChoicePreview {
+  return {
+    valid: false,
+    reason,
+    cards: [],
+    targets: [],
+    targetCount: { min: 0, max: 0 },
+    fixedTargets: [],
+  };
 }

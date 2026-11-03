@@ -4,6 +4,7 @@ import {
   cardQueries,
   defineSkill,
   defineWindow,
+  defineQuery,
   draw,
   invoke,
   modify,
@@ -13,9 +14,14 @@ import {
   runPhase,
   skillAvailable,
   SkillBook,
-  viewAs,
 } from '../../src/sdk';
-import type { Context, SkillHandle, SkillProvider, WorldReader } from '../../src/sdk';
+import type {
+  Context,
+  SkillDefinition,
+  SkillHandle,
+  SkillProvider,
+  WorldReader,
+} from '../../src/sdk';
 import type { TriggerSource } from '../../src/core/runtime/window';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
@@ -44,12 +50,12 @@ it.each([false, true])(
     const definition = defineSkill({
       id: source.skill,
       name: source.name,
-      effects: [
+      triggers: [
         on(window, {
           id: 'repeat',
           times: () => 3,
           retain: () => retained,
-          run(ctx, _event, _self, occurrence) {
+          run(ctx, { occurrence }) {
             seen.push(occurrence.index);
             ctx.commit('probe.provider', [], occurrence);
             remove(ctx);
@@ -60,7 +66,7 @@ it.each([false, true])(
     const game = cardGame();
     await game.room.run('install', async (ctx) => {
       remove = game.skills.addProvider({ collect: () => [{ self: source, definition }] }, ctx);
-      ctx.unwrap(await ctx.window(window, null));
+      await ctx.window(window, null);
     });
     expect(seen).toEqual([1]);
     expect(game.room.history.facts('probe.provider')).toHaveLength(1);
@@ -112,11 +118,11 @@ it('SkillBook 重新挂接不复活原窗口，旧 detach 不破坏新挂接的�
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'repeat',
         times: () => 3,
-        run(_ctx, _event, _self, occurrence) {
+        run(_ctx, { occurrence }) {
           seen.push(occurrence.index);
           if (!replaced) {
             replaced = true;
@@ -135,7 +141,7 @@ it('SkillBook 重新挂接不复活原窗口，旧 detach 不破坏新挂接的�
   expect(seen).toEqual([1]);
   await target.run('second', async (ctx) => {
     book.addProvider({ collect: () => [] }, ctx)(ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
   });
   expect(seen).toEqual([1, 1, 2, 3]);
   detach();
@@ -148,7 +154,7 @@ it('顺序选择返回后重查 Provider 登记，旧选项被跳过且不影响
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'choose',
         order: 'choose',
@@ -174,8 +180,8 @@ it('顺序选择返回后重查 Provider 登记，旧选项被跳过且不影响
   const running = game.room.run('windows', async (ctx) => {
     at = ctx;
     remove = game.skills.addProvider(provider, ctx);
-    ctx.unwrap(await ctx.window(window, null));
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
+    await ctx.window(window, null);
     remove(ctx);
   });
   const first = await nextRequest(game.room);
@@ -202,7 +208,7 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
     id: 'probe:late',
     name: '后来来源',
     modifiers: [modify(cardQueries.handLimitCorrection, () => 1)],
-    effects: [
+    triggers: [
       on(window, {
         id: 'late',
         run() {
@@ -214,7 +220,7 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'install',
         run(ctx) {
@@ -241,9 +247,9 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
   const game = cardGame();
   await game.room.run('windows', async (ctx) => {
     game.skills.addProvider({ collect: () => [{ self: source, definition }] }, ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
     expect(seen).toEqual(['A']);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
   });
   expect(seen).toEqual(['A', 'B', 'A']);
   rebuilt(game);
@@ -257,14 +263,14 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'invoke',
         retain: () => true,
-        async run(ctx, _event, self) {
+        async run(ctx, { self }) {
           at = ctx;
           old = self;
-          accepted = ctx.unwrap(await invoke(ctx, self, '是否发动派生技能？'));
+          accepted = await invoke(ctx, self, '是否发动派生技能？');
         },
       }),
     ],
@@ -273,7 +279,7 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
   const game = cardGame();
   const running = game.room.run('invoke', async (ctx) => {
     remove = game.skills.addProvider(provider, ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
   });
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('invoke');
@@ -296,37 +302,35 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'paid',
         retain: () => true,
-        async run(ctx, _event, self) {
-          expect(ctx.unwrap(await invoke(ctx, self, '发动后继续？'))).toBe(true);
+        async run(ctx, { self }) {
+          expect(await invoke(ctx, self, '发动后继续？')).toBe(true);
           expect(
-            ctx.unwrap(
+            (
               await pay(ctx, {
-                actor: self.owner,
                 skill: self,
                 cards: ['slash1'],
                 to: 'discard',
                 reason: 'first-fee',
-              }),
+              })
             ).kind,
           ).toBe('paid');
           remove(ctx);
           expect(self.registered!()).toBe(false);
           expect(
-            ctx.unwrap(
+            (
               await pay(ctx, {
-                actor: self.owner,
                 skill: self,
                 cards: ['slash2'],
                 to: 'discard',
                 reason: 'later-fee',
-              }),
+              })
             ).kind,
           ).toBe('unavailable');
-          ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+          await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
           ctx.commit('probe.continued', [], null);
         },
       }),
@@ -335,7 +339,7 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
   const game = cardGame({ draw: [card('reward', 'jink')] });
   const running = game.room.run('effect', async (ctx) => {
     remove = game.skills.addProvider({ collect: () => [{ self: source, definition }] }, ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
   });
   const request = await nextRequest(game.room);
   expect(game.room.decisions.submit(request.id, request.token, true)).toEqual({ kind: 'accepted' });
@@ -350,28 +354,27 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
 });
 
 it('来源卸载立即移除查询/转换/主动入口，重新登记只产生新的有效引用', async () => {
-  const definition = defineSkill({
+  const definition = {
     id: source.skill,
-    name: source.name,
-    effects: [],
+    name: '定义名称',
     modifiers: [modify(cardQueries.handLimitCorrection, () => 2)],
-    active: [{ id: 'active', label: '主动', available: () => true, run() {} }],
+    active: [{ id: 'active', available: () => true, run() {} }],
     viewAs: [
-      viewAs({
+      {
         id: 'slash',
-        label: '转换杀',
         names: () => ['standard:slash'],
         count: { min: 1, max: 1 },
-        materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+        materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
         make: () => ({ name: 'standard:slash' }),
-      }),
+      },
     ],
-  });
+  } satisfies SkillDefinition;
   const provider: SkillProvider = { collect: () => [{ self: source, definition }] };
   const game = cardGame();
   await game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
+    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
       const remove = game.skills.addProvider(provider, at);
+      await at.window(window, null);
       const old = game.skills.binding(at.world, source.id)!.self;
       const choice = {
         kind: 'viewAs' as const,
@@ -380,7 +383,10 @@ it('来源卸载立即移除查询/转换/主动入口，重新登记只产生�
         materials: ['slash1'],
       };
       expect(game.book.handLimit(at, 'a')).toBe(6);
-      expect(activeOffers(at, game.book, phase)).toHaveLength(1);
+      expect(activeOffers(at, game.book, phase)).toMatchObject([{ label: source.name }]);
+      expect(game.book.offers(at, 'a', 'use')).toContainEqual(
+        expect.objectContaining({ kind: 'viewAs', label: source.name }),
+      );
       expect(game.book.build(at, 'a', choice, 'use').ok).toBe(true);
       remove(at);
       expect(game.book.handLimit(at, 'a')).toBe(4);
@@ -421,7 +427,7 @@ it('装配期无需 Context，重复登记拒绝；挂接后省略 Context 不�
 
 it('纯查询中的安装/卸载均拒绝且保留登记，正常规则操作仍可以卸载', async () => {
   const game = cardGame();
-  const definition = defineSkill({ id: source.skill, name: source.name, effects: [] });
+  const definition = defineSkill({ id: source.skill, name: source.name, triggers: [] });
   const provider: SkillProvider = { collect: () => [{ self: source, definition }] };
   await game.room.run('query', (ctx) => {
     const remove = game.skills.addProvider(provider, ctx);
@@ -536,7 +542,7 @@ it.each(['query', 'ended'] as const)('向 %s Room 挂接失败不封口尚未装
     target.finish('finished');
     expect(() => book.attach(target)).toThrow();
   }
-  const definition = defineSkill({ id: source.skill, name: source.name, effects: [] });
+  const definition = defineSkill({ id: source.skill, name: source.name, triggers: [] });
   book.register([definition]);
   const remove = book.addProvider({ collect: () => [{ self: source, definition }] });
   remove();
@@ -562,10 +568,11 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
       return ctx.world.player(this.#owner).alive;
     }
   }
-  const definition = defineSkill({
-    id: source.skill,
-    name: source.name,
-    effects: [
+  class Definition implements SkillDefinition {
+    id = source.skill;
+    name = source.name;
+    viewAs = [{ id: 'virtual', make: { name: 'standard:slash' } }];
+    triggers = [
       on(window, {
         id: 'run',
         retain: () => true,
@@ -573,14 +580,39 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
           ctx.commit('probe.class', [], null);
         },
       }),
-    ],
-  });
+    ];
+  }
+  const definition = new Definition();
   const game = cardGame();
   await game.room.run('class', async (ctx) => {
     game.skills.addProvider({ collect: () => [{ self: new Source(), definition }] }, ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
+    const first = game.skills.binding(ctx.world, source.id)!;
+    const trigger = definition.triggers[0]!;
+    definition.name = '新定义';
+    definition.triggers.length = 0;
+    expect(first.definition.name).toBe(source.name);
+    expect(first.definition.triggers).toHaveLength(1);
+    const next = game.skills.binding(ctx.world, source.id)!;
+    expect(next.definition.name).toBe('新定义');
+    expect(next.definition.triggers).toEqual([]);
+    definition.triggers.push(trigger);
+    expect(Object.isFrozen(definition)).toBe(false);
+    expect(
+      game.book.build(
+        ctx,
+        'a',
+        { kind: 'viewAs', instance: source.id, recipe: 'virtual', materials: [] },
+        'use',
+      ),
+    ).toMatchObject({ ok: true, value: { name: 'standard:slash', materials: [] } });
+    definition.viewAs.push(definition.viewAs[0]!);
+    expect(() => game.skills.bindings(ctx.world)).toThrow(
+      `[${source.skill}] Duplicate view-as recipe ID: virtual.`,
+    );
+    definition.viewAs.pop();
     enabled = false;
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
     const handle = game.skills.binding(ctx.world, source.id)!.self;
     expect(handle.effective(ctx.world)).toBe(false);
     expect(skillAvailable(ctx, handle)).toBe(false);
@@ -596,11 +628,11 @@ it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也
   const definition = defineSkill({
     id: source.skill,
     name: source.name,
-    effects: [
+    triggers: [
       on(window, {
         id: 'repeat',
         times: () => 3,
-        run(ctx, _event, _self, occurrence) {
+        run(ctx, { occurrence }) {
           seen.push(occurrence.index);
           if (!replaced) {
             replaced = true;
@@ -617,12 +649,69 @@ it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也
   const game = cardGame();
   await game.room.run('install', async (ctx) => {
     remove = game.skills.addProvider(provider, ctx);
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
     expect(seen).toEqual([1]);
     expect(game.skills.binding(ctx.world, source.id)).toBeDefined();
-    ctx.unwrap(await ctx.window(window, null));
+    await ctx.window(window, null);
     remove(ctx);
   });
   expect(seen).toEqual([1, 1, 2, 3]);
   rebuilt(game);
 });
+
+it.each(['registered', 'effective', 'available', 'retain'] as const)(
+  '异步 %s 不能被布尔组合掩盖，先冻结再拒绝续体写入',
+  async (kind) => {
+    let active: Context;
+    let lateRejected = false;
+    let fired = 0;
+    // 模拟外部 JS 内容误返回 Promise；正常 TS 签名仍只允许同步布尔值。
+    const invalid = (async () => {
+      await Promise.resolve();
+      try {
+        active.commit('probe.late-query-write', [], null);
+      } catch {
+        lateRejected = true;
+      }
+      return false;
+    }) as unknown as () => boolean;
+    const query = defineQuery<null, number>('probe:source-sync', (a, b) => a + b);
+    const definition = defineSkill({
+      id: source.skill,
+      name: source.name,
+      triggers: [
+        on(window, {
+          id: 'sync-source',
+          when: () => true,
+          ...(kind === 'retain' ? { retain: invalid } : {}),
+          run() {
+            fired++;
+          },
+        }),
+      ],
+      modifiers: [modify(query, () => 5)],
+    });
+    const self: SkillHandle = {
+      ...source,
+      effective: kind === 'effective' ? invalid : () => kind !== 'retain',
+      ...(kind === 'registered' ? { registered: invalid } : {}),
+      ...(kind === 'available' ? { available: invalid } : {}),
+    };
+    const game = cardGame();
+    await expect(
+      game.room.run('sync source', async (ctx) => {
+        active = ctx;
+        game.skills.addProvider({ collect: () => [{ self, definition }] }, ctx);
+        if (kind === 'registered' || kind === 'effective') game.skills.query(ctx, query, null, 0);
+        else await ctx.window(window, null);
+      }),
+    ).rejects.toThrow('Queries cannot await');
+    await Promise.resolve();
+    expect(game.room.status).toBe('faulted');
+    expect(fired).toBe(0);
+    expect(lateRejected).toBe(true);
+    expect(game.room.history.facts()).toEqual([]);
+    expect(game.room.history.entries.filter((entry) => entry.type === 'fault')).toHaveLength(1);
+    rebuilt(game);
+  },
+);

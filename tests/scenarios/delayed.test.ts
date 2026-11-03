@@ -19,7 +19,7 @@ import {
   judgmentFinished,
   finishGame,
 } from '../../src/sdk';
-import type { UseIntent } from '../../src/sdk';
+import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -40,9 +40,8 @@ const turn = (game: ReturnType<typeof cardGame>, owner: string) =>
   );
 
 function phases(result: Awaited<ReturnType<typeof turn>>) {
-  if (result.kind !== 'resolved' || result.value.kind !== 'resolved')
-    throw new Error('Turn did not resolve.');
-  return result.value.value.phases;
+  if (result.kind !== 'resolved') throw new Error('Turn did not resolve.');
+  return result.value.phases;
 }
 
 it('延时牌使用只安装，不提前判定或反制；同名牌不能重复放到同一角色', async () => {
@@ -355,7 +354,7 @@ it('skipNext 消耗下一次对应阶段，额外同名阶段之后不会重复�
       body: async (at, phase, book) => {
         if (phase.kind === 'prepare')
           expect(await runPhase(at, book, 'a', 'play', () => {}, phase.turn)).toMatchObject({
-            value: { exit: 'skipped' },
+            exit: 'skipped',
           });
       },
     }),
@@ -369,13 +368,13 @@ it('转化来源在宣告后消失仍保留延时牌名，原使用者死亡也�
   const skill = defineSkill({
     id: 'probe:conversion',
     name: '转化',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'delay',
         label: '转化',
         names: () => ['standard:indulgence'],
-        materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+        materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
         count: { min: 1, max: 1 },
         make: () => ({ name: 'standard:indulgence' }),
       }),
@@ -438,9 +437,26 @@ it('判定完成后效结束整局，乐不思蜀不再产生新的阶段跳过�
 });
 
 it('延时牌定义快照配置，不被调用者之后修改的目标模式影响', async () => {
-  const input = { id: 'probe:config', label: '配置', self: false, resolve() {} };
+  let resolved = 0;
+  class Configuration {
+    id = 'probe:config';
+    label = '配置';
+    self = false;
+    #amount = 1;
+
+    resolve(_ctx: Context, { effect, book, phase }: DelayedInput) {
+      expect(effect.target).toBe('b');
+      expect(book).toBe(game.book);
+      expect(phase.kind).toBe('judge');
+      resolved += this.#amount;
+    }
+  }
+  const input = new Configuration();
   const definition = delayedCard(input);
   input.self = true;
+  input.resolve = () => {
+    throw new Error('Changed delayed resolver must not run.');
+  };
   const game = cardGame({ hands: { a: [] }, definitions: [definition] });
   expect(
     await use(game, {
@@ -451,4 +467,8 @@ it('延时牌定义快照配置，不被调用者之后修改的目标模式影�
     }),
   ).toMatchObject({ value: { kind: 'used' } });
   expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
+  await turn(game, 'b');
+  expect(resolved).toBe(1);
+  expect(delayedCards(game.room.world, 'b')).toHaveLength(0);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });

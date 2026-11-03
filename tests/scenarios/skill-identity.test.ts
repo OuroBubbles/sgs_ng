@@ -1,6 +1,5 @@
 import { expect, it } from 'vitest';
 import {
-  activate,
   activeOffers,
   costPaid,
   ownedCards,
@@ -13,7 +12,7 @@ import {
 import type { Context, PhaseView } from '../../src/sdk';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { card, cardGame } from '../fixtures/cards';
+import { card, cardGame, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 
 const original = { kind: 'general', id: 'original' } as const;
@@ -49,7 +48,7 @@ async function prepare(game: Game, skill: string) {
       ['a', 'b', 'c'].map((player) => ({ kind: 'vitality', player, hp: 2 })),
       null,
     );
-    ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill, source: original }));
+    await game.skills.grant(ctx, { owner: 'a', skill, source: original });
   });
 }
 function currentInstance(game: Game, skill: string) {
@@ -94,14 +93,14 @@ for (const rule of cases) {
         async run(ctx) {
           replaced = true;
           if (change === 'recreate') {
-            ctx.unwrap(await game.skills.revoke(ctx, 'a', skill, original));
-            ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill, source: original }));
+            await game.skills.revoke(ctx, 'a', skill, original);
+            await game.skills.grant(ctx, { owner: 'a', skill, source: original });
           } else if (change === 'disable-enable') {
-            ctx.unwrap(await game.skills.setEnabled(ctx, 'a', skill, original, false));
-            ctx.unwrap(await game.skills.setEnabled(ctx, 'a', skill, original, true));
+            await game.skills.setEnabled(ctx, 'a', skill, original, false);
+            await game.skills.setEnabled(ctx, 'a', skill, original, true);
           } else {
-            ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill, source: additional }));
-            ctx.unwrap(await game.skills.revoke(ctx, 'a', skill, original));
+            await game.skills.grant(ctx, { owner: 'a', skill, source: additional });
+            await game.skills.revoke(ctx, 'a', skill, original);
           }
         },
       });
@@ -110,18 +109,23 @@ for (const rule of cases) {
       const first = game.room.run('first-phase', (ctx) =>
         runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
           firstPhase = phase;
-          await activate(at, game.book, phase, { skill: firstInstance, action: rule.action });
+          await activate(at, game.book, phase, { instance: firstInstance, action: rule.action });
           const current = currentInstance(game, skill);
           expect(current === firstInstance).toBe(change !== 'recreate');
           expect(activeOffers(at, game.book, phase).some((offer) => offer.skill === skill)).toBe(
             false,
           );
           expect(
-            validateActive(at, game.book, phase, { skill: current, action: rule.action }).ok,
+            validateActive(at, game.book, phase, {
+              instance: current,
+              action: rule.action,
+              cards: ownedCards(at.world, 'a', ['hand', 'equipment']).slice(0, rule.cards),
+              targets: rule.targets,
+            }).ok,
           ).toBe(false);
           // 绕过菜单直接提交新实例也不能支付第二次；材料与目标仍足够。
           expect(ownedCards(at.world, 'a').length).toBeGreaterThanOrEqual(rule.cards);
-          await activate(at, game.book, phase, { skill: current, action: rule.action });
+          await activate(at, game.book, phase, { instance: current, action: rule.action });
         }),
       );
       await resolveAction(game, rule);
@@ -141,7 +145,7 @@ for (const rule of cases) {
             true,
           );
           await activate(at, game.book, phase, {
-            skill: currentInstance(game, skill),
+            instance: currentInstance(game, skill),
             action: rule.action,
           });
         }),
@@ -179,19 +183,17 @@ it.each(cases)('$name嵌套同角色出牌阶段有独立次数，返回后外�
   const instance = currentInstance(game, skill);
   const running = game.room.run('nested-phases', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, outer) => {
-      await activate(at, game.book, outer, { skill: instance, action: rule.action });
+      await activate(at, game.book, outer, { instance: instance, action: rule.action });
       expect(activeOffers(at, game.book, outer).some((offer) => offer.skill === skill)).toBe(false);
-      at.unwrap(
-        await runPhase(at, game.book, 'a', 'play', async (inside, inner) => {
-          expect(inner.id).not.toBe(outer.id);
-          expect(
-            activeOffers(inside, game.book, inner).some((offer) => offer.skill === skill),
-          ).toBe(true);
-          await activate(inside, game.book, inner, { skill: instance, action: rule.action });
-        }),
-      );
+      await runPhase(at, game.book, 'a', 'play', async (inside, inner) => {
+        expect(inner.id).not.toBe(outer.id);
+        expect(activeOffers(inside, game.book, inner).some((offer) => offer.skill === skill)).toBe(
+          true,
+        );
+        await activate(inside, game.book, inner, { instance: instance, action: rule.action });
+      });
       expect(activeOffers(at, game.book, outer).some((offer) => offer.skill === skill)).toBe(false);
-      await activate(at, game.book, outer, { skill: instance, action: rule.action });
+      await activate(at, game.book, outer, { instance: instance, action: rule.action });
     }),
   );
   await resolveAction(game, rule);
@@ -225,18 +227,13 @@ it.each([false, true])(
         },
       });
     const body = async (ctx: Context) => {
-      ctx.unwrap(
-        await game.skills.grant(ctx, { owner: 'c', skill: 'standard:kurou', source: original }),
-      );
-      ctx.unwrap(await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, false));
-      ctx.unwrap(await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, true));
-      ctx.unwrap(await game.skills.revoke(ctx, 'c', 'standard:kurou', original));
+      await game.skills.grant(ctx, { owner: 'c', skill: 'standard:kurou', source: original });
+      await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, false);
+      await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, true);
+      await game.skills.revoke(ctx, 'c', 'standard:kurou', original);
     };
     await game.room.run('change', async (ctx) => {
-      if (inTurn)
-        ctx.unwrap(
-          await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => body(at) }),
-        );
+      if (inTurn) await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => body(at) });
       else await body(ctx);
     });
     const order = inTurn ? ['b', 'c', 'd', 'a'] : ['c', 'd', 'a', 'b'];

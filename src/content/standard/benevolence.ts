@@ -1,6 +1,4 @@
 import {
-  defineSkill,
-  viewAs,
   ownedCards,
   JointSelection,
   defineState,
@@ -22,15 +20,16 @@ import {
   withCardSupply,
 } from '../../sdk';
 import type {
-  CardBook,
   Context,
   PhaseView,
   SkillHandle,
   CardChoice,
   UseIntent,
   SemanticCard,
+  ActiveInput,
 } from '../../sdk';
 import { otherSeats } from './helpers';
+import type { SkillDefinition } from '../../sdk';
 
 const given = defineState(
   'standard:rende-given',
@@ -49,7 +48,8 @@ const scope = (self: SkillHandle, phase: PhaseView) => ({
 });
 const phaseLive = (ctx: Context, self: SkillHandle, phase: PhaseView) =>
   ctx.world.player(self.owner).alive && !phase.turn?.ended && !isGameOver(ctx.world);
-function rendeSelection(ctx: Context, self: SkillHandle, phase: PhaseView): JointSelection {
+
+function rendeSelection(ctx: Context, { self, phase }: ActiveInput): JointSelection {
   return new JointSelection({
     cards: () =>
       phaseLive(ctx, self, phase)
@@ -57,62 +57,48 @@ function rendeSelection(ctx: Context, self: SkillHandle, phase: PhaseView): Join
         : [],
     targets: () =>
       phaseLive(ctx, self, phase)
-        ? otherSeats(ctx, self.owner)
-            .filter((id) => ctx.world.player(id).alive)
-            .map((id) => ({ id, label: id }))
+        ? otherSeats(ctx, self.owner).filter((id) => ctx.world.player(id).alive)
         : [],
     cardCount: { min: 1, max: 'all' },
     targetCount: { min: 1, max: 1 },
   });
 }
-export const rende = defineSkill({
+export const rende = {
   id: 'standard:rende',
   name: '仁德',
   description:
     '出牌阶段，你可以将至少一张手牌交给一名其他角色，可以多次分配。本阶段以此法给出的手牌首次累计达到两张后，你回复 1 点体力。交牌不是弃牌。',
-  effects: [],
   active: [
     {
       id: 'give',
-      label: '仁德',
-      available: (ctx, self, phase) =>
-        rendeSelection(ctx, self, phase).inspect({ cards: [], targets: [] }).valid,
-      async run(ctx, self, phase) {
-        const model = rendeSelection(ctx, self, phase);
-        const answer = await ctx.ask(
-          model.decision(self.owner, '仁德：选择手牌和一名其他角色', true, {
-            cancelLabel: '取消发动',
-            reason: self.skill,
-          }),
-        );
-        if (answer.kind !== 'chosen') return;
-        const target = answer.value.targets[0]!;
+      selection: rendeSelection,
+      async run(ctx, { self, phase, choice, selection: model }) {
+        const target = choice.targets[0]!;
         const hand = ctx.world.snapshot.zones.find(
           (zone) => zone.owner === target && zone.kind === 'hand',
         )!;
         const before = readState(ctx.world, given, scope(self, phase));
-        const after = before + answer.value.cards.length;
+        const after = before + choice.cards.length;
         const paid = await pay(ctx, {
-          actor: self.owner,
           skill: self,
-          cards: answer.value.cards,
+          cards: choice.cards,
           to: hand.id,
           areas: ['hand'],
           reason: self.skill,
-          legal: () => model.validate(answer.value).ok,
+          legal: () => model.validate(choice).ok,
           changes: [stateChange(ctx, given, scope(self, phase), after)],
           factKind: 'skill.invoked',
-          declaration: { label: self.name, targets: [target], count: answer.value.cards.length },
+          declaration: { label: self.name, targets: [target], count: choice.cards.length },
         });
-        if (paid.kind === 'aborted') return ctx.abort(paid.reason);
-        if (paid.value.kind !== 'paid') return;
+
+        if (paid.kind !== 'paid') return;
         // 累计与交牌同次提交；后效中的失去/重新获得技能不能重置本阶段累计。
         if (before < 2 && after >= 2 && ctx.world.player(self.owner).alive)
           await recover(ctx, { from: self.owner, to: self.owner, amount: 1 });
       },
     },
   ],
-});
+} satisfies SkillDefinition;
 
 const qingnangLimit = (self: SkillHandle, phase: PhaseView) => ({
   key: 'qingnang',
@@ -120,12 +106,7 @@ const qingnangLimit = (self: SkillHandle, phase: PhaseView) => ({
   lifetime: phase.lifetime,
   max: 1,
 });
-function qingnangSelection(
-  ctx: Context,
-  book: CardBook,
-  self: SkillHandle,
-  phase: PhaseView,
-): JointSelection {
+function qingnangSelection(ctx: Context, { self, phase, book }: ActiveInput): JointSelection {
   return new JointSelection({
     cards: () =>
       phaseLive(ctx, self, phase)
@@ -144,76 +125,62 @@ function qingnangSelection(
       phaseLive(ctx, self, phase)
         ? ctx.world.snapshot.players
             .filter((player) => player.alive && player.hp < player.maxHp)
-            .map((player) => ({ id: player.id, label: player.id }))
+            .map((player) => player.id)
         : [],
     cardCount: { min: 1, max: 1 },
     targetCount: { min: 1, max: 1 },
   });
 }
-export const qingnang = defineSkill({
+export const qingnang = {
   id: 'standard:qingnang',
   name: '青囊',
   description:
     '出牌阶段限一次，你可以弃置一张手牌，令一名已受伤的角色回复 1 点体力，可以选择自己。',
-  effects: [],
   active: [
     {
       id: 'discard-heal',
-      label: '青囊',
-      available: (ctx, self, phase, book) =>
-        used(ctx.world, self.owner, qingnangLimit(self, phase)) === 0 &&
-        qingnangSelection(ctx, book, self, phase).inspect({ cards: [], targets: [] }).valid,
-      async run(ctx, self, phase, book) {
-        const model = qingnangSelection(ctx, book, self, phase);
-        const answer = await ctx.ask(
-          model.decision(self.owner, '青囊：弃置一张手牌，选择一名受伤角色', true, {
-            cancelLabel: '取消发动',
-            reason: self.skill,
-          }),
-        );
-        if (answer.kind !== 'chosen') return;
+      available: (ctx, { self, phase }) =>
+        used(ctx.world, self.owner, qingnangLimit(self, phase)) === 0,
+      selection: qingnangSelection,
+      async run(ctx, { self, phase, book, choice, selection: model }) {
         const paid = await payDiscard(ctx, book, {
-          actor: self.owner,
           skill: self,
-          cards: answer.value.cards,
+          cards: choice.cards,
           areas: ['hand'],
           reason: self.skill,
           limit: qingnangLimit(self, phase),
-          legal: () => model.validate(answer.value).ok,
+          legal: () => model.validate(choice).ok,
           factKind: 'skill.invoked',
-          declaration: { label: self.name, targets: answer.value.targets },
+          declaration: { label: self.name, targets: choice.targets },
         });
-        if (paid.kind === 'aborted') return ctx.abort(paid.reason);
-        if (paid.value.kind !== 'paid') return;
-        const target = answer.value.targets[0]!;
+
+        if (paid.kind !== 'paid') return;
+        const target = choice.targets[0]!;
         if (ctx.world.player(target).alive)
           await recover(ctx, { from: self.owner, to: target, amount: 1 });
       },
     },
   ],
-});
-export const jijiu = defineSkill({
+} satisfies SkillDefinition;
+export const jijiu = {
   id: 'standard:jijiu',
   name: '急救',
   description:
     '你的回合外，你可以将一张红色手牌或装备牌当桃使用。救援属于使用牌，不能将急救当作普通打出。',
-  effects: [],
   viewAs: [
-    viewAs({
+    {
       id: 'red-peach',
-      label: '急救',
-      names: () => ['standard:peach'],
       count: { min: 1, max: 1 },
-      available: (ctx, self, purpose) =>
+      available: (ctx, { self, purpose }) =>
         purpose === 'use' && readState(ctx.world, activeTurn, activeTarget)?.owner !== self.owner,
-      materials: (ctx, self, book) =>
+      materials: (ctx, { self, book }) =>
         ownedCards(ctx.world, self.owner, ['hand', 'equipment']).filter(
           (id) => book.face(ctx, id).color === 'red',
         ),
-      make: () => ({ name: 'standard:peach' }),
-    }),
+      make: { name: 'standard:peach' },
+    },
   ],
-});
+} satisfies SkillDefinition;
 
 const allies = (ctx: Context, owner: string) =>
   otherSeats(ctx, owner).filter(
@@ -244,47 +211,42 @@ const probeChoice: CardChoice = {
   materials: [],
   reason: 'standard:jijiang',
 };
-export const jijiang = defineSkill({
+export const jijiang = {
   id: 'standard:jijiang',
   name: '激将',
   lord: true,
   description:
     '主公技。当你需要使用或打出杀时，可以请求其他蜀势力角色依次替你打出杀。实际供牌者打出，使用杀时由你承担目标、距离和次数；本阶段请求失败后，不能再主动以激将使用杀。',
-  effects: [
+  triggers: [
     on(responseRequested, {
-      id: 'delegate-slash',
       order: 'choose',
-      when: (ctx, request, self) =>
+      when: (ctx, { payload: request, self }) =>
         request.actor === self.owner &&
         request.actor === request.beneficiary &&
         request.names.includes('standard:slash') &&
         request.available(ctx) &&
         allies(ctx, self.owner).length > 0,
-      async run(ctx, request, self) {
+      async run(ctx, { payload: request, self }) {
         const invoked = await invoke(ctx, self, '是否发动【激将】请求其他蜀角色打出杀？', (at) =>
           request.available(at),
         );
-        if (invoked.kind === 'aborted') return ctx.abort(invoked.reason);
-        if (!invoked.value) return;
+
+        if (!invoked) return;
         for (const actor of otherSeats(ctx, self.owner)) {
           if (!request.available(ctx)) return;
           if (!ctx.world.player(actor).alive || kingdomOf(ctx.world, actor) !== '蜀') continue;
           const result = await request.delegate(ctx, actor, ['standard:slash']);
-          if (result.kind === 'aborted') return ctx.abort(result.reason);
-          if (result.value.kind === 'responded' || result.value.kind === 'used') return;
+
+          if (result.kind === 'responded' || result.kind === 'used') return;
         }
         markFailed(ctx, self);
       },
     }),
   ],
   viewAs: [
-    viewAs({
+    {
       id: 'ask-slash',
-      label: '激将',
-      names: () => ['standard:slash'],
-      materials: () => [],
-      count: { min: 0, max: 0 },
-      available(ctx, self, purpose) {
+      available(ctx, { self, purpose }) {
         const phase = currentPhase(ctx);
         return (
           purpose === 'use' &&
@@ -292,19 +254,22 @@ export const jijiang = defineSkill({
           !(phase && readState(ctx.world, failed, scope(self, phase)))
         );
       },
-      make: () => ({ name: 'standard:slash' }),
-      use: (ctx, self, intent, book) =>
+      make: { name: 'standard:slash' },
+      use: (ctx, { self, intent, book }) =>
         ctx.flow('jijiang.use', async (at) => {
           const probe: UseIntent = { ...intent, choice: probeChoice };
           const live = (current: Context) => book.validateUse(current, probe).ok;
-          const invoked = await invoke(
-            at,
-            self,
-            '是否发动【激将】请求其他蜀角色为此次用杀供牌？',
-            live,
-          );
-          if (invoked.kind === 'aborted') return at.abort(invoked.reason);
-          if (!invoked.value) return { kind: 'unavailable', reason: 'Jijiang was not invoked.' };
+          // 选择此配方并提交目标已经表示发动；不再追加一次是否发动的询问。
+          const paid = await pay(at, {
+            skill: self,
+            reason: self.skill,
+            factKind: 'skill.invoked',
+            declaration: { label: self.name },
+            legal: () => live(at),
+          });
+
+          if (paid.kind !== 'paid')
+            return { kind: 'unavailable', reason: 'Jijiang was not invoked.' };
           for (const actor of otherSeats(at, self.owner)) {
             if (!live(at)) return { kind: 'unavailable', reason: 'Use is no longer available.' };
             if (!at.world.player(actor).alive || kingdomOf(at.world, actor) !== '蜀') continue;
@@ -318,18 +283,15 @@ export const jijiang = defineSkill({
                 reason: self.skill,
                 available: live,
               },
-              async (useAt, supply) => {
-                const used = await book.use(useAt, {
+              (useAt, supply) =>
+                book.use(useAt, {
                   ...intent,
                   choice: providedChoice(supply.card, actor, self.skill),
-                });
-                if (used.kind === 'aborted') return useAt.abort(used.reason);
-                return used.value;
-              },
+                }),
             );
-            if (supplied.kind === 'aborted') return at.abort(supplied.reason);
-            if (supplied.value.kind === 'supplied') return supplied.value.value;
-            if (supplied.value.kind === 'invalidated')
+
+            if (supplied.kind === 'supplied') return supplied.value;
+            if (supplied.kind === 'invalidated')
               return {
                 kind: 'unavailable',
                 reason: 'Supplied card was invalidated after payment.',
@@ -338,6 +300,6 @@ export const jijiang = defineSkill({
           markFailed(at, self);
           return { kind: 'unavailable', reason: 'No Shu player supplied Slash.' };
         }),
-    }),
+    },
   ],
-});
+} satisfies SkillDefinition;

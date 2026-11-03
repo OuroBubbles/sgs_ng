@@ -19,7 +19,7 @@ import {
   kill,
   costPaid,
 } from '../../src/sdk';
-import type { DiscardQuery } from '../../src/sdk';
+import type { DiscardQuery, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { jieyin } from '../../src/content/standard/generals';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -30,11 +30,11 @@ const protection = (accepts: (input: DiscardQuery) => boolean) =>
   defineSkill({
     id: 'test:protection',
     name: '保护',
-    effects: [],
+    triggers: [],
     modifiers: [
       modify(
         cardQueries.prohibitDiscard,
-        (_ctx, input, self) => input.owner === self.owner && accepts(input),
+        (_ctx, { input, self }) => input.owner === self.owner && accepts(input),
       ),
       modify(cardQueries.prohibitDiscard, () => false),
     ],
@@ -94,6 +94,87 @@ it('弃置查询包含操作者/持有者/原因/区域/牌面，否决不可被
   });
 });
 
+it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣告走同一支付流程', async () => {
+  const game = cardGame({ hands: { a: [card('fee', 'jink')], b: [] } });
+  class Cost {
+    #enabled = false;
+    #reason = 'prototype.discard';
+
+    constructor(readonly limit: UsageLimit) {}
+
+    get actor() {
+      return 'a';
+    }
+    get cards() {
+      return ['fee'];
+    }
+    get areas() {
+      return ['hand'] as const;
+    }
+    get reason() {
+      return this.#reason;
+    }
+    get factKind() {
+      return this.#reason;
+    }
+    get declaration() {
+      return { label: this.#reason };
+    }
+    legal() {
+      return this.#enabled;
+    }
+    enable() {
+      this.#enabled = true;
+    }
+  }
+  await game.room.run('cost', (ctx) =>
+    withLifetime(ctx, 'phase', async (at, lifetime) => {
+      const limit = { key: 'once', source: 'prototype', max: 1, lifetime };
+      const spec = new Cost(limit);
+      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(at.world.position('fee')).toBe('a:hand');
+      expect(used(at.world, 'a', limit)).toBe(0);
+      expect(game.room.history.facts(spec.factKind)).toEqual([]);
+
+      const order: string[] = [];
+      at.listen(cardsMoved, {
+        id: 'prototype-move',
+        owner: null,
+        eligible: () => true,
+        run(child) {
+          expect(child.world.position('fee')).toBe('discard');
+          expect(used(child.world, 'a', limit)).toBe(1);
+          order.push('moved');
+        },
+      });
+      at.listen(costPaid, {
+        id: 'prototype-paid',
+        owner: null,
+        eligible: () => true,
+        run: () => {
+          order.push('paid');
+        },
+      });
+      spec.enable();
+      expect(await payDiscard(at, game.book, spec)).toMatchObject({
+        kind: 'paid',
+        receipt: {
+          actor: 'a',
+          cards: ['fee'],
+          reason: spec.reason,
+          declaration: { label: spec.reason },
+        },
+      });
+      expect(order).toEqual(['moved', 'paid']);
+      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(used(at.world, 'a', limit)).toBe(1);
+      expect(game.room.history.facts(spec.factKind)).toHaveLength(1);
+    }),
+  );
+  expect(game.room.status).toBe('ready');
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+});
+
 it('费用整批重查，受保护材料不能部分支付，也不能被自定义 legal=true 绕过；解除后费用/次数同次提交', async () => {
   const skill = protection((input) => input.card === 'guarded');
   const game = cardGame({
@@ -104,16 +185,18 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
   await game.room.run('cost', (ctx) =>
     withLifetime(ctx, 'phase', async (at, lifetime) => {
       const limit = { key: 'once', source: 'skill', max: 1, lifetime };
+      let materialReads = 0;
       const spec = {
         actor: 'a',
-        cards: ['free', 'guarded'],
+        get cards() {
+          return ++materialReads === 2 ? ['free'] : ['free', 'guarded'];
+        },
         reason: 'fee',
         limit,
         legal: () => true,
       };
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({
-        value: { kind: 'unavailable' },
-      });
+      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'unavailable' });
+      expect(materialReads).toBe(1);
       expect(at.world.zone('a:hand').cards).toEqual(['guarded', 'free']);
       expect(used(at.world, 'a', limit)).toBe(0);
       await game.skills.revoke(at, 'a', skill.id, source);
@@ -126,7 +209,9 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
           expect(used(child.world, 'a', limit)).toBe(1);
         },
       });
-      expect(await payDiscard(at, game.book, spec)).toMatchObject({ value: { kind: 'paid' } });
+      materialReads = 0;
+      expect(await payDiscard(at, game.book, spec)).toMatchObject({ kind: 'paid' });
+      expect(materialReads).toBe(1);
     }),
   );
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -171,13 +256,18 @@ it('结姻的候选和支付使用同一弃置权限，不能提交受保护手�
     ctx.commit('wound', [{ kind: 'vitality', player: 'b', hp: 2 }], null);
   });
   const running = game.room.run('play', (ctx) => runPhase(ctx, game.book, 'a', 'play', playPhase));
-  await answer(game, { skill: instance, action: 'discard-heal' }, 'play-action');
   const request = await nextRequest(game.room);
-  expect(options(request).map((item) => item.id)).toEqual(['f1', 'f2']);
+  expect(request.kind).toBe('play-action');
+  const input = { instance: instance, action: 'discard-heal', cards: ['f1', 'f2'], targets: ['b'] };
+  const preview = game.room.decisions.preview(request.id, input)!;
+  expect((preview.feedback as { cards: { id: string }[] }).cards.map((item) => item.id)).toEqual([
+    'f1',
+    'f2',
+  ]);
   expect(
-    game.room.decisions.preview(request.id, { cards: ['guarded', 'f1'], targets: ['b'] })?.valid,
+    game.room.decisions.preview(request.id, { ...input, cards: ['guarded', 'f1'] })?.valid,
   ).toBe(false);
-  await answer(game, { cards: ['f1', 'f2'], targets: ['b'] });
+  await answer(game, input, 'play-action');
   await running;
   expect(game.room.world.position('guarded')).toBe('a:hand');
   expect(game.room.world.player('b').hp).toBe(3);
@@ -255,9 +345,7 @@ for (const count of [0, 2]) {
     const entry = delayedCards(game.room.world, 'b')[0]!;
     await game.room.run('discard', async (ctx) => {
       const input = { actor: 'a', owner: 'b', cards: [entry.id], reason: 'effect' };
-      expect(await discardCards(ctx, game.book, input)).toMatchObject({
-        value: { kind: 'unavailable' },
-      });
+      expect(await discardCards(ctx, game.book, input)).toMatchObject({ kind: 'unavailable' });
       if (count) {
         expect(
           game.book.canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm0', reason: 'effect' }),
@@ -283,7 +371,8 @@ for (const count of [0, 2]) {
         },
       });
       expect(await discardCards(ctx, game.book, input)).toMatchObject({
-        value: { kind: 'discarded', cards: remaining },
+        kind: 'discarded',
+        cards: remaining,
       });
     });
     expect(delayedCards(game.room.world, 'b')).toEqual([]);
@@ -307,7 +396,7 @@ it('效果弃置批内有一张禁止就整体失败；普通转移、用牌善�
         cards: ['guarded', 's'],
         reason: 'discard',
       }),
-    ).toMatchObject({ value: { kind: 'unavailable' } });
+    ).toMatchObject({ kind: 'unavailable' });
     await moveCards(
       ctx,
       [{ cards: ['guarded'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],

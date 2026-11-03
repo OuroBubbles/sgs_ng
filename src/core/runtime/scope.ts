@@ -1,3 +1,5 @@
+import { immutable } from '../model/value';
+
 export class RuleAbort extends Error {
   constructor(readonly reason: string) {
     super(reason);
@@ -16,7 +18,8 @@ export class Scope {
     readonly id: string,
     readonly parent: Scope | null,
   ) {
-    this.path = Object.freeze([...(parent?.path ?? []), id]);
+    // 同一作用域的因果路径由历史记录共享，不在每条事实和轨迹中重复复制。
+    this.path = immutable([...(parent?.path ?? []), id]);
     if (parent) this.#detach = parent.onClose(() => this.close(parent.reason));
   }
 
@@ -50,11 +53,26 @@ export class Scope {
     const failures: unknown[] = [];
     for (const cleanup of cleanups) {
       try {
-        cleanup();
+        const result: unknown = cleanup();
+        if (
+          result !== null &&
+          (typeof result === 'object' || typeof result === 'function') &&
+          'then' in result &&
+          typeof result.then === 'function'
+        ) {
+          // 异步规则善后必须由流程等待；这里只释放同步资源，并接住违规续体的拒绝。
+          Promise.resolve(result).catch(() => undefined);
+          throw new Error('Resource cleanup cannot await.');
+        }
       } catch (error) {
         failures.push(error);
       }
     }
-    if (failures.length) throw new AggregateError(failures, `Cleanup failed: ${this.id}`);
+    if (failures.length) {
+      const details = failures
+        .map((error) => (error instanceof Error ? error.message : String(error)))
+        .join('; ');
+      throw new AggregateError(failures, `Cleanup failed: ${this.id}: ${details}`);
+    }
   }
 }

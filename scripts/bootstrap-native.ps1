@@ -1,11 +1,15 @@
-param(
+﻿param(
   [ValidateSet('Rust', 'Msvc', 'Android')]
   [string[]]$Components = @('Rust', 'Msvc')
 )
 
 $ErrorActionPreference = 'Stop'
 $bootstrapRoot = Split-Path -Parent $PSScriptRoot
-$tools = Join-Path $bootstrapRoot '.tools'
+$tools = if ($env:SGS_NATIVE_TOOLS_ROOT) {
+  [IO.Path]::GetFullPath($env:SGS_NATIVE_TOOLS_ROOT)
+} else {
+  Join-Path (Split-Path -Parent $bootstrapRoot) 'shared\tools\native-windows'
+}
 $downloads = Join-Path $tools 'downloads'
 New-Item -ItemType Directory -Path $downloads -Force | Out-Null
 
@@ -21,7 +25,7 @@ if ($Components -contains 'Rust') {
 }
 
 if ($Components -contains 'Msvc') {
-  # 此第三方脚本只负责提取 Microsoft 官方包；版本固定，执行范围局限在 .tools。
+  # 此第三方脚本提取 Microsoft 官方包；固定版本，清理仅限已确认的工具目录。
   $revision = '49b58850aa5e5c1e65f090d4651ee76607883e11'
   $gist = Invoke-RestMethod "https://api.github.com/gists/7f3162ec2988e81e56d5c4e22cde9977/$revision"
   $script = Join-Path $downloads 'portable-msvc.py'
@@ -29,15 +33,22 @@ if ($Components -contains 'Msvc') {
   Push-Location -LiteralPath $tools
   try {
     if ((Get-Location).Path -ne $tools) { throw 'Unexpected extraction directory.' }
-    & python $script --vs 2022 --msvc-version 14.44 --sdk-version 26100 --target x64 --accept-license
+    $extractRoot = [IO.Path]::GetFullPath((Join-Path $tools 'msvc'))
+    if (!(($extractRoot + '\').StartsWith($tools.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase))) {
+      throw 'MSVC extraction must stay within the selected tools directory.'
+    }
+    & uv run --no-project --python 3.12 $script --vs 2022 --msvc-version 14.44 --sdk-version 26100 --target x64 --accept-license
     if ($LASTEXITCODE -ne 0) { throw 'Portable MSVC extraction failed.' }
   } finally { Pop-Location }
 }
 
 if ($Components -contains 'Android') {
-  if (-not $env:ANDROID_HOME -or -not $env:JAVA_HOME) { throw 'Set ANDROID_HOME and JAVA_HOME first.' }
-  & "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat" 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
+  . (Join-Path $PSScriptRoot 'toolchain.ps1')
+  if (-not $env:ANDROID_HOME -or -not $env:JAVA_HOME) { throw 'Install a JDK and Android command-line SDK in the shared Android tool directory, or set JAVA_HOME and ANDROID_HOME.' }
+  & "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat" "--sdk_root=$env:ANDROID_HOME" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
   if ($LASTEXITCODE -ne 0) { throw 'Android packages installation failed.' }
+  & rustup target add aarch64-linux-android
+  if ($LASTEXITCODE -ne 0) { throw 'Android Rust target installation failed.' }
 }
 
-Write-Output 'Native tools prepared. Run scripts/native.ps1 -Task check.'
+Write-Output "Native tools prepared in $tools. Run pnpm desktop:debug."

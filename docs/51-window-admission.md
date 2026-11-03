@@ -10,13 +10,11 @@ ctx.windowOf(type) 返回当前 Context 最近的同类型祖先 WindowRef，窗
 const window = ctx.windowOf(damageReceived);
 if (!window) return;
 
-const change = ctx.unwrap(
-  await book.skills.grant(ctx, {
-    owner: self.owner,
-    skill: 'workshop:echo',
-    source: { kind: 'effect', id: self.skill },
-  }),
-);
+const change = await book.skills.grant(ctx, {
+  owner: self.owner,
+  skill: 'workshop:echo',
+  source: { kind: 'effect', id: self.skill },
+});
 
 if (change.after) book.skills.include(ctx, window, [change.after.id]);
 ```
@@ -73,6 +71,6 @@ window.included 跟踪记录请求的因果路径、目标窗口 ID、加入与�
 
 本批完整规则场景 1132 项、全部单元/行为 1139 项分别通过，原有标准整局 60 秒/2400 决策预算保持不变。浏览器 174 项一次全量通过，无跳过、重试通过或意外失败。Windows Debug/Release 各 66 组实际 WebView2 检查及不同 PID 的真实重启恢复通过，控制台错误为空；隔离测试目录和实际进程/端口已清理。发布 ZIP 4,617,088 字节，实际四个成员、exe/模块字节、运行指南、清单及原生证明的独立核对见 `.artifacts/validation/window-admission-package-audit.json`。
 
-该批标准与演武为 0.1.9，渡口仍为 0.1.0 且精确依赖 standard@0.1.9；壳保持 0.1.0。默认标准仍为 32 种牌、25 将、108 实体；启用演武为 37 种牌、29 将与五种作者牌组。旧外部模块按 [48](48-content-persistence.md) 的恢复契约保留源码并提示版本不符，需重新构建或导入随包新模块；最新版本与完整验证以 [STATUS](STATUS.md) 为准。
+该批标准与演武为 0.1.9，渡口仍为 0.1.0 且精确依赖 standard@0.1.9；壳保持 0.1.0。默认标准仍为 32 种牌、25 将、108 实体；启用演武为 37 种牌、29 将与五种作者牌组。旧外部模块按 [持久恢复](39-source-packages.md#持久安装与恢复) 的恢复契约保留源码并提示版本不符，需重新构建或导入随包新模块；最新版本与完整验证以 [STATUS](STATUS.md) 为准。
 
 长期独立效果注册、复杂选择、完整标准语义审计、作者资源交付与完整离线验收继续推进。Android 仍在桌面完成之后，高级托管、联机、录像/重连及挂起执行恢复仍在后续范围。

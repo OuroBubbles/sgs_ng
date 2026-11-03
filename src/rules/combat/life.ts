@@ -1,6 +1,6 @@
 import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { cardsMoved } from '../cards/move';
 import { isGameOver } from '../game/end';
 import { withLifetime } from '../scopes/lifetime';
@@ -80,7 +80,7 @@ class Draft implements DeathDraft {
 }
 
 /** 标记死亡后开放死亡效果，再原子清理所属区域和技能；不夺走已宣告牌的处理区材料。 */
-export function kill(ctx: Context, request: DeathInput): Promise<FlowResult<DeathResult>> {
+export function kill(ctx: Context, request: DeathInput): Promise<DeathResult> {
   return ctx.flow('death', async (child) => {
     const input = immutable(request);
     if (input.killer !== null) child.world.player(input.killer);
@@ -164,10 +164,7 @@ export function kill(ctx: Context, request: DeathInput): Promise<FlowResult<Deat
 }
 
 /** 每次导致濒死的提交有独立因果；嵌套濒死不共享一个可被内层提前清掉的布尔标记。 */
-export async function enterDying(
-  ctx: Context,
-  request: DyingInput,
-): Promise<FlowResult<DyingResult>> {
+export async function enterDying(ctx: Context, request: DyingInput): Promise<DyingResult> {
   return withLifetime(ctx, 'dying', async (child, lifetime) => {
     const event: DyingEvent = immutable({ ...request, id: child.cause.flowId });
     const player = child.world.player(event.player);
@@ -202,8 +199,8 @@ export async function enterDying(
         cause: event.cause,
         reason: 'dying',
       });
-      if (result.kind === 'aborted') return child.abort(result.reason);
-      kind = result.value.kind;
+
+      kind = result.kind;
     }
     const result: DyingResult = immutable({ kind, event });
     child.commit(

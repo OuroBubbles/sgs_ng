@@ -1,8 +1,9 @@
 import type { Change, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
-import type { Context, FlowResult, Room } from '../../core/runtime/room';
-import { defineWindow } from '../../core/runtime/window';
+import type { Context, Room } from '../../core/runtime/room';
+import { syncQueryValue } from '../../core/runtime/query';
+import { defineWindow, labelTrigger } from '../../core/runtime/window';
 import type {
   Trigger,
   TriggerSource,
@@ -29,17 +30,38 @@ export interface EffectRecord<Data = unknown> {
   readonly scopeId: string | null;
   readonly data: DeepReadonly<Data>;
 }
+/** 字段始终是本次行为绑定的快照；跨 await 读取当前实例须显式调用 current。 */
 export interface EffectHandle<Data = unknown> extends EffectRecord<Data> {
-  /** data 在实例仍存在时读取最新值；结束后的普通后续保留本次绑定快照。 */
-  active(world: WorldReader): boolean;
-  update(ctx: Context, data: Data): Promise<FlowResult<EffectRecord<Data> | null>>;
-  end(ctx: Context, reason: string): Promise<FlowResult<boolean>>;
+  /** 当前挂接中的实时记录；结束、外局或旧挂接均返回 null。 */
+  current(world: WorldReader): EffectRecord<Data> | null;
+  update(ctx: Context, data: Data): Promise<EffectRecord<Data> | null>;
+  /** 返回本次实际移除的记录；重复结束返回 null。后效不改写这份结果。 */
+  end(ctx: Context, reason: string): Promise<EffectRecord<Data> | null>;
 }
 export interface EffectTrigger {
   readonly id: string;
   readonly window: object;
+  /** 纯同步绑定；候选收集、执行前重绑及显式入窗均检查这一约定。 */
   bind(self: EffectHandle): Trigger<unknown>;
 }
+
+/** 实例由 create(self) 的闭包保留；触发输入只携带本次窗口的数据。 */
+export interface EffectTriggerInput<Payload> {
+  readonly payload: Payload;
+}
+export interface EffectTriggerOccurrenceInput<Payload> extends EffectTriggerInput<Payload> {
+  readonly occurrence: TriggerOccurrence;
+}
+export interface EffectTriggerDefinition<Payload> {
+  /** 默认使用时点 ID；同一效果中重名的处理器须显式区分。 */
+  readonly id?: string;
+  readonly group?: string;
+  readonly order?: 'automatic' | 'choose';
+  readonly times?: (ctx: Context, input: EffectTriggerInput<Payload>) => number;
+  readonly when?: (ctx: Context, input: EffectTriggerOccurrenceInput<Payload>) => boolean;
+  readonly run: (ctx: Context, input: EffectTriggerOccurrenceInput<Payload>) => unknown;
+}
+
 export interface EffectModifier {
   readonly query: object;
   contribution(ctx: Context, input: unknown): unknown;
@@ -51,11 +73,12 @@ export interface EffectBehavior {
 interface EffectDeclaration<Data> {
   readonly id: string;
   readonly name: string;
+  /** 新增、更新与读取存量数据都必须同步校验。 */
   readonly accepts: (data: unknown) => data is Data;
   /** 在纯收集/查询中以普通闭包绑定实例；条件和分支不需要配置模板。 */
   create(self: EffectHandle<Data>): EffectBehavior;
   /** 状态已结束、通用结束窗口已完成后的普通后续，不恢复效果资格。 */
-  onEnd?(ctx: Context, before: EffectRecord<Data>, reason: string): void | Promise<void>;
+  onEnd?(ctx: Context, input: EffectEnd<Data>): unknown;
 }
 export type EffectDefinition<Data = unknown> = Readonly<EffectDeclaration<Data>>;
 export interface EffectInput<Data> {
@@ -69,8 +92,8 @@ export interface PreparedEffect<Data> {
   /** 可与费用/宣告一起提交；调用方仍负责自己的最终资格检查。 */
   readonly change: Extract<Change, { kind: 'setState' }>;
 }
-export interface EffectEnd {
-  readonly before: EffectRecord;
+export interface EffectEnd<Data = unknown> {
+  readonly before: EffectRecord<Data>;
   readonly reason: string;
 }
 export const effectAdded = defineWindow<EffectRecord>('effect.added');
@@ -80,35 +103,43 @@ export const effectChanged = defineWindow<{
 }>('effect.changed');
 export const effectEnded = defineWindow<EffectEnd>('effect.ended');
 
+const definedEffects = new WeakSet<object>();
+// 绑定保留接收者；登记核对仍使用绑定前的工厂身份，不把包装函数当作另一份实现。
+const factoryOrigins = new WeakMap<object, object>();
+
 export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDefinition<Data> {
-  if (
-    !definition.id.trim() ||
-    !definition.name.trim() ||
-    typeof definition.accepts !== 'function' ||
-    typeof definition.create !== 'function'
-  )
+  if (definedEffects.has(definition)) return definition;
+  const { id, name, accepts, create: factory, onEnd } = definition;
+  if (!id.trim() || !name.trim() || typeof accepts !== 'function' || typeof factory !== 'function')
     throw new Error('Effect requires an ID, name, data validator and ordinary behavior factory.');
-  return Object.freeze({ ...definition });
+  const create = factory.bind(definition);
+  const fixed = Object.freeze({
+    id,
+    name,
+    accepts: accepts.bind(definition),
+    create,
+    ...(onEnd === undefined ? {} : { onEnd: onEnd.bind(definition) }),
+  });
+  factoryOrigins.set(create, factoryOrigins.get(factory) ?? factory);
+  definedEffects.add(fixed);
+  return fixed;
 }
 
 /** 只描述一个普通触发；身份、生存资格、行动序与有限次数仍走原有 Window。 */
 export function effectOn<Payload>(
   window: WindowType<Payload>,
-  input: {
-    readonly id: string;
-    readonly group?: string;
-    readonly order?: 'automatic' | 'choose';
-    readonly times?: (ctx: Context, payload: Payload) => number;
-    readonly when?: (ctx: Context, payload: Payload, occurrence: TriggerOccurrence) => boolean;
-    readonly run: (
-      ctx: Context,
-      payload: Payload,
-      occurrence: TriggerOccurrence,
-    ) => void | Promise<void>;
-  },
+  input: EffectTriggerDefinition<Payload>,
 ): EffectTrigger {
-  if (!input.id) throw new Error('Effect trigger requires an ID.');
-  const handler = Object.freeze({ ...input });
+  const { id = window.id } = input;
+  if (!id) throw new Error('Effect trigger requires an ID.');
+  const handler = Object.freeze({
+    id,
+    group: input.group,
+    order: input.order,
+    times: input.times?.bind(input),
+    when: input.when?.bind(input),
+    run: input.run.bind(input),
+  });
   return Object.freeze({
     id: handler.id,
     window,
@@ -120,10 +151,11 @@ export function effectOn<Payload>(
       ...(handler.order === undefined ? {} : { order: handler.order }),
       ...(handler.times === undefined
         ? {}
-        : { times: (ctx, value) => handler.times!(ctx, value as Payload) }),
+        : { times: (ctx, value) => handler.times!(ctx, { payload: value as Payload }) }),
       eligible: (ctx, value, occurrence) =>
-        self.active(ctx.world) && (handler.when?.(ctx, value as Payload, occurrence) ?? true),
-      run: (ctx, value, occurrence) => handler.run(ctx, value as Payload, occurrence),
+        self.current(ctx.world) !== null &&
+        (handler.when?.(ctx, { payload: value as Payload, occurrence }) ?? true),
+      run: (ctx, value, occurrence) => handler.run(ctx, { payload: value as Payload, occurrence }),
     }),
   });
 }
@@ -145,15 +177,13 @@ export class EffectBook implements TriggerSource {
 
   register(definitions: readonly EffectDefinition[]): void {
     if (this.#sealed) throw new Error('Effect definitions are sealed after attachment.');
+    const prepared = definitions.map(defineEffect);
     if (
-      new Set(definitions.map((definition) => definition.id)).size !== definitions.length ||
-      definitions.some((definition) => this.#definitions.has(definition.id))
+      new Set(prepared.map((definition) => definition.id)).size !== prepared.length ||
+      prepared.some((definition) => this.#definitions.has(definition.id))
     )
       throw new Error('Duplicate effect definition.');
-    const prepared = definitions.map(
-      (definition) => [definition.id, defineEffect(definition)] as const,
-    );
-    this.#definitions = new Map([...this.#definitions, ...prepared]);
+    for (const definition of prepared) this.#definitions.set(definition.id, definition);
   }
 
   #definition(id: string): EffectDefinition {
@@ -168,10 +198,12 @@ export class EffectBook implements TriggerSource {
   ): readonly EffectRecord<Data>[];
   instances(world: WorldReader): readonly EffectRecord[];
   instances(world: WorldReader, definition?: EffectDefinition): readonly EffectRecord[] {
-    return world.snapshot.states
-      .filter((state) => state.key === stateKey)
-      .map((state) => this.#record(world, state))
-      .filter((record) => !definition || record.type === definition.id);
+    const records: EffectRecord[] = [];
+    // 先校验完整效果列表，再按定义筛选，避免条件隐藏了非法记录。
+    for (const state of world.snapshot.states)
+      if (state.key === stateKey) records.push(this.#record(world, state));
+
+    return definition ? records.filter((record) => record.type === definition.id) : records;
   }
 
   #record(world: WorldReader, entry: StateEntry): EffectRecord {
@@ -187,7 +219,9 @@ export class EffectBook implements TriggerSource {
       )
     )
       throw new Error('Invalid stored effect record.');
-    if (!this.#definition(record.type).accepts(record.data))
+    if (
+      !syncQueryValue(this.#definition(record.type).accepts(record.data), `${record.type}.accepts`)
+    )
       throw new Error(`Invalid effect data: ${record.type}`);
     return record;
   }
@@ -203,11 +237,14 @@ export class EffectBook implements TriggerSource {
       owner: null,
       eligible: (_ctx, ended) => ended.statesBefore.some((state) => state.key === stateKey),
       run: async (ctx, ended) => {
+        // 同批记录已一起到期；单项后效的规则中止不撤销其余项的结束责任。
         for (const state of ended.statesBefore.filter((entry) => entry.key === stateKey))
-          await this.#finished(
-            ctx,
-            this.#record(ctx.world, state),
-            `lifetime:${ended.kind}:${ended.exit}`,
+          await ctx.attempt('effect.expire', (at) =>
+            this.#finished(
+              at,
+              this.#record(at.world, state),
+              `lifetime:${ended.kind}:${ended.exit}`,
+            ),
           );
       },
     });
@@ -241,18 +278,26 @@ export class EffectBook implements TriggerSource {
     this.#assertWriting(ctx);
     if (isGameOver(ctx.world)) throw new Error('Cannot add an effect after game end.');
     const registered = this.#definition(definition.id);
-    if (registered.create !== definition.create || !ctx.query(() => registered.accepts(input.data)))
+    const expected = factoryOrigins.get(registered.create) ?? registered.create;
+    const proposed = factoryOrigins.get(definition.create) ?? definition.create;
+    if (expected !== proposed)
       throw new Error('Effect definition or data does not match the registered declaration.');
-    if (input.owner !== null) ctx.world.player(input.owner);
-    assertLifetime(ctx, input.lifetime ?? null);
-    const record: EffectRecord<Data> = immutable({
-      id: `effect:${ctx.cause.flowId}`,
-      type: definition.id,
-      owner: input.owner,
-      origin: input.origin ?? null,
-      scopeId: input.lifetime?.id ?? null,
-      data: input.data,
-    }) as EffectRecord<Data>;
+    const lifetime = ctx.query(() => input.lifetime ?? null);
+    // 整份记录一次复制，保留 origin/data 的别名，并校验实际将提交的数据。
+    const record: EffectRecord<Data> = ctx.query(() =>
+      immutable({
+        id: `effect:${ctx.cause.flowId}`,
+        type: registered.id,
+        owner: input.owner,
+        origin: input.origin ?? null,
+        scopeId: lifetime?.id ?? null,
+        data: input.data,
+      }),
+    );
+    if (!ctx.query(() => registered.accepts(record.data)))
+      throw new Error('Effect definition or data does not match the registered declaration.');
+    if (record.owner !== null) ctx.world.player(record.owner);
+    assertLifetime(ctx, lifetime);
     return Object.freeze({
       record,
       change: immutable({
@@ -273,14 +318,14 @@ export class EffectBook implements TriggerSource {
     ctx: Context,
     definition: EffectDefinition<Data>,
     input: EffectInput<Data>,
-  ): Promise<FlowResult<PreparedEffect<Data>>> {
+  ): Promise<PreparedEffect<Data>> {
     return ctx.flow('effect.prepare', (at) => this.#prepare(at, definition, input));
   }
   add<Data>(
     ctx: Context,
     definition: EffectDefinition<Data>,
     input: EffectInput<Data>,
-  ): Promise<FlowResult<EffectRecord<Data>>> {
+  ): Promise<EffectRecord<Data>> {
     return ctx.flow('effect.add', async (at) => {
       const prepared = this.#prepare(at, definition, input);
       at.commit('effect.added', [prepared.change], prepared.record);
@@ -293,21 +338,15 @@ export class EffectBook implements TriggerSource {
     });
   }
 
-  update<Data>(
-    ctx: Context,
-    id: string,
-    data: Data,
-  ): Promise<FlowResult<EffectRecord<Data> | null>> {
+  update<Data>(ctx: Context, id: string, data: Data): Promise<EffectRecord<Data> | null> {
     return ctx.flow('effect.update', async (at) => {
       this.#assertWriting(at);
-      const entry = at.world.snapshot.states.find(
-        (state) => state.key === stateKey && state.id === id,
-      );
-      if (!entry || isGameOver(at.world)) return null;
+      const entry = at.world.state(id);
+      if (entry?.key !== stateKey || isGameOver(at.world)) return null;
       const before = this.#record(at.world, entry);
-      if (!at.query(() => this.#definition(before.type).accepts(data)))
+      const after = at.query(() => immutable({ ...before, data })) as EffectRecord<Data>;
+      if (!at.query(() => this.#definition(before.type).accepts(after.data)))
         throw new Error('Invalid updated effect data.');
-      const after = immutable({ ...before, data }) as EffectRecord<Data>;
       at.commit('effect.changed', [{ kind: 'setState', state: { ...entry, value: after } }], {
         before,
         after,
@@ -321,18 +360,16 @@ export class EffectBook implements TriggerSource {
     });
   }
 
-  end(ctx: Context, id: string, reason: string): Promise<FlowResult<boolean>> {
+  end(ctx: Context, id: string, reason: string): Promise<EffectRecord | null> {
     return ctx.flow('effect.end', async (at) => {
       this.#assertWriting(at);
       if (!reason.trim()) throw new Error('Effect end requires a reason.');
-      const entry = at.world.snapshot.states.find(
-        (state) => state.key === stateKey && state.id === id,
-      );
-      if (!entry) return false;
+      const entry = at.world.state(id);
+      if (entry?.key !== stateKey) return null;
       const before = this.#record(at.world, entry);
       at.commit('effect.removed', [{ kind: 'removeState', state: id }], { before, reason });
       await this.#finished(at, before, reason);
-      return true;
+      return before;
     });
   }
 
@@ -341,29 +378,28 @@ export class EffectBook implements TriggerSource {
     ctx.commit('effect.ended', [], ended);
     await ctx.window(effectEnded, ended, before.owner === null ? {} : { subject: before.owner });
     const onEnd = this.#definition(before.type).onEnd;
-    if (onEnd) ctx.unwrap(await ctx.flow('effect.after-end', (at) => onEnd(at, before, reason)));
+    if (onEnd) await ctx.flow('effect.after-end', (at) => onEnd(at, ended));
   }
 
   #handle(world: WorldReader, record: EffectRecord): EffectHandle {
     const registration = this.#attachments.get(world);
-    const current = () =>
-      world.snapshot.states.find((state) => state.key === stateKey && state.id === record.id)
-        ?.value as EffectRecord | undefined;
-    const active = (at: WorldReader) =>
-      at === world &&
-      registration !== undefined &&
-      this.#attachments.get(world) === registration &&
-      current() !== undefined;
+    const current = (at: WorldReader): EffectRecord | null => {
+      if (
+        at !== world ||
+        registration === undefined ||
+        this.#attachments.get(world) !== registration
+      )
+        return null;
+      const entry = world.state(record.id);
+      return entry?.key === stateKey ? this.#record(world, entry) : null;
+    };
     const check = (ctx: Context) => {
       if (ctx.world !== world || this.#attachments.get(world) !== registration)
         throw new Error('Effect handle is outside its attachment.');
     };
     return Object.freeze({
       ...record,
-      get data() {
-        return (current() ?? record).data;
-      },
-      active,
+      current,
       update: (ctx: Context, data: unknown) => {
         check(ctx);
         return this.update(ctx, record.id, data);
@@ -375,8 +411,11 @@ export class EffectBook implements TriggerSource {
     });
   }
 
-  #behavior(world: WorldReader, record: EffectRecord): EffectBehavior {
-    const behavior = this.#definition(record.type).create(this.#handle(world, record));
+  #behavior(self: EffectHandle): EffectBehavior {
+    const behavior = syncQueryValue(
+      this.#definition(self.type).create(self),
+      `${self.type}.create`,
+    );
     if (
       new Set(behavior.triggers?.map((trigger) => trigger.id)).size !==
       (behavior.triggers?.length ?? 0)
@@ -389,19 +428,24 @@ export class EffectBook implements TriggerSource {
     if (!this.#attachments.has(world)) return [];
     return this.instances(world).flatMap((record) => {
       const self = this.#handle(world, record);
-      return (this.#behavior(world, record).triggers ?? [])
+      return (this.#behavior(self).triggers ?? [])
         .filter((trigger) => trigger.window === type)
         .map((trigger): Trigger<Payload> => {
           // 入场身份/组/座次/次数固定；资格与普通闭包在执行前按最新数据重绑。
-          const latest = (ctx: Context) =>
-            self.active(ctx.world)
-              ? this.#behavior(world, record)
-                  .triggers?.find((current) => current.id === trigger.id && current.window === type)
-                  ?.bind(self)
-              : undefined;
+          const latest = (ctx: Context) => {
+            const current = self.current(ctx.world);
+            if (!current) return undefined;
+            const bindingSelf = this.#handle(world, current);
+            const binding = this.#behavior(bindingSelf)
+              .triggers?.find((item) => item.id === trigger.id && item.window === type)
+              ?.bind(bindingSelf);
+            return syncQueryValue(binding, `${record.type}/${trigger.id}.bind`);
+          };
           return {
-            ...trigger.bind(self),
-            label: this.#definition(record.type).name,
+            ...labelTrigger(
+              syncQueryValue(trigger.bind(self), `${record.type}/${trigger.id}.bind`),
+              this.#definition(record.type).name,
+            ),
             eligible: (ctx, payload, occurrence) =>
               latest(ctx)?.eligible(ctx, payload, occurrence) ?? false,
             async run(ctx, payload, occurrence) {
@@ -422,10 +466,11 @@ export class EffectBook implements TriggerSource {
     return ctx.query(() => {
       if (!this.#attachments.has(ctx.world)) return [];
       return this.instances(ctx.world).flatMap((record) =>
-        (this.#behavior(ctx.world, record).modifiers ?? [])
+        (this.#behavior(this.#handle(ctx.world, record)).modifiers ?? [])
           .filter((modifier) => modifier.query === query)
           .flatMap((modifier) => {
-            const value = modifier.contribution(ctx, input) as Value | undefined;
+            // 数组本身不会暴露其中的 Promise，须在装入结果前检查单项。
+            const value = syncQueryValue(modifier.contribution(ctx, input)) as Value | undefined;
             return value === undefined ? [] : [value];
           }),
       );
@@ -443,11 +488,15 @@ export class EffectBook implements TriggerSource {
       ctx.query(() =>
         this.instances(ctx.world)
           .filter((record) => ids.has(record.id))
-          .flatMap((record) =>
-            (this.#behavior(ctx.world, record).triggers ?? [])
+          .flatMap((record) => {
+            const self = this.#handle(ctx.world, record);
+            return (this.#behavior(self).triggers ?? [])
               .filter((trigger) => trigger.window === window.type)
-              .map((trigger) => trigger.bind(this.#handle(ctx.world, record)).id),
-          ),
+              .map(
+                (trigger) =>
+                  syncQueryValue(trigger.bind(self), `${record.type}/${trigger.id}.bind`).id,
+              );
+          }),
       ),
     );
     return ctx.include(window, this, (trigger) => triggers.has(trigger.id));

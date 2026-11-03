@@ -1,6 +1,6 @@
 import { JointSelection } from '../../core/decisions/selection';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
 import type { CardBook } from './book';
 import { delayedCards } from './delayed';
@@ -13,6 +13,8 @@ export interface OwnedCardChoice {
   readonly reason: string;
   readonly prompt?: string;
   readonly discard?: boolean;
+  /** 可取消选牌不宣告技能；调用者在接纳后负责支付与后效。 */
+  readonly optional?: boolean;
 }
 export type ChosenOwnedCard =
   | { readonly kind: 'chosen'; readonly card: string; readonly from: string }
@@ -29,7 +31,7 @@ export function chooseOwnedCard(
   ctx: Context,
   book: CardBook,
   request: OwnedCardChoice,
-): Promise<FlowResult<ChosenOwnedCard>> {
+): Promise<ChosenOwnedCard> {
   return ctx.flow('chooseOwnedCard', async (child) => {
     const input = immutable(request);
     if (
@@ -98,21 +100,38 @@ export function chooseOwnedCard(
       cards: () =>
         available().map((item, i) => {
           const zone = child.world.zone(item.from);
-          const card = item.delayed ?? child.world.card(item.card);
+          const card = visible(item.from) ? (item.delayed ?? book.face(child, item.card)) : null;
           return {
             id: item.id,
-            label: !visible(item.from)
+            label: !card
               ? `${zone.kind === 'hand' ? '未知手牌' : '未知牌'} ${i + 1}`
               : `${book.definition(card.name).label} · ${card.suit} ${card.rank}`,
           };
         }),
-      targets: () => [],
       cardCount: { min: 1, max: 1 },
-      targetCount: { min: 0, max: 0 },
     });
-    const answer = await child.ask(
-      selection.decision(input.actor, input.prompt ?? `选择 ${input.target} 的一张牌`),
-    );
+    const answer = await child.ask({
+      ...selection.decision(input.actor, input.prompt ?? `选择 ${input.target} 的一张牌`, {
+        optional: input.optional ?? false,
+      }),
+      describe: () => ({
+        ...selection.describe(),
+        purpose: 'owned-card',
+        reason: input.reason,
+        target: input.target,
+        ownedCards: available().map((item) => {
+          const card = visible(item.from) ? (item.delayed ?? book.face(child, item.card)) : null;
+          return {
+            id: item.id,
+            area: child.world.zone(item.from).kind,
+            face: card
+              ? { name: card.name, suit: card.suit, rank: card.rank, color: card.color }
+              : null,
+          };
+        }),
+        ...(input.optional ? { cancelLabel: '不发动' } : {}),
+      }),
+    });
     if (answer.kind !== 'chosen') return { kind: 'unavailable' };
     const chosen = available().find((item) => item.id === answer.value.cards[0]);
     if (!chosen) return { kind: 'unavailable' };

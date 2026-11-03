@@ -104,7 +104,7 @@ it.each([
     expect(game.book.attackRange(ctx, 'a', slash)).toBe(range);
     expect(
       await equip(ctx, game.book, { card: 'weapon', owner: 'b', from: 'a:equipment' }),
-    ).toMatchObject({ value: { kind: 'equipped' } });
+    ).toMatchObject({ kind: 'equipped' });
     expect(game.book.attackRange(ctx, 'a', slash)).toBe(1);
     expect(game.book.attackRange(ctx, 'b', slash)).toBe(range);
   });

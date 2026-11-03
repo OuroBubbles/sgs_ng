@@ -21,8 +21,28 @@ export interface TableLayout {
   readonly decision: TableRegion;
   readonly skills: TableRegion;
   readonly choices: TableRegion;
+  readonly ownedChoices: TableRegion;
   readonly equipment: readonly TableRegion[];
   readonly seats: readonly SeatRect[];
+}
+
+/** FreeKill Photo 的原始 175×233 坐标；整块等比缩放，立绘与区域不再各自猜位置。 */
+export function photoLayout(seat: SeatRect) {
+  const scale = Math.min(seat.width / 175, seat.height / 233);
+  const left = seat.x - (175 * scale) / 2;
+  const top = seat.y - (233 * scale) / 2;
+  const region = (x: number, y: number, width: number, height: number): TableRegion => ({
+    left: left + x * scale,
+    top: top + y * scale,
+    width: width * scale,
+    height: height * scale,
+  });
+  return {
+    scale,
+    frame: region(0, 0, 175, 233),
+    portrait: region(31, 5, 103 / 0.75, 166 / 0.75),
+    equipment: region(23 / 0.75, 118 / 0.75, 103 / 0.75, 53 / 0.75),
+  };
 }
 
 /** 临时牌池优先居中；需要选角色时，给目标中心保留真实点击位置。空白容器不截获指针。 */
@@ -35,10 +55,10 @@ export function cardPoolCenter(
 ): number {
   const center = layout.width / 2;
   if (!count) return center;
-  const top = layout.arena.height / 2 - cardHeight / 2 + (privatePool ? 9 : 0);
+  const top = layout.arena.top + layout.arena.height / 2 - cardHeight / 2 + (privatePool ? 9 : 0);
   const blocking = targets.filter((seat) => seat.y >= top && seat.y <= top + cardHeight);
   if (!blocking.length) return center;
-  const cardWidth = cardHeight * 0.72;
+  const cardWidth = (cardHeight * 93) / 130;
   const total = count * cardWidth + (count - 1) * 8;
   const margin = total / 2 + 8;
   if (margin * 2 >= layout.width) return center;
@@ -69,7 +89,7 @@ export function cardPoolCenter(
   return best;
 }
 
-/** 本人固定右下，手牌在左下，确认区在手牌上方；其余席位围绕桌面。 */
+/** 本人固定右下，手牌在左下，确认区在手牌上方；牌堆与回合信息由桌面顶栏承载。 */
 export function layoutTable(
   width: number,
   height: number,
@@ -83,37 +103,56 @@ export function layoutTable(
   const gap = 8;
   const selfWidth = portrait ? 86 : short ? 90 : Math.min(158, width * 0.14);
   const selfHeight = portrait ? 162 : short ? 138 : 226;
-  const skillWidth = portrait ? 64 : short ? 78 : 104;
-  const handHeight = short ? 98 : portrait ? 146 : 188;
+  const skillWidth = portrait ? 80 : short ? 112 : 180;
+  const preferredHandHeight = short ? Math.min(118, height - 164) : portrait ? 164 : 206;
   const decisionHeight = portrait ? 98 : short ? 54 : 76;
+  const sideRows = Math.ceil(Math.max(0, count - 4) / 2);
+  const preferredArenaHeight = height - preferredHandHeight - decisionHeight - pad - gap * 2;
+  // 姓名至少约 12px；能排进顶边时，优先调整区域分配，避免把两侧武将压成缩略图。
+  const readableHeight = 136;
+  const compactHandHeight = 132;
+  const singleSide =
+    !portrait &&
+    !short &&
+    sideRows > 1 &&
+    (preferredArenaHeight - pad * 2) / sideRows - 26 - gap < readableHeight &&
+    width / (count - 3 + 2.8) >= (readableHeight * 175) / 233 &&
+    height - compactHandHeight - decisionHeight - pad - gap * 2 >=
+      readableHeight + 26 + gap + pad + 98;
+  const handHeight = singleSide ? compactHandHeight : preferredHandHeight;
   const handLeft = portrait ? 39 : 52;
   const selfLeft = width - selfWidth - pad;
   const skillLeft = selfLeft - skillWidth - gap;
   const handTop = height - handHeight - pad;
   const decisionTop = handTop - decisionHeight - gap;
-  const arenaHeight = Math.max(80, decisionTop - gap);
+  const arenaBottom = Math.max(80, decisionTop - gap);
   const oneRow = short && count > 4;
-  const sideCount = oneRow ? 0 : Math.ceil(Math.max(0, count - 4) / 2);
-  const topCount = oneRow ? count - 1 : count < 5 ? Math.max(1, count - 2) : Math.min(3, count - 3);
+  const sideCount = oneRow ? 0 : singleSide ? 1 : sideRows;
+  const topCount = oneRow
+    ? count - 1
+    : singleSide
+      ? count - 3
+      : count < 5
+        ? Math.max(1, count - 2)
+        : Math.min(3, count - 3);
   const cardWidth = Math.min(portrait ? 82 : 142, width / (topCount + (oneRow ? 0.6 : 2.8)));
-  const gearHeight = compact ? 25 : 34;
-  const counterHeight = 26;
+  const judgmentMargin = Math.min(26, (cardWidth / 175) * 33);
   const cardHeight = Math.max(
     38,
     Math.min(
-      compact ? 110 : 190,
-      (arenaHeight - pad * 2 - counterHeight) / Math.max(1, sideCount) - gearHeight - gap,
+      singleSide ? readableHeight : compact ? 110 : 190,
+      (arenaBottom - pad * 2) / Math.max(1, sideCount) - (sideCount > 1 ? judgmentMargin + gap : 0),
     ),
   );
+  const arenaTop = singleSide ? pad + cardHeight + judgmentMargin + gap : 0;
+  const arenaHeight = arenaBottom - arenaTop;
+  const ownedChoiceHeight = Math.min(360, arenaHeight - pad);
   const rightCount = oneRow ? 0 : count <= 4 ? (count === 2 ? 0 : 1) : sideCount;
   const leftCount = count - 1 - topCount - rightCount;
   const slots: SeatRect[] = [];
   const seat = (x: number, y: number): SeatRect => ({
     x: Math.max(cardWidth / 2 + pad, Math.min(width - cardWidth / 2 - pad, x)),
-    y: Math.max(
-      cardHeight / 2 + pad + counterHeight,
-      Math.min(arenaHeight - cardHeight / 2 - gearHeight, y),
-    ),
+    y: Math.max(cardHeight / 2 + pad, Math.min(arenaBottom - cardHeight / 2 - judgmentMargin, y)),
     width: cardWidth,
     height: cardHeight,
   });
@@ -122,8 +161,8 @@ export function layoutTable(
       seat(
         width - pad - cardWidth / 2,
         rightCount === 1
-          ? arenaHeight * 0.58
-          : pad + cardHeight / 2 + i * (arenaHeight - pad * 2 - cardHeight - gearHeight),
+          ? arenaBottom * 0.58
+          : pad + cardHeight / 2 + i * (arenaBottom - pad * 2 - cardHeight - judgmentMargin),
       ),
     );
   for (let i = 0; i < topCount; i++) {
@@ -140,7 +179,7 @@ export function layoutTable(
     slots.push(
       seat(
         topCount === 1 ? width * 0.3 : from + ((to - from) * i) / (topCount - 1),
-        pad + counterHeight + cardHeight / 2,
+        pad + cardHeight / 2,
       ),
     );
   }
@@ -149,8 +188,8 @@ export function layoutTable(
       seat(
         pad + cardWidth / 2,
         leftCount === 1
-          ? arenaHeight * 0.62
-          : pad + cardHeight / 2 + i * (arenaHeight - pad * 2 - cardHeight - gearHeight),
+          ? arenaBottom * 0.62
+          : pad + cardHeight / 2 + i * (arenaBottom - pad * 2 - cardHeight - judgmentMargin),
       ),
     );
   const seats = Array.from(
@@ -159,7 +198,11 @@ export function layoutTable(
       index === focus
         ? {
             x: selfLeft + selfWidth / 2,
-            y: height - selfHeight / 2 - pad,
+            y:
+              height -
+              (Math.min(selfWidth / 175, selfHeight / 233) * 233) / 2 -
+              pad -
+              Math.min(32, (selfWidth / 175) * 33),
             width: selfWidth,
             height: selfHeight,
           }
@@ -170,7 +213,7 @@ export function layoutTable(
     height,
     compact,
     focus,
-    arena: { left: 0, top: 0, width, height: arenaHeight },
+    arena: { left: 0, top: arenaTop, width, height: arenaHeight },
     hand: {
       left: handLeft,
       top: handTop,
@@ -183,28 +226,25 @@ export function layoutTable(
       width: selfLeft - handLeft - gap,
       height: decisionHeight,
     },
-    skills: { left: skillLeft, top: height - 58 - pad, width: skillWidth, height: 58 },
+    skills: {
+      left: skillLeft,
+      top: height - selfHeight - pad,
+      width: skillWidth,
+      height: selfHeight - 24,
+    },
     choices: {
       left: width * 0.22,
-      top: arenaHeight * 0.43,
+      top: arenaTop + arenaHeight * 0.43,
       width: width * 0.56,
       height: Math.min(150, arenaHeight * 0.48),
     },
-    equipment: seats.map((item, index) =>
-      index === focus
-        ? {
-            left: skillLeft,
-            top: height - selfHeight - pad,
-            width: skillWidth,
-            height: selfHeight - 68,
-          }
-        : {
-            left: item.x - item.width / 2,
-            top: item.y + item.height / 2 + 3,
-            width: item.width,
-            height: gearHeight,
-          },
-    ),
+    ownedChoices: {
+      left: width * 0.22,
+      top: arenaTop + (arenaHeight - ownedChoiceHeight) / 2,
+      width: width * 0.56,
+      height: ownedChoiceHeight,
+    },
+    equipment: seats.map((item) => photoLayout(item).equipment),
     seats,
   };
 }

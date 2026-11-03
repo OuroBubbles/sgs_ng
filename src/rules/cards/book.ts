@@ -1,7 +1,9 @@
-import type { Validation } from '../../core/decisions/hub';
-import type { ChoiceCount } from '../../core/decisions/selection';
-import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Decision, Validation } from '../../core/decisions/hub';
+import { normalizeChoiceCount } from '../../core/decisions/count';
+import type { ChoiceCount } from '../../core/decisions/count';
+import { immutable, isStringArray } from '../../core/model/value';
+import { syncQueryValue } from '../../core/runtime/query';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { pay, used } from '../costs/pay';
 import type { UsageLimit } from '../costs/pay';
@@ -34,6 +36,8 @@ import type {
   UseRules,
   TargetResolver,
   ViewAs,
+  ViewAsInput,
+  viewAs,
 } from './types';
 import { ownedCards, timingSnapshot, colorOfSuit, isResponseBlocked } from './types';
 import { physicalCardFace } from './face';
@@ -44,6 +48,8 @@ import type { ResponseIntent, ResponseResult, ResponseConsumer } from './respons
 export type { ResponseResult } from './response';
 
 export interface CardOffer {
+  /** 来源定义供表现层归组；不参与提交身份与合法性判定。 */
+  readonly skill?: string;
   readonly description?: string;
   readonly id: string;
   readonly kind: 'physical' | 'viewAs';
@@ -113,12 +119,6 @@ function invalid(reason: string): { readonly ok: false; readonly reason: string 
   return { ok: false, reason };
 }
 function countValid(count: ChoiceCount, selected: number, total: number): boolean {
-  if (
-    !Number.isSafeInteger(count.min) ||
-    count.min < 0 ||
-    (count.max !== 'all' && (!Number.isSafeInteger(count.max) || count.max < count.min))
-  )
-    throw new Error('Invalid material/target count.');
   return selected >= count.min && selected <= (count.max === 'all' ? total : count.max);
 }
 
@@ -135,8 +135,7 @@ export function parseCardChoice(input: unknown): Validation<CardChoice> {
     !('recipe' in input) ||
     typeof input.recipe !== 'string' ||
     !('materials' in input) ||
-    !Array.isArray(input.materials) ||
-    !input.materials.every((id): id is string => typeof id === 'string')
+    !isStringArray(input.materials)
   )
     return invalid('Invalid card recipe choice.');
   try {
@@ -166,6 +165,82 @@ const defaults: CardPolicy = {
   responseTimes: () => 1,
 };
 
+function fixedUse(rules: UseRules, id: string): UseRules {
+  const {
+    count: declaredCount,
+    timings,
+    usage,
+    canUse,
+    target,
+    selection,
+    prepare,
+    fixedTargets,
+    canResolve,
+    resolve,
+    execute,
+  } = rules;
+  if (!resolve && !execute) throw new Error('A usable card requires resolve or execute.');
+  const count = normalizeChoiceCount(declaredCount, `${id} target`);
+  return Object.freeze({
+    count,
+    target: target.bind(rules),
+    ...(timings === undefined ? {} : { timings: Object.freeze([...timings]) }),
+    ...(usage === undefined ? {} : { usage: Object.freeze({ key: usage.key, max: usage.max }) }),
+    ...(canUse === undefined ? {} : { canUse: canUse.bind(rules) }),
+    ...(selection === undefined ? {} : { selection: selection.bind(rules) }),
+    ...(prepare === undefined ? {} : { prepare: prepare.bind(rules) }),
+    ...(fixedTargets === undefined ? {} : { fixedTargets: fixedTargets.bind(rules) }),
+    ...(canResolve === undefined ? {} : { canResolve: canResolve.bind(rules) }),
+    ...(resolve === undefined ? {} : { resolve: resolve.bind(rules) }),
+    ...(execute === undefined ? {} : { execute: execute.bind(rules) }),
+  });
+}
+
+const definedCards = new WeakSet<CardDefinition>();
+
+/** 隔离可变声明并固定方法入口；原接收者保留，已完成的规范化直接复用。 */
+export function defineCard(definition: CardDefinition): CardDefinition {
+  if (definedCards.has(definition)) return definition;
+  const { id, label, type, nature, response, counterable, delayed, equipment, use } = definition;
+  if (!id) throw new Error('Duplicate or empty card definition.');
+  if (!['basic', 'trick', 'equipment'].includes(type))
+    throw new Error('Card definition requires an explicit type.');
+  if (nature !== undefined && (typeof nature !== 'string' || !nature.trim()))
+    throw new Error('Card nature must be a nonempty string.');
+  let fixedDelayed: CardDefinition['delayed'];
+  if (delayed !== undefined) {
+    const { resolve, cancelled } = delayed;
+    fixedDelayed = Object.freeze({
+      resolve: resolve.bind(delayed),
+      ...(cancelled === undefined ? {} : { cancelled: cancelled.bind(delayed) }),
+    });
+  }
+  let fixedEquipment: CardDefinition['equipment'];
+  if (equipment !== undefined) {
+    const { slot, range, skill } = equipment;
+    fixedEquipment = Object.freeze({
+      slot,
+      ...(range === undefined ? {} : { range }),
+      ...(skill === undefined
+        ? {}
+        : { skill: typeof skill === 'function' ? skill.bind(equipment) : defineSkill(skill) }),
+    });
+  }
+  const fixed = Object.freeze({
+    id,
+    label,
+    type,
+    ...(nature === undefined ? {} : { nature }),
+    ...(response === undefined ? {} : { response }),
+    ...(counterable === undefined ? {} : { counterable }),
+    ...(fixedDelayed === undefined ? {} : { delayed: fixedDelayed }),
+    ...(fixedEquipment === undefined ? {} : { equipment: fixedEquipment }),
+    ...(use === undefined ? {} : { use: fixedUse(use, id) }),
+  });
+  definedCards.add(fixed);
+  return fixed;
+}
+
 /** 固定牌定义与统一动作管线。牌与技能的自由代码只依赖公开的语义操作。 */
 export class CardBook {
   /** 独立效果属于每局规则目录，不借用角色的技能授予或当前技能资格。 */
@@ -180,68 +255,24 @@ export class CardBook {
     readonly skills: SkillBook,
     policy: Partial<CardPolicy> = {},
   ) {
+    const prepared = definitions.map(defineCard);
     if (
-      definitions.some(
-        (definition) => definition.use && !definition.use.resolve && !definition.use.execute,
-      )
-    )
-      throw new Error('A usable card requires resolve or execute.');
-    if (
-      definitions.some((definition) => !definition.id) ||
-      new Set(definitions.map((definition) => definition.id)).size !== definitions.length
+      prepared.some((definition) => !definition.id) ||
+      new Set(prepared.map((definition) => definition.id)).size !== prepared.length
     )
       throw new Error('Duplicate or empty card definition.');
-    if (
-      definitions.some((definition) => !['basic', 'trick', 'equipment'].includes(definition.type))
-    )
-      throw new Error('Card definition requires an explicit type.');
-    if (
-      definitions.some(
-        (definition) =>
-          definition.nature !== undefined &&
-          (typeof definition.nature !== 'string' || !definition.nature.trim()),
-      )
-    )
-      throw new Error('Card nature must be a nonempty string.');
-    this.#definitions = new Map(
-      definitions.map((definition) => [
-        definition.id,
-        Object.freeze({
-          ...definition,
-          ...(definition.delayed ? { delayed: Object.freeze({ ...definition.delayed }) } : {}),
-          ...(definition.equipment === undefined
-            ? {}
-            : {
-                equipment: Object.freeze({
-                  ...definition.equipment,
-                  ...(definition.equipment.skill
-                    ? {
-                        skill:
-                          typeof definition.equipment.skill === 'function'
-                            ? definition.equipment.skill
-                            : defineSkill(definition.equipment.skill),
-                      }
-                    : {}),
-                }),
-              }),
-          ...(definition.use === undefined
-            ? {}
-            : {
-                use: Object.freeze({
-                  ...definition.use,
-                  count: Object.freeze({ ...definition.use.count }),
-                  ...(definition.use.timings
-                    ? { timings: Object.freeze([...definition.use.timings]) }
-                    : {}),
-                  ...(definition.use.usage === undefined
-                    ? {}
-                    : { usage: Object.freeze({ ...definition.use.usage }) }),
-                }),
-              }),
-        }),
-      ]),
-    );
-    this.policy = Object.freeze({ ...defaults, ...policy });
+    this.#definitions = new Map(prepared.map((definition) => [definition.id, definition]));
+    // 逐项读取也支持原型方法；固定入口而保留原接收者，不缓存查询结果。
+    this.policy = Object.freeze({
+      distance: policy.distance?.bind(policy) ?? defaults.distance,
+      handLimit: policy.handLimit?.bind(policy) ?? defaults.handLimit,
+      attackRange: policy.attackRange?.bind(policy) ?? defaults.attackRange,
+      prohibitUse: policy.prohibitUse?.bind(policy) ?? defaults.prohibitUse,
+      prohibitResponse: policy.prohibitResponse?.bind(policy) ?? defaults.prohibitResponse,
+      prohibitTarget: policy.prohibitTarget?.bind(policy) ?? defaults.prohibitTarget,
+      usage: policy.usage?.bind(policy) ?? defaults.usage,
+      responseTimes: policy.responseTimes?.bind(policy) ?? defaults.responseTimes,
+    });
     this.skills.addProvider(equipmentAbilities([...this.#definitions.values()], this));
   }
 
@@ -310,55 +341,159 @@ export class CardBook {
     purpose: Purpose | UseTiming,
     names?: readonly string[],
   ): readonly CardOffer[] {
+    return ctx.query(() => immutable([...this.#offerCandidates(ctx, actor, purpose, names)]));
+  }
+
+  /** 只判断候选存在性；纯同步过滤可收窄候选，实际材料和目标仍须最终验证。 */
+  hasOffers(
+    ctx: Context,
+    actor: string,
+    purpose: Purpose | UseTiming,
+    names?: readonly string[],
+    accepts?: (offer: CardOffer) => boolean,
+  ): boolean {
     return ctx.query(() => {
-      if (!ctx.world.player(actor).alive || isGameOver(ctx.world)) return [];
-      const operation = typeof purpose === 'string' ? purpose : 'use';
-      const offers: CardOffer[] = [];
-      for (const id of ownedCards(ctx.world, actor)) {
-        const card = this.#build(ctx, actor, { kind: 'physical', card: id }, operation);
+      for (const offer of this.#offerCandidates(ctx, actor, purpose, names))
+        if (!accepts || syncQueryValue(accepts(immutable(offer)), 'card.offer.filter')) return true;
+      return false;
+    });
+  }
+
+  // 两个公开入口均在 query 内消费迭代器，不让规则回调逃出纯查询边界。
+  *#offerCandidates(
+    ctx: Context,
+    actor: string,
+    purpose: Purpose | UseTiming,
+    names?: readonly string[],
+  ): Iterable<CardOffer> {
+    if (!ctx.world.player(actor).alive || isGameOver(ctx.world)) return;
+    const operation = typeof purpose === 'string' ? purpose : 'use';
+    for (const id of ownedCards(ctx.world, actor)) {
+      const card = this.#build(ctx, actor, { kind: 'physical', card: id }, operation);
+      if (
+        card.ok &&
+        this.#supports(card.value.name, purpose) &&
+        (!names || names.includes(card.value.name))
+      )
+        yield {
+          id: JSON.stringify(['physical', id]),
+          kind: 'physical',
+          label: this.definition(card.value.name).label,
+          names: [card.value.name],
+          materials: [id],
+          count: { min: 1, max: 1 },
+          choice: { card: id },
+        };
+    }
+    for (const { self, definition } of this.skills.bindings(ctx.world)) {
+      if (self.owner !== actor || !self.effective(ctx.world)) continue;
+      const input: ViewAsInput = { self, book: this, purpose: operation };
+      for (const recipe of definition.viewAs ?? []) {
         if (
-          card.ok &&
-          this.#supports(card.value.name, purpose) &&
-          (!names || names.includes(card.value.name))
+          recipe.available &&
+          !syncQueryValue(recipe.available(ctx, input), `${self.skill}/${recipe.id}.available`)
         )
-          offers.push({
-            id: JSON.stringify(['physical', id]),
-            kind: 'physical',
-            label: this.definition(card.value.name).label,
-            names: [card.value.name],
-            materials: [id],
-            count: { min: 1, max: 1 },
-            choice: { card: id },
-          });
+          continue;
+        const possible = this.#names(ctx, input, recipe).filter(
+          (name) => this.#supports(name, purpose) && (!names || names.includes(name)),
+        );
+        const materials = syncQueryValue(
+          recipe.materials(ctx, input),
+          `${self.skill}/${recipe.id}.materials`,
+        );
+        const count = this.#count(ctx, input, recipe);
+        if (!possible.length || materials.length < count.min) continue;
+        yield {
+          id: JSON.stringify([self.id, recipe.id]),
+          kind: 'viewAs',
+          label: recipe.label ?? self.name,
+          skill: self.skill,
+          description: definition.description ?? '',
+          names: possible,
+          materials,
+          count,
+          choice: { instance: self.id, recipe: recipe.id },
+        };
       }
-      for (const { self, definition } of this.skills.bindings(ctx.world)) {
-        if (self.owner !== actor || !self.effective(ctx.world)) continue;
-        for (const recipe of definition.viewAs ?? []) {
-          if (recipe.available && !recipe.available(ctx, self, operation)) continue;
-          const possible = recipe
-            .names(ctx, self)
-            .filter((name) => this.#supports(name, purpose) && (!names || names.includes(name)));
-          const materials = recipe.materials(ctx, self, this);
-          const count = this.#count(ctx, self, recipe);
-          if (!possible.length || materials.length < count.min) continue;
-          offers.push({
-            id: JSON.stringify([self.id, recipe.id]),
-            kind: 'viewAs',
-            label: recipe.label,
-            description: definition.description ?? '',
-            names: possible,
-            materials,
-            count,
-            choice: { instance: self.id, recipe: recipe.id },
-          });
-        }
+    }
+  }
+
+  /** 玩家草稿可以包含附属选择；只有验证后的真实意图进入用牌与效果管线。 */
+  useSelection(
+    ctx: Context,
+    input: Omit<UseIntent, 'targets' | 'parameters'>,
+  ): Decision<Pick<UseIntent, 'targets' | 'parameters'>> {
+    return ctx.query(() => {
+      const intent: UseIntent = { ...input, targets: [] };
+      const built = this.#build(ctx, intent.actor, intent.choice, 'use');
+      const rules = built.ok ? this.definition(built.value.name).use : undefined;
+      if (rules?.selection) {
+        const selection = syncQueryValue(
+          rules.selection(ctx, { intent, book: this }),
+          `${built.ok ? built.value.name : ''}.selection`,
+        );
+        // 选择可由普通对象或原型方法实现；固定入口，不用展开对象丢失其声明。
+        const { available, describe, feedback, validate } = selection;
+        return {
+          player: selection.player,
+          kind: selection.kind,
+          prompt: selection.prompt,
+          optional: selection.optional,
+          ...(describe === undefined
+            ? { data: selection.data }
+            : { describe: () => ctx.query(() => describe.call(selection)) }),
+          ...(available === undefined
+            ? {}
+            : { available: () => ctx.query(() => available.call(selection)) }),
+          feedback: (raw) =>
+            ctx.query(() =>
+              syncQueryValue(feedback?.call(selection, raw), 'use.selection.feedback'),
+            ),
+          validate: (raw) =>
+            ctx.query(() => {
+              // 出牌草稿也直接调用 validate，不能依赖 DecisionHub 代查可用性。
+              if (
+                available &&
+                !syncQueryValue(available.call(selection), 'use.selection.available')
+              )
+                return invalid('Card selection is no longer available.');
+              const chosen = syncQueryValue(
+                validate.call(selection, raw),
+                'use.selection.validate',
+              );
+              if (!chosen.ok) return chosen;
+              const legal = this.validateUse(ctx, { ...intent, ...chosen.value });
+              return legal.ok ? chosen : legal;
+            }),
+        };
       }
-      return immutable(offers);
+      const parse = (raw: unknown): Validation<Pick<UseIntent, 'targets' | 'parameters'>> => {
+        if (!raw || typeof raw !== 'object' || !('targets' in raw) || !isStringArray(raw.targets))
+          return invalid('Expected target IDs.');
+        return { ok: true, value: { targets: raw.targets } };
+      };
+      return {
+        player: intent.actor,
+        kind: 'cards-targets',
+        prompt: '选择用牌目标',
+        optional: true,
+        feedback: (raw) => {
+          const parsed = parse(raw);
+          return parsed.ok ? this.inspectUse(ctx, { ...intent, ...parsed.value }) : null;
+        },
+        validate: (raw) => {
+          const parsed = parse(raw);
+          if (!parsed.ok) return parsed;
+          const legal = this.validateUse(ctx, { ...intent, ...parsed.value });
+          return legal.ok ? parsed : legal;
+        },
+      };
     });
   }
 
   validateUse(ctx: Context, intent: UseIntent): Validation<UseRequest> {
     return ctx.query(() => {
+      if (!isStringArray(intent.targets)) return invalid('Expected target IDs.');
       const built = this.#build(ctx, intent.actor, intent.choice, 'use');
       if (!built.ok) return built;
       if (
@@ -392,7 +527,7 @@ export class CardBook {
           !lifetime.active ||
           !lifetime.belongsTo(ctx.world) ||
           !ctx.cause.scopePath.includes(lifetime.id) ||
-          !opportunity.available(ctx)
+          !syncQueryValue(opportunity.available(ctx), 'counter.available')
         )
           return invalid('Counter opportunity is closed or outside this flow.');
       }
@@ -405,7 +540,7 @@ export class CardBook {
           !opportunity.lifetime.active ||
           !opportunity.lifetime.belongsTo(ctx.world) ||
           !ctx.cause.scopePath.includes(opportunity.lifetime.id) ||
-          !opportunity.available(ctx) ||
+          !syncQueryValue(opportunity.available(ctx), 'response.available') ||
           isResponseBlocked(opportunity.to, intent.actor, built.value.name)
         )
           return invalid('Response use opportunity is closed or outside this flow.');
@@ -424,7 +559,12 @@ export class CardBook {
       if (rules.fixedTargets) {
         if (intent.targets.length)
           return invalid('Fixed-target cards do not accept manual targets.');
-        const targets = immutable(rules.fixedTargets(ctx, intent.actor, built.value, this));
+        const targets = immutable(
+          syncQueryValue(
+            rules.fixedTargets(ctx, { actor: intent.actor, card: built.value, book: this }),
+            `${built.value.name}.fixedTargets`,
+          ),
+        );
         if (
           new Set(targets).size !== targets.length ||
           targets.some((id) => !ctx.world.snapshot.players.some((player) => player.id === id))
@@ -450,7 +590,10 @@ export class CardBook {
       const limit = this.#limit(ctx, request);
       if (limit && used(ctx.world, intent.actor, limit) >= limit.max)
         return invalid('Usage limit reached.');
-      const reason = rules.canUse?.(ctx, request, this);
+      const reason = syncQueryValue(
+        rules.canUse?.(ctx, { request, book: this }),
+        `${request.card.name}.canUse`,
+      );
       return reason ? invalid(reason) : { ok: true, value: request };
     });
   }
@@ -510,7 +653,7 @@ export class CardBook {
     });
   }
 
-  use(ctx: Context, input: UseIntent): Promise<FlowResult<UseResult>> {
+  use(ctx: Context, input: UseIntent): Promise<UseResult> {
     return ctx.flow('useCard', async (child) => {
       let intent: UseIntent = {
         actor: input.actor,
@@ -530,19 +673,26 @@ export class CardBook {
         const binding = this.skills.binding(child.world, selected.instance)!;
         const recipe = binding.definition.viewAs!.find((item) => item.id === selected.recipe)!;
         if (recipe.use) {
-          const prepared = await recipe.use(child, binding.self, intent, this);
-          if (prepared.kind === 'aborted') return child.abort(prepared.reason);
-          return prepared.value;
+          const prepared = await recipe.use(child, {
+            self: binding.self,
+            book: this,
+            purpose: 'use',
+            intent,
+          });
+
+          return prepared;
         }
       }
       const origins = new Map(request.card.materials.map((id) => [id, child.world.position(id)]));
       const rules = this.definition(request.card.name).use!;
       if (rules.prepare) {
         const prepare = rules.prepare;
-        const prepared = await child.flow('use.prepare', (at) => prepare(at, request, this));
-        if (prepared.kind === 'aborted') return child.abort(prepared.reason);
-        if (!prepared.value.ok) return { kind: 'unavailable', reason: prepared.value.reason };
-        intent = { ...intent, parameters: immutable(prepared.value.value) };
+        const prepared = await child.flow('use.prepare', (at) =>
+          prepare(at, { request, book: this }),
+        );
+
+        if (!prepared.ok) return { kind: 'unavailable', reason: prepared.reason };
+        intent = { ...intent, parameters: immutable(prepared.value) };
         const finalized = this.validateUse(child, intent);
         if (!finalized.ok) return { kind: 'unavailable', reason: finalized.reason };
         if (
@@ -555,115 +705,104 @@ export class CardBook {
       const parameters = intent.parameters ?? null;
       const useId = child.cause.flowId;
       const limit = child.query(() => this.#limit(child, request));
-      const result = await withProcessing<UseResult>(
-        child,
-        [],
-        'discard',
-        async (body, processing) => {
-          const plan: UsePlan = new UsePlan(
+      const result = await withProcessing<UseResult>(child, [], async (body, processing) => {
+        const plan: UsePlan = new UsePlan(
+          useId,
+          intent.actor,
+          request.card,
+          processing.zone,
+          intent.timing,
+          request.targets,
+          body,
+          processing.lifetime,
+          (at, target, options) =>
+            this.#target(
+              at,
+              {
+                ...request,
+                targetOptions: options ?? {},
+                targets: [...plan.targets, target],
+              },
+              target,
+            ),
+          'use',
+          useId,
+          parameters,
+          intent.prohibitedCounters ?? [],
+        );
+        const paid = await pay(body, {
+          cards: request.card.materials,
+          to: processing.zone,
+          reason: useId,
+          factKind: 'card.used',
+          changes: [plan.initializeChange(body)],
+          ...(request.card.source?.kind === 'viewAs'
+            ? {
+                skill: this.#handle(body.world, request.card.source.instance),
+              }
+            : { actor: intent.actor }),
+          ...(limit ? { limit } : {}),
+          materialAllowed: (_pay, id, zone) => origins.get(id) === zone.id,
+          legal: (atPay) => {
+            const latest = this.validateUse(atPay, intent);
+            return (
+              latest.ok &&
+              JSON.stringify(latest.value.card) === JSON.stringify(request.card) &&
+              JSON.stringify(latest.value.targets) === JSON.stringify(request.targets)
+            );
+          },
+          declaration: {
             useId,
-            intent.actor,
-            request.card,
-            processing.zone,
-            intent.timing,
-            request.targets,
-            body,
-            processing.lifetime,
-            (at, target, options) =>
-              this.#target(
-                at,
-                {
-                  ...request,
-                  targetOptions: options ?? {},
-                  targets: [...plan.targets, target],
-                },
-                target,
-              ),
-            'use',
-            useId,
-            parameters,
-            intent.prohibitedCounters ?? [],
-          );
-          const paid = await pay(body, {
-            actor: intent.actor,
-            cards: request.card.materials,
-            to: processing.zone,
-            reason: useId,
-            factKind: 'card.used',
-            changes: [plan.initializeChange(body)],
-            ...(request.card.source?.kind === 'viewAs'
-              ? {
-                  skill: this.#handle(body.world, request.card.source.instance),
-                }
+            processing: processing.zone,
+            card: request.card,
+            targets: request.targets,
+            timing: intent.timing.kind,
+            context: timingSnapshot(intent.timing),
+            ...(intent.prohibitedCounters?.length
+              ? { prohibitedCounters: intent.prohibitedCounters }
               : {}),
-            ...(limit ? { limit } : {}),
-            materialAllowed: (_pay, id, zone) => origins.get(id) === zone.id,
-            legal: (atPay) => {
-              const latest = this.validateUse(atPay, intent);
-              return (
-                latest.ok &&
-                JSON.stringify(latest.value.card) === JSON.stringify(request.card) &&
-                JSON.stringify(latest.value.targets) === JSON.stringify(request.targets)
-              );
-            },
-            declaration: {
-              useId,
-              processing: processing.zone,
-              card: request.card,
-              targets: request.targets,
-              timing: intent.timing.kind,
-              context: timingSnapshot(intent.timing),
-              ...(intent.prohibitedCounters?.length
-                ? { prohibitedCounters: intent.prohibitedCounters }
-                : {}),
-              ...(parameters === null ? {} : { parameters }),
-            },
-          });
-          if (paid.kind === 'aborted') return body.abort(paid.reason);
-          if (paid.value.kind !== 'paid') return { kind: 'unavailable', reason: paid.value.reason };
-          await body.window(useDeclared, plan, { subject: intent.actor });
-          await body.window(targetsConfirming, plan, { subject: intent.actor });
-          await this.#confirmTargets(body, plan);
-          let dispatched = false;
-          const resolveTargets = async (
-            at: Context,
-            resolve: TargetResolver | undefined = rules.resolve,
-          ): Promise<void> => {
-            at.assertActive();
-            if (
-              at.world !== body.world ||
-              !at.cause.scopePath.includes(body.scope.id) ||
-              dispatched
-            )
-              throw new Error('Targets must resolve once within this use.');
-            dispatched = true;
-            const resolved = await at.flow('use.targets.resolve', (child) =>
-              this.#resolveTargets(child, plan, rules, resolve),
-            );
-            if (resolved.kind === 'aborted') return at.abort(resolved.reason);
-          };
-          let outcome: unknown = null;
-          if (rules.execute) {
-            const execute = rules.execute;
-            const executed = await body.flow('use.execute', (at) =>
-              execute(at, plan, this, resolveTargets),
-            );
-            if (executed.kind === 'aborted') return body.abort(executed.reason);
-            outcome = executed.value ?? null;
-          } else await resolveTargets(body);
-          if (
-            (!dispatched && plan.effects.length > 0) ||
-            plan.effects.some((effect) => ['pending', 'targeting', 'ready'].includes(effect.state))
-          )
-            throw new Error('Card body left unresolved target effects.');
-          const finished = plan.close(outcome);
-          body.commit('card.finished', [], finished);
-          await body.window(useFinished, finished, { subject: intent.actor });
-          return { kind: 'used', use: finished };
-        },
-      );
-      if (result.kind === 'aborted') return child.abort(result.reason);
-      return result.value;
+            ...(parameters === null ? {} : { parameters }),
+          },
+        });
+
+        if (paid.kind !== 'paid') return { kind: 'unavailable', reason: paid.reason };
+        await body.window(useDeclared, plan, { subject: intent.actor });
+        await body.window(targetsConfirming, plan, { subject: intent.actor });
+        await this.#confirmTargets(body, plan);
+        let dispatched = false;
+        const resolveTargets = async (
+          at: Context,
+          resolve: TargetResolver | undefined = rules.resolve,
+        ): Promise<void> => {
+          at.assertActive();
+          if (at.world !== body.world || !at.cause.scopePath.includes(body.scope.id) || dispatched)
+            throw new Error('Targets must resolve once within this use.');
+          dispatched = true;
+          await at.flow('use.targets.resolve', (child) =>
+            this.#resolveTargets(child, plan, rules, resolve),
+          );
+        };
+        let outcome: unknown = null;
+        if (rules.execute) {
+          const execute = rules.execute;
+          const executed = await body.flow('use.execute', (at) =>
+            execute(at, { use: plan, book: this, resolveTargets }),
+          );
+
+          outcome = executed ?? null;
+        } else await resolveTargets(body);
+        if (
+          (!dispatched && plan.effects.length > 0) ||
+          plan.effects.some((effect) => ['pending', 'targeting', 'ready'].includes(effect.state))
+        )
+          throw new Error('Card body left unresolved target effects.');
+        const finished = plan.close(outcome);
+        body.commit('card.finished', [], finished);
+        await body.window(useFinished, finished, { subject: intent.actor });
+        return { kind: 'used', use: finished };
+      });
+
+      return result;
     });
   }
 
@@ -673,7 +812,7 @@ export class CardBook {
     source: CardUseRef,
     target: string,
     resolver: TargetResolver,
-  ): Promise<FlowResult<UseSnapshot>> {
+  ): Promise<UseSnapshot> {
     const input = immutable(source);
     return withLifetime(ctx, 'delayed.effect', async (child, lifetime) => {
       if (!this.definition(input.card.name).delayed) throw new Error('Card has no delayed rules.');
@@ -706,7 +845,7 @@ export class CardBook {
   }
 
   /** 征询一次固定用途的用牌；仍完整执行 use，不把救援等用牌降格为响应。 */
-  askUse(ctx: Context, request: UseOfferRequest): Promise<FlowResult<AskedUseResult>> {
+  askUse(ctx: Context, request: UseOfferRequest): Promise<AskedUseResult> {
     return ctx.flow('askUse', async (child) => {
       const actor = request.actor;
       const names = immutable(request.names);
@@ -715,21 +854,16 @@ export class CardBook {
       const available = request.available;
       const live = () => child.query(() => available?.(child) ?? true);
       const intent = (choice: CardChoice): UseIntent => ({ actor, choice, targets, timing });
+      const accepts = (offer: CardOffer) =>
+        offer.kind === 'viewAs' ||
+        ('card' in offer.choice &&
+          this.validateUse(child, intent({ kind: 'physical', card: offer.choice.card })).ok);
       const offers = () =>
-        !live()
-          ? []
-          : this.offers(child, actor, timing, names).filter(
-              (offer) =>
-                offer.kind === 'viewAs' ||
-                ('card' in offer.choice &&
-                  this.validateUse(child, intent({ kind: 'physical', card: offer.choice.card }))
-                    .ok),
-            );
+        !live() ? [] : this.offers(child, actor, timing, names).filter(accepts);
       const answer = await child.ask<CardChoice>({
         player: actor,
         kind: 'use-card',
         prompt: request.prompt,
-        data: null,
         describe: () => ({
           names,
           targets,
@@ -746,7 +880,7 @@ export class CardBook {
             : {}),
         }),
         optional: true,
-        available: () => offers().length > 0,
+        available: () => live() && this.hasOffers(child, actor, timing, names, accepts),
         validate: (input) => {
           const parsed = parseCardChoice(input);
           if (!parsed.ok) return parsed;
@@ -764,8 +898,8 @@ export class CardBook {
       if (!live() || !checked.ok || !names.includes(checked.value.card.name))
         return { kind: 'unavailable', reason: 'Requested card is no longer available.' };
       const used = await this.use(child, intent(answer.value));
-      if (used.kind === 'aborted') return child.abort(used.reason);
-      return used.value;
+
+      return used;
     });
   }
 
@@ -774,7 +908,7 @@ export class CardBook {
     actor: string,
     requestedNames: readonly string[],
     target: EffectRef,
-  ): Promise<FlowResult<ResponseResult>> {
+  ): Promise<ResponseResult> {
     return requestResponse(
       ctx,
       this,
@@ -791,7 +925,7 @@ export class CardBook {
     actor: string,
     names: readonly string[],
     target: EffectRef,
-  ): Promise<FlowResult<ResponseResult>> {
+  ): Promise<ResponseResult> {
     return requestResponse(
       ctx,
       this,
@@ -809,21 +943,24 @@ export class CardBook {
     input: ResponseIntent,
     available: (ctx: Context) => boolean,
     consume?: ResponseConsumer,
-  ): Promise<FlowResult<ResponseResult>> {
+  ): Promise<ResponseResult> {
     if (input.purpose === 'response') return this.#respondChoice(ctx, input, available, consume);
     return ctx.flow<ResponseResult>('response.use', async (at) => {
       const opportunity = Object.freeze({
         ...input.opportunity,
-        available: (current: Context) => input.opportunity.available(current) && available(current),
+        available: (current: Context) =>
+          current.query(
+            () =>
+              syncQueryValue(input.opportunity.available(current), 'response.available') &&
+              available(current),
+          ),
       });
-      const result = at.unwrap(
-        await this.use(at, {
-          actor: input.actor,
-          choice: input.choice,
-          targets: [],
-          timing: { kind: 'response', opportunity },
-        }),
-      );
+      const result = await this.use(at, {
+        actor: input.actor,
+        choice: input.choice,
+        targets: [],
+        timing: { kind: 'response', opportunity },
+      });
       return result.kind === 'used'
         ? {
             kind: 'used',
@@ -841,11 +978,11 @@ export class CardBook {
     input: ResponseIntent,
     available: (ctx: Context) => boolean,
     consume?: ResponseConsumer,
-  ): Promise<FlowResult<ResponseResult>> {
+  ): Promise<ResponseResult> {
     return ctx.flow('response.card', async (child) => {
       const { actor, names, to, choice } = input;
       const built = this.build(child, actor, choice, 'response');
-      if (!available(child) || !built.ok || !names.includes(built.value.name))
+      if (!child.query(() => available(child)) || !built.ok || !names.includes(built.value.name))
         return { kind: 'unavailable' };
       const card = built.value;
       const id = child.cause.flowId;
@@ -855,22 +992,20 @@ export class CardBook {
       const processed = await withProcessing<ResponseResult>(
         child,
         [],
-        'discard',
         async (body, processing) => {
           const paid = await pay(body, {
-            actor,
             cards: card.materials,
             to: processing.zone,
             reason: id,
             factKind: 'card.responded',
             ...(card.source?.kind === 'viewAs'
               ? { skill: this.#handle(body.world, card.source.instance) }
-              : {}),
+              : { actor }),
             materialAllowed: (_pay, material, zone) => origins.get(material) === zone.id,
             legal: (atPay) => {
               const current = this.#build(atPay, actor, choice, 'response');
               return (
-                available(atPay) &&
+                atPay.query(() => available(atPay)) &&
                 current.ok &&
                 names.includes(current.value.name) &&
                 JSON.stringify(current.value) === JSON.stringify(card)
@@ -885,8 +1020,8 @@ export class CardBook {
               card,
             },
           });
-          if (paid.kind === 'aborted') return body.abort(paid.reason);
-          if (paid.value.kind !== 'paid') return { kind: 'unavailable' };
+
+          if (paid.kind !== 'paid') return { kind: 'unavailable' };
           await body.window(
             responseFinished,
             immutable({ id, actor, card, subject: { kind: 'effect', effect: to } }),
@@ -898,17 +1033,17 @@ export class CardBook {
             body,
             response,
             (at) =>
-              available(at) &&
+              at.query(() => available(at)) &&
               processing.lifetime.active &&
               at.cause.scopePath.includes(processing.lifetime.id) &&
               card.materials.every((material) => at.world.position(material) === processing.zone),
           );
-          if (consumed.kind === 'aborted') return body.abort(consumed.reason);
-          return consumed.value;
+
+          return consumed;
         },
       );
-      if (processed.kind === 'aborted') return child.abort(processed.reason);
-      return processed.value;
+
+      return processed;
     });
   }
 
@@ -1051,7 +1186,7 @@ export class CardBook {
   ): Promise<void> {
     const available = (at: Context, effect: CardEffect) =>
       this.#effectAvailable(at, effect) &&
-      at.query(() => rules.canResolve?.(at, effect, this) ?? true);
+      at.query(() => rules.canResolve?.(at, { effect, book: this }) ?? true);
     const prepare = async () => {
       if (confirmTargets) await this.#confirmTargets(ctx, plan);
     };
@@ -1084,8 +1219,8 @@ export class CardBook {
             if (!resolver) throw new Error('Target effects require a resolve function.');
             effect.start();
             const current = effect;
-            const resolved = await ctx.flow('effect:' + effect.effectId, (at) =>
-              resolver(at, current, this),
+            const resolved = await ctx.attempt('effect:' + effect.effectId, (at) =>
+              resolver(at, { effect: current, book: this }),
             );
             effect.finish(
               resolved.kind === 'resolved' ? 'resolved' : 'aborted',
@@ -1123,21 +1258,35 @@ export class CardBook {
     if (!binding) throw new Error('Ability source is no longer available.');
     return binding.self;
   }
-  #count(ctx: Context, self: SkillHandle, recipe: ViewAs): ChoiceCount {
-    return typeof recipe.count === 'function' ? recipe.count(ctx, self) : recipe.count;
+  #count(ctx: Context, input: ViewAsInput, recipe: ReturnType<typeof viewAs>): ChoiceCount {
+    if (typeof recipe.count !== 'function') return recipe.count;
+    const count = syncQueryValue(
+      recipe.count(ctx, input),
+      `${input.self.skill}/${recipe.id}.count`,
+    );
+    return normalizeChoiceCount(count, `${input.self.skill}/${recipe.id} material`);
+  }
+  #names(ctx: Context, input: ViewAsInput, recipe: ViewAs): readonly string[] {
+    return typeof recipe.make === 'function'
+      ? syncQueryValue(recipe.names!(ctx, input), `${input.self.skill}/${recipe.id}.names`)
+      : [recipe.make.name];
   }
   #target(ctx: Context, request: UseRequest, target: string): boolean {
-    return (
-      ctx.world.snapshot.players.some((player) => player.id === target && player.alive) &&
-      !this.#prohibitedTarget(ctx, request.actor, target, request.card) &&
-      (this.definition(request.card.name).use?.target(ctx, request, target, this) ?? false)
+    return ctx.query(
+      () =>
+        ctx.world.snapshot.players.some((player) => player.id === target && player.alive) &&
+        !this.#prohibitedTarget(ctx, request.actor, target, request.card) &&
+        (this.definition(request.card.name).use?.target(ctx, { request, target, book: this }) ??
+          false),
     );
   }
   #limit(ctx: Context, request: UseRequest): UsageLimit | undefined {
     const usage = this.definition(request.card.name).use?.usage;
     if (request.timing.kind !== 'play' || !usage) return undefined;
     const modified = this.skills.query(ctx, queries.usageLimit, request, usage.max);
-    const value = this.policy.usage(ctx, request, modified ?? Number.MAX_SAFE_INTEGER);
+    const value = ctx.query(() =>
+      this.policy.usage(ctx, request, modified ?? Number.MAX_SAFE_INTEGER),
+    );
     if (value !== null && (!Number.isSafeInteger(value) || value < 0))
       throw new Error('Invalid card usage limit.');
     return {
@@ -1155,13 +1304,15 @@ export class CardBook {
   ): Validation<SemanticCard> {
     if (!ctx.world.player(actor).alive || isGameOver(ctx.world))
       return invalid('Actor or game is no longer active.');
+    if (choice.kind !== 'physical' && !isStringArray(choice.materials))
+      return invalid('Expected material IDs.');
     let face: CardFace;
     let materials: readonly string[];
     let source: SemanticCard['source'] = null;
     if (choice.kind === 'physical') {
       if (!ownedCards(ctx.world, actor).includes(choice.card))
         return invalid("Physical card is not in this actor's hand.");
-      face = this.physicalCard(ctx, choice.card);
+      face = this.face(ctx, choice.card);
       materials = [choice.card];
     } else if (choice.kind === 'generated') {
       if (!choice.reason) return invalid('Generated card requires a reason.');
@@ -1179,16 +1330,32 @@ export class CardBook {
       const { self, definition } = binding;
       const recipe = definition.viewAs?.find((item) => item.id === choice.recipe);
       if (!recipe) return invalid('Unknown view-as recipe.');
-      if (recipe.available && !recipe.available(ctx, self, purpose))
-        return invalid('Recipe is unavailable here.');
-      const candidates = recipe.materials(ctx, self, this);
+      const input: ViewAsInput = { self, book: this, purpose };
       if (
-        !countValid(this.#count(ctx, self, recipe), choice.materials.length, candidates.length) ||
+        recipe.available &&
+        !syncQueryValue(recipe.available(ctx, input), `${self.skill}/${recipe.id}.available`)
+      )
+        return invalid('Recipe is unavailable here.');
+      const candidates = syncQueryValue(
+        recipe.materials(ctx, input),
+        `${self.skill}/${recipe.id}.materials`,
+      );
+      if (
+        !countValid(this.#count(ctx, input, recipe), choice.materials.length, candidates.length) ||
         choice.materials.some((id) => !candidates.includes(id))
       )
         return invalid('Invalid recipe materials.');
-      const made = recipe.make(ctx, self, choice.materials, choice.parameters ?? null);
-      if (!made || !recipe.names(ctx, self).includes(made.name))
+      const made = syncQueryValue(
+        typeof recipe.make === 'function'
+          ? recipe.make(ctx, {
+              ...input,
+              materials: choice.materials,
+              parameters: choice.parameters ?? null,
+            })
+          : recipe.make,
+        `${self.skill}/${recipe.id}.make`,
+      );
+      if (!made || !this.#names(ctx, input, recipe).includes(made.name))
         return invalid('Recipe could not construct this card.');
       face = made;
       materials = choice.materials;
@@ -1201,7 +1368,8 @@ export class CardBook {
       return invalid('Duplicate or unknown material.');
     if (!this.#supports(face.name, purpose))
       return invalid('Card is unavailable for this purpose.');
-    const faces = materials.map((id) => this.face(ctx, id));
+    // 同次构牌复用实体牌面；转换和生成牌的材料仍按当前状态读取。
+    const faces = choice.kind === 'physical' ? [face] : materials.map((id) => this.face(ctx, id));
     const first = faces.length === 1 ? faces[0]! : null;
     const suit = face.suit ?? first?.suit ?? 'none';
     const colors = faces.map((card) => card.color);

@@ -1,21 +1,16 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
-import { card, cardGame, use } from '../fixtures/cards';
+import { playMatch } from '../fixtures/match';
+import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   runPhase,
   runTurn,
   currentPhase,
   activeOffers,
-  activate,
-  kingdomOf,
   setKingdom,
-  roleOf,
   costPaid,
   cardsMoved,
   moveCards,
@@ -73,7 +68,7 @@ async function act(ctx: Context, game: Game, phase: PhaseView, skill: string) {
   const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === skill)!;
   expect(offer).toBeDefined();
   await activate(ctx, game.book, phase, {
-    skill: offer.choice.instance,
+    instance: offer.choice.instance,
     action: offer.choice.action,
   });
 }
@@ -111,32 +106,12 @@ function startJijiang(
         targets: ['b'],
         timing: phase.playTiming(),
       });
-      if (result.kind === 'aborted') return at.abort(result.reason);
-      await after?.(at, phase, result.value);
+
+      await after?.(at, phase, result);
     }),
   );
 }
 
-it('刘备和华佗完整初始化，主公技由身份模式授予，群势力及体力正确', async () => {
-  expect(standardGenerals).toHaveLength(25);
-  for (const general of standardGenerals.slice(13, 15)) {
-    const match = createOfflineMatch(6, 14, 'standard:identity', Array(6).fill(general.id));
-    await match.prepare();
-    for (const player of match.room.world.snapshot.players) {
-      expect(kingdomOf(match.room.world, player.id)).toBe(general.kingdom);
-      expect(player.maxHp).toBe(
-        general.maxHp + Number(roleOf(match.room.world, player.id) === 'lord'),
-      );
-      expect(
-        match.room.world.snapshot.skills.filter((s) => s.owner === player.id).map((s) => s.skill),
-      ).toEqual(
-        general.skills.filter(
-          (id) => id !== 'standard:jijiang' || roleOf(match.room.world, player.id) === 'lord',
-        ),
-      );
-    }
-  }
-});
 it('currentPhase 只返回局内当前祖先阶段，嵌套和规则中止后恢复，关闭后为空', async () => {
   const game = scenario();
   const foreign = scenario();
@@ -254,12 +229,12 @@ it('仁德转交不受弃置禁令约束，目标死亡后已转交牌照常埋�
   const lock = defineSkill({
     id: 'test:lock',
     name: '禁弃',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
   const game = scenario({
     hands: { a: [card('one', 'jink'), card('two', 'slash')] },
-    skills: (book) => [...standardGeneralSkills(book), lock],
+    skills: [...standardGeneralSkills, lock],
   });
   await grant(game, 'standard:rende');
   await grant(game, lock.id);
@@ -311,12 +286,12 @@ it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动�
   const lock = defineSkill({
     id: 'test:lock',
     name: '禁弃',
-    effects: [],
+    triggers: [],
     modifiers: [modify(cardQueries.prohibitDiscard, () => true)],
   });
   const blocked = scenario({
     hands: { a: [card('fee', 'jink')] },
-    skills: (book) => [...standardGeneralSkills(book), lock],
+    skills: [...standardGeneralSkills, lock],
   });
   await grant(blocked, 'standard:qingnang');
   await grant(blocked, lock.id);
@@ -488,7 +463,6 @@ it('激将由蜀角色打出、刘备使用：两种归属各一次，实际材�
       }).ok,
     ).toBe(false);
   });
-  await answer(game, true, 'invoke');
   expect((await nextRequest(game.room)).player).toBe('c');
   await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
   await running;
@@ -522,7 +496,6 @@ it.each(['wusheng', 'longdan', 'spear'] as const)(
         },
       });
     });
-    await answer(game, true, 'invoke');
     const r = await nextRequest(game.room);
     const offer = (
       r.data as { offers: { kind: string; choice: { instance: string; recipe: string } }[] }
@@ -541,7 +514,6 @@ it('激将第一人放弃后询问下一人，只有实际供牌者支付', asyn
     hands: { c: [card('first', 'slash')], d: [card('last', 'slash')] },
   });
   const running = startJijiang(game);
-  await answer(game, true, 'invoke');
   await cancel(game);
   expect((await nextRequest(game.room)).player).toBe('d');
   await answer(game, { kind: 'physical', card: 'last' }, 'card-response');
@@ -564,13 +536,12 @@ it('激将失败不消耗用杀次数，本阶段隐藏该用牌配方；下一�
             targets: ['b'],
             timing: phase.playTiming(),
           });
-          expect(result).toMatchObject({ value: { kind: 'unavailable' } });
+          expect(result).toMatchObject({ kind: 'unavailable' });
           expect(game.book.offers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(false);
         } else expect(game.book.offers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(true);
       },
     }),
   );
-  await answer(game, true, 'invoke');
   await running;
   expect(game.room.history.facts('card.used')).toEqual([]);
   expect(game.room.world.snapshot.states.some((s) => s.key === 'standard:jijiang-failed')).toBe(
@@ -607,7 +578,6 @@ it('激将以实际供牌牌面重新检查目标禁令，失败不宣告刘备�
   const running = startJijiang(game, (_ctx, _phase, result) =>
     expect(result.kind).toBe('unavailable'),
   );
-  await answer(game, true, 'invoke');
   await answer(game, { kind: 'physical', card: 'red' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(4);
@@ -643,7 +613,6 @@ it.each(['moved', 'donor-dead', 'lord-dead'] as const)(
       },
     });
     const running = startJijiang(game);
-    await answer(game, true, 'invoke');
     await answer(game, { kind: 'physical', card: 'first' }, 'card-response');
     await running;
     expect(game.room.world.position('next')).toBe('d:hand');
@@ -663,7 +632,6 @@ it('激将已宣告后失去技能仍完成本次供牌和用杀', async () => {
     },
   });
   const running = startJijiang(game);
-  await answer(game, true, 'invoke');
   await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
@@ -680,7 +648,6 @@ it.each(['response', 'use'] as const)(
           : { prohibitUse: (_ctx, actor) => actor === 'c' },
     });
     const running = startJijiang(game);
-    await answer(game, true, 'invoke');
     if (kind === 'use') await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
     await running;
     expect(game.room.world.player('b').hp).toBe(kind === 'response' ? 4 : 3);
@@ -690,7 +657,7 @@ it.each(['physical', 'zero'] as const)('供牌回调中止遵守独立处理区�
   const zero = defineSkill({
     id: 'test:zero',
     name: '零材料',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'zero',
@@ -727,7 +694,7 @@ it.each(['physical', 'zero'] as const)('供牌回调中止遵守独立处理区�
       : { kind: 'viewAs', instance: self.id, recipe: 'zero', materials: [] },
     'card-response',
   );
-  expect(await running).toMatchObject({ value: { kind: 'aborted' } });
+  expect(await running).toMatchObject({ kind: 'aborted', reason: 'stop' });
   await game.room.run('closed', (ctx) => expect(held.available(ctx)).toBe(false));
   if (kind === 'physical') expect(game.room.world.position('supply')).toBe('discard');
   replay(game);
@@ -757,36 +724,16 @@ it('本人出牌阶段激将打出失败后仍可自己响应，但本阶段不�
 });
 it('刘备、华佗八人标准局以基础 AI 走过供牌与治疗，最终正常结束', async () => {
   const lineup = [13, 14, 0, 3, 2, 11, 9, 12].map((i) => standardGenerals[i]!.id);
-  const match = createOfflineMatch(8, 14, 'standard:identity', lineup);
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 7000; step++) {
-      await setImmediate();
-      const r = match.room.decisions.pending[0];
-      if (!r) continue;
-      const reply = decideBasic(observeAgent(match, r.player), r, (v) =>
-        match.room.decisions.preview(r.id, v),
-      );
-      if (reply.kind === 'unsupported') throw Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(r.id, r.token)
-          : match.room.decisions.submit(r.id, r.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(
-      match.room.history
-        .facts('card.used')
-        .some(
-          (f) =>
-            (f.data.detail as { declaration: { card: { source: { reason?: string } | null } } })
-              .declaration.card.source?.reason === 'standard:jijiang',
-        ),
-    ).toBe(true);
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 7000 });
+
+  expect(
+    match.room.history
+      .facts('card.used')
+      .some(
+        (f) =>
+          (f.data.detail as { declaration: { card: { source: { reason?: string } | null } } })
+            .declaration.card.source?.reason === 'standard:jijiang',
+      ),
+  ).toBe(true);
 }, 60000);

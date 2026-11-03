@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import {
   ArrangementSelection,
   runPhase,
@@ -16,7 +16,8 @@ import {
   roleOf,
 } from '../../src/sdk';
 import type { WorldSeed } from '../../src/core/model/state';
-import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
+import type { ArrangementGroup, ArrangementSpec } from '../../src/core/decisions/arrangement';
+import type { ChoiceItem, Context } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
@@ -30,6 +31,43 @@ import { decideBasic } from '../../src/app/offline/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 type Game = ReturnType<typeof cardGame>;
+
+it('分组模型拒绝异步候选或去向，查询故障先于续体写入冻结本局', async () => {
+  for (const field of ['items', 'groups', 'canPlace'] as const) {
+    const game = room();
+    let at: Context;
+    let lateError = '';
+    const invalid = async () => {
+      await Promise.resolve();
+      try {
+        at.commit('invalid.arrangement.late', [], null);
+      } catch (error) {
+        lateError = (error as Error).message;
+      }
+      return false;
+    };
+    const spec = {
+      items: () => [{ id: 'one', label: '一' }],
+      groups: [{ id: 'top', label: '牌顶', count: { min: 0, max: 'all' } }],
+      canPlace: () => true,
+      [field]: invalid,
+    } as unknown as ArrangementSpec;
+    const model = new ArrangementSelection(spec);
+    const before = game.world.snapshot;
+    await expect(
+      game.run('arrange', (ctx) => {
+        at = ctx;
+        return ctx.ask(model.decision('a', '异步分组'));
+      }),
+    ).rejects.toThrow(`Queries cannot await (arrangement.${field})`);
+    await Promise.resolve();
+    expect(lateError).toContain('Queries cannot await');
+    expect(game.status).toBe('faulted');
+    expect(game.decisions.pending).toEqual([]);
+    expect(game.world.snapshot).toBe(before);
+    expect(game.history.facts()).toEqual([]);
+  }
+});
 const source = { kind: 'general', id: 'test' } as const;
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const groups: readonly ArrangementGroup[] = [
@@ -47,7 +85,29 @@ const topCards = () =>
     card(`x${i}`, i % 2 ? 'jink' : 'slash', i % 2 ? 'heart' : 'spade'),
   );
 function model(ids = ['a', 'b', 'c']) {
-  return new ArrangementSelection({ items: () => ids.map((id) => ({ id, label: id })), groups });
+  class Spec {
+    #ids = ids;
+    #groups = groups;
+    #allow = true;
+
+    items() {
+      return this.#ids.map((id) => ({ id, label: id }));
+    }
+
+    groups() {
+      return this.#groups;
+    }
+
+    canPlace() {
+      return this.#allow;
+    }
+  }
+  const spec = new Spec();
+  const selection = new ArrangementSelection(spec);
+  spec.items = () => [];
+  spec.groups = () => [];
+  spec.canPlace = () => false;
+  return selection;
 }
 function scenario(options: Parameters<typeof cardGame>[0] = {}) {
   return cardGame({
@@ -82,7 +142,15 @@ function replay(game: Pick<Game, 'room'> & { readonly initial: WorldSeed }) {
 }
 
 it('排序模型按组 ID 验证，组内先后保留，输入/输出均不共享可变数组', () => {
-  const selection = model();
+  class Item {
+    constructor(readonly id: string) {}
+
+    get label() {
+      return `选项 ${this.id}`;
+    }
+  }
+  const items = ['a', 'b', 'c'].map((id) => new Item(id));
+  const selection = new ArrangementSelection({ items: () => items, groups });
   const input = {
     groups: [
       { id: 'bottom', items: ['c'] },
@@ -140,20 +208,18 @@ it('排序模型不是观星特例：三个分组、上下限与空候选均可�
   ).toBe(false);
   expect(model([]).validate(arranged([], [])).ok).toBe(true);
 });
-it('排序配置拒绝非法计数和重复组/候选', () => {
+it('排序配置拒绝空槽、空分组与重复身份', () => {
   expect(() => new ArrangementSelection({ items: () => [], groups: [] })).toThrow();
   expect(
     () => new ArrangementSelection({ items: () => [], groups: [groups[0]!, groups[0]!] }),
   ).toThrow();
-  for (const count of [
-    { min: -1, max: 3 },
-    { min: 2, max: 1 },
-    { min: 0, max: 1.2 },
-  ])
-    expect(
-      () => new ArrangementSelection({ items: () => [], groups: [{ id: 'a', label: 'A', count }] }),
-    ).toThrow();
   expect(() => model(['a', 'a']).initial()).toThrow('distinct stable IDs');
+  expect(() =>
+    new ArrangementSelection({
+      items: () => new Array<ChoiceItem>(1),
+      groups: [{ id: 'none', label: '空组', count: { min: 0, max: 0 } }],
+    }).decision('a', '配置检查').available!(),
+  ).toThrow();
 });
 it('没有足够分组容量时返回 unavailable，不开放必选等待', async () => {
   const target = room();
@@ -197,12 +263,11 @@ it('实时候选刷新使旧 token 和旧集合失效，必选不可取消，一
 
 it.each([2, 4, 8])('诸葛亮初始化与观星数量按 %s 人局存活人数计算，上限五张', async (count) => {
   expect(standardGenerals).toHaveLength(25);
-  const match = createOfflineMatch(
-    count,
-    19,
-    'standard:identity',
-    Array<string>(count).fill('standard:zhugeliang'),
-  );
+  const match = createOfflineMatch({
+    seed: 19,
+    preset: 'standard:identity',
+    lineup: Array<string>(count).fill('standard:zhugeliang'),
+  });
   await match.prepare();
   expect(match.room.world.player('甲席').maxHp).toBe(
     3 + Number(count > 4 && roleOf(match.room.world, '甲席') === 'lord'),
@@ -369,6 +434,8 @@ it('私有取牌的自定义善后在局部中止后归还实时余牌，已经�
         return at.abort('local');
       },
       async (at, pool) => {
+        expect(pool.lifetime.active).toBe(true);
+        expect(privateCardPools(at.world, 'a')[0]!.cards).toEqual(['x0', 'x2']);
         await moveCards(
           at,
           [{ cards: pool.remaining(), from: pool.zone, to: 'draw', place: 'top' }],
@@ -377,7 +444,7 @@ it('私有取牌的自定义善后在局部中止后归还实时余牌，已经�
       },
     ),
   );
-  expect(result).toMatchObject({ value: { kind: 'aborted', reason: 'local' } });
+  expect(result).toMatchObject({ kind: 'aborted', reason: 'local' });
   expect(game.room.world.zone('draw').cards).toEqual(['x0', 'x2', 'x3', 'x4', 'x5']);
   expect(game.room.world.position('x1')).toBe('b:hand');
   replay(game);
@@ -387,8 +454,10 @@ function privateMatch() {
     id: 'private-stars',
     seed: 17,
     players: [{ id: 'a' }, { id: 'b' }],
-    cards: standardCards,
-    skills: standardGeneralSkills,
+    content: {
+      cards: standardCards,
+      skills: standardGeneralSkills,
+    },
     deck: [
       card('secret0', 'ex_nihilo', 'heart'),
       card('secret1', 'collateral'),
@@ -580,29 +649,8 @@ it('混合八人标准对局的观星由基础 AI 经正式选择完成，最终
     'diaochan',
     'lvbu',
   ].map((id) => `standard:${id}`);
-  const match = createOfflineMatch(8, 27, 'standard:identity', roster);
-  const running = match.start();
-  try {
-    for (let step = 0; step < 24000 && !match.result; step++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const reply = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
-      if (reply.kind === 'unsupported') throw new Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(await running).toMatchObject({ kind: 'resolved' });
-    expect(match.room.history.facts('cards.arranged').length).toBeGreaterThan(0);
-    replay(match);
-  } finally {
-    match.room.abort('test cleanup');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 27, preset: 'standard:identity', lineup: roster });
+  await playMatch(match, { steps: 24000 });
+
+  expect(match.room.history.facts('cards.arranged').length).toBeGreaterThan(0);
 }, 60000);

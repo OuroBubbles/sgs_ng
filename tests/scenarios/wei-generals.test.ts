@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
+import { playMatch } from '../fixtures/match';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -23,14 +23,9 @@ import {
   modify,
   cardQueries,
   SkillBook,
-  generalOf,
-  roleOf,
-  genderOf,
 } from '../../src/sdk';
 import type { Context, DamageResult, PhaseView } from '../../src/sdk';
 import { createOfflineMatch } from '../../src/app/offline/practice';
-import { decideBasic } from '../../src/app/offline/basic-agent';
-import { observeAgent } from '../../src/app/offline/agent-observation';
 
 type Game = ReturnType<typeof cardGame>;
 const source = { kind: 'general', id: 'test' } as const;
@@ -56,7 +51,7 @@ const hit = (ctx: Context, from: string | null = 'b', amount = 1) =>
 it('刚烈在一次两点伤害后只判定一次；少于两张可弃手牌时直接造成一点伤害', async () => {
   const game = cardGame({
     hands: { a: [], b: [card('only', 'peach')] },
-    skills: (book) => [ganglie(book)],
+    skills: [ganglie],
     draw: [card('judge', 'slash')],
   });
   await grant(game, 'standard:ganglie');
@@ -74,16 +69,19 @@ it('刚烈来源可以支付两张手牌；受保护手牌和装备不进入候�
   const locked = defineSkill({
     id: 'test:protect',
     name: '保护',
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.prohibitDiscard, (_ctx, request) => request.card === 'protected'),
+      modify(
+        cardQueries.prohibitDiscard,
+        (_ctx, { input: request }) => request.card === 'protected',
+      ),
     ],
   });
   const game = cardGame({
     hands: { a: [], b: [card('one', 'slash'), card('two', 'slash'), card('protected', 'peach')] },
     equipment: { b: [card('weapon', 'spear')] },
     draw: [card('judge', 'slash')],
-    skills: (book) => [ganglie(book), locked],
+    skills: [ganglie, locked],
   });
   await grant(game, 'standard:ganglie');
   await grant(game, locked.id);
@@ -106,7 +104,7 @@ it('刚烈来源可拒绝弃置；没有来源也仍判定，红桃时没有来�
   for (const branch of ['decline', 'no-source', 'heart'] as const) {
     const game = cardGame({
       hands: { a: [], b: [card('one', 'slash'), card('two', 'slash')] },
-      skills: (book) => [ganglie(book)],
+      skills: [ganglie],
       draw: [card('judge', 'slash', branch === 'heart' ? 'heart' : 'club')],
     });
     await grant(game, 'standard:ganglie');
@@ -127,7 +125,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
   for (const branch of ['retrial', 'revoke', 'dead-source'] as const) {
     const game = cardGame({
       hands: { a: [], c: [card('red', 'jink', 'heart')] },
-      skills: (book) => [ganglie(book)],
+      skills: [ganglie],
       draw: [card('judge', 'slash')],
     });
     await grant(game, 'standard:ganglie');
@@ -175,7 +173,7 @@ it('刚烈判定可被改为红桃；已经发动后失去技能仍执行判定�
 it('拒绝发动刚烈不翻牌，濒死未获救死亡也不再发动受伤技能', async () => {
   const game = cardGame({
     hands: { a: [] },
-    skills: (book) => [ganglie(book)],
+    skills: [ganglie],
     draw: [card('judge', 'slash')],
   });
   await grant(game, 'standard:ganglie');
@@ -192,6 +190,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
   const game = cardGame({
     hands: { a: [] },
     skills: standardGeneralSkills,
+    effects: [luoyiAftereffect],
     draw: ['one', 'two', 'three', 'four'].map((id) => card(id, 'slash')),
   });
   await grant(game, 'standard:luoyi');
@@ -226,6 +225,7 @@ it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失�
   const game = cardGame({
     hands: { a: [card('s1', 'slash'), card('s2', 'slash')] },
     skills: standardGeneralSkills,
+    effects: [luoyiAftereffect],
     draw: [card('draw', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -261,6 +261,7 @@ it('决斗目标打回伤害仍是实际来源，但不是其本人使用的决�
   const game = cardGame({
     hands: { a: [card('response', 'slash')], b: [card('duel', 'duel')] },
     skills: standardGeneralSkills,
+    effects: [luoyiAftereffect],
     draw: [card('draw', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -297,6 +298,7 @@ it.each(['physical', 'generated'] as const)(
     const game = cardGame({
       hands: { a: kind === 'physical' ? [card('duel', 'duel')] : [], b: [] },
       skills: standardGeneralSkills,
+      effects: [luoyiAftereffect],
       draw: [card('draw', 'jink')],
     });
     await grant(game, 'standard:luoyi');
@@ -305,23 +307,21 @@ it.each(['physical', 'generated'] as const)(
         phases: ['draw', 'play'],
         async body(at, phase) {
           if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
-          at.unwrap(await game.skills.revoke(at, 'a', 'standard:luoyi', source));
-          at.unwrap(
-            await game.book.use(at, {
-              actor: 'a',
-              choice:
-                kind === 'physical'
-                  ? { kind: 'physical', card: 'duel' }
-                  : {
-                      kind: 'generated',
-                      face: { name: 'standard:duel' },
-                      materials: [],
-                      reason: 'probe',
-                    },
-              targets: ['b'],
-              timing: { kind: 'effect' },
-            }),
-          );
+          await game.skills.revoke(at, 'a', 'standard:luoyi', source);
+          await game.book.use(at, {
+            actor: 'a',
+            choice:
+              kind === 'physical'
+                ? { kind: 'physical', card: 'duel' }
+                : {
+                    kind: 'generated',
+                    face: { name: 'standard:duel' },
+                    materials: [],
+                    reason: 'probe',
+                  },
+            targets: ['b'],
+            timing: { kind: 'effect' },
+          });
         },
       }),
     );
@@ -343,6 +343,7 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
   const game = cardGame({
     hands: { a: [card('nested', 'slash'), card('outer', 'slash'), card('cancelled', 'slash')] },
     skills: standardGeneralSkills,
+    effects: [luoyiAftereffect],
     draw: [card('d1', 'jink'), card('d2', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -353,7 +354,7 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
     eligible: () => suppress,
     async run(ctx) {
       for (const bonus of game.book.effects.instances(ctx.world, luoyiAftereffect))
-        ctx.unwrap(await game.book.effects.end(ctx, bonus.id, 'test:bonus-cancelled'));
+        await game.book.effects.end(ctx, bonus.id, 'test:bonus-cancelled');
     },
   });
   const slash = (ctx: Context, id: string, target = 'b') =>
@@ -395,6 +396,7 @@ it('拒绝裸衣保留两张摸牌；零摸牌不询问，独立阶段不虚构�
     const game = cardGame({
       hands: { a: [] },
       skills: standardGeneralSkills,
+      effects: [luoyiAftereffect],
       draw: [card('one', 'jink'), card('two', 'jink')],
     });
     await grant(game, 'standard:luoyi');
@@ -421,10 +423,10 @@ it('拒绝裸衣保留两张摸牌；零摸牌不询问，独立阶段不虚构�
 it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告包含整个循环', async () => {
   const game = cardGame({
     hands: { a: [] },
-    skills: (book) => [luoshen(book)],
+    skills: [luoshen],
     draw: [card('black1', 'slash'), card('black2', 'jink', 'club'), card('red', 'peach', 'heart')],
   });
-  await grant(game, 'standard:luoshen');
+  const instance = await grant(game, 'standard:luoshen');
   let drawn = 0;
   game.room.on(cardsDrawn, {
     id: 'count',
@@ -436,6 +438,15 @@ it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告�
   });
   const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
   await answer(game, true);
+  const continuation = await nextRequest(game.room);
+  expect(continuation.data).toMatchObject({
+    skill: 'standard:luoshen',
+    instance,
+  });
+  expect(game.room.decisions.submit(continuation.id, continuation.token, 'yes')).toMatchObject({
+    kind: 'rejected',
+    reason: 'invalid',
+  });
   await answer(game, true);
   await answer(game, true);
   await running;
@@ -451,7 +462,7 @@ it('洛神可主动停止或完全拒绝，空牌堆也会正常结束', async (
   for (const branch of ['stop', 'decline', 'empty'] as const) {
     const game = cardGame({
       hands: { a: [] },
-      skills: (book) => [luoshen(book)],
+      skills: [luoshen],
       draw: branch === 'empty' ? [] : [card('first', 'slash'), card('second', 'jink')],
     });
     await grant(game, 'standard:luoshen');
@@ -461,13 +472,14 @@ it('洛神可主动停止或完全拒绝，空牌堆也会正常结束', async (
     await running;
     expect(game.room.world.zone('a:hand').cards).toHaveLength(branch === 'stop' ? 1 : 0);
     expect(game.room.history.facts('judgment.finished')).toHaveLength(branch === 'decline' ? 0 : 1);
+    expect(game.room.history.facts('skill.invoked')).toHaveLength(branch === 'decline' ? 0 : 1);
   }
 });
 
 it.each([true, false])('洛神按最终改判颜色取牌，不沿用首次公开的颜色：黑色 %s', async (black) => {
   const game = cardGame({
     hands: { a: [], c: [card('replacement', 'jink', black ? 'club' : 'heart')] },
-    skills: (book) => [luoshen(book)],
+    skills: [luoshen],
     draw: [card('original', 'slash', black ? 'heart' : 'spade')],
   });
   await grant(game, 'standard:luoshen');
@@ -492,7 +504,7 @@ it.each([true, false])('洛神按最终改判颜色取牌，不沿用首次公�
 it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不截断已宣告的循环', async () => {
   const game = cardGame({
     hands: { a: [] },
-    skills: (book) => [luoshen(book)],
+    skills: [luoshen],
     draw: [card('first', 'slash'), card('second', 'jink'), card('red', 'peach', 'heart')],
   });
   await grant(game, 'standard:luoshen');
@@ -517,13 +529,14 @@ it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不�
   expect(game.room.world.zone('a:hand').cards).toEqual(['second']);
   expect(game.room.world.position('first')).toBe('c:hand');
   expect(game.room.history.facts('judgment.finished')).toHaveLength(3);
+  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
   replay(game);
 });
 
 it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取得', async () => {
   const game = cardGame({
     hands: { a: [] },
-    skills: (book) => [luoshen(book)],
+    skills: [luoshen],
     draw: [card('outer', 'slash'), card('nested', 'jink')],
   });
   await grant(game, 'standard:luoshen');
@@ -549,7 +562,7 @@ it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取�
 it('判定后目标死亡时，洛神不取得牌也不再询问', async () => {
   const game = cardGame({
     hands: { a: [] },
-    skills: (book) => [luoshen(book)],
+    skills: [luoshen],
     draw: [card('judge', 'slash')],
   });
   await grant(game, 'standard:luoshen');
@@ -613,20 +626,27 @@ it('倾国可用黑色手牌响应闪，拒绝红牌、装备和他人的牌，�
 });
 
 it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得最终 CardBook', () => {
-  const definition = defineSkill({ id: 'test:one', name: '甲', effects: [] });
+  const definition = defineSkill({ id: 'test:one', name: '甲', triggers: [] });
   const skills = new SkillBook([definition]);
-  const other = defineSkill({ id: 'test:other', name: '乙', effects: [] });
-  expect(() => skills.register([other, definition])).toThrow(/Duplicate/);
+  const other = defineSkill({ id: 'test:other', name: '乙', triggers: [] });
+  expect(() => skills.register([other, definition])).toThrow(
+    'Duplicate skill definition: test:one.',
+  );
   expect(() => skills.definition(other.id)).toThrow(/Unknown/);
+  expect(() => skills.register([other, { id: '', name: '缺少 ID' }])).toThrow(/requires an ID/);
+  expect(() => skills.definition(other.id)).toThrow(/Unknown/);
+  expect(skills.definition(definition.id)).toBe(definition);
   skills.register([other]);
   const detach = skills.attach(room());
   detach();
   expect(() => skills.register([])).toThrow(/sealed/);
   const game = cardGame({
-    skills: (book) => {
-      expect(book.skills).toBeInstanceOf(SkillBook);
-      return [ganglie(book)];
-    },
+    skills: [
+      (book) => {
+        expect(book.skills).toBeInstanceOf(SkillBook);
+        return [ganglie(book)];
+      },
+    ],
   });
   expect(game.skills.definition('standard:ganglie').name).toBe('刚烈');
 });
@@ -672,56 +692,10 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
   },
 );
 
-it('新增魏将的体力性别技能完整初始化，不覆盖主公奖励', async () => {
-  for (const general of standardGenerals.slice(6, 9)) {
-    const match = createOfflineMatch(
-      6,
-      42,
-      'standard:identity',
-      Array.from({ length: 6 }, () => general.id),
-    );
-    await match.prepare();
-    for (const player of match.room.world.snapshot.players) {
-      expect(generalOf(match.room.world, player.id)).toBe(general.id);
-      expect(genderOf(match.room.world, player.id)).toBe(general.gender);
-      expect(player.maxHp).toBe(
-        general.maxHp + (roleOf(match.room.world, player.id) === 'lord' ? 1 : 0),
-      );
-      expect(
-        match.room.world.snapshot.skills
-          .filter((entry) => entry.owner === player.id)
-          .map((entry) => entry.skill),
-      ).toEqual(general.skills);
-    }
-    match.room.abort('done');
-  }
-});
-
 it('含三名新魏将的八人局，由基础 AI 经公开决策走到真实身份胜负', async () => {
   const lineup = [...standardGenerals.slice(6, 9), ...standardGenerals.slice(0, 5)].map(
     (general) => general.id,
   );
-  const match = createOfflineMatch(8, 42, 'standard:identity', lineup);
-  const running = match.start();
-  try {
-    for (let step = 0; !match.result && step < 4000; step++) {
-      await setImmediate();
-      const request = match.room.decisions.pending[0];
-      if (!request) continue;
-      const reply = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
-      if (reply.kind === 'unsupported') throw new Error(reply.reason);
-      expect(
-        reply.kind === 'cancel'
-          ? match.room.decisions.cancel(request.id, request.token)
-          : match.room.decisions.submit(request.id, request.token, reply.value),
-      ).toEqual({ kind: 'accepted' });
-    }
-    expect(match.result).not.toBeNull();
-    expect(await running).toMatchObject({ kind: 'resolved' });
-  } finally {
-    match.room.abort('done');
-    await running;
-  }
+  const match = createOfflineMatch({ seed: 42, preset: 'standard:identity', lineup });
+  await playMatch(match, { steps: 4000 });
 }, 60_000);

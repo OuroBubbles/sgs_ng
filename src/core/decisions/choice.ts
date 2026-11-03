@@ -11,21 +11,25 @@ export function chooseOne<T extends string>(input: {
   readonly optional?: boolean;
   readonly available?: () => boolean;
 }): Decision<T> {
-  const options = immutable(input.options);
+  const { player, prompt, options: entries, reason, optional, available } = input;
+  // 各字段已只读，泛型 ID 是标量字符串；避免映射类型丢失其具体子类型。
+  const options = immutable(
+    Array.from(entries, ({ id, label }) => ({ id, label })),
+  ) as typeof entries;
   if (
-    !input.reason ||
+    !reason ||
     !options.length ||
     options.some((option) => !option.id || !option.label) ||
     new Set(options.map((option) => option.id)).size !== options.length
   )
     throw new Error('Choice options require distinct IDs and readable labels.');
   return {
-    player: input.player,
-    prompt: input.prompt,
+    player,
+    prompt,
     kind: 'choose-option',
-    optional: input.optional ?? false,
-    data: { options, reason: input.reason },
-    ...(input.available ? { available: input.available } : {}),
+    optional: optional ?? false,
+    data: { options, reason },
+    ...(available ? { available: available.bind(input) } : {}),
     validate: (value) => {
       const found = options.find((option) => option.id === value);
       return found ? { ok: true, value: found.id } : { ok: false, reason: '请选择一个有效选项。' };

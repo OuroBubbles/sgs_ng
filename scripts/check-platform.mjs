@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 function version(command, args = ['--version']) {
   const result = spawnSync(command, args, { encoding: 'utf8', windowsHide: true });
-  return result.error ? null : `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  return result.status === 0 ? `${result.stdout ?? ''}${result.stderr ?? ''}`.trim() : null;
 }
 
 function directories(path) {
@@ -30,8 +30,8 @@ const report = {
   windowsSdk: process.env.WindowsSDKVersion ?? null,
   java: version(java, ['-version']),
   androidSdk: sdk || null,
-  ndkVersions: directories(join(sdk, 'ndk')),
-  androidPlatforms: directories(join(sdk, 'platforms')),
+  ndkVersions: sdk ? directories(join(sdk, 'ndk')) : [],
+  androidPlatforms: sdk ? directories(join(sdk, 'platforms')) : [],
   devices: version(adb, ['devices', '-l']),
 };
 
@@ -49,3 +49,4 @@ const output = {
 mkdirSync('.artifacts/p0', { recursive: true });
 writeFileSync('.artifacts/p0/platform.json', `${JSON.stringify(output, null, 2)}\n`);
 console.log(JSON.stringify(output, null, 2));
+process.exitCode = missing.length ? 1 : 0;

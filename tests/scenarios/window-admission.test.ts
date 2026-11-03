@@ -504,12 +504,12 @@ it.each([false, true])(
     const learned = defineSkill({
       id: 'probe:learned',
       name: '新技能',
-      effects: [
+      triggers: [
         on(damageReceived, {
           id: 'draw',
-          when: (_ctx, hit, self) => hit.input.to === self.owner,
-          async run(ctx, _hit, self) {
-            ctx.unwrap(await draw(ctx, { player: self.owner, count: 1, reason: self.skill }));
+          when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
+          async run(ctx, { self }) {
+            await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
           },
         }),
       ],
@@ -518,9 +518,11 @@ it.each([false, true])(
     game.room.on(damageReceived, {
       ...effect('0-learn', () => {}, 'b'),
       async run(ctx) {
-        const change = ctx.unwrap(
-          await game.skills.grant(ctx, { owner: 'b', skill: learned.id, source: grantSource }),
-        );
+        const change = await game.skills.grant(ctx, {
+          owner: 'b',
+          skill: learned.id,
+          source: grantSource,
+        });
         if (include)
           expect(
             game.skills.include(ctx, ctx.windowOf(damageReceived)!, [change.after!.id]).added,
@@ -672,7 +674,7 @@ it('SkillBook 的窗口专用 Provider 可按实例加入，卸载/重装不绕�
   const definition = defineSkill({
     id: 'probe:provided',
     name: '动态来源',
-    effects: [
+    triggers: [
       on(window, {
         id: 'count',
         run() {
@@ -721,7 +723,7 @@ it('授予后在执行前死亡或失去技能，新候选与普通候选一样�
     const learned = defineSkill({
       id: 'probe:short',
       name: '短暂',
-      effects: [
+      triggers: [
         on(window, {
           id: 'count',
           run() {
@@ -734,20 +736,20 @@ it('授予后在执行前死亡或失去技能，新候选与普通候选一样�
     game.room.on(window, {
       ...effect('inject', () => {}),
       async run(ctx) {
-        const change = ctx.unwrap(
-          await game.skills.grant(ctx, { owner: 'a', skill: learned.id, source: grantSource }),
-        );
+        const change = await game.skills.grant(ctx, {
+          owner: 'a',
+          skill: learned.id,
+          source: grantSource,
+        });
         game.skills.include(ctx, ctx.windowOf(window)!, [change.after!.id]);
         if (die)
-          ctx.unwrap(
-            await kill(ctx, {
-              player: 'a',
-              killer: null,
-              reason: 'rule',
-              cause: { kind: 'rule', seq: null, data: null },
-            }),
-          );
-        else ctx.unwrap(await game.skills.revoke(ctx, 'a', learned.id, grantSource));
+          await kill(ctx, {
+            player: 'a',
+            killer: null,
+            reason: 'rule',
+            cause: { kind: 'rule', seq: null, data: null },
+          });
+        else await game.skills.revoke(ctx, 'a', learned.id, grantSource);
       },
     });
     await game.room.run('window', (ctx) => ctx.window(window, null));
@@ -763,22 +765,20 @@ it('同技能真正重新授予产生新实例，可显式加入；旧实例剩�
   const learned = defineSkill({
     id: 'probe:regain',
     name: '重授',
-    effects: [
+    triggers: [
       on(window, {
         id: 'point',
         times: () => 2,
-        async run(ctx, _payload, self) {
+        async run(ctx, { self }) {
           ids.push(self.id);
           if (replaced) return;
           replaced = true;
-          ctx.unwrap(await game.skills.revoke(ctx, self.owner, self.skill, grantSource));
-          const change = ctx.unwrap(
-            await game.skills.grant(ctx, {
-              owner: self.owner,
-              skill: self.skill,
-              source: grantSource,
-            }),
-          );
+          await game.skills.revoke(ctx, self.owner, self.skill, grantSource);
+          const change = await game.skills.grant(ctx, {
+            owner: self.owner,
+            skill: self.skill,
+            source: grantSource,
+          });
           expect(
             game.skills.include(ctx, ctx.windowOf(window)!, [change.after!.id]).added,
           ).toHaveLength(1);
@@ -804,12 +804,12 @@ it('技能选择只影响选定实例，新技能仍使用普通 invoke/pay 和�
     defineSkill({
       id: `probe:${id}`,
       name: id,
-      effects: [
+      triggers: [
         on(window, {
           id: 'invoke',
           order: 'choose',
-          async run(ctx, _payload, self) {
-            if (ctx.unwrap(await invoke(ctx, self, `invoke ${id}`))) seen.push(id);
+          async run(ctx, { self }) {
+            if (await invoke(ctx, self, `invoke ${id}`)) seen.push(id);
           },
         }),
       ],
@@ -820,12 +820,12 @@ it('技能选择只影响选定实例，新技能仍使用普通 invoke/pay 和�
     ...effect('inject', () => {}),
     async run(ctx) {
       const ref = ctx.windowOf(window)!;
-      const first = ctx.unwrap(
-        await game.skills.grant(ctx, { owner: 'a', skill: 'probe:one', source: grantSource }),
-      );
-      ctx.unwrap(
-        await game.skills.grant(ctx, { owner: 'a', skill: 'probe:two', source: grantSource }),
-      );
+      const first = await game.skills.grant(ctx, {
+        owner: 'a',
+        skill: 'probe:one',
+        source: grantSource,
+      });
+      await game.skills.grant(ctx, { owner: 'a', skill: 'probe:two', source: grantSource });
       expect(game.skills.include(ctx, ref, [first.after!.id]).added).toHaveLength(1);
     },
   });

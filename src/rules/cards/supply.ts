@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { pay } from '../costs/pay';
 import { isGameOver } from '../game/end';
 import { parseCardChoice } from './book';
@@ -13,6 +13,7 @@ export interface CardSupplyInput {
   readonly beneficiary: string;
   readonly names: readonly string[];
   readonly reason: string;
+  /** 同步纯资格；保留原接收者，并在每次读取时进入查询守卫。 */
   readonly available?: (ctx: Context) => boolean;
 }
 export interface SuppliedCard {
@@ -33,8 +34,8 @@ export function withCardSupply<T>(
   book: CardBook,
   input: CardSupplyInput,
   body: (ctx: Context, supply: SuppliedCard) => T | Promise<T>,
-): Promise<FlowResult<SupplyResult<T>>> {
-  const isAvailable = input.available;
+): Promise<SupplyResult<T>> {
+  const isAvailable = input.available?.bind(input);
   const { actor, beneficiary, names, reason } = immutable({
     actor: input.actor,
     beneficiary: input.beneficiary,
@@ -51,7 +52,7 @@ export function withCardSupply<T>(
       at.world.player(actor).alive &&
       at.world.player(beneficiary).alive &&
       !isGameOver(at.world) &&
-      (isAvailable?.(at) ?? true);
+      (isAvailable === undefined || at.query(() => isAvailable(at)));
     const valid = (at: Context, choice: CardChoice) =>
       at.query(() => {
         if (!live(at)) return false;
@@ -62,7 +63,6 @@ export function withCardSupply<T>(
       player: actor,
       kind: 'card-response',
       prompt: `请为 ${beneficiary} 打出${names.map((name) => book.definition(name).label).join('/')}（${reason}）`,
-      data: null,
       optional: true,
       describe: () => ({
         names,
@@ -70,7 +70,7 @@ export function withCardSupply<T>(
         reason,
         offers: book.offers(child, actor, 'response', names),
       }),
-      available: () => live(child) && book.offers(child, actor, 'response', names).length > 0,
+      available: () => live(child) && book.hasOffers(child, actor, 'response', names),
       validate: (value) => {
         const parsed = parseCardChoice(value);
         return !parsed.ok
@@ -86,67 +86,61 @@ export function withCardSupply<T>(
     if (!built.ok || !valid(child, answer.value)) return { kind: 'unavailable' };
     const card = built.value;
     const origins = new Map(card.materials.map((id) => [id, child.world.position(id)]));
-    const result = await withProcessing<SupplyResult<T>>(
-      child,
-      [],
-      'discard',
-      async (at, processing) => {
-        const responseId = at.cause.flowId;
-        const paid = await pay(at, {
+    const result = await withProcessing<SupplyResult<T>>(child, [], async (at, processing) => {
+      const responseId = at.cause.flowId;
+      const paid = await pay(at, {
+        cards: card.materials,
+        to: processing.zone,
+        reason,
+        ...(card.source?.kind === 'viewAs'
+          ? { skill: book.skills.binding(at.world, card.source.instance)!.self }
+          : { actor }),
+        materialAllowed: (_ctx, id, zone) => origins.get(id) === zone.id,
+        legal: (latest) => {
+          const current = book.build(latest, actor, answer.value, 'response');
+          return (
+            live(latest) &&
+            current.ok &&
+            names.includes(current.value.name) &&
+            JSON.stringify(current.value) === JSON.stringify(card)
+          );
+        },
+        factKind: 'card.responded',
+        declaration: {
+          id: responseId,
+          card,
+          beneficiary,
+          subject: { kind: 'supply', reason },
+          processing: processing.zone,
+        },
+      });
+
+      if (paid.kind !== 'paid') return { kind: 'unavailable' };
+      await at.window(
+        responseFinished,
+        {
+          id: responseId,
           actor,
-          cards: card.materials,
-          to: processing.zone,
-          reason,
-          ...(card.source?.kind === 'viewAs'
-            ? { skill: book.skills.binding(at.world, card.source.instance)!.self }
-            : {}),
-          materialAllowed: (_ctx, id, zone) => origins.get(id) === zone.id,
-          legal: (latest) => {
-            const current = book.build(latest, actor, answer.value, 'response');
-            return (
-              live(latest) &&
-              current.ok &&
-              names.includes(current.value.name) &&
-              JSON.stringify(current.value) === JSON.stringify(card)
-            );
-          },
-          factKind: 'card.responded',
-          declaration: {
-            id: responseId,
-            card,
-            beneficiary,
-            subject: { kind: 'supply', reason },
-            processing: processing.zone,
-          },
-        });
-        if (paid.kind === 'aborted') return at.abort(paid.reason);
-        if (paid.value.kind !== 'paid') return { kind: 'unavailable' };
-        await at.window(
-          responseFinished,
-          {
-            id: responseId,
-            actor,
-            card,
-            subject: { kind: 'supply', id: child.cause.flowId, beneficiary, reason },
-          },
-          { subject: actor },
-        );
-        const available = (current: Context) =>
-          live(current) &&
-          at.scope.active &&
-          current.cause.scopePath.includes(at.scope.id) &&
-          card.materials.every((id) => current.world.position(id) === processing.zone);
-        if (!available(at)) return { kind: 'invalidated' };
-        return {
-          kind: 'supplied',
-          value: await body(
-            at,
-            Object.freeze({ id: responseId, actor, card, processing: processing.zone, available }),
-          ),
-        };
-      },
-    );
-    if (result.kind === 'aborted') return child.abort(result.reason);
-    return result.value;
+          card,
+          subject: { kind: 'supply', id: child.cause.flowId, beneficiary, reason },
+        },
+        { subject: actor },
+      );
+      const available = (current: Context) =>
+        live(current) &&
+        at.scope.active &&
+        current.cause.scopePath.includes(at.scope.id) &&
+        card.materials.every((id) => current.world.position(id) === processing.zone);
+      if (!available(at)) return { kind: 'invalidated' };
+      return {
+        kind: 'supplied',
+        value: await body(
+          at,
+          Object.freeze({ id: responseId, actor, card, processing: processing.zone, available }),
+        ),
+      };
+    });
+
+    return result;
   });
 }

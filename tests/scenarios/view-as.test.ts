@@ -9,12 +9,208 @@ import {
   damageReceived,
 } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/wusheng';
-import type { CardChoice } from '../../src/sdk';
+import type {
+  CardChoice,
+  Context,
+  SkillDefinition,
+  ViewAs,
+  ViewAsInput,
+  ViewAsMakeInput,
+  ViewAsUseInput,
+  UseResult,
+} from '../../src/sdk';
+import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 
 const slash = { actor: 'a', targets: ['b'], timing: { kind: 'effect' } } as const;
+
+it('动态转换数量在菜单、存在性与构牌入口读取时校验，错误不产生规则变更', async () => {
+  for (const entry of ['offers', 'has-offers', 'build'] as const) {
+    let count = { min: 1, max: 1 };
+    const skill = defineSkill({
+      id: 'probe:dynamic-count',
+      name: '动态数量',
+      viewAs: [
+        {
+          id: 'convert',
+          materials: () => ['fee'],
+          count: () => count,
+          make: { name: 'standard:slash' },
+        },
+      ],
+    });
+    const game = cardGame({ skills: [skill], hands: { a: [card('fee', 'jink')] } });
+    await game.room.run('grant', (ctx) =>
+      game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
+    );
+    await game.room.run('valid', (ctx) => {
+      const reads = { min: 0, max: 0 };
+      count = {
+        get min() {
+          return ++reads.min === 1 ? 1 : -1;
+        },
+        get max() {
+          return ++reads.max === 1 ? 1 : 0;
+        },
+      };
+      if (entry === 'offers')
+        expect(game.book.offers(ctx, 'a', 'use', ['standard:slash'])).toMatchObject([
+          { label: '动态数量', count: { min: 1, max: 1 } },
+        ]);
+      else if (entry === 'has-offers')
+        expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
+      else
+        expect(
+          game.book.build(
+            ctx,
+            'a',
+            {
+              kind: 'viewAs',
+              instance: game.room.world.snapshot.skills[0]!.id,
+              recipe: 'convert',
+              materials: ['fee'],
+            },
+            'use',
+          ).ok,
+        ).toBe(true);
+      expect(reads).toEqual({ min: 1, max: 1 });
+    });
+    const instance = game.room.world.snapshot.skills[0]!.id;
+    const before = game.room.world.snapshot;
+    const facts = game.room.history.facts();
+    count = { min: 1, max: 0 };
+    await expect(
+      game.room.run(entry, (ctx) => {
+        if (entry === 'offers') game.book.offers(ctx, 'a', 'use');
+        else if (entry === 'has-offers') game.book.hasOffers(ctx, 'a', 'use', ['standard:slash']);
+        else
+          game.book.build(
+            ctx,
+            'a',
+            { kind: 'viewAs', instance, recipe: 'convert', materials: ['fee'] },
+            'use',
+          );
+      }),
+    ).rejects.toThrow('Invalid probe:dynamic-count/convert material count.');
+    expect(game.room.status).toBe('faulted');
+    expect(game.room.world.snapshot).toBe(before);
+    expect(game.room.history.facts()).toEqual(facts);
+    expect(game.room.decisions.pending).toEqual([]);
+    expect(rebuildWorld(game.initial, facts)).toEqual(before);
+  }
+});
 const source = { kind: 'general', id: 'a' } as const;
+
+it('存在性与菜单共用候选，过滤可提前停止，仍须独立验证实际目标', async () => {
+  const game = cardGame({
+    hands: { a: [card('black', 'jink', 'spade'), card('red', 'jink', 'heart')] },
+    skills: [wusheng],
+  });
+  await game.room.run('check', async (ctx) => {
+    await game.skills.grant(ctx, { owner: 'a', skill: wusheng.id, source });
+    for (const purpose of ['use', 'response', { kind: 'effect' }] as const) {
+      for (const names of [undefined, ['standard:slash'], ['standard:jink'], ['standard:peach']])
+        expect(game.book.hasOffers(ctx, 'a', purpose, names)).toBe(
+          game.book.offers(ctx, 'a', purpose, names).length > 0,
+        );
+    }
+    let visited = 0;
+    expect(
+      game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], () => {
+        visited++;
+        return true;
+      }),
+    ).toBe(true);
+    expect(visited).toBe(1);
+    expect(game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], () => false)).toBe(false);
+    const instance = game.room.world.snapshot.skills[0]!.id;
+    expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
+    expect(
+      game.book.validateUse(ctx, {
+        actor: 'a',
+        choice: { kind: 'viewAs', instance, recipe: 'red-slash', materials: ['red'] },
+        targets: ['c'],
+        timing: { kind: 'effect' },
+      }).ok,
+    ).toBe(false);
+    await game.skills.revoke(ctx, 'a', wusheng.id, source);
+    expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(false);
+    expect(game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'])).toBe(true);
+  });
+  const asyncFilter = (async () => {
+    await Promise.resolve();
+    return true;
+  }) as unknown as () => boolean;
+  await expect(
+    game.room.run('invalid-filter', (ctx) =>
+      game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], asyncFilter),
+    ),
+  ).rejects.toThrow('Queries cannot await (card.offer.filter).');
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+});
+
+it('转换候选与构牌逐项拒绝异步资格、材料和牌面，故障后续体不能写入', async () => {
+  for (const field of ['available', 'names', 'materials', 'count', 'make'] as const) {
+    for (const entry of field === 'make'
+      ? (['build'] as const)
+      : (['offers', 'has-offers', 'build'] as const)) {
+      let lateError = '';
+      const invalid = async (ctx: Context) => {
+        await Promise.resolve();
+        try {
+          ctx.commit('invalid.view-as.late', [], null);
+        } catch (error) {
+          lateError = (error as Error).message;
+        }
+        return false;
+      };
+      // 外部 JS 内容可能绕过 TS 返回类型；其他字段仍是正常转换定义。
+      const recipe = {
+        id: 'convert',
+        label: '转换',
+        available: () => true,
+        names: () => ['standard:slash'],
+        materials: () => ['fee'],
+        count: { min: 1, max: 1 },
+        make: () => ({ name: 'standard:slash' }),
+        [field]: invalid,
+      } as unknown as ViewAs;
+      const skill = defineSkill({
+        id: 'probe:async-view',
+        name: '异步转换',
+        triggers: [],
+        viewAs: [recipe],
+      });
+      const game = cardGame({ skills: [skill], hands: { a: [card('fee', 'jink', 'heart')] } });
+      await game.room.run('grant', (ctx) =>
+        game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
+      );
+      const instance = game.room.world.snapshot.skills[0]!.id;
+      await expect(
+        game.room.run(entry, (ctx) => {
+          if (entry === 'offers') game.book.offers(ctx, 'a', 'use');
+          else if (entry === 'has-offers') game.book.hasOffers(ctx, 'a', 'use', ['standard:slash']);
+          else
+            game.book.build(
+              ctx,
+              'a',
+              { kind: 'viewAs', instance, recipe: 'convert', materials: ['fee'] },
+              'use',
+            );
+        }),
+      ).rejects.toThrow(`Queries cannot await (probe:async-view/convert.${field})`);
+      await Promise.resolve();
+      expect(game.room.status).toBe('faulted');
+      expect(lateError).toContain('Queries cannot await');
+      expect(game.room.world.position('fee')).toBe('a:hand');
+      expect(game.room.history.facts('invalid.view-as.late')).toEqual([]);
+      expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(
+        game.room.world.snapshot,
+      );
+    }
+  }
+});
 
 it('武圣仅转换红色材料，牌名/距离/目标/响应复用普通杀管线', async () => {
   const game = cardGame({ skills: [wusheng], hands: { b: [card('jink', 'jink')] } });
@@ -80,61 +276,180 @@ it('装备区红色材料也能转换，不受固定手牌入口限制', async (
   expect(game.room.world.player('b').hp).toBe(3);
 });
 
-it('零材料配方在空手时仍出现并完成用牌，不创建虚假实体牌', async () => {
-  const zero = defineSkill({
+it('零材料固定配方隔离原始牌面，空手仍能完成用牌且不创建虚假实体牌', async () => {
+  class Face {
+    #name = 'standard:slash';
+
+    get name() {
+      return this.#name;
+    }
+
+    set name(value: string) {
+      this.#name = value;
+    }
+  }
+  const face = new Face();
+  const raw = Object.freeze({
+    id: 'slash',
+    label: 'zero slash',
+    make: face,
+  });
+  const recipe = viewAs(raw);
+  expect(viewAs(recipe)).toBe(recipe);
+  expect(() => {
+    // @ts-expect-error 材料候选和数量必须整组声明，不能把遗漏误当作零材料。
+    return viewAs({ ...raw, materials: () => [] });
+  }).toThrow('materials and count must be provided together');
+  expect(() => {
+    // @ts-expect-error 单独的数量不能替代材料候选。
+    return viewAs({ ...raw, count: { min: 0, max: 0 } });
+  }).toThrow('materials and count must be provided together');
+  const zero = {
     id: 'test:zero',
     name: 'zero',
-    effects: [],
-    viewAs: [
-      viewAs({
-        id: 'slash',
-        label: 'zero slash',
-        names: () => ['standard:slash'],
-        materials: () => [],
-        count: { min: 0, max: 0 },
-        make: () => ({ name: 'standard:slash' }),
-      }),
-    ],
-  });
+    viewAs: [raw],
+  } satisfies SkillDefinition;
   const game = cardGame({ hands: { a: [] }, skills: [zero] });
+  const normalized: readonly ReturnType<typeof viewAs>[] = game.skills
+    .definition(zero.id)
+    .viewAs!.map((entry) => entry);
+  const registered = normalized[0]!;
+  expect(registered.count).toEqual({ min: 0, max: 0 });
+  expect(viewAs(registered)).toBe(registered);
+  expect(registered).not.toBe(recipe);
+  face.name = 'standard:duel';
+  const fresh = viewAs(raw);
+  expect(fresh).not.toBe(recipe);
+  expect(fresh.make).toEqual({ name: 'standard:duel' });
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: zero.id, source }),
   );
   const instance = game.room.world.snapshot.skills[0]?.id ?? '';
   await game.room.run('offers', (ctx) => {
+    expect(game.book.hasOffers(ctx, 'a', 'use')).toBe(true);
     expect(game.book.offers(ctx, 'a', 'use')).toMatchObject([
-      { kind: 'viewAs', materials: [], count: { min: 0, max: 0 } },
+      {
+        kind: 'viewAs',
+        label: 'zero slash',
+        names: ['standard:slash'],
+        materials: [],
+        count: { min: 0, max: 0 },
+      },
     ]);
+    expect(
+      game.book.validateUse(ctx, {
+        ...slash,
+        choice: { kind: 'viewAs', instance, recipe: 'slash', materials: ['invented'] },
+      }).ok,
+    ).toBe(false);
   });
   expect(
     await use(game, {
       ...slash,
       choice: { kind: 'viewAs', instance, recipe: 'slash', materials: [] },
     }),
-  ).toMatchObject({ value: { use: { card: { suit: 'none', rank: 0, materials: [] } } } });
+  ).toMatchObject({
+    value: { use: { card: { name: 'standard:slash', suit: 'none', rank: 0, materials: [] } } },
+  });
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.snapshot.cards).toHaveLength(0);
 });
 
+it('自定义转换可同步拒绝或直接返回用牌 Promise，原方法与完整结算仍保留', async () => {
+  let ready = false;
+  class Recipe {
+    id = 'conditional-slash';
+    label = 'conditional slash';
+    make = { name: 'standard:slash' };
+    #reason = 'probe:conditional-use';
+
+    use(ctx: Context, { self, intent, book }: ViewAsUseInput): UseResult | Promise<UseResult> {
+      if (!ready) return { kind: 'unavailable', reason: this.#reason };
+      return book.use(ctx, {
+        ...intent,
+        actor: self.owner,
+        choice: { kind: 'generated', face: this.make, materials: [], reason: this.#reason },
+      });
+    }
+  }
+  const raw = new Recipe();
+  const recipe = viewAs(raw);
+  raw.use = () => ({ kind: 'unavailable', reason: 'replaced entry' });
+  const skill = { id: 'probe:conditional', name: 'conditional', viewAs: [recipe] };
+  const game = cardGame({ hands: { a: [] }, skills: [skill] });
+  await game.room.run('grant', (ctx) =>
+    game.skills.grant(ctx, { owner: 'a', skill: skill.id, source }),
+  );
+  const instance = game.room.world.snapshot.skills[0]!.id;
+  const intent = {
+    ...slash,
+    choice: { kind: 'viewAs', instance, recipe: recipe.id, materials: [] } as const,
+  };
+  const before = game.room.history.facts();
+  expect(await use(game, intent)).toMatchObject({
+    kind: 'resolved',
+    value: { kind: 'unavailable', reason: 'probe:conditional-use' },
+  });
+  expect(game.room.history.facts()).toEqual(before);
+  expect(game.room.world.player('b').hp).toBe(4);
+
+  ready = true;
+  expect(await use(game, intent)).toMatchObject({
+    kind: 'resolved',
+    value: {
+      kind: 'used',
+      use: { actor: 'a', card: { source: { kind: 'generated', reason: 'probe:conditional-use' } } },
+    },
+  });
+  expect(game.room.world.player('b').hp).toBe(3);
+  expect(game.room.history.facts('card.used')).toHaveLength(1);
+  expect(game.room.world.snapshot.cards).toHaveLength(0);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+});
+
 it('多材料与动态牌名按实际参数构造，同一配方无需固定牌名或一张材料', async () => {
+  class Recipe {
+    id = 'choose-name';
+    label = 'flexible';
+    #names = ['standard:slash', 'standard:duel'];
+    #max = 2;
+
+    available() {
+      return this.#max > 0;
+    }
+
+    names() {
+      return this.#names;
+    }
+
+    materials(ctx: Context, { self }: ViewAsInput) {
+      expect(this.#max).toBe(2);
+      return ownedCards(ctx.world, self.owner);
+    }
+
+    count(ctx: Context, { self }: ViewAsInput) {
+      return { min: ctx.world.player(self.owner).hp === 4 ? this.#max : 1, max: this.#max };
+    }
+
+    make(_ctx: Context, { parameters }: ViewAsMakeInput) {
+      return typeof parameters === 'string' && this.#names.includes(parameters)
+        ? { name: parameters }
+        : null;
+    }
+  }
+  const recipe = new Recipe();
   const flexible = defineSkill({
     id: 'test:flexible',
     name: 'flexible',
-    effects: [],
-    viewAs: [
-      viewAs({
-        id: 'choose-name',
-        label: 'flexible',
-        names: () => ['standard:slash', 'standard:duel'],
-        materials: (ctx, self) => ownedCards(ctx.world, self.owner),
-        count: (ctx, self) => ({ min: ctx.world.player(self.owner).hp === 4 ? 2 : 1, max: 2 }),
-        make: (_ctx, _self, _materials, parameters) =>
-          parameters === 'standard:duel' || parameters === 'standard:slash'
-            ? { name: parameters }
-            : null,
-      }),
-    ],
+    triggers: [],
+    viewAs: [viewAs(recipe)],
   });
+  recipe.names = () => [];
+  recipe.materials = () => [];
+  recipe.count = () => ({ min: 0, max: 0 });
+  recipe.make = () => null;
+  recipe.available = () => false;
+  expect(Object.isFrozen(recipe)).toBe(false);
   const game = cardGame({ skills: [flexible] });
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: flexible.id, source }),
@@ -151,6 +466,83 @@ it('多材料与动态牌名按实际参数构造，同一配方无需固定牌�
     value: { use: { card: { name: 'standard:duel', rank: 0, materials: ['slash1', 'slash2'] } } },
   });
   expect(game.room.world.zone('discard').cards).toEqual(['slash1', 'slash2']);
+});
+
+it('同一配方按使用与打出切换牌名、材料和数量，最终校验沿用实际用途', async () => {
+  const adaptive = defineSkill({
+    id: 'test:adaptive',
+    name: '变式',
+    viewAs: [
+      viewAs({
+        id: 'duel-slash',
+        label: '变式',
+        names: (_ctx, { book, purpose }) => [
+          book.definition(purpose === 'use' ? 'standard:duel' : 'standard:slash').id,
+        ],
+        materials: (ctx, { self, book, purpose }) =>
+          ownedCards(ctx.world, self.owner).filter(
+            (id) => book.face(ctx, id).color === (purpose === 'use' ? 'red' : 'black'),
+          ),
+        count: (_ctx, { purpose }) => ({ min: purpose === 'use' ? 1 : 2, max: 2 }),
+        make: (_ctx, { purpose }) => ({
+          name: purpose === 'use' ? 'standard:duel' : 'standard:slash',
+        }),
+      }),
+    ],
+  });
+  const game = cardGame({
+    skills: [adaptive],
+    hands: {
+      a: [card('red', 'jink', 'heart'), card('black1', 'jink'), card('black2', 'jink')],
+      b: [card('duel', 'duel')],
+    },
+  });
+  await game.room.run('grant', (ctx) =>
+    game.skills.grant(ctx, { owner: 'a', skill: adaptive.id, source }),
+  );
+  const instance = game.room.world.snapshot.skills[0]!.id;
+  const choice = { kind: 'viewAs', instance, recipe: 'duel-slash' } as const;
+  await game.room.run('preview', (ctx) => {
+    const offers = (purpose: 'use' | 'response') =>
+      game.book.offers(ctx, 'a', purpose).filter((offer) => offer.skill === adaptive.id);
+    expect(offers('use')).toMatchObject([
+      { names: ['standard:duel'], materials: ['red'], count: { min: 1, max: 2 } },
+    ]);
+    expect(offers('response')).toMatchObject([
+      { names: ['standard:slash'], materials: ['black1', 'black2'], count: { min: 2, max: 2 } },
+    ]);
+    expect(game.book.build(ctx, 'a', { ...choice, materials: ['black1'] }, 'response').ok).toBe(
+      false,
+    );
+    expect(game.book.build(ctx, 'a', { ...choice, materials: ['red'] }, 'response').ok).toBe(false);
+    expect(
+      game.book.build(ctx, 'a', { ...choice, materials: ['black1', 'black2'] }, 'use').ok,
+    ).toBe(false);
+  });
+  expect(
+    await use(game, { ...slash, targets: ['c'], choice: { ...choice, materials: ['red'] } }),
+  ).toMatchObject({ value: { kind: 'used', use: { card: { name: 'standard:duel' } } } });
+  expect(game.room.world.player('c').hp).toBe(3);
+
+  const running = use(game, {
+    ...slash,
+    actor: 'b',
+    targets: ['a'],
+    choice: { kind: 'physical', card: 'duel' },
+  });
+  const request = await nextRequest(game.room);
+  expect(request).toMatchObject({ player: 'a', kind: 'card-response' });
+  expect(
+    game.room.decisions.submit(request.id, request.token, {
+      ...choice,
+      materials: ['black1', 'black2'],
+    }),
+  ).toEqual({ kind: 'accepted' });
+  await running;
+  expect(game.room.world.player('a').hp).toBe(4);
+  expect(game.room.world.player('b').hp).toBe(3);
+  expect(game.room.world.zone('discard').cards).toEqual(['red', 'black1', 'black2', 'duel']);
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
 it('重复材料、错误参数、未知配方与错误拥有者均不支付', async () => {
@@ -219,15 +611,13 @@ it('零材料配方也可响应，同一个目标效果保存完整关联', asyn
   const zero = defineSkill({
     id: 'test:zero-jink',
     name: 'zero jink',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'jink',
         label: 'zero jink',
         names: () => ['standard:jink'],
-        materials: () => [],
-        count: { min: 0, max: 0 },
-        available: (_ctx, _self, purpose) => purpose === 'use',
+        available: (_ctx, { purpose }) => purpose === 'use',
         make: () => ({ name: 'standard:jink' }),
       }),
     ],

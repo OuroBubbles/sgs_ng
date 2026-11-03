@@ -21,15 +21,13 @@ export function installRescue(room: Room, book: CardBook): () => void {
           ctx.world.player(event.player).hp <= 0 &&
           !isGameOver(ctx.world)
         ) {
-          const answer = ctx.unwrap(
-            await book.askUse(ctx, {
-              actor,
-              names: ['standard:peach'],
-              targets: [event.player],
-              timing: { kind: 'rescue', dying: event.player },
-              prompt: `${event.player} 濒死，还需要 ${1 - ctx.world.player(event.player).hp} 个桃`,
-            }),
-          );
+          const answer = await book.askUse(ctx, {
+            actor,
+            names: ['standard:peach'],
+            targets: [event.player],
+            timing: { kind: 'rescue', dying: event.player },
+            prompt: `${event.player} 濒死，还需要 ${1 - ctx.world.player(event.player).hp} 个桃`,
+          });
           if (answer.kind !== 'used') break;
         }
       }

@@ -1,16 +1,27 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { CardView } from '../core/view/table';
   import type { GameSelection } from '../core/view/game';
+  import type { ReplyResult } from '../core/decisions/hub';
   import { LocalSession } from './offline/session';
-  import { createOfflineMatch, availablePackages, defaultContent } from './offline/practice';
-  import { resolvePackages } from '../content/package';
-  import { ContentLibrary } from './offline/content-library';
-  import { BattleBoard } from '../client/table/board';
+  import { RemoteSession, rememberedRoom, type RememberedRoom } from './network/session';
+  import type { LobbyView } from './network/protocol';
+  import {
+    createOfflineMatch,
+    defaultContent,
+    practiceContent,
+    seatNames,
+  } from './offline/practice';
+  import { defaultRoomSetup, type RoomSetup } from './network/setup';
+  import type { BattleBoard } from '../client/table/board';
   import type { TableLayout, TableRegion } from '../client/table/layout';
   import { cardPoolCenter } from '../client/table/layout';
-  import { acceptsGameShortcut } from '../client/interaction/selection';
+  import { acceptsGameShortcut, selectForcedTargets } from '../client/interaction/selection';
   import HandCard from '../client/panels/HandCard.svelte';
+  import OwnedCardPicker from '../client/panels/OwnedCardPicker.svelte';
+  import PlayerPanel from '../client/panels/PlayerPanel.svelte';
+  import SkillArea from '../client/panels/SkillArea.svelte';
+  import TargetLines from '../client/table/TargetLines.svelte';
   import CardFace from '../client/panels/CardFace.svelte';
   import CardInspector from '../client/panels/CardInspector.svelte';
   import SkillInspector from '../client/panels/SkillInspector.svelte';
@@ -19,44 +30,85 @@
   import SpinePanel from '../client/panels/SpinePanel.svelte';
   import ArrangePanel from '../client/panels/ArrangePanel.svelte';
   import { observeVisibility } from '../platform/lifecycle';
+  import { GameAudio } from '../client/presentation/audio';
+  import NetworkSetup from '../client/panels/NetworkSetup.svelte';
+  import HostedRoomInfo from '../client/panels/HostedRoomInfo.svelte';
+  import RoomLobby from '../client/panels/RoomLobby.svelte';
+  import LobbyShell from '../client/panels/LobbyShell.svelte';
+  import GeneralGallery from '../client/panels/GeneralGallery.svelte';
+  import { skinImage } from '../client/presentation/skin';
+  import {
+    observeHosting,
+    createDesktopRoom,
+    closeDesktopRoom,
+    unavailableHosting,
+    type HostingState,
+  } from '../platform/hosting';
 
+  type LobbyPage = 'home' | 'solo' | 'network' | 'content';
   const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
   const initialSession = new LocalSession(createOfflineMatch(), { human: '甲席' });
-  let session = $state.raw(initialSession);
+  let session = $state.raw<LocalSession | RemoteSession>(initialSession);
+  const online = $derived(session instanceof RemoteSession);
+  let remoteLobby = $state.raw<LobbyView | null>(null);
+  let savedRoom = $state.raw<RememberedRoom | null>(null);
+  let remoteState = $state<RemoteSession['connectionState'] | null>(null);
+  let remoteEpoch = $state(0);
+  let remoteBaseline = $state(0);
+  let remoteRetryable = $state(false);
+  const disconnected = $derived(
+    remoteLobby?.seats.filter((seat) => !seat.connected).map((seat) => seat.id) ?? [],
+  );
+  let hosting = $state.raw<HostingState>(unavailableHosting);
+  let lastRoomSetup = $state.raw<RoomSetup>(defaultRoomSetup);
+  let lastRoomPort = $state(1422);
+  let lobbyPage = $state<LobbyPage>('home');
   let view = $state.raw(initialSession.view);
+  const tableOpen = $derived(view.status !== 'idle' && view.players.length > 0);
   let selection = $state<GameSelection>(empty());
+  let autoTargetEnabled = $state(true);
   let playerCount = $state(4);
   let seed = $state(42);
   let deckPreset = $state('standard:identity');
-  const contentLibrary = new ContentLibrary(availablePackages);
-  let libraryView = $state.raw(contentLibrary.view);
-  const enabledPackages = $derived(libraryView.enabled);
-  const importedPackages = $derived(libraryView.modules.map((entry) => entry.package));
-  const importBusy = $derived(!libraryView.ready || libraryView.busy);
-  const contentLocked = $derived(importBusy || libraryView.recovery);
-  let pendingContentChoice = $state<{ id: string; enabled: boolean } | null>(null);
-  let contentInput = $state<HTMLInputElement | null>(null);
-  const packages = $derived([...availablePackages, ...importedPackages]);
-  const optionalPackages = $derived(packages.filter((entry) => entry.manifest.id !== 'standard'));
-  const packageSelection = $derived.by(() => {
-    try {
-      return {
-        content: resolvePackages(packages, ['standard', ...enabledPackages]),
-        error: '',
-      };
-    } catch (error) {
-      return {
-        content: defaultContent,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  });
-  const selectedContent = $derived(packageSelection.content);
+  let enablePractice = $state(false);
+  const selectedContent = $derived(enablePractice ? practiceContent : defaultContent);
   const generals = $derived(selectedContent.generals);
   const implementedCardCount = $derived(selectedContent.cards.length);
   let manualPractice = $state(false);
+  let practiceOptionsOpen = $state(false);
   let general = $state('standard:guanyu');
+  const selectedGeneral = $derived(generals.find((item) => item.id === general));
+  // 大厅复用实际内容装配的技能说明；不启动对局，也不另维护一份技能文案。
+  const lobbySkills = $derived(selectedContent.createBooks().skills);
+  const selectedGeneralSkills = $derived(
+    selectedGeneral?.skills.map((id) => lobbySkills.definition(id)) ?? [],
+  );
+  let failedPortrait = $state<string | null>(null);
   let aiGeneral = $state('preset');
+  // 预览与开局共享同一份阵容草稿，不在表现层另外推算一套席位。
+  const localLineup = $derived(
+    Array.from({ length: playerCount }, (_, i) =>
+      i === 0 ? general : aiGeneral === 'preset' ? generals[i % generals.length]!.id : aiGeneral,
+    ),
+  );
+  const lobbySeats = $derived(
+    localLineup.map((id, i) => ({
+      seat: seatNames[i]!,
+      name: manualPractice
+        ? '自由演练'
+        : (generals.find((item) => item.id === id)?.name ?? '待选将'),
+      portrait: manualPractice
+        ? skinImage('ui/photo/unknown.jpg')
+        : (selectedContent.generalViews[id]?.portrait ?? skinImage('ui/photo/unknown.jpg')),
+      controller: manualPractice ? '手动' : i === 0 ? '你' : 'AI',
+    })),
+  );
+  const localDeckName = $derived(
+    selectedContent.decks.find((deck) => deck.id === deckPreset)?.label ?? '',
+  );
+  const matchSummary = $derived(
+    `${playerCount} 席 · ${manualPractice ? '手动演练' : `${selectedGeneral?.name ?? '待选将'}领衔`} · ${localDeckName}`,
+  );
   let notice = $state('');
   let boardHost: HTMLDivElement;
   let board = $state.raw<BattleBoard | null>(null);
@@ -68,6 +120,8 @@
   let logOpen = $state(false);
   let skillsOpen = $state(false);
   let animations = $state(true);
+  let soundEnabled = $state(true);
+  let audio = $state.raw<GameAudio | null>(null);
   let visible = $state(true);
   let unsubscribe = () => {};
   let decisionKey = '';
@@ -88,6 +142,22 @@
   );
   const offers = $derived(view.decision && 'offers' in view.decision ? view.decision.offers : []);
   const selectedOffer = $derived(offers.find((offer) => offer.id === selection.offer));
+  const cardOptions = $derived(
+    (selectedOffer?.kind === 'active' && selectedOffer.count.max === 1) ||
+      (view.decision?.kind === 'cards-targets' && view.decision.cardCount.max === 1)
+      ? session.inspect(view.decision?.id, view.decision?.token, { ...selection, cards: [] }).cards
+      : preview.cards,
+  );
+  const ownedCardGroups = $derived(
+    view.decision?.kind === 'cards-targets' ? view.decision.cardGroups : undefined,
+  );
+  $effect(() => {
+    if (!autoTargetEnabled || !view.decision) return;
+    const next = selectForcedTargets(selection, (draft) =>
+      session.inspect(view.decision?.id, view.decision?.token, draft),
+    );
+    if (next !== selection) selection = next;
+  });
   const fixedTargets = $derived(
     view.decision?.kind === 'play-action'
       ? preview.fixedTargets
@@ -103,6 +173,35 @@
   ]);
   const phaseName = $derived(phases.find(([kind]) => kind === view.phase)?.[1] ?? '等待');
   const ownSeat = $derived(view.players.find((player) => player.self));
+  const decisionHint = $derived.by(() => {
+    if (view.error) return view.error;
+    if (notice) return notice;
+    if (preview.prompt) return preview.prompt;
+    if (selectedOffer && !preview.valid && preview.reason)
+      return `${selectedOffer.label}：${preview.reason}`;
+    if (selectedOffer?.description) return `${selectedOffer.label}：${selectedOffer.description}`;
+    if (view.decision?.prompt) return view.decision.prompt;
+    if (view.status === 'idle') return '设置席位，开始本地对局';
+    if (view.paused) return '对局已暂停';
+    if (view.result) return '对局已结束';
+    if (view.automated) {
+      if (view.control?.delegated && view.automated === view.viewer) return '基础 AI 正在代你操作…';
+      return `${view.automated} 正在思考…`;
+    }
+    if (remoteLobby?.waitingFor) return `等待 ${remoteLobby.waitingFor} 选择`;
+    return '正在结算…';
+  });
+  const decisionDetail = $derived.by(() => {
+    if (view.control?.reason) return view.control.reason;
+    if (selectedOffer && selectedOffer.kind !== 'physical') {
+      const count = selectedOffer.count;
+      return `材料 ${selection.cards.length} / ${count.min}${count.max === count.min ? '' : `–${count.max === 'all' ? selectedOffer.cards.length : count.max}`} · 目标 ${selection.targets.length} / ${preview.targetCount.min} · ${preview.reason}`;
+    }
+    if (view.decision) return preview.reason;
+    if (view.control?.delegated) return '已托管 · 可随时收回操作';
+    if (remoteLobby?.waitingFor) return '对方选择后继续结算';
+    return '公开记录随结算更新 · 右键或长按查看牌面';
+  });
   $effect(() => {
     if (!selectedContent.decks.some((deck) => deck.id === deckPreset))
       deckPreset = 'standard:identity';
@@ -136,37 +235,64 @@
   function subscribe() {
     unsubscribe();
     unsubscribe = session.subscribe((next) => {
-      const key = next.decision ? `${next.decision.id}:${next.decision.token}` : '';
-      if (next.viewer !== view.viewer || key !== decisionKey) {
+      const previousRound = remoteLobby?.round;
+      const previousEditing = remoteLobby?.editing;
+      const previousEpoch = remoteEpoch;
+      remoteLobby = session instanceof RemoteSession ? session.lobby : null;
+      remoteState = session instanceof RemoteSession ? session.connectionState : null;
+      remoteEpoch = session instanceof RemoteSession ? session.epoch : 0;
+      remoteBaseline = session instanceof RemoteSession ? session.actionBaseline : 0;
+      remoteRetryable = session instanceof RemoteSession && session.reconnectable;
+      const scopeChanged =
+        previousRound !== remoteLobby?.round || previousEditing !== remoteLobby?.editing;
+      if (previousRound !== remoteLobby?.round) audio?.reset();
+      if (remoteEpoch !== previousEpoch) audio?.update(next, false);
+      // 藏牌投影暂时省略请求；恢复同一请求时保留草稿，换局或请求变化仍清空。
+      const key =
+        next.paused && !scopeChanged
+          ? decisionKey
+          : next.decision
+            ? `${next.decision.id}:${next.decision.token}`
+            : '';
+      const viewerChanged = !next.paused && !view.paused && next.viewer !== view.viewer;
+      if (scopeChanged || viewerChanged || key !== decisionKey) {
         selection = empty();
+        autoTargetEnabled = true;
         inspectedCard = null;
         skillsOpen = false;
         notice = '';
+      }
+      if (next.paused) {
+        inspectedCard = null;
+        skillsOpen = false;
       }
       decisionKey = key;
       view = next;
     });
   }
   onMount(() => {
-    subscribe();
-    const offContent = contentLibrary.subscribe((value) => {
-      libraryView = value;
-    });
-    contentLibrary.restore().catch((error: unknown) => {
-      notice = String(error);
-    });
-    const instance = new BattleBoard();
-    board = instance;
-    instance
-      .mount(boardHost, (layout) => {
-        tableLayout = layout;
-      })
-      .then(() => {
-        rendererReady = true;
+    let mounted = true;
+    let offHosting = () => {};
+    observeHosting((next) => {
+      if (mounted) hosting = next;
+    })
+      .then((off) => {
+        if (mounted) offHosting = off;
+        else off();
       })
       .catch((error: unknown) => {
-        rendererError = String(error);
+        if (mounted) notice = String(error);
       });
+    const playback = new GameAudio();
+    audio = playback;
+    savedRoom = rememberedRoom();
+    if (
+      new URL(location.href).searchParams.has('online') &&
+      (!savedRoom || new URL(savedRoom.address).host !== location.host)
+    ) {
+      connectOnline(location.href);
+    }
+    subscribe();
     const offVisibility = observeVisibility((active) => {
       visible = active;
       if (!active) {
@@ -175,114 +301,155 @@
       }
     });
     return () => {
-      offContent();
-      contentLibrary.dispose();
+      mounted = false;
+      offHosting();
       unsubscribe();
-      session.dispose();
+      if (session instanceof RemoteSession) session.dispose(false);
+      else session.dispose();
       offVisibility();
-      instance.destroy();
+      playback.destroy();
     };
   });
   $effect(() => {
-    board?.update(
-      view,
-      { ...selection, targets: displayedTargets },
-      { ...preview, targets: targetOptions },
-    );
+    // 模块与 GPU 实例都属于本次对局，退出后不接纳迟到的模块或初始化。
+    if (!tableOpen) return;
+    const host = boardHost;
+    let active = true;
+    let instance: BattleBoard | null = null;
+    rendererError = '';
+    import('../client/table/board')
+      .then(async ({ BattleBoard }) => {
+        if (!active) return;
+        const current = new BattleBoard();
+        instance = current;
+        board = current;
+        await current.mount(host, (layout) => {
+          if (active) tableLayout = layout;
+        });
+        if (active) rendererReady = true;
+      })
+      .catch((error: unknown) => {
+        if (active) rendererError = String(error);
+      });
+    return () => {
+      active = false;
+      instance?.destroy();
+      board = null;
+      tableLayout = null;
+      rendererReady = false;
+    };
+  });
+  $effect(() => {
+    board?.update(view);
   });
   $effect(() => {
     board?.setActive(!labOpen && visible);
   });
+  $effect(() => {
+    audio?.update(view, soundEnabled && visible && !labOpen);
+  });
 
-  const regionStyle = (region: TableRegion | undefined) =>
+  // 选牌框按内容收缩，以区域中心定位；其余区域仍填满布局给出的矩形。
+  const regionStyle = (region: TableRegion | undefined, fitContent = false) =>
     region
-      ? `left:${region.left}px;top:${region.top}px;width:${region.width}px;height:${region.height}px`
+      ? `left:${region.left}px;top:${region.top + (fitContent ? region.height / 2 : 0)}px;width:${region.width}px;${fitContent ? 'max-height' : 'height'}:${region.height}px`
       : 'visibility:hidden';
-  async function importFiles(input: HTMLInputElement) {
-    const files = [...(input.files ?? [])];
-    input.value = '';
-    if (!files.length || contentLocked || view.status !== 'idle') return;
+  function useSession(next: LocalSession | RemoteSession) {
+    audio?.reset();
+    session.dispose();
+    session = next;
+    subscribe();
+    selection = empty();
     notice = '';
-    await contentLibrary.import(files);
   }
-  async function togglePackage(id: string, input: HTMLInputElement) {
-    const enabled = input.checked;
-    if (view.status !== 'idle') return;
-    notice = '';
-    // 开关是待保存的输入草稿；目录和开局资格仍等待事务提交，失败后恢复旧值。
-    pendingContentChoice = { id, enabled };
-    try {
-      await contentLibrary.toggle(id, enabled);
-    } finally {
-      pendingContentChoice = null;
+  /** 回到开局页只结束会话；本地配置仍是草稿，等实际开局时再校验。 */
+  async function returnToLobby() {
+    if (hosting.room || hosting.busy) {
+      try {
+        await closeDesktopRoom();
+      } catch (error) {
+        notice = String(error);
+        return;
+      }
     }
+    const wasOnline = online;
+    useSession(new LocalSession(createOfflineMatch(), { human: '甲席' }));
+    savedRoom = rememberedRoom();
+    lobbyPage = 'solo';
+    if (wasOnline) history.replaceState(null, '', location.pathname);
   }
-  async function removePackage(id: string) {
-    if (view.status !== 'idle') return;
-    notice = '';
-    await contentLibrary.remove(id);
-  }
-  async function restoreContent() {
-    notice = '';
-    await contentLibrary.restore();
-  }
-  async function clearContent() {
-    notice = '';
-    await contentLibrary.clear();
-  }
-  function replace(start: boolean) {
-    if (importBusy) return;
-    if (packageSelection.error) {
-      notice = packageSelection.error;
+  function connectOnline(address: string, resume?: string) {
+    let next: RemoteSession;
+    try {
+      next = new RemoteSession(address, resume);
+    } catch (error) {
+      notice = error instanceof Error ? error.message : String(error);
       return;
     }
+    useSession(next);
+  }
+  async function createRoom(port: number, setup: RoomSetup) {
+    notice = '';
+    lastRoomSetup = { ...setup, lineup: [...setup.lineup] };
+    lastRoomPort = port;
+    try {
+      const room = await createDesktopRoom(port, { ...setup, practice: enablePractice });
+      connectOnline(room.local);
+    } catch (error) {
+      notice = error instanceof Error ? error.message : String(error);
+    }
+  }
+  function startLocalMatch() {
     if (!Number.isSafeInteger(seed) || seed < 1 || seed > 0xffffffff) {
+      practiceOptionsOpen = true;
       notice = '牌局种子需为 1 至 4294967295 的整数';
       return;
     }
     let next: LocalSession;
     try {
       next = new LocalSession(
-        createOfflineMatch(
-          playerCount,
+        createOfflineMatch({
           seed,
-          deckPreset,
-          manualPractice
-            ? null
-            : Array.from({ length: playerCount }, (_, i) =>
-                i === 0
-                  ? general
-                  : aiGeneral === 'preset'
-                    ? generals[i % generals.length]!.id
-                    : aiGeneral,
-              ),
-          selectedContent,
-        ),
+          preset: deckPreset,
+          content: selectedContent,
+          ...(manualPractice ? { count: playerCount } : { lineup: localLineup }),
+        }),
         manualPractice ? {} : { human: '甲席' },
       );
     } catch (error) {
       notice = `内容装配失败：${error instanceof Error ? error.message : String(error)}`;
       return;
     }
-    session.dispose();
-    session = next;
-    subscribe();
-    selection = empty();
-    if (start) session.start();
+    useSession(next);
+    session.start();
+  }
+  async function chooseLobbyGeneral(id: string) {
+    general = id;
+    manualPractice = false;
+    lobbyPage = 'solo';
+    notice = '';
+    await tick();
+    document.querySelector<HTMLElement>('.lobby-heading h1')?.focus();
   }
   function selectCard(id: string) {
     const decision = view.decision;
     if (!decision) return;
     if (decision.kind === 'cards-targets') {
-      if (!preview.cards.some((item) => item.id === id && item.selectable)) return;
+      if (!cardOptions.some((item) => item.id === id && item.selectable)) return;
       selection = {
         ...selection,
         cards: selection.cards.includes(id)
           ? selection.cards.filter((card) => card !== id)
-          : [...selection.cards, id],
+          : decision.cardCount.max === 1
+            ? [id]
+            : [...selection.cards, id],
       };
-    } else if (selectedOffer?.kind === 'viewAs') {
-      if (!selectedOffer.cards.includes(id)) {
+    } else if (selectedOffer && selectedOffer.kind !== 'physical') {
+      if (
+        selectedOffer.kind === 'active'
+          ? !cardOptions.some((card) => card.id === id && card.selectable)
+          : !selectedOffer.cards.includes(id)
+      ) {
         notice = '此牌不能作为当前技能的材料';
         return;
       }
@@ -301,7 +468,6 @@
             : max === 'all' || cards.length <= max
               ? cards
               : selection.cards,
-        targets: [],
       };
     } else {
       const offer = offers.find((offer) => offer.cardId === id);
@@ -309,23 +475,49 @@
         notice = '此牌当前不能使用，可右键或长按查看说明';
         return;
       }
-      const next = {
+      selection = {
         offer: selection.offer === offer.id ? null : offer.id,
         cards: [],
         targets: selection.targets,
       };
-      const feedback = session.inspect(decision.id, decision.token, { ...next, targets: [] });
-      selection = {
-        ...next,
-        targets: next.targets.filter((target) =>
-          feedback.targets.some((item) => item.id === target && item.selectable),
-        ),
-      };
     }
+    autoTargetEnabled = true;
+    retainTargets();
+    notice = '';
+  }
+  /** 换牌或技能时保留仍可选的目标，逐项重查以保留有意义的次序。 */
+  function retainTargets() {
+    const decision = view.decision;
+    if (!decision) return;
+    const previous = selection.targets;
+    let next = { ...selection, targets: [] as string[] };
+    for (const id of previous) {
+      const feedback = session.inspect(decision.id, decision.token, next);
+      if (feedback.targets.some((target) => target.id === id && target.selectable))
+        next = { ...next, targets: [...next.targets, id] };
+    }
+    selection = next;
+  }
+  function selectOffer(id: string) {
+    const offer = offers.find((offer) => offer.id === id);
+    if (!offer) return;
+    if (selection.offer === id) selection = empty();
+    else {
+      const previous = selectedOffer?.cardId ? [selectedOffer.cardId] : selection.cards;
+      const cards = previous.filter((card) => offer.cards.includes(card));
+      selection = {
+        offer: id,
+        cards: offer.count.max === 'all' ? cards : cards.slice(0, offer.count.max),
+        targets: selection.targets,
+      };
+      retainTargets();
+    }
+    autoTargetEnabled = true;
     notice = '';
   }
   function selectTarget(id: string) {
     if (!targetOptions.some((item) => item.id === id && item.selectable)) return;
+    autoTargetEnabled = !selection.targets.includes(id);
     selection = {
       ...selection,
       targets: selection.targets.includes(id)
@@ -334,31 +526,77 @@
           ? [id]
           : [...selection.targets, id],
     };
+    retainTargets();
     notice = '';
   }
-  function reply(value?: unknown) {
+  async function reply(value?: unknown) {
     const decision = view.decision;
     if (!decision) return;
-    const result =
-      value === undefined
-        ? session.reply(decision.id, decision.token, selection)
-        : session.answer(decision.id, decision.token, value);
-    if (result.kind === 'rejected') notice = result.message;
+    const key = decisionKey;
+    const current = session;
+    const epoch = remoteEpoch;
+    const result = await (value === undefined
+      ? current.reply(decision.id, decision.token, selection)
+      : current.answer(decision.id, decision.token, value));
+    if (
+      result.kind === 'rejected' &&
+      current === session &&
+      key === decisionKey &&
+      epoch === remoteEpoch
+    )
+      notice = result.message;
   }
-  function cancel() {
+  async function cancel() {
     const decision = view.decision;
     if (!decision) return;
-    const result = session.cancel(decision.id, decision.token);
-    if (result.kind === 'rejected') notice = result.message;
+    const current = session;
+    const key = decisionKey;
+    const epoch = remoteEpoch;
+    const result = await current.cancel(decision.id, decision.token);
+    if (
+      result.kind === 'rejected' &&
+      current === session &&
+      key === decisionKey &&
+      epoch === remoteEpoch
+    )
+      notice = result.message;
+  }
+  function cancelDraft() {
+    if (view.decision?.kind === 'play-action' && selection.offer) {
+      selection = empty();
+      autoTargetEnabled = false;
+      notice = '';
+      return;
+    }
+    return cancel();
+  }
+  async function roomReply(action: (remote: RemoteSession) => Promise<ReplyResult>) {
+    const current = session;
+    if (!(current instanceof RemoteSession)) return;
+    const round = current.lobby?.round;
+    notice = '';
+    const result = await action(current);
+    if (session === current && current.lobby?.round === round && result.kind === 'rejected')
+      notice = result.message;
+  }
+  async function toggleDelegation() {
+    if (!view.control) return;
+    const current = session;
+    const round = remoteLobby?.round;
+    const result = await current.setDelegated(!view.control.delegated);
+    if (session === current && remoteLobby?.round === round && result.kind === 'rejected')
+      notice = result.message;
   }
   function available(id: string): boolean {
     if (view.decision?.kind === 'cards-targets')
-      return preview.cards.some((item) => item.id === id && item.selectable);
+      return cardOptions.some((item) => item.id === id && item.selectable);
+    if (selectedOffer?.kind === 'active')
+      return cardOptions.some((card) => card.id === id && card.selectable);
     return selectedOffer?.kind === 'viewAs'
       ? selectedOffer.cards.includes(id)
       : offers.some((offer) => offer.cardId === id);
   }
-  function keydown(event: KeyboardEvent) {
+  async function keydown(event: KeyboardEvent) {
     if (logOpen) {
       if (event.key === 'Escape') {
         logOpen = false;
@@ -378,11 +616,12 @@
       return;
     if (event.key === 'Escape') {
       selection = empty();
+      autoTargetEnabled = false;
       notice = '';
     }
     if (event.key === 'Enter' && preview.valid) {
       event.preventDefault();
-      reply();
+      await reply();
     }
     const id =
       view.decision?.kind === 'cards-targets'
@@ -396,7 +635,19 @@
 
 <div class="app-shell" class:motion-off={!animations} class:setup={view.status === 'idle'}>
   <header class="app-header">
-    <a href="/" class="brand" aria-label="弈 三国杀新章"
+    <a
+      href="/"
+      class="brand"
+      aria-label="弈 三国杀新章"
+      onclick={async (event) => {
+        if (view.status !== 'idle' || online) return;
+        event.preventDefault();
+        lobbyPage = 'home';
+        notice = '';
+        await tick();
+        document.querySelector<HTMLElement>('.lobby-shell')?.scrollTo({ top: 0 });
+        document.querySelector<HTMLElement>('.launch-title h1')?.focus({ preventScroll: true });
+      }}
       ><span class="brand-seal">弈</span>
       <div><strong>三国杀<span>新章</span></strong><small>SANGUOSHA / NEXT</small></div></a
     >
@@ -405,61 +656,341 @@
         >{/each}
     </nav>
     <div class="header-actions">
-      <span class="room-tag">{session.human ? '单机 · 基础 AI' : '手动演练'}</span><button
-        class="subtle-button"
-        onclick={() => {
-          labOpen = true;
-        }}>动画验证 ↗</button
-      >
+      {#if hosting.room}<HostedRoomInfo
+          room={hosting.room}
+          busy={hosting.busy}
+          open={view.status === 'idle'}
+          onclose={returnToLobby}
+        />{/if}
+      <span class="room-tag"
+        >{online
+          ? `联机 · ${remoteLobby?.seat ?? '连接中'}`
+          : session.human
+            ? '单机 · 基础 AI'
+            : '手动演练'}</span
+      >{#if online}<button
+          class="subtle-button"
+          data-back-action={view.status === 'idle' ? '' : undefined}
+          onclick={returnToLobby}>离开联机</button
+        >{/if}{#if view.status !== 'idle' || lobbyPage === 'content'}<button
+          class="subtle-button"
+          onclick={() => {
+            labOpen = true;
+          }}>动画验证 ↗</button
+        >{/if}
     </div>
   </header>
-  <main class="game-layout">
+
+  {#if view.status === 'idle'}
+    <LobbyShell
+      page={online ? 'room' : lobbyPage}
+      summary={implementedCardCount + ' 种牌 · ' + generals.length + ' 名武将'}
+      {matchSummary}
+      seats={lobbySeats}
+      message={notice}
+      onstart={startLocalMatch}
+      oncount={(count: number) => {
+        playerCount = count;
+      }}
+      resumeSeat={savedRoom?.seat}
+      onpage={(page: LobbyPage) => {
+        lobbyPage = page;
+        notice = '';
+      }}
+      onresume={() => {
+        if (savedRoom) connectOnline(savedRoom.address, savedRoom.key);
+      }}
+    >
+      {#if online}
+        <RoomLobby
+          lobby={remoteLobby}
+          message={notice}
+          onready={(enabled: boolean) => roomReply((remote) => remote.setReady(enabled))}
+          ongeneral={(id: string) => roomReply((remote) => remote.chooseGeneral(id))}
+        />
+      {:else}
+        <section
+          class="lobby-panel setup-panel"
+          aria-label="开局设置"
+          hidden={lobbyPage !== 'solo'}
+        >
+          <div class="solo-preview" aria-label="所选武将预览">
+            <div class="solo-portrait">
+              {#key general}
+                <img
+                  src={(manualPractice || failedPortrait === general
+                    ? undefined
+                    : selectedContent.generalViews[general]?.portrait) ??
+                    skinImage('ui/photo/unknown.jpg')}
+                  alt=""
+                  onerror={() => {
+                    failedPortrait = general;
+                  }}
+                />
+              {/key}
+              {#if !manualPractice && selectedGeneral}<span>{selectedGeneral.kingdom}</span>{/if}
+            </div>
+            <div>
+              <span class="solo-caption">{manualPractice ? '手动演练' : '甲席 · 你的武将'}</span>
+              <h2>{manualPractice ? '自由演练' : (selectedGeneral?.name ?? '选择武将')}</h2>
+              {#if !manualPractice && selectedGeneral}
+                <div class="solo-general-info" aria-label="所选武将资料">
+                  <span>{selectedGeneral.kingdom}势力</span>
+                  <span>体力上限 <strong>{selectedGeneral.maxHp}</strong></span>
+                </div>
+              {/if}
+              <p>
+                {manualPractice
+                  ? '逐席操作，检验技能与结算。'
+                  : '你执掌甲席，其余角色由基础 AI 行动。'}
+              </p>
+            </div>
+            <button
+              class="solo-browse"
+              aria-label="浏览武将一览"
+              onclick={async () => {
+                lobbyPage = 'content';
+                await tick();
+                document.querySelector<HTMLElement>('.lobby-heading h1')?.focus();
+              }}>武将一览 <span aria-hidden="true">↗</span></button
+            >
+          </div>
+          <fieldset class="lobby-fields solo-settings">
+            <legend>牌局设置</legend>
+            <label
+              >你的武将 <select bind:value={general} disabled={manualPractice}>
+                {#each generals as item (item.id)}<option value={item.id}>{item.name}</option
+                  >{/each}
+              </select></label
+            >
+            <label
+              >席位 <select bind:value={playerCount}
+                ><option value={2}>两人</option><option value={4}>四人</option><option value={6}
+                  >六人</option
+                ><option value={8}>八人</option></select
+              ></label
+            >
+            <label
+              >AI 武将 <select
+                bind:value={aiGeneral}
+                disabled={manualPractice}
+                title="应用于所有 AI 席位"
+              >
+                <option value="preset">默认预设</option>
+                {#each generals as item (item.id)}<option value={item.id}>{item.name}</option
+                  >{/each}
+              </select></label
+            ><label
+              >牌组 <select bind:value={deckPreset}
+                >{#each selectedContent.decks as deck (deck.id)}<option value={deck.id}
+                    >{deck.label}</option
+                  >{/each}</select
+              ></label
+            >
+          </fieldset>
+          <section class="solo-roster" aria-label="本局阵容预览">
+            <header>
+              <h3>本局席位</h3>
+              <span>{manualPractice ? '全部手动控制' : `你与 ${playerCount - 1} 位基础 AI`}</span>
+            </header>
+            <ol>
+              {#each lobbySeats as seat (seat.seat)}
+                <li class:human={seat.controller === '你'}>
+                  <img src={seat.portrait} alt="" />
+                  <div>
+                    <strong>{seat.name}</strong>
+                    <span>{seat.seat} · {seat.controller}</span>
+                  </div>
+                </li>
+              {/each}
+            </ol>
+          </section>
+          <details class="solo-options" bind:open={practiceOptionsOpen}>
+            <summary
+              ><span>演练与复现</span><small
+                >{manualPractice ? '全部手动' : '基础 AI'} · 种子 {seed}</small
+              ></summary
+            >
+            <div class="lobby-fields">
+              <div class="seed-option">
+                <label
+                  >牌局种子 <input
+                    type="number"
+                    min="1"
+                    max="4294967295"
+                    bind:value={seed}
+                    aria-describedby="practice-seed-help"
+                  /></label
+                >
+                <small id="practice-seed-help">相同种子与配置可复现开局。</small>
+              </div>
+              <label class="practice-toggle"
+                ><input type="checkbox" bind:checked={manualPractice} />手动演练（内容调试）</label
+              >
+            </div>
+          </details>
+          {#if notice}<p role="alert">
+              {notice}
+            </p>{/if}
+          <div class="solo-start">
+            <div><strong>准备就绪</strong><small>{matchSummary}</small></div>
+            <button class="confirm-button" onclick={startLocalMatch}>开始单机对局 →</button>
+          </div>
+        </section>
+        <section
+          class="lobby-panel network-panel"
+          aria-label="联机入口"
+          hidden={lobbyPage !== 'network'}
+        >
+          <NetworkSetup
+            {hosting}
+            generals={selectedContent.generals}
+            decks={selectedContent.decks}
+            seats={seatNames}
+            initialSetup={lastRoomSetup}
+            initialPort={lastRoomPort}
+            onconnect={connectOnline}
+            oncreate={createRoom}
+          />
+          {#if notice}<p role="alert">{notice}</p>{/if}
+        </section>
+        <aside
+          class="lobby-panel lobby-content"
+          aria-label="内置内容选择"
+          hidden={lobbyPage === 'home'}
+        >
+          {#if lobbyPage === 'solo' && !manualPractice && selectedGeneral}
+            <section class="lobby-general-skills" aria-label="所选武将技能">
+              <span class="lobby-section-caption">甲席 · 你的武将</span>
+              <h2>{selectedGeneral.name} · 技能</h2>
+              <dl>
+                {#each selectedGeneralSkills as skill (skill.id)}
+                  <div>
+                    <dt>{skill.name}{skill.lord ? ' · 主公技' : ''}</dt>
+                    <dd>{skill.description || '当前内容尚未提供技能说明。'}</dd>
+                  </div>
+                {/each}
+              </dl>
+              {#if selectedGeneralSkills.length === 0}<p>该武将未配置技能。</p>{/if}
+            </section>
+          {/if}
+          <h2>{lobbyPage === 'content' ? '内置内容' : '本局内容'}</h2>
+          <p>标准与 EX 牌组就绪。机制演武提供额外武将，用于复杂技能的自由演练。</p>
+          <div class="content-stats" aria-label="可用内容统计">
+            <div><strong>{generals.length}</strong><span>名武将</span></div>
+            <div><strong>{implementedCardCount}</strong><span>种牌</span></div>
+          </div>
+          <fieldset class="content-options">
+            <legend>内置内容</legend>
+            <span class="content-choice"
+              ><label class="practice-toggle"
+                ><input type="checkbox" bind:checked={enablePractice} />机制演武</label
+              ></span
+            >
+          </fieldset>
+          <small
+            >当前 {implementedCardCount} 种牌 · {generals.length} 名武将。选择用于单机与创建房间，加入房间时使用主持端内容。</small
+          >
+        </aside>
+        {#if lobbyPage === 'content'}
+          <GeneralGallery
+            entries={generals.map((item) => ({
+              id: item.id,
+              name: item.name,
+              kingdom: item.kingdom,
+              maxHp: item.maxHp,
+              portrait: selectedContent.generalViews[item.id]?.portrait,
+            }))}
+            selected={general}
+            onselect={chooseLobbyGeneral}
+          />
+        {/if}
+      {/if}
+    </LobbyShell>
+  {/if}
+  <main
+    class="game-layout"
+    class:lobby-hidden={view.status === 'idle'}
+    inert={view.status === 'idle'}
+    aria-hidden={view.status === 'idle'}
+  >
     <section class="table-column" aria-label="对局战场">
       <div class="table-topline">
-        <span><b>演武场</b><em>{view.players.length} 人身份局 · {view.deckName}</em></span><span
-          class="turn-label"
-          >第 {view.turn}
-          {view.extraTurn ? '额外回合' : '回合'} ／ {view.result
-            ? '对局结束'
-            : view.error
-              ? '本局中止'
-              : (view.active ?? (view.turn > 0 ? '回合衔接' : '尚未开局'))} · {phaseName}</span
+        <span
+          ><b>{online && view.status === 'idle' ? '房间' : '演武场'}</b><em
+            >{online && view.status === 'idle'
+              ? remoteLobby
+                ? `${remoteLobby.lineup.length} 席 · ${remoteLobby.deckName}`
+                : '正在连接主持端'
+              : `${view.players.length} 人身份局 · ${view.deckName}`}</em
+          ></span
         >
+        <div class="table-state">
+          {#if online && view.status === 'idle'}<span>等待玩家准备</span
+            >{:else if online && remoteState === 'connected' && remoteLobby?.phase === 'playing' && disconnected.length}
+            <span role="status" aria-label="断线玩家"
+              >{disconnected.join('、')} 已断开，等待重连</span
+            >
+            <button class="subtle-button" onclick={() => roomReply((remote) => remote.endRound())}
+              >结束本局</button
+            >
+          {:else}
+            <span class="pile-count">牌堆 {view.drawCount} ／ 弃牌 {view.discardCount}</span><span
+              class="turn-label"
+              >第 {view.turn}
+              {view.extraTurn ? '额外回合' : '回合'} ／ {view.error
+                ? '本局中止'
+                : view.result
+                  ? '对局结束'
+                  : (view.active ?? (view.turn > 0 ? '回合衔接' : '尚未开局'))} · {phaseName}</span
+            >
+          {/if}
+        </div>
       </div>
       <div class="table-surface">
         <div class="board-canvas" bind:this={boardHost} data-testid="battle-canvas"></div>
+        {#key session}{#key (remoteLobby?.round ?? 0) + ':' + Boolean(remoteLobby?.editing) + ':' + remoteEpoch}<TargetLines
+              {view}
+              layout={tableLayout}
+              targets={displayedTargets}
+              baseline={remoteBaseline}
+              active={animations &&
+                visible &&
+                !view.paused &&
+                !labOpen &&
+                (!online || remoteState === 'connected')}
+            />{/key}{/key}
         <div class="target-overlays">
           {#each view.players as player, i (player.id)}
             {@const seat = tableLayout?.seats[i]}
             {@const selectable = targetOptions.some(
               (target) => target.id === player.id && target.selectable,
             )}
-            <button
-              class="target-hitbox"
-              class:self={player.self}
-              class:selected={displayedTargets.includes(player.id)}
-              class:available={selectable}
-              class:unavailable={!selectable && Boolean(selection.offer)}
-              style={seat
-                ? `left:${seat.x}px;top:${seat.y}px;width:${seat.width}px;height:${seat.height}px`
-                : 'visibility:hidden'}
-              data-seat={i}
-              data-testid={`target-${player.id}`}
-              data-chained={player.chained}
-              data-shield={player.shield}
-              aria-label={`${player.name}${player.title ? `·${player.title}` : ''}，性别${player.gender}，${player.alive ? `体力${player.hp}/${player.maxHp}，手牌${player.handCount}，护盾${player.shield}` : '已阵亡'}，${player.role ?? '身份未知'}${player.alive && player.chained ? '，连环' : ''}${displayedTargets.includes(player.id) && preview.targetCount.max !== 1 ? `，选择顺序${displayedTargets.indexOf(player.id) + 1}` : ''}`}
-              aria-pressed={displayedTargets.includes(player.id)}
-              aria-disabled={!selectable}
-              onclick={() => selectTarget(player.id)}
-              ><span class="sr-only">{player.name} {player.hp}/{player.maxHp} {player.role}</span
-              >{#if selectable}<span class="target-state"
-                  >{displayedTargets.includes(player.id)
-                    ? preview.targetCount.max === 1
-                      ? '已选'
-                      : `已选 ${displayedTargets.indexOf(player.id) + 1}`
-                    : '可选'}</span
-                >{/if}</button
-            >
+            {#if seat}<PlayerPanel
+                {player}
+                {seat}
+                index={i}
+                selected={displayedTargets.includes(player.id)}
+                {selectable}
+                choosing={Boolean(selection.offer) ||
+                  targetOptions.some((target) => target.selectable)}
+                order={displayedTargets.includes(player.id) && preview.targetCount.max !== 1
+                  ? displayedTargets.indexOf(player.id) + 1
+                  : undefined}
+                active={view.active === player.id && view.status === 'running'}
+                animated={animations && visible && !view.paused && !labOpen}
+                {selectedCards}
+                handCount={view.hand.length}
+                {available}
+                onselect={() => selectTarget(player.id)}
+                oncard={(card: CardView) => {
+                  if (player.self && available(card.id)) selectCard(card.id);
+                  else inspectedCard = card;
+                }}
+                oninspect={(card: CardView) => {
+                  inspectedCard = card;
+                }}
+              />{/if}
           {/each}
         </div>
         <div
@@ -468,151 +999,38 @@
             ? 'inset:0;width:100%;height:100%'
             : regionStyle(tableLayout?.arena)}
         >
-          {#if view.status === 'idle'}
+          {#if view.error}
             <section
               class="lobby"
-              aria-label="开局设置"
-              data-content-ready={libraryView.ready && !libraryView.busy}
+              aria-label={online && remoteState !== 'connected' ? '联机连接' : '对局中止'}
             >
-              <span class="eyebrow">OFFLINE / IDENTITY</span>
-              <h1>落子，入局。</h1>
-              <p>你执掌甲席，其余角色自动行动。<br />基础 AI 按公开信息与自己的手牌做出决策。</p>
-              <div class="lobby-fields">
-                <label
-                  >AI 武将 <select
-                    bind:value={aiGeneral}
-                    disabled={manualPractice}
-                    title="应用于所有 AI 席位"
-                  >
-                    <option value="preset">默认预设</option>
-                    {#each generals as item (item.id)}<option value={item.id}>{item.name}</option
-                      >{/each}
-                  </select></label
-                >
-                <label
-                  >你的武将 <select bind:value={general} disabled={manualPractice}>
-                    {#each generals as item (item.id)}<option value={item.id}>{item.name}</option
-                      >{/each}
-                  </select></label
-                >
-                <label
-                  >席位 <select bind:value={playerCount}
-                    ><option value={2}>两人</option><option value={4}>四人</option><option value={6}
-                      >六人</option
-                    ><option value={8}>八人</option></select
-                  ></label
-                ><label
-                  >牌组 <select bind:value={deckPreset}
-                    >{#each selectedContent.decks as deck (deck.id)}<option value={deck.id}
-                        >{deck.label}</option
-                      >{/each}</select
-                  ></label
-                ><label
-                  >牌局种子 <input
-                    type="number"
-                    min="1"
-                    max="4294967295"
-                    bind:value={seed}
-                  /></label
-                >
-              </div>
-              <div class="lobby-options">
-                <input
-                  class="content-file-input"
-                  type="file"
-                  accept=".sgs,.sgs.mjs,.mjs"
-                  multiple
-                  bind:this={contentInput}
-                  aria-label="导入本地内容包"
-                  onchange={(event) => importFiles(event.currentTarget)}
-                />
-                {#if optionalPackages.length}
-                  <fieldset class="package-options">
-                    <legend
-                      >扩展内容
-                      {#if importBusy || importedPackages.length || enabledPackages.length || libraryView.recovery}
-                        <span
-                          class="content-store-status"
-                          data-testid="content-store-status"
-                          role="status"
-                          >{!libraryView.ready
-                            ? '读取中'
-                            : libraryView.busy
-                              ? '保存中'
-                              : libraryView.recovery
-                                ? '需要处理'
-                                : '已保存'}</span
-                        >
-                      {/if}
-                      {#if libraryView.recovery}<button
-                          class="content-action"
-                          aria-label="重新载入内容"
-                          disabled={importBusy}
-                          onclick={restoreContent}>重载</button
-                        >{/if}
-                      {#if importedPackages.length || enabledPackages.length || libraryView.recovery}<button
-                          class="content-action"
-                          aria-label="清空已保存内容"
-                          title="清空已保存的模块和启用选择"
-                          disabled={importBusy}
-                          onclick={clearContent}>清空</button
-                        >{/if}
-                    </legend>
-                    {#each optionalPackages as entry (entry.manifest.id)}
-                      <span class="package-item"
-                        ><label class="practice-toggle"
-                          ><input
-                            type="checkbox"
-                            checked={pendingContentChoice?.id === entry.manifest.id
-                              ? pendingContentChoice.enabled
-                              : selectedContent.packages.some(
-                                  (item) => item.id === entry.manifest.id,
-                                )}
-                            disabled={contentLocked}
-                            onchange={(event) =>
-                              togglePackage(entry.manifest.id, event.currentTarget)}
-                          />{entry.manifest.name}</label
-                        >{#if importedPackages.some((item) => item.manifest.id === entry.manifest.id)}<button
-                            class="package-remove"
-                            aria-label={`移除${entry.manifest.name}`}
-                            disabled={contentLocked}
-                            onclick={() => removePackage(entry.manifest.id)}>×</button
-                          >{/if}</span
-                      >
-                    {/each}
-                    <button
-                      class="content-import"
-                      disabled={contentLocked}
-                      onclick={() => contentInput?.click()}>导入内容包</button
-                    >
-                  </fieldset>
-                {/if}
-                <label class="practice-toggle"
-                  ><input
-                    type="checkbox"
-                    bind:checked={manualPractice}
-                  />手动演练（内容调试）</label
-                >
-              </div>
-              {#if notice || libraryView.error || packageSelection.error}<p role="alert">
-                  {notice || libraryView.error || packageSelection.error}
-                </p>{/if}
-              <button
-                class="confirm-button"
-                disabled={importBusy || !!packageSelection.error}
-                onclick={() => replace(true)}>开始单机对局 →</button
-              ><small
-                >当前 {implementedCardCount} 种牌与 {generals.length} 名武将。{selectedContent.versions
-                  .map((entry) => `${entry.id}@${entry.version}`)
-                  .join(' · ')}。手动演练用于内容调试。</small
+              <span class="eyebrow"
+                >{online && remoteState !== 'connected' ? 'CONNECTION' : 'GAME STOPPED'}</span
               >
-            </section>
-          {:else if view.error}
-            <section class="lobby" aria-label="对局中止">
-              <span class="eyebrow">GAME STOPPED</span>
-              <h1>本局已中止</h1>
+              <h1>
+                {online && remoteState !== 'connected'
+                  ? remoteState === 'connecting'
+                    ? '正在重连'
+                    : '连接已断开'
+                  : '本局已中止'}
+              </h1>
               <p>{view.error}</p>
-              <button class="confirm-button" onclick={() => replace(false)}>重新开局 →</button>
+              {#if remoteRetryable}<button
+                  class="confirm-button"
+                  onclick={() => {
+                    if (session instanceof RemoteSession) session.reconnect();
+                  }}>重连原席位 →</button
+                >{/if}
+              {#if session instanceof RemoteSession && session.connected}
+                <button
+                  class="confirm-button"
+                  disabled={remoteLobby?.phase !== 'finished'}
+                  onclick={() => roomReply((remote) => remote.prepare())}>返回房间 →</button
+                >
+              {/if}
+              <button class="confirm-button" data-back-action onclick={returnToLobby}
+                >{online ? '返回单机 →' : '重新开局 →'}</button
+              >
             </section>
           {:else if view.result}
             <section class="lobby end-result" aria-label="对局结果">
@@ -625,11 +1043,21 @@
                     >{player.name} · {player.role} {player.alive ? '' : '· 阵亡'}</span
                   >{/each}
               </div>
-              <button class="confirm-button" onclick={() => replace(false)}>再开一局 →</button>
+              {#if session instanceof RemoteSession && session.connected}
+                <button
+                  class="confirm-button"
+                  disabled={remoteLobby?.phase !== 'finished'}
+                  onclick={() => roomReply((remote) => remote.prepare())}>准备下一局 →</button
+                >
+              {/if}
+              <button class="confirm-button" data-back-action onclick={returnToLobby}
+                >{online ? '返回单机 →' : '再开一局 →'}</button
+              >
             </section>
           {:else if view.decision?.kind !== 'arrange' && view.pools.some((pool) => pool.cards.length)}
             <div
               class="public-pools"
+              data-selection-input
               style={`--pool-card-height:${poolCardHeight}px;left:${poolCenter}px`}
               role="group"
               aria-label={hasPrivatePool ? '仅本人可见的牌池' : '公开牌池'}
@@ -685,90 +1113,17 @@
             <span class:ready={rendererReady}></span>{rendererError ||
               (rendererReady ? 'WebGL 战场已就绪' : '正在准备战场')}
           </div>
-          <span class="pile-count">牌堆 {view.drawCount} ／ 弃牌 {view.discardCount}</span>
         </div>
-        {#if view.players.some((player) => player.equipment.length || player.judgment.length)}
-          <div class="equipment-shelf" role="group" aria-label="公开装备与判定区">
-            {#each view.players.filter((player) => player.equipment.length || player.judgment.length) as player (player.id)}
-              <div
-                class="equipment-holder"
-                class:own-gear={view.players.indexOf(player) === tableLayout?.focus}
-                style={regionStyle(tableLayout?.equipment[view.players.indexOf(player)])}
-              >
-                <span>{player.name}</span>
-                <div class="equipment-items" data-testid={`equipment-${player.id}`}>
-                  {#if player.equipment.length}<span>装备</span>{/if}
-                  {#each player.equipment as item, i (item.id)}
-                    <HandCard
-                      card={item}
-                      index={player.self ? view.hand.length + i : -1}
-                      compact
-                      selected={player.self && selectedCards.includes(item.id)}
-                      available={!player.self || available(item.id)}
-                      onselect={() => {
-                        if (player.self && available(item.id)) selectCard(item.id);
-                        else inspectedCard = item;
-                      }}
-                      oninspect={() => {
-                        inspectedCard = item;
-                      }}
-                    />
-                  {/each}
-                </div>
-                {#if player.judgment.length}<div
-                    class="equipment-items"
-                    role="group"
-                    aria-label={`${player.name}的判定区`}
-                    data-testid={`judgment-${player.id}`}
-                  >
-                    <span>判定</span>
-                    {#each player.judgment as item (item.id)}
-                      <HandCard
-                        card={item}
-                        index={-1}
-                        compact
-                        selected={false}
-                        onselect={() => {
-                          inspectedCard = item;
-                        }}
-                        oninspect={() => {
-                          inspectedCard = item;
-                        }}
-                      />
-                    {/each}
-                  </div>{/if}
-              </div>
-            {/each}
-          </div>
-        {/if}
-
         <div class="skills-dock" aria-label="当前席位技能" style={regionStyle(tableLayout?.skills)}>
-          {#if offers.some((offer) => offer.kind !== 'physical')}<div class="recipe-bar">
-              <span>技能</span
-              >{#each offers.filter((offer) => offer.kind !== 'physical') as offer (offer.id)}<button
-                  class:active={selection.offer === offer.id}
-                  aria-pressed={selection.offer === offer.id}
-                  title={offer.description}
-                  onclick={() => {
-                    selection =
-                      selection.offer === offer.id
-                        ? empty()
-                        : { offer: offer.id, cards: [], targets: [] };
-                    notice = '';
-                  }}
-                  >{offer.label}{selection.offer === offer.id
-                    ? offer.kind === 'active'
-                      ? ' · 确认发动'
-                      : offer.count.max === 0
-                        ? view.decision?.kind === 'card-response'
-                          ? ' · 确认打出'
-                          : preview.targetCount.max === 0
-                            ? ' · 确认用牌'
-                            : ' · 选择目标'
-                        : ' · 选择材料'
-                    : ''}</button
-                >{/each}
-            </div>{/if}
+          {#if ownSeat}<SkillArea
+              skills={ownSeat.skills}
+              {offers}
+              selected={selection.offer}
+              onselect={selectOffer}
+              oninspect={() => {
+                skillsOpen = true;
+              }}
+            />{/if}
         </div>
         <section style={regionStyle(tableLayout?.hand)} class="hand-zone" aria-label="当前席位手牌">
           <div class="hand-meta">
@@ -791,7 +1146,7 @@
               {/if}</span
             >
           </div>
-          <div class="hand-cards" data-testid="hand-cards">
+          <div class="hand-cards" data-selection-input data-testid="hand-cards">
             {#each view.hand as item, i (item.id)}<HandCard
                 card={item}
                 index={i}
@@ -806,94 +1161,109 @@
               </p>{/if}
           </div>
         </section>
-        {#if view.decision?.kind === 'cards-targets'}<div
+        {#if view.decision?.kind === 'cards-targets' || selectedOffer?.kind === 'active'}<div
             class="choice-options"
-            style={regionStyle(tableLayout?.choices)}
+            data-selection-input
+            class:owned-card-options={Boolean(ownedCardGroups)}
+            style={regionStyle(
+              ownedCardGroups ? tableLayout?.ownedChoices : tableLayout?.choices,
+              Boolean(ownedCardGroups),
+            )}
           >
-            {#each view.decision.cards.filter((item) => !materials.some((card) => card.id === item.id) && !view.pools.some( (pool) => pool.cards.some((card) => card.id === item.id), )) as item (item.id)}<button
-                class="subtle-button"
-                aria-pressed={selection.cards.includes(item.id)}
-                disabled={!preview.cards.some(
-                  (candidate) => candidate.id === item.id && candidate.selectable,
-                )}
-                onclick={() => selectCard(item.id)}>{item.label}</button
-              >{/each}
+            {#if ownedCardGroups}<OwnedCardPicker
+                groups={ownedCardGroups}
+                cards={cardOptions}
+                selected={selection.cards}
+                onselect={selectCard}
+                oninspect={(card: CardView) => {
+                  inspectedCard = card;
+                }}
+              />{:else}{#each cardOptions.filter((item) => !materials.some((card) => card.id === item.id) && !view.pools.some( (pool) => pool.cards.some((card) => card.id === item.id), )) as item (item.id)}<button
+                  class="subtle-button"
+                  aria-pressed={selection.cards.includes(item.id)}
+                  disabled={!cardOptions.some(
+                    (candidate) => candidate.id === item.id && candidate.selectable,
+                  )}
+                  onclick={() => selectCard(item.id)}>{item.label}</button
+                >{/each}{/if}
           </div>{/if}
 
         <div
           class="decision-bar"
+          class:waiting={!view.decision}
           style={regionStyle(tableLayout?.decision)}
           data-decision-kind={view.decision?.kind ?? ''}
+          data-decision-key={view.decision ? `${view.decision.id}:${view.decision.token}` : ''}
         >
           <div class="decision-copy" aria-live="polite">
             <span class="decision-index">{view.decision ? '弈' : '·'}</span>
             <div>
-              <strong data-testid="decision-hint"
-                >{view.error ||
-                  notice ||
-                  (selectedOffer && !preview.valid ? preview.reason : '') ||
-                  selectedOffer?.description ||
-                  view.decision?.prompt ||
-                  (view.status === 'idle'
-                    ? '设置席位，开始本地对局'
-                    : view.paused
-                      ? '对局已暂停'
-                      : view.result
-                        ? '对局已结束'
-                        : view.automated
-                          ? `${view.automated} 正在思考…`
-                          : '正在结算…')}</strong
-              ><small
-                >{view.decision ? preview.reason : '公开记录随结算更新 · 右键或长按查看牌面'}</small
+              <strong data-testid="decision-hint">{decisionHint}</strong><small
+                >{decisionDetail}</small
               >
             </div>
           </div>
-          <div class="decision-actions">
-            {#if view.decision?.kind === 'invoke'}<button
-                class="confirm-button"
-                onclick={() => reply(true)}>发动</button
-              ><button class="cancel-button" onclick={() => reply(false)}>不发动</button>
-            {:else if view.decision?.kind === 'trigger-order' || view.decision?.kind === 'choose-option'}{#each view.decision.options as option (option.id)}<button
-                  class="subtle-button"
-                  disabled={!option.selectable}
-                  onclick={() => reply(option.id)}>{option.label}</button
-                >{/each}
-              {#if view.decision.optional}<button class="cancel-button" onclick={cancel}
-                  >{view.decision.cancelLabel ?? '取消'}</button
+          {#if view.decision}<div class="decision-actions">
+              {#if view.decision?.kind === 'invoke'}<button
+                  class="confirm-button"
+                  onclick={() => reply(true)}>发动</button
+                ><button class="cancel-button" onclick={() => reply(false)}>不发动</button>
+              {:else if view.decision?.kind === 'trigger-order' || view.decision?.kind === 'choose-option'}{#each view.decision.options as option (option.id)}<button
+                    class="subtle-button"
+                    disabled={!option.selectable}
+                    onclick={() => reply(option.id)}>{option.label}</button
+                  >{/each}
+                {#if view.decision.optional}<button class="cancel-button" onclick={cancel}
+                    >{view.decision.cancelLabel ?? '取消'}</button
+                  >{/if}
+              {:else if view.decision?.kind === 'arrange'}<span>请在排序面板确认</span>
+              {:else if view.decision?.kind === 'unsupported'}<span
+                  >尚无此类选择面板：{view.decision.original}</span
+                >
+              {:else}<button
+                  class="confirm-button"
+                  aria-label="确认当前选择"
+                  disabled={!preview.valid}
+                  onclick={() => reply()}>确认 <span>↵</span></button
+                ><button
+                  class="cancel-button"
+                  disabled={!view.decision?.optional}
+                  onclick={cancelDraft}
+                  >{view.decision?.kind === 'play-action' && selection.offer
+                    ? '取消选择'
+                    : (view.decision?.cancelLabel ??
+                      (view.decision?.kind === 'play-action'
+                        ? '结束出牌'
+                        : view.decision?.kind === 'use-card'
+                          ? view.decision.purpose === 'counter'
+                            ? '放弃反制'
+                            : view.decision.purpose === 'rescue'
+                              ? '放弃救援'
+                              : '放弃使用'
+                          : '放弃响应'))}</button
                 >{/if}
-            {:else if view.decision?.kind === 'arrange'}<span>请在排序面板确认</span>
-            {:else if view.decision?.kind === 'unsupported'}<span
-                >尚无此类选择面板：{view.decision.original}</span
-              >
-            {:else}<button
-                class="confirm-button"
-                aria-label="确认当前选择"
-                disabled={!preview.valid}
-                onclick={() => reply()}>确认 <span>↵</span></button
-              ><button class="cancel-button" disabled={!view.decision?.optional} onclick={cancel}
-                >{view.decision?.cancelLabel ??
-                  (view.decision?.kind === 'play-action'
-                    ? '结束出牌'
-                    : view.decision?.kind === 'use-card'
-                      ? view.decision.purpose === 'counter'
-                        ? '放弃反制'
-                        : view.decision.purpose === 'rescue'
-                          ? '放弃救援'
-                          : '放弃使用'
-                      : '放弃响应')}</button
-              >{/if}
-          </div>
+            </div>{/if}
         </div>
         <nav class="table-tools" aria-label="牌桌工具">
+          {#if view.control}<button
+              aria-label={view.control.delegated ? '收回操作' : 'AI 托管'}
+              aria-pressed={view.control.delegated}
+              disabled={view.status !== 'running' || view.paused}
+              onclick={toggleDelegation}>{view.control.delegated ? '收回' : '托管'}</button
+            >{/if}
           <button
             aria-label="结算记录"
             onclick={() => {
               logOpen = !logOpen;
             }}>记录</button
           ><button
-            aria-label={session.human ? '暂停对局' : '隐藏手牌'}
+            aria-label={online ? '隐藏联机手牌' : session.human ? '暂停对局' : '隐藏手牌'}
+            data-back-action={view.status === 'running' && !view.paused && !logOpen
+              ? ''
+              : undefined}
             disabled={!view.viewer || view.status !== 'running'}
-            onclick={() => session.hide()}>{session.human ? '暂停' : '藏牌'}</button
+            onclick={() => session.hide()}
+            >{online ? '藏牌' : session.human ? '暂停' : '藏牌'}</button
           >
         </nav>
       </div>
@@ -901,6 +1271,7 @@
     <aside class="journal" class:open={logOpen} aria-label="结算记录">
       <button
         class="journal-close subtle-button"
+        data-back-action={logOpen ? '' : undefined}
         onclick={() => {
           logOpen = false;
         }}>关闭记录</button
@@ -929,8 +1300,18 @@
     </aside>
   </main>
   <footer class="app-footer">
-    <span>本地运行 · 无需网络</span><span class="footer-center">SGS_NG ／ 自由落子</span>
+    <span>{online ? '联机运行 · 主持端结算' : '本地运行 · 无需网络'}</span><span
+      class="footer-center">SGS_NG ／ 自由落子</span
+    >
     <div>
+      <button
+        class="text-button"
+        aria-label="音效与语音"
+        aria-pressed={soundEnabled}
+        onclick={() => {
+          soundEnabled = !soundEnabled;
+        }}>声音{soundEnabled ? '开启' : '关闭'}</button
+      >
       <button
         class="text-button"
         onclick={() => {
@@ -968,7 +1349,12 @@
     />
   {/key}
 {/if}
-{#if view.paused}<PauseCurtain onresume={() => session.resume()} />{/if}
+{#if view.paused}<PauseCurtain
+    onexit={returnToLobby}
+    {online}
+    delegated={view.control?.delegated ?? false}
+    onresume={() => session.resume()}
+  />{/if}
 {#if view.handoff}{#key view.handoff.key}<SeatCurtain
       name={view.handoff.name}
       turn={view.handoff.turn}

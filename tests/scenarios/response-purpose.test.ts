@@ -79,7 +79,7 @@ it('禁止打出闪不禁止抵消杀时使用闪', async () => {
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
     async run(ctx, request) {
-      ctx.unwrap(await request.provide(ctx, { kind: 'physical', card: 'dodge' }));
+      await request.provide(ctx, { kind: 'physical', card: 'dodge' });
     },
   });
   await use(game, attack());
@@ -130,30 +130,28 @@ it.each(['effect', 'play'] as const)(
     await game.room.run('probe', async (ctx) => {
       if (kind === 'effect') {
         expect(
-          ctx.unwrap(
+          (
             await game.book.use(ctx, {
               actor: 'b',
               choice: { kind: 'physical', card: 'dodge' },
               targets: [],
               timing: { kind: 'effect' },
-            }),
+            })
           ).kind,
         ).toBe('unavailable');
       } else {
-        ctx.unwrap(
-          await runPhase(ctx, game.book, 'b', 'play', async (at, phase) => {
-            expect(
-              at.unwrap(
-                await game.book.use(at, {
-                  actor: 'b',
-                  choice: { kind: 'physical', card: 'dodge' },
-                  targets: [],
-                  timing: { kind: 'play', owner: 'b', phase: phase.lifetime },
-                }),
-              ).kind,
-            ).toBe('unavailable');
-          }),
-        );
+        await runPhase(ctx, game.book, 'b', 'play', async (at, phase) => {
+          expect(
+            (
+              await game.book.use(at, {
+                actor: 'b',
+                choice: { kind: 'physical', card: 'dodge' },
+                targets: [],
+                timing: { kind: 'play', owner: 'b', phase: phase.lifetime },
+              })
+            ).kind,
+          ).toBe('unavailable');
+        });
       }
     });
     expect(game.room.world.position('dodge')).toBe('b:hand');
@@ -189,7 +187,7 @@ it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 
   for (const room of [game.room, create().room]) {
     await room.run('stale', async (ctx) => {
       expect(
-        ctx.unwrap(
+        (
           await game.book.use(ctx, {
             actor: 'b',
             choice: {
@@ -200,7 +198,7 @@ it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 
             },
             targets: [],
             timing: timing!,
-          }),
+          })
         ).kind,
       ).toBe('unavailable');
     });
@@ -291,7 +289,7 @@ it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种�
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
     async run(ctx, request) {
-      expect(ctx.unwrap(await request.delegate(ctx, 'c')).kind).toBe('used');
+      expect((await request.delegate(ctx, 'c')).kind).toBe('used');
     },
   });
   await dodge(game, use(game, attack()));
@@ -310,7 +308,7 @@ it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', a
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
     async run(ctx, request) {
-      expect(ctx.unwrap(await request.delegate(ctx, 'c')).kind).toBe('unavailable');
+      expect((await request.delegate(ctx, 'c')).kind).toBe('unavailable');
     },
   });
   await dodge(game, use(game, attack()));
@@ -335,7 +333,7 @@ it.each(['prohibit', 'take', 'death'] as const)(
       owner: null,
       eligible: (_ctx, request) => request.actor === 'b',
       async run(ctx, request) {
-        ctx.unwrap(await request.delegate(ctx, 'c'));
+        await request.delegate(ctx, 'c');
       },
     });
     game.room.on(responseFinished, {
@@ -345,29 +343,25 @@ it.each(['prohibit', 'take', 'death'] as const)(
       async run(ctx) {
         if (change === 'prohibit') prohibited = true;
         else if (change === 'take')
-          ctx.unwrap(
-            await moveCards(
-              ctx,
-              [
-                {
-                  cards: ['dodge'],
-                  from: ctx.world.position('dodge'),
-                  to: 'd:hand',
-                  place: 'bottom',
-                },
-              ],
-              'probe:take',
-            ),
+          await moveCards(
+            ctx,
+            [
+              {
+                cards: ['dodge'],
+                from: ctx.world.position('dodge'),
+                to: 'd:hand',
+                place: 'bottom',
+              },
+            ],
+            'probe:take',
           );
         else
-          ctx.unwrap(
-            await kill(ctx, {
-              player: 'b',
-              killer: null,
-              reason: 'rule',
-              cause: { kind: 'rule', seq: null, data: null },
-            }),
-          );
+          await kill(ctx, {
+            player: 'b',
+            killer: null,
+            reason: 'rule',
+            cause: { kind: 'rule', seq: null, data: null },
+          });
       },
     });
     await dodge(game, use(game, attack()));
@@ -386,9 +380,7 @@ it('两层委托仍只有末端 d 打出与原请求者 b 使用，候选不重�
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b' || request.actor === 'c',
     async run(ctx, request) {
-      expect(ctx.unwrap(await request.delegate(ctx, request.actor === 'b' ? 'c' : 'd')).kind).toBe(
-        'used',
-      );
+      expect((await request.delegate(ctx, request.actor === 'b' ? 'c' : 'd')).kind).toBe('used');
     },
   });
   await dodge(game, use(game, attack()));
@@ -449,7 +441,7 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
     owner: null,
     eligible: (_ctx, request) => request.actor === 'b',
     async run(ctx, request) {
-      expect(ctx.unwrap(await request.delegate(ctx, 'c')).kind).toBe('used');
+      expect((await request.delegate(ctx, 'c')).kind).toBe('used');
     },
   });
   game.room.on(useFinished, {
@@ -457,14 +449,12 @@ it('主公实际使用完成后死亡不撤销已提交使用与供牌结果，�
     owner: null,
     eligible: (_ctx, result) => result.card.name === 'standard:jink',
     async run(ctx) {
-      ctx.unwrap(
-        await kill(ctx, {
-          player: 'b',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        }),
-      );
+      await kill(ctx, {
+        player: 'b',
+        killer: null,
+        reason: 'rule',
+        cause: { kind: 'rule', seq: null, data: null },
+      });
     },
   });
   await dodge(game, use(game, attack()));
@@ -494,7 +484,7 @@ it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不�
   const recipe = defineSkill({
     id: 'probe:timing',
     name: '时机配方',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'many',

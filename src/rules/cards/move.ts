@@ -1,12 +1,14 @@
 import type { CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 
 export interface MoveResult {
   readonly kind: 'moved' | 'unchanged';
   readonly moves: readonly CardMove[];
+  /** 本批次提交前存在的受影响区域；含来源和接收区，不随后续结算改变。 */
   readonly before: readonly Zone[];
+  /** 同次提交后的区域快照；本批次新建/移除的区域按实际存在性出现。 */
   readonly after: readonly Zone[];
 }
 
@@ -25,7 +27,7 @@ export function moveCards(
   moves: readonly CardMove[],
   reason: string,
   declaration?: MoveDeclaration,
-): Promise<FlowResult<MoveResult>> {
+): Promise<MoveResult> {
   return ctx.flow(
     'moveCards',
     async (child) => {

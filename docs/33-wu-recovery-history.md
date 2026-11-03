@@ -14,7 +14,7 @@
 
 ## 可查询的真实用牌活动
 
-[cardActivities(history, withinScope?)](../src/rules/cards/activity.ts) 从权威宣告事实返回按序的使用/打出、实际角色、语义牌和作用域路径；后续 [53](53-standard-semantics.md) 补充宣告当时的 turnId 与实际 phase：
+[cardActivities(facts, withinScope?)](../src/rules/cards/activity.ts) 接收完整、有序的事实列表（如 ctx.history.facts()），返回按序的使用/打出、实际角色、语义牌和作用域路径；后续 [53](53-standard-semantics.md) 补充宣告当时的 turnId 与实际 phase：
 
 - 普通使用读取 `card.used`。
 - 普通响应与供牌读取 `card.responded`，归属实际供牌者。

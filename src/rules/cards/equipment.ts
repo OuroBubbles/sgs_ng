@@ -1,6 +1,6 @@
-import type { WorldReader, Zone } from '../../core/model/state';
+import type { Card, WorldReader, Zone } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineSkill, isSkillBlocked } from '../skills/skills';
 import type { SkillBinding, SkillDefinition, SkillHandle, SkillProvider } from '../skills/skills';
 import { modify } from '../skills/query';
@@ -72,7 +72,7 @@ export function equip(
     readonly owner: string;
     readonly from: string;
   },
-): Promise<FlowResult<EquipResult>> {
+): Promise<EquipResult> {
   const request = immutable(input);
   return ctx.flow('equipment.equip', async (child) => {
     const definition = book.definition(child.world.card(request.card).name).equipment;
@@ -96,7 +96,7 @@ export function equip(
       owner: request.owner,
       replaced,
     });
-    const moved = await moveCards(
+    await moveCards(
       child,
       [
         ...replaced.map((card) => ({
@@ -110,7 +110,7 @@ export function equip(
       'equipment',
       { kind: 'equipment.equipped', data: result },
     );
-    if (moved.kind === 'aborted') return child.abort(moved.reason);
+
     return result;
   });
 }
@@ -122,12 +122,16 @@ export function equipmentCard(
     readonly label: string;
   } & EquipmentDefinition,
 ): CardDefinition {
-  if (
-    !input.slot ||
-    (input.range !== undefined && (!Number.isSafeInteger(input.range) || input.range < 1))
-  )
+  const { id, label, slot, range, skill } = input;
+  if (!slot || (range !== undefined && (!Number.isSafeInteger(range) || range < 1)))
     throw new Error('Invalid equipment range.');
-  const { id, label, ...equipment } = input;
+  const equipment: EquipmentDefinition = {
+    slot,
+    ...(range === undefined ? {} : { range }),
+    ...(skill === undefined
+      ? {}
+      : { skill: typeof skill === 'function' ? skill.bind(input) : skill }),
+  };
   const definition: CardDefinition = {
     id,
     type: 'equipment',
@@ -135,22 +139,21 @@ export function equipmentCard(
     equipment: Object.freeze(equipment),
     use: {
       count: { min: 0, max: 0 },
-      fixedTargets: (_ctx, actor) => [actor],
-      target: (_ctx, request, target) => target === request.actor,
-      canUse: (ctx, request) =>
+      fixedTargets: (_ctx, { actor }) => [actor],
+      target: (_ctx, { request, target }) => target === request.actor,
+      canUse: (ctx, { request }) =>
         request.targets.length === 1 &&
         request.card.materials.length === 1 &&
         ctx.world.card(request.card.materials[0]!).name === id
           ? null
           : 'Equipment requires one matching physical card.',
-      async resolve(ctx, effect, book) {
+      async resolve(ctx, { effect, book }) {
         const card = effect.card.materials[0]!;
-        const result = await equip(ctx, book, {
+        await equip(ctx, book, {
           card,
           owner: effect.target,
           from: effect.processing,
         });
-        if (result.kind === 'aborted') return ctx.abort(result.reason);
       },
     },
   };
@@ -184,21 +187,22 @@ export function equipmentAbilities(
         const equipment = card.equipment!;
         const base =
           typeof equipment.skill === 'function' ? equipment.skill(book) : equipment.skill;
+        const { id, name, description, triggers = [], active, viewAs, modifiers = [] } = base ?? {};
         return [
           card.id,
           defineSkill({
-            id: base?.id ?? `${card.id}:ability`,
-            name: base?.name ?? card.label,
-            ...(base?.description === undefined ? {} : { description: base.description }),
-            effects: base?.effects ?? [],
-            ...(base?.active === undefined ? {} : { active: base.active }),
-            ...(base?.viewAs === undefined ? {} : { viewAs: base.viewAs }),
+            id: id ?? `${card.id}:ability`,
+            name: name ?? card.label,
+            ...(description === undefined ? {} : { description }),
+            triggers,
+            ...(active === undefined ? {} : { active }),
+            ...(viewAs === undefined ? {} : { viewAs }),
             modifiers: [
-              ...(base?.modifiers ?? []),
+              ...modifiers,
               ...(equipment.range === undefined
                 ? []
                 : [
-                    modify(attackRange, (_ctx, input, self) =>
+                    modify(attackRange, (_ctx, { input, self }) =>
                       input.actor === self.owner && !input.card.materials.includes(self.origin!.id)
                         ? equipment.range
                         : undefined,
@@ -209,33 +213,49 @@ export function equipmentAbilities(
         ] as const;
       }),
   );
-  const collectFrom = (world: WorldReader, zones: readonly Zone[]): SkillBinding[] =>
-    zones.flatMap((zone) => {
-      if (zone.kind !== 'equipment' || zone.owner === null) return [];
-      return zone.cards.flatMap((card) => {
-        const definition = abilities.get(world.card(card).name);
-        if (!definition) return [];
-        const owner = zone.owner!;
-        const id = JSON.stringify(['equipment', owner, card]);
-        const self: SkillHandle = Object.freeze({
-          id,
-          owner,
-          skill: definition.id,
-          name: definition.name,
-          origin: Object.freeze({ kind: 'equipment', id: card }),
-          effective: (current: WorldReader) =>
-            equippedCards(current, owner).includes(card) && !isSkillBlocked(current, owner, id),
-        });
-        return [{ self, definition }];
-      });
+  // 仅复用实体牌与持有者的不可变来源描述；资格仍从当前 World 读取。
+  // 每张牌只保留最近的持有者，不累计所有者历史，绑定也不捕获 World。
+  const byCard = new WeakMap<Card, SkillBinding>();
+  const bindingFor = (card: Card, owner: string): SkillBinding | undefined => {
+    const previous = byCard.get(card);
+    if (previous?.self.owner === owner) return previous;
+    const definition = abilities.get(card.name);
+    if (!definition) return;
+    const id = JSON.stringify(['equipment', owner, card.id]);
+    const self: SkillHandle = Object.freeze({
+      id,
+      owner,
+      skill: definition.id,
+      name: definition.name,
+      origin: Object.freeze({ kind: 'equipment', id: card.id }),
+      effective: (current: WorldReader) =>
+        current.snapshot.zones.some(
+          (zone) =>
+            zone.kind === 'equipment' && zone.owner === owner && zone.cards.includes(card.id),
+        ) && !isSkillBlocked(current, owner, id),
     });
+    const binding = Object.freeze({ self, definition });
+    byCard.set(card, binding);
+    return binding;
+  };
+  const collectFrom = (world: WorldReader, zones: readonly Zone[]): SkillBinding[] => {
+    const bindings: SkillBinding[] = [];
+    for (const zone of zones) {
+      if (zone.kind !== 'equipment' || zone.owner === null) continue;
+      const owner = zone.owner;
+      for (const card of zone.cards) {
+        const binding = bindingFor(world.card(card), owner);
+        if (binding) bindings.push(binding);
+      }
+    }
+    return bindings;
+  };
   return Object.freeze({
     collect(world: WorldReader, window?: { readonly type: object; readonly payload: unknown }) {
       const current = collectFrom(world, world.snapshot.zones);
-      const before =
-        window?.type === cardsMoved
-          ? collectFrom(world, (window.payload as MoveResult).before)
-          : [];
+      if (window?.type !== cardsMoved) return current;
+      // 只有移动窗口需要合并历史来源，并按实体与持有者去重。
+      const before = collectFrom(world, (window.payload as MoveResult).before);
       return [
         ...new Map([...current, ...before].map((binding) => [binding.self.id, binding])).values(),
       ];

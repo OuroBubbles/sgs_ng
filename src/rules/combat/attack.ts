@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import type { CardBook } from '../cards/book';
 import type { EffectRef, Purpose } from '../cards/types';
@@ -28,7 +28,7 @@ export interface AttackResult {
 export const attackDefended = defineWindow<DefenseDraft>('attack.defended');
 
 /** 作者可保留完整响应/突破管线，仅以普通函数指定命中后的伤害。 */
-export type AttackDamage = (ctx: Context, effect: EffectRef) => Promise<FlowResult<DamageResult>>;
+export type AttackDamage = (ctx: Context, effect: EffectRef) => Promise<DamageResult>;
 const defaultDamage: AttackDamage = (ctx, effect) =>
   damage(ctx, {
     from: effect.actor,
@@ -47,17 +47,15 @@ export async function resolveAttack(
   deal: AttackDamage = defaultDamage,
 ): Promise<void> {
   const effect = effectReference(target);
-  const result = await ctx.flow('attack', async (at) => {
+  await ctx.flow('attack', async (at) => {
     const responses: Answered[] = [];
     const live = () => at.world.player(effect.target).alive && !isGameOver(at.world);
     const count = book.responseTimes(at, effect, effect.target, response.name);
     let defended = count > 0;
     for (let i = 0; i < count && live(); i++) {
-      const answer = at.unwrap(
-        await (response.purpose === 'use'
-          ? book.useResponse(at, effect.target, [response.name], effect)
-          : book.respond(at, effect.target, [response.name], effect)),
-      );
+      const answer = await (response.purpose === 'use'
+        ? book.useResponse(at, effect.target, [response.name], effect)
+        : book.respond(at, effect.target, [response.name], effect));
       if (!isResponseSatisfied(answer)) {
         defended = false;
         break;
@@ -94,7 +92,7 @@ export async function resolveAttack(
         : 'undefended';
     let dealt: DamageResult | null = null;
     if (kind === 'undefended') {
-      dealt = at.unwrap(await deal(at, effect));
+      dealt = await deal(at, effect);
     }
     at.commit('attack.finished', [], {
       effect,
@@ -104,5 +102,4 @@ export async function resolveAttack(
       damage: dealt,
     } satisfies AttackResult);
   });
-  ctx.unwrap(result);
 }

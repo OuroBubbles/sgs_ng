@@ -4,14 +4,14 @@
 
 ## 两名标准武将
 
-实现位于 [strategists.ts](../src/content/standard/strategists.ts)，只依赖 SDK。依据本地 FreeKill 的[鬼才](../freekill/packages/standard/pkg/skills/guicai.lua)、[反馈](../freekill/packages/standard/pkg/skills/fankui.lua)、[天妒](../freekill/packages/standard/pkg/skills/tiandu.lua)、[遗计](../freekill/packages/standard/pkg/skills/yiji.lua)及[改判操作](../freekill/ltk/server/events/judge.lua)；沿用标准版本，没有混入界限突破。
+实现位于 [strategists.ts](../src/content/standard/strategists.ts)，只依赖 SDK。依据本地 FreeKill 的[鬼才](../../freekill/packages/standard/pkg/skills/guicai.lua)、[反馈](../../freekill/packages/standard/pkg/skills/fankui.lua)、[天妒](../../freekill/packages/standard/pkg/skills/tiandu.lua)、[遗计](../../freekill/packages/standard/pkg/skills/yiji.lua)及[改判操作](../../freekill/ltk/server/events/judge.lua)；沿用标准版本，没有混入界限突破。
 
 | 武将   | 基础体力 / 性别 | 技能                                                               |
 | ------ | --------------- | ------------------------------------------------------------------ |
 | 司马懿 | 3 / 男          | 鬼才以一张手牌改判；反馈在一次伤害后取得来源的一张手牌或装备。     |
 | 郭嘉   | 3 / 男          | 天妒取得自己最终的判定牌；遗计按每点伤害分别观看牌堆顶两张并分配。 |
 
-反馈按伤害事件发动一次，手牌选择使用现有不透明候选，不给选择者实体 ID、牌名或原手牌顺序。自伤时只能选择装备。取得不是弃置，不受弃置禁令影响；来源死亡或已无合法区域时不产生无解请求。
+反馈按伤害事件发动一次，直接选牌并一次确认，取消即放弃本次发动。手牌选择使用现有不透明候选，不给选择者实体 ID、牌名或原手牌顺序。自伤时只能选择装备。取得不是弃置，不受弃置禁令影响；来源死亡或已无合法区域时不产生无解请求。选牌接纳后零费用宣告，宣告后失去技能仍结算；支付后效移走选牌或来源死亡时不追取，也不重新选择。
 
 天妒在结果封口后的 `judgmentFinished` 询问，判定成败不影响资格。只取得仍在本次处理区的最终牌；已被别人取走不会强取。宣告后失去技能不回滚，角色死亡则不再收牌。与洛神组合时，公共结束窗口先取得牌，洛神后续不会重复取得，但仍可根据已封口的黑色结果继续判定。
 
@@ -27,19 +27,13 @@
 
 移牌后效已能看到完整新牌面和宣告；之后才开放 `costPaid`。支付后效令改判者死亡、失去技能或移走材料，不回滚已发生的改判。被替换的旧牌已不在原处理区时不会从其他持有者手里再次拿走。
 
-通用 [responseFinished](../src/rules/cards/played.ts) 现在携带显式用途：
-
-```ts
-type ResponseSubject =
-  | { kind: 'effect'; effect: EffectRef }
-  | { kind: 'judgment'; id: string; player: string };
-```
+通用 [responseFinished](../src/rules/cards/played.ts) 通过 ResponseSubject 区分效果响应、改判与供牌，具体字段以该文件中的类型为准。
 
 正常响应与鬼才都由实际打出者触发一次这个窗口；改判不伪造一个杀或锦囊的 EffectId。正常响应仍有 `card.responded` 事实，改判的响应快照嵌入自身的 `judgment.replaced` 事实，不重复提交一次费用或改写。非打出方式的底层改判可不传 `response`。这不是把任意移牌都当成使用/打出。
 
 ## 私有临时牌池
 
-[withPrivateTopCards](../src/rules/cards/private-pool.ts) 从牌堆顶取至多指定数量，必要时只洗弃牌补足；用独立处理区暂存，配合生存期内的可见者状态。它不是摸牌，不触发 `drawing` / `cardsDrawn`，牌也没有先进入本人手牌。嵌套池相互独立，不能从外层处理区借牌补足。
+[withPrivateTopCards](../src/rules/cards/private-pool.ts) 从牌堆顶取至多指定数量，必要时只洗弃牌补足；用独立处理区暂存，可见者状态直接归属于该处理区的生存期；余牌处理与标记清理由同一所有权组织，不再另设 private-pool 生存期和结束窗口。它不是摸牌，不触发 `drawing` / `cardsDrawn`，牌也没有先进入本人手牌。嵌套池相互独立，不能从外层处理区借牌补足。
 
 遗计完成一次发动后，以普通循环表达“选任意张、交给一人、继续分配”。目标可以是自己，取消选择就保留余牌；支持将两张分给不同角色或一次交给同一角色。每次候选按实时余牌生成，已被后效取走的牌不能再次交出。失去技能不截断本次已宣告分配；每个后续伤害点仍重新检查是否持有技能。
 
@@ -55,9 +49,9 @@ type ResponseSubject =
 
 ## 验证与后续
 
-- [27 项新增场景](../tests/scenarios/strategists.test.ts)：改判原子宣告/禁令/取消/多人顺序/失效费用/已宣告延续、打出完成用途、反馈暗选/自伤、天妒/洛神、私有投影与 AI 观察、遗计多点/分批/保留/失去/死亡/中止/嵌套/不足牌，以及目录初始化。
+- [谋士场景](../tests/scenarios/strategists.test.ts)：改判原子宣告/禁令/取消/多人顺序/失效费用/已宣告延续、打出完成用途、反馈一次提交/暗选/自伤/宣告后效、天妒/洛神、私有投影与 AI 观察、遗计多点/分批/保留/失去/死亡/中止/嵌套/不足牌，以及目录初始化。
 - 八人局使用实际标准＋EX 牌组与基础 AI，断言真实发生鬼才改判、反馈取牌、遗计私有池及交牌，并走到身份胜负。
 - 浏览器通过真实八卦判定进入鬼才和天妒，通过 AI 伤害进入遗计；验证分批交牌、暂停隐藏与横屏点选。Windows 实际运行与累计检查见 [STATUS](STATUS.md)。
 - [布局检查](../src/client/table/layout.test.ts) 新增双牌池与确认区边界、2／4／6／8 席位目标中心净空的场景。
 
-标准二十五将已有首轮实现，后续仍需系统语义审计、更多查询与复杂选择、内容包登记、完整信息记忆和离线模式。后续有限 occurrence 已接入 [38](38-window-occurrences.md)，遗计各点发动可与其他同一时点效果交错，单次分配内部仍用普通循环；有序分组见 [37](37-arrangement-astrology.md)，带额度分配仍待继续。安卓构建与真机验收继续等桌面版完成后开展。
+遗计各点发动可与其他同一时点效果交错，见 [38](38-window-occurrences.md)，单次分配内部仍用普通循环；有序分组见 [37](37-arrangement-astrology.md)。当前交付与待验范围以 [STATUS](STATUS.md) 为准。

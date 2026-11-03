@@ -26,11 +26,9 @@ it('判定公开实有牌，保留独立牌面、颜色和结果，并善后实�
     ),
   ).toMatchObject({
     value: {
-      value: {
-        kind: 'judged',
-        matched: true,
-        card: { id: 'top', suit: 'heart', color: 'red', rank: 4 },
-      },
+      kind: 'judged',
+      matched: true,
+      card: { id: 'top', suit: 'heart', color: 'red', rank: 4 },
     },
   });
   expect(game.room.world.position('top')).toBe('discard');
@@ -75,7 +73,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
           previousTo: 'a:hand',
           reason: 'swap',
         }),
-      ).toMatchObject({ value: 'replaced' });
+      ).toBe('replaced');
     },
   });
   expect(
@@ -86,7 +84,7 @@ it('改判牌移动与牌面同次提交，旧牌可原子换回手牌，后效�
         match: (_ctx, card) => card.suit === 'diamond',
       }),
     ),
-  ).toMatchObject({ value: { value: { matched: true, card: { id: 'new' } } } });
+  ).toMatchObject({ value: { matched: true, card: { id: 'new' } } });
   expect(game.room.world.position('old')).toBe('a:hand');
   expect(game.room.world.position('new')).toBe('discard');
 });
@@ -116,7 +114,7 @@ it('连续改判按行动顺序结算，前一个改判不会封闭后一个', a
         match: (_ctx, card) => card.color === 'black',
       }),
     ),
-  ).toMatchObject({ value: { value: { matched: true, card: { id: 'last' } } } });
+  ).toMatchObject({ value: { matched: true, card: { id: 'last' } } });
   expect(game.room.history.facts('judgment.replaced')).toHaveLength(2);
   expect(game.room.world.zone('discard').cards).toEqual(['old', 'first', 'last']);
 });
@@ -157,7 +155,7 @@ it.each([false, true])(
           match: (_ctx, card) => card.color === 'red',
         }),
       ),
-    ).toMatchObject({ value: { value: { matched: true, card: { id: replace ? 'new' : 'old' } } } });
+    ).toMatchObject({ value: { matched: true, card: { id: replace ? 'new' : 'old' } } });
     expect(game.room.world.position('old')).toBe('b:hand');
     expect(game.room.world.position('new')).toBe(replace ? 'discard' : 'a:hand');
   },
@@ -210,12 +208,10 @@ it('牌堆空时只洗弃牌，其他判定/处理区的牌不被循环使用', 
     discard: [card('available', 'peach')],
   });
   await game.room.run('outer', (ctx) =>
-    withProcessing(ctx, [{ cards: ['parked'], from: 'a:hand' }], 'discard', async (at) => {
+    withProcessing(ctx, [{ cards: ['parked'], from: 'a:hand' }], async (at) => {
       expect(
         await judge(at, game.book, { player: 'a', reason: 'probe', match: () => true }),
-      ).toMatchObject({
-        value: { card: { id: 'available' } },
-      });
+      ).toMatchObject({ card: { id: 'available' } });
       await moveCards(
         at,
         [{ cards: ['available'], from: 'discard', to: 'a:hand', place: 'bottom' }],
@@ -223,9 +219,7 @@ it('牌堆空时只洗弃牌，其他判定/处理区的牌不被循环使用', 
       );
       expect(
         await judge(at, game.book, { player: 'a', reason: 'empty', match: () => true }),
-      ).toMatchObject({
-        value: { kind: 'unavailable', card: null, matched: null },
-      });
+      ).toMatchObject({ kind: 'unavailable', card: null, matched: null });
     }),
   );
   expect(game.room.world.position('parked')).toBe('discard');
@@ -247,7 +241,7 @@ it('嵌套判定拥有独立牌面和处理区，内层完成不覆盖外层', a
           reason: 'inner',
           match: (_ctx, card) => card.color === 'black',
         }),
-      ).toMatchObject({ value: { matched: true, card: { id: 'inner' } } });
+      ).toMatchObject({ matched: true, card: { id: 'inner' } });
       expect(judgment.card?.id).toBe('outer');
       expect(ctx.world.position('outer')).toBe(judgment.processing);
     },
@@ -260,7 +254,7 @@ it('嵌套判定拥有独立牌面和处理区，内层完成不覆盖外层', a
         match: (_ctx, card) => card.color === 'red',
       }),
     ),
-  ).toMatchObject({ value: { value: { matched: true } } });
+  ).toMatchObject({ value: { matched: true } });
 });
 
 it.each(['death', 'finish'] as const)(
@@ -294,7 +288,7 @@ it.each(['death', 'finish'] as const)(
           },
         }),
       ),
-    ).toMatchObject({ value: { value: { kind: 'unavailable', matched: null } } });
+    ).toMatchObject({ value: { kind: 'unavailable', matched: null } });
     expect(evaluated).toBe(false);
     expect(game.room.world.position('old')).toBe('discard');
   },
@@ -307,9 +301,9 @@ it('改判原区域已失效不支付；非法目的区域拒绝整批且不更�
     owner: null,
     eligible: () => true,
     async run(ctx, judgment) {
-      expect(
-        await judgment.replace(ctx, { card: 'new', from: 'b:hand', reason: 'stale' }),
-      ).toMatchObject({ value: 'unavailable' });
+      expect(await judgment.replace(ctx, { card: 'new', from: 'b:hand', reason: 'stale' })).toBe(
+        'unavailable',
+      );
       const snapshot = ctx.world.snapshot;
       await expect(
         judgment.replace(ctx, {

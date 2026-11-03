@@ -10,7 +10,8 @@ const manifest = JSON.parse(await read('src/content/standard/portraits/provenanc
 const emitted = await readdir(new URL('dist/assets/', root));
 const images = [];
 for (const image of manifest.images) {
-  const original = await read(image.source);
+  // 素材清单中的来源相对工作区；参考项目与本项目同级。
+  const original = await read(`../${image.source}`);
   const copied = await read(`src/content/standard/portraits/${image.file}`);
   assert.equal(original.length, image.bytes);
   assert.equal(copied.length, image.bytes);
@@ -29,7 +30,7 @@ for (const image of manifest.images) {
 assert.equal(images.length, 25);
 
 const guest = await read('examples/content/harbor/guest.jpg');
-assert.deepEqual(guest, await read('noname/resources/app/image/character/lingtong.jpg'));
+assert.deepEqual(guest, await read('../noname/resources/app/image/character/lingtong.jpg'));
 const moduleSource = (await read('.artifacts/content/harbor.sgs.mjs')).toString('utf8');
 const inline = [...moduleSource.matchAll(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/g)];
 assert.equal(inline.length, 1);

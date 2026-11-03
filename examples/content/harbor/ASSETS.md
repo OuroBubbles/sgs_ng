@@ -4,4 +4,4 @@
 
 SHA-256：`35aaa8b20b3f4b989aa4d01fa4b18da019ef2ac66159b487907a97900799f98d`。
 
-作者可将其替换为自己的图片。`index.ts` 通过普通 `import` 引入；`pnpm content:example` 将原始图片内联进单个模块，导入与持久安装不依赖源码目录继续存在。接口与限制见 [立绘与作者图片](../../../docs/57-portraits-content-images.md)。
+开发者可将其替换为自己的图片。index.ts 使用普通静态 import，由常规构建处理；远端主持测试以原始字节发送媒体并验证连接内释放，见 [立绘](../../../docs/57-portraits-content-images.md)。

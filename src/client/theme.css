@@ -1,3 +1,14 @@
+@font-face {
+  font-family: 'FreeKillName';
+  src: url('../assets/freekill/fonts/FZLBGBK.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FreeKillButton';
+  src: url('../assets/freekill/fonts/FZLE.ttf') format('truetype');
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --ink: #111d19;
@@ -8,4 +19,6 @@
   --line: #7f8b692b;
   --serif: 'KaiTi', 'STKaiti', 'SimSun', serif;
   --sans: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --fk-name: 'FreeKillName', 'LiSu', serif;
+  --fk-button: 'FreeKillButton', 'LiSu', serif;
 }

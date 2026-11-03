@@ -11,7 +11,8 @@ import {
   responseFinished,
   runPhase,
   activeOffers,
-  activate,
+  withRevealedCards,
+  chooseOwnedCard,
 } from '../../src/sdk';
 import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/wusheng';
@@ -22,7 +23,7 @@ import { guose } from '../../src/content/standard/tacticians';
 import { guicai } from '../../src/content/standard/strategists';
 import { fanjian } from '../../src/content/standard/intrigue';
 import { vermilion } from '../../src/content/workshop/faces';
-import { card, cardGame, use } from '../fixtures/cards';
+import { card, cardGame, use, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/app/offline/role-match';
@@ -47,9 +48,9 @@ function filter(id: string, change: CardFaceChange): SkillDefinition {
   return defineSkill({
     id,
     name: id,
-    effects: [],
+    triggers: [],
     modifiers: [
-      modify(cardQueries.cardFace, (_ctx, input, self) =>
+      modify(cardQueries.cardFace, (_ctx, { input, self }) =>
         input.player === self.owner ? change : undefined,
       ),
     ],
@@ -81,15 +82,13 @@ it('牌转交后按新持有者查询，失去技能立即恢复原牌面，不�
   await grant(game, vermilion.id);
   await grant(game, vermilion.id, 'b');
   await game.room.run('give', async (ctx) => {
-    ctx.unwrap(
-      await moveCards(
-        ctx,
-        [{ cards: ['own'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],
-        'give',
-      ),
+    await moveCards(
+      ctx,
+      [{ cards: ['own'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],
+      'give',
     );
     expect(game.book.face(ctx, 'own').color).toBe('red');
-    ctx.unwrap(await game.skills.revoke(ctx, 'b', vermilion.id, source));
+    await game.skills.revoke(ctx, 'b', vermilion.id, source);
     expect(game.book.face(ctx, 'own').color).toBe('black');
     expect(ctx.world.card('own').suit).toBe('spade');
   });
@@ -204,7 +203,7 @@ it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从�
     owner: null,
     eligible: (_ctx, paid) => paid.cards.includes('s'),
     async run(ctx) {
-      ctx.unwrap(await game.skills.revoke(ctx, 'a', vermilion.id, source));
+      await game.skills.revoke(ctx, 'a', vermilion.id, source);
       expect(game.book.face(ctx, 's').color).toBe('black');
     },
   });
@@ -233,20 +232,18 @@ it.each(['grant', 'revoke'] as const)(
       async run(ctx, judgment) {
         expect(judgment.card?.suit).toBe(action === 'grant' ? 'spade' : 'heart');
         if (action === 'grant')
-          ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: vermilion.id, source }));
-        else ctx.unwrap(await game.skills.revoke(ctx, 'a', vermilion.id, source));
+          await game.skills.grant(ctx, { owner: 'a', skill: vermilion.id, source });
+        else await game.skills.revoke(ctx, 'a', vermilion.id, source);
         expect(judgment.card?.suit).toBe(action === 'grant' ? 'heart' : 'spade');
       },
     });
     await game.room.run('judge', async (ctx) =>
       expect(
-        ctx.unwrap(
-          await judge(ctx, game.book, {
-            player: 'a',
-            reason: 'probe',
-            match: (_at, card) => card.color === 'red',
-          }),
-        ),
+        await judge(ctx, game.book, {
+          player: 'a',
+          reason: 'probe',
+          match: (_at, card) => card.color === 'red',
+        }),
       ).toMatchObject({
         matched: action === 'grant',
         card: { suit: action === 'grant' ? 'heart' : 'spade' },
@@ -264,13 +261,11 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
     owner: null,
     eligible: () => true,
     async run(ctx, result) {
-      ctx.unwrap(await game.skills.revoke(ctx, 'a', vermilion.id, source));
-      ctx.unwrap(
-        await moveCards(
-          ctx,
-          [{ cards: ['top'], from: result.processing, to: 'b:hand', place: 'bottom' }],
-          'take',
-        ),
+      await game.skills.revoke(ctx, 'a', vermilion.id, source);
+      await moveCards(
+        ctx,
+        [{ cards: ['top'], from: result.processing, to: 'b:hand', place: 'bottom' }],
+        'take',
       );
       expect(result.card?.suit).toBe('heart');
       expect(game.book.face(ctx, 'top').suit).toBe('spade');
@@ -278,13 +273,11 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
   });
   await game.room.run('judge', async (ctx) =>
     expect(
-      ctx.unwrap(
-        await judge(ctx, game.book, {
-          player: 'a',
-          reason: 'probe',
-          match: (_at, card) => card.color === 'red',
-        }),
-      ),
+      await judge(ctx, game.book, {
+        player: 'a',
+        reason: 'probe',
+        match: (_at, card) => card.color === 'red',
+      }),
     ).toMatchObject({ matched: true, card: { suit: 'heart' } }),
   );
   expect(game.room.world.position('top')).toBe('b:hand');
@@ -293,7 +286,7 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
 
 it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则最终判定仍为黑', async () => {
   const game = cardGame({
-    skills: (book) => [vermilion, guicai(book)],
+    skills: [vermilion, guicai],
     hands: { a: [card('replacement', 'slash')] },
     draw: [card('old', 'jink', 'heart')],
   });
@@ -324,7 +317,7 @@ it('他人红颜式手牌用于鬼才，打出为红、被判定者无过滤则�
       .kind,
   ).toBe('accepted');
   expect(await running).toMatchObject({
-    value: { value: { matched: false, card: { suit: 'spade', color: 'black' } } },
+    value: { matched: false, card: { suit: 'spade', color: 'black' } },
   });
   expect(seen).toEqual(['red']);
   clean(game);
@@ -379,7 +372,7 @@ it('查询贡献不能借助捕获的运行上下文提交、随机或注册后�
   const bad = defineSkill({
     id: 'probe:write',
     name: '禁止写入',
-    effects: [],
+    triggers: [],
     modifiers: [
       modify(cardQueries.cardFace, () => {
         captured.commit('bad', [], {});
@@ -403,8 +396,10 @@ it('UI 与 AI 读取相同当前牌面，不泄漏其他手牌；观察不改变
     seed: 2,
     players: [{ id: 'a', skills: [vermilion.id] }, { id: 'b' }],
     deck: Array.from({ length: 20 }, (_, i) => card(`c${i}`, 'slash')),
-    cards: standardCards,
-    skills: [vermilion],
+    content: {
+      cards: standardCards,
+      skills: [vermilion],
+    },
   });
   await match.prepare();
   const id = match.room.world.zone('a:hand').cards[0]!;
@@ -420,19 +415,20 @@ it('UI 与 AI 读取相同当前牌面，不泄漏其他手牌；观察不改变
 it('递归牌面查询明确诊断，退出后不残留求值标记；不同实体的组合查询可以完成', async () => {
   let recursive = true;
   const game = cardGame({
-    skills: (book) => [
-      defineSkill({
-        id: 'probe:recursive',
-        name: '组合读取',
-        effects: [],
-        modifiers: [
-          modify(cardQueries.cardFace, (ctx, input) => {
-            if (input.card.id !== 'slash1') return undefined;
-            const other = book.face(ctx, recursive ? 'slash1' : 'peach');
-            return { suit: other.suit };
-          }),
-        ],
-      }),
+    skills: [
+      (book) =>
+        defineSkill({
+          id: 'probe:recursive',
+          name: '组合读取',
+          triggers: [],
+          modifiers: [
+            modify(cardQueries.cardFace, (ctx, { input }) => {
+              if (input.card.id !== 'slash1') return undefined;
+              const other = book.face(ctx, recursive ? 'slash1' : 'peach');
+              return { suit: other.suit };
+            }),
+          ],
+        }),
     ],
   });
   await grant(game, 'probe:recursive');
@@ -451,12 +447,10 @@ it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色�
   const running = game.room.run('fanjian', (ctx) =>
     runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
       const offer = activeOffers(at, game.book, phase)[0]!;
-      at.unwrap(
-        await activate(at, game.book, phase, {
-          skill: offer.choice.instance,
-          action: offer.choice.action,
-        }),
-      );
+      await activate(at, game.book, phase, {
+        instance: offer.choice.instance,
+        action: offer.choice.action,
+      });
     }),
   );
   const target = await nextRequest(game.room);
@@ -489,8 +483,10 @@ it('基础 AI 改判使用接收者的判定候选面，不把自己黑色手牌
     ],
     roles: ['lord', 'rebel'],
     deck: Array.from({ length: 24 }, (_, i) => card(`r${i}`, 'slash')),
-    cards: standardCards,
-    skills: (book) => [vermilion, guicai(book)],
+    content: {
+      cards: standardCards,
+      skills: [vermilion, guicai],
+    },
   });
   await match.prepare();
   const running = match.room.run('judge', (ctx) =>
@@ -508,11 +504,91 @@ it('基础 AI 改判使用接收者的判定候选面，不把自己黑色手牌
   expect(answer).toEqual({ kind: 'cancel' });
   expect(match.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
   expect(await running).toMatchObject({
-    value: { value: { matched: true, card: { suit: 'heart' } } },
+    value: { matched: true, card: { suit: 'heart' } },
   });
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
     match.room.world.snapshot,
   );
+  match.room.abort('complete');
+});
+
+it('角色选牌按区域投影：暗手牌无牌面，公开装备使用不透明选项和正常花色点数，本人手牌保留过滤', async () => {
+  const match = new RoleMatch({
+    id: 'owned-faces',
+    seed: 2,
+    players: [{ id: 'a' }, { id: 'b', skills: [vermilion.id] }],
+    deck: [
+      card('secret', 'ex_nihilo'),
+      { ...card('shown', 'crossbow'), rank: 13 },
+      ...Array.from({ length: 20 }, (_, i) => card(`d${i}`, 'slash')),
+    ],
+    content: {
+      cards: standardCards,
+      skills: [vermilion],
+    },
+  });
+  await match.prepare();
+  await match.room.run('setup', (ctx) =>
+    moveCards(
+      ctx,
+      ctx.world.snapshot.cards.map((card) => ({
+        cards: [card.id],
+        from: ctx.world.position(card.id),
+        to: card.id === 'secret' ? 'b:hand' : card.id === 'shown' ? 'b:equipment' : 'draw',
+        place: 'bottom' as const,
+      })),
+      'setup',
+    ),
+  );
+  for (const actor of ['a', 'b']) {
+    const running = match.room.run('choose', (ctx) =>
+      chooseOwnedCard(ctx, match.book, {
+        actor,
+        target: 'b',
+        areas: ['hand', 'equipment'],
+        reason: 'probe',
+        optional: true,
+      }),
+    );
+    const request = await nextRequest(match.room);
+    const factsBeforeView = match.room.history.facts().length;
+    const decision = projectMatch(match, actor, request).decision;
+    expect(decision).toMatchObject({
+      cardGroups: [
+        {
+          id: 'hand',
+          label: 'b · 手牌',
+          cards: [{ face: actor === 'a' ? null : { name: '无中生有', suit: '♥', color: 'red' } }],
+        },
+        {
+          id: 'equipment',
+          label: 'b · 装备',
+          cards: [{ face: { name: '诸葛连弩', suit: '♥', rank: 'K', color: 'red' } }],
+        },
+      ],
+    });
+    expect(request.data).not.toHaveProperty('cards');
+    if (actor === 'a') expect(JSON.stringify(request.data)).not.toContain('secret');
+    expect(projectMatch(match, actor === 'a' ? 'b' : 'a', request).decision).toBeNull();
+    expect(projectMatch(match, null, request).decision).toBeNull();
+    expect(match.room.history.facts()).toHaveLength(factsBeforeView);
+    if (decision?.kind !== 'cards-targets') throw Error('Expected card choice.');
+    const equipment = decision.cardGroups?.find((group) => group.id === 'equipment')?.cards[0];
+    expect(equipment?.face?.id).toBe(equipment?.id);
+    expect(equipment?.id).not.toBe('shown');
+    expect(
+      match.room.decisions.submit(request.id, request.token, { cards: ['shown'], targets: [] }),
+    ).toMatchObject({ kind: 'rejected', reason: 'invalid' });
+    expect(
+      match.room.decisions.submit(request.id, request.token, {
+        cards: [equipment?.id],
+        targets: [],
+      }),
+    ).toEqual({ kind: 'accepted' });
+    expect(await running).toMatchObject({
+      value: { kind: 'chosen', card: 'shown', from: 'b:equipment' },
+    });
+  }
   match.room.abort('complete');
 });
 
@@ -522,27 +598,27 @@ it('桌面用牌快照与日志不因失去过滤而改变，手中余牌即时�
     seed: 2,
     players: [{ id: 'a', skills: [vermilion.id] }, { id: 'b' }],
     deck: Array.from({ length: 20 }, (_, i) => card(`h${i}`, 'slash')),
-    cards: standardCards,
-    skills: [vermilion],
+    content: {
+      cards: standardCards,
+      skills: [vermilion],
+    },
   });
   await match.prepare();
   const id = match.room.world.zone('a:hand').cards[0]!;
   await match.room.run('use', async (ctx) => {
-    ctx.unwrap(
-      await match.book.use(ctx, {
-        actor: 'a',
-        choice: { kind: 'physical', card: id },
-        targets: ['b'],
-        timing: { kind: 'effect' },
-      }),
-    );
+    await match.book.use(ctx, {
+      actor: 'a',
+      choice: { kind: 'physical', card: id },
+      targets: ['b'],
+      timing: { kind: 'effect' },
+    });
   });
   const before = projectMatch(match, 'a', null);
   await match.room.run('remove', async (ctx) => {
     const instance = ctx.world.snapshot.skills.find(
       (skill) => skill.owner === 'a' && skill.skill === vermilion.id,
     )!;
-    ctx.unwrap(await match.skills.revoke(ctx, 'a', vermilion.id, instance.grants[0]!.source));
+    await match.skills.revoke(ctx, 'a', vermilion.id, instance.grants[0]!.source);
   });
   const after = projectMatch(match, 'a', null);
   expect(after.actions[0]?.card).toMatchObject({ suit: '♥', color: 'red' });
@@ -551,6 +627,60 @@ it('桌面用牌快照与日志不因失去过滤而改变，手中余牌即时�
   expect(after.log.filter((entry) => entry.text.includes('使用【杀】'))).toEqual(
     before.log.filter((entry) => entry.text.includes('使用【杀】')),
   );
+  expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
+    match.room.world.snapshot,
+  );
+  match.room.abort('complete');
+});
+
+it('日志窗口之外的公开牌池仍存活，同次公开多张牌保留展示顺序', async () => {
+  const match = new RoleMatch({
+    id: 'public-history',
+    seed: 2,
+    players: [{ id: 'a' }, { id: 'b' }],
+    roles: ['lord', 'rebel'],
+    content: {
+      cards: standardCards,
+    },
+    deck: Array.from({ length: 24 }, (_, i) => card(`public${i}`, 'slash')),
+  });
+  await match.prepare();
+  await match.room.run('public pools', (ctx) =>
+    withRevealedCards(ctx, { count: 2, reason: 'outer' }, async (outerCtx, outer) => {
+      await withRevealedCards(outerCtx, { count: 2, reason: 'inner' }, async (at, inner) => {
+        const gifts = at.world.zone('a:hand').cards;
+        await moveCards(
+          at,
+          [{ cards: gifts, from: 'a:hand', to: 'b:hand', place: 'bottom' }],
+          'public gift',
+          {
+            kind: 'cards.given',
+            data: { actor: 'a', target: 'b', cards: gifts, count: gifts.length, visible: true },
+          },
+        );
+        // 后续公开叙事足够长，但不能使仍在处理中的旧公开牌池消失。
+        for (let i = 0; i < 110; i++)
+          at.commit('draw.completed', [], { input: { player: 'a' }, cards: [] });
+        const shown = projectMatch(match, null, null);
+        expect(shown.log).toHaveLength(100);
+        expect(shown.log.every((entry) => entry.text === 'a摸了 0 张牌')).toBe(true);
+        expect(shown.actions.map((action) => action.card.id)).toEqual(gifts.slice(-3));
+        expect(shown.pools.map((pool) => pool.zone)).toEqual([outer.zone, inner.zone]);
+        const taken = outer.remaining()[0]!;
+        await moveCards(
+          at,
+          [{ cards: [taken], from: outer.zone, to: 'b:hand', place: 'bottom' }],
+          'take public card',
+        );
+        expect(projectMatch(match, null, null).pools[0]!.cards.map((card) => card.id)).toEqual(
+          outer.remaining(),
+        );
+        expect(shown.pools[0]!.cards).toHaveLength(2);
+      });
+      expect(projectMatch(match, null, null).pools.map((pool) => pool.zone)).toEqual([outer.zone]);
+    }),
+  );
+  expect(projectMatch(match, null, null).pools).toEqual([]);
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
     match.room.world.snapshot,
   );

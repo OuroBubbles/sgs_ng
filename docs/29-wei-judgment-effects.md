@@ -4,7 +4,7 @@
 
 ## 三名标准武将
 
-实现为 [wei.ts](../src/content/standard/wei.ts) 中的普通函数，只使用 SDK。文本与流程依据本地 FreeKill 的[刚烈](../freekill/packages/standard/pkg/skills/ganglie.lua)、[裸衣](../freekill/packages/standard/pkg/skills/luoyi.lua)、[洛神](../freekill/packages/standard/pkg/skills/luoshen.lua)、[倾国](../freekill/packages/standard/pkg/skills/qingguo.lua)，没有混入界限突破版本。
+实现为 [wei.ts](../src/content/standard/wei.ts) 中的普通函数，只使用 SDK。文本与流程依据本地 FreeKill 的[刚烈](../../freekill/packages/standard/pkg/skills/ganglie.lua)、[裸衣](../../freekill/packages/standard/pkg/skills/luoyi.lua)、[洛神](../../freekill/packages/standard/pkg/skills/luoshen.lua)、[倾国](../../freekill/packages/standard/pkg/skills/qingguo.lua)，没有混入界限突破版本。
 
 | 武将   | 基础体力 / 性别 | 技能                                                                      |
 | ------ | --------------- | ------------------------------------------------------------------------- |
@@ -46,7 +46,7 @@
 
 [SkillBook.register](../src/rules/skills/skills.ts) 只在装配期原子追加不可变定义，第一次 `attach` 后目录固定，解除挂接也不重新开放。重复 ID 或无效定义拒绝整批，不留下半注册内容。
 
-[RoleMatch](../src/app/offline/role-match.ts) 的 `skills` 接受定义数组或 `(book: CardBook) => readonly SkillDefinition[]`。先建立牌目录，再调用一次技能工厂，随后验证武将引用并建立 Room。刚烈直接闭包持有传入的牌规则，避免把当前 Room 或 CardBook 塞入全局变量。标准工厂现登记裸衣独立效果定义；包声明/加载见 [39](39-source-packages.md)、[47](47-local-content-modules.md)，独立效果见 [56](56-independent-effects.md)。
+[RoleMatch](../src/app/offline/role-match.ts) 通过 content 接受普通定义或预装配目录。skills 是静态定义与普通工厂并列的列表；先建立牌目录，再按列表顺序调用工厂并登记技能，随后验证武将引用、建立 Room。刚烈直接闭包持有本局 CardBook，技能条目和工厂可读取前序声明。裸衣独立效果通过 effects 显式组合；装配见 [源码组合](39-source-packages.md)，独立效果见 [56](56-independent-effects.md)。
 
 ## 验证与边界
 

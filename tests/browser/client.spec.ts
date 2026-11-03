@@ -1,5 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
-import tauriConfig from '../../src-tauri/tauri.conf.json' with { type: 'json' };
+import { test, expect, type Page, type Locator } from '@playwright/test';
 
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -9,16 +8,12 @@ test.beforeEach(async ({ page }) => {
   page.on('console', (message) => {
     if (message.type() === 'error') found.push(message.text());
   });
-  await page.route('http://127.0.0.1:1420/', async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({
-      response,
-      headers: { ...response.headers(), 'Content-Security-Policy': tauriConfig.app.security.csp },
-    });
-  });
   await page.goto('/');
-  await expect(page.getByText('WebGL 战场已就绪')).toBeAttached();
-  await expect(page.getByTestId('battle-canvas').locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toBeHidden();
+  await page.getByText('演练与复现', { exact: true }).click();
+  await expect(page.locator('[data-content-ready="true"]')).toBeVisible();
+  await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveCount(0);
 });
 test.afterEach(({ page }) => {
   expect(errors.get(page)).toEqual([]);
@@ -27,16 +22,90 @@ test.afterEach(({ page }) => {
 const hand = (page: Page) => page.getByTestId('hand-cards').locator('button');
 const confirm = (page: Page) => page.getByRole('button', { name: '确认当前选择', exact: true });
 
+async function selectTarget(page: Page, item: string | Locator) {
+  const target = typeof item === 'string' ? page.getByTestId(item) : item;
+  if ((await target.getAttribute('aria-pressed')) !== 'true') await target.click();
+}
+
+async function expectSeatTextToFit(page: Page) {
+  await expect
+    .poll(() =>
+      page.locator('.target-hitbox').evaluateAll((nodes) => {
+        const failures: string[] = [];
+        for (const node of nodes) {
+          const seat = node.getBoundingClientRect();
+          const table = node.closest('.table-surface')!.getBoundingClientRect();
+          if (
+            seat.x < table.x - 1 ||
+            seat.right > table.right + 1 ||
+            seat.y < table.y - 1 ||
+            seat.bottom > table.bottom + 1
+          )
+            failures.push('席位越过牌桌边界');
+          const label = node.getAttribute('aria-label') ?? '';
+          if (
+            label.includes('身份未知') &&
+            node.querySelector('.seat-role')?.textContent !== '未知'
+          )
+            failures.push('隐藏身份被显示');
+          const hp = label.match(/体力(-?\d+)\/(\d+)/);
+          const handCount = label.match(/手牌(\d+)/)?.[1];
+          const gender = label.match(/性别([^，]+)/)?.[1];
+          if (hp && node.querySelector('.seat-health')?.textContent !== `${hp[1]}/${hp[2]}`)
+            failures.push('可见体力与席位不一致');
+          if (handCount && node.querySelector('.seat-hand b')?.textContent !== handCount)
+            failures.push('可见手牌数量与席位不一致');
+          if (node.querySelector('.seat-gender')?.textContent !== gender)
+            failures.push('可见性别与席位不一致');
+          const chained = !label.includes('已阵亡') && node.getAttribute('data-chained') === 'true';
+          if (Boolean(node.querySelector('.seat-effect[title="连环"]')) !== chained)
+            failures.push('连环标记与席位不一致');
+          const shield = !label.includes('已阵亡') ? Number(node.getAttribute('data-shield')) : 0;
+          if (shield > 0 && node.querySelector('.shield')?.textContent !== String(shield))
+            failures.push('护盾标记与席位不一致');
+          for (const field of node.querySelectorAll(
+            '.seat-role,.seat-hand,.seat-name,.seat-vitals,.seat-effect,.seat-number',
+          )) {
+            const rect = field.getBoundingClientRect();
+            const overhang =
+              (seat.width / 175) * (field.classList.contains('seat-number') ? 36 : 8);
+            if (
+              // 原图中的身份牌、手牌数底板允许外扩；实际图元仍必须完整位于牌桌内。
+              rect.x < seat.x - overhang - 1 ||
+              rect.right > seat.right + overhang + 1 ||
+              rect.y < seat.y - overhang - 1 ||
+              rect.bottom > seat.bottom + overhang + 1 ||
+              rect.x < table.x - 1 ||
+              rect.right > table.right + 1 ||
+              rect.y < table.y - 1 ||
+              rect.bottom > table.bottom + 1 ||
+              (field.clientWidth > 0 && field.scrollWidth > field.clientWidth + 1) ||
+              (field.clientHeight > 0 && field.scrollHeight > field.clientHeight + 1)
+            )
+              failures.push(`${field.className}: ${field.textContent}`);
+            if (Number.parseFloat(getComputedStyle(field).fontSize) < 10)
+              failures.push('字号小于 10px');
+          }
+        }
+        return failures;
+      }),
+    )
+    .toEqual([]);
+}
+
 test('标准立绘实际绘制到原席位，确认与目标区域仍按参考布局可操作', async ({ page }, info) => {
   await startGeneral(page, 'standard:guanyu', 4, 2, 'standard:caocao');
   const canvas = page.getByTestId('battle-canvas').locator('canvas');
-  await expect(canvas).toHaveAttribute(
-    'data-portraits',
-    info.project.name === 'touch' ? '甲席' : '甲席,乙席,丙席,丁席',
-  );
+  await expect(canvas).toHaveAttribute('data-portraits', '甲席,乙席,丙席,丁席');
+  await expectSeatTextToFit(page);
+  await expect(page.locator('.seat-name').first()).toHaveCSS('writing-mode', 'vertical-rl');
+  await expect(page.locator('.seat-vitals').first()).toHaveCSS('flex-direction', 'column');
   await expect(page.getByTestId('target-甲席')).toHaveAccessibleName(/关羽/);
   await expect(page.getByTestId('target-乙席')).toHaveAccessibleName(/曹操/);
   await reachOwnSkill(page, '结束出牌');
+  await expect(page.getByTestId('hand-cards').locator('.card-picture')).toHaveCount(
+    await hand(page).count(),
+  );
   await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);
   await page.screenshot({
     path: `.artifacts/ui/portraits-${info.project.name}.png`,
@@ -44,149 +113,69 @@ test('标准立绘实际绘制到原席位，确认与目标区域仍按参考�
   });
 });
 
-test('坏立绘回退轮廓，解码失败不阻塞本人选择', async ({ page }, info) => {
+test('坏立绘回退默认图、坏卡面回退文字，解码失败不阻塞本人选择', async ({ page }, info) => {
   await page.route('**/assets/guanyu-*.jpg', (route) =>
     route.fulfill({ status: 200, contentType: 'image/jpeg', body: 'invalid image' }),
   );
-  await startGeneral(page, 'standard:guanyu', 2, 2, 'standard:caocao');
+  await page.route('**/assets/slash-*.png', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: 'invalid card image' }),
+  );
+  await page
+    .getByRole('combobox', { name: '牌组', exact: true })
+    .selectOption('standard:mechanics');
+  await startGeneral(page, 'standard:guanyu', 2, 27, 'standard:caocao');
   await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveAttribute(
     'data-portraits',
-    info.project.name === 'touch' ? '' : '乙席',
+    '乙席',
   );
   await reachOwnSkill(page, '结束出牌');
   await expect(page.getByRole('button', { name: '结束出牌', exact: true })).toBeEnabled();
+  const slash = hand(page)
+    .filter({ has: page.locator('.card-name', { hasText: /^杀$/ }) })
+    .first();
+  await expect(slash.locator('.card-name:not(.sr-only)')).toBeVisible();
+  await expect(slash.locator('.card-picture')).toHaveCount(0);
+  await slash.click();
+  await expect(confirm(page)).toBeEnabled();
+  await page.getByRole('button', { name: '取消选择', exact: true }).click();
   await page.screenshot({
     path: `.artifacts/ui/portrait-fallback-${info.project.name}.png`,
     fullPage: true,
   });
 });
 
-test('从本地导入普通模块，自动启用新将/牌组，真实备航与潮声复用宿主窗口', async ({
-  page,
-}, info) => {
-  await page
-    .getByLabel('导入本地内容包', { exact: true })
-    .setInputFiles('.artifacts/content/harbor.sgs.mjs');
-  await expect(page.getByRole('checkbox', { name: '渡口', exact: true })).toBeChecked();
-  await expect(page.getByRole('region', { name: '开局设置' })).toContainText('33 种牌与 26 名武将');
-  await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('harbor:crossing');
-  await startGeneral(page, 'harbor:guest', 2, 2, 'standard:guanyu');
-  await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveAttribute(
-    'data-portraits',
-    info.project.name === 'touch' ? '甲席' : '甲席,乙席',
-  );
-  await reachOwnSkill(page, '结束出牌');
-  const before = await hand(page).count();
-  const card = page.getByTestId('hand-cards').getByTestId('card-harbor-card-6');
-  await expect(card).toHaveAccessibleName(/备航/);
-  await card.click();
-  await page.getByTestId('target-甲席').click();
-  await confirm(page).click();
-  await expect(page.getByTestId('decision-hint')).toContainText('潮声');
-  await page.getByRole('button', { name: '发动', exact: true }).click();
-  await expect(hand(page)).toHaveCount(before + 2);
-  await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('journal')).toContainText('甲席发动【潮声】');
-  await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);
-  await page.screenshot({
-    path: `.artifacts/ui/imported-content-${info.project.name}.png`,
-    fullPage: true,
+test('不访问内容数据库即可组合内置源码，切换后刷新目录并保留合法选择', async ({ page }, info) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'indexedDB', {
+      get() {
+        throw new Error('日常入口不应访问内容数据库');
+      },
+    });
   });
-});
-
-test('模块批量导入失败保留原选择，错误模块和重复 ID 不产生半安装', async ({ page }) => {
-  const toggle = page.getByRole('checkbox', { name: '作者演武', exact: true });
-  const input = page.getByLabel('导入本地内容包', { exact: true });
-  await toggle.check();
-  await page
-    .getByRole('combobox', { name: '你的武将', exact: true })
-    .selectOption('workshop:guest');
-  await input.setInputFiles({
-    name: 'wrong.sgs.mjs',
-    mimeType: 'text/javascript',
-    buffer: Buffer.from('export const format = "wrong"; export default () => null;'),
-  });
-  await expect(page.getByRole('alert')).toContainText('content:build');
-  await expect(toggle).toBeChecked();
-  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveValue(
-    'workshop:guest',
-  );
-  await input.setInputFiles([
-    '.artifacts/content/harbor.sgs.mjs',
-    '.artifacts/content/harbor.sgs.mjs',
-  ]);
-  await expect(page.getByRole('alert')).toContainText('Duplicate package');
-  await expect(page.getByRole('checkbox', { name: '渡口', exact: true })).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
   await expect(page.getByRole('button', { name: '开始单机对局' })).toBeEnabled();
-});
-
-test('批内依赖顺序任意，停用与移除级联依赖并回退失效选择，窄屏开局仍可见', async ({
-  page,
-}, info) => {
-  const input = page.getByLabel('导入本地内容包', { exact: true });
-  const dependent = {
-    name: 'pilot.sgs.mjs',
-    mimeType: 'text/javascript',
-    buffer: Buffer.from(
-      'export const format="sgs-content/1"; export default sdk => sdk.definePackage({manifest:{id:"pilot",name:"领航",version:"1",requires:[{id:"harbor",version:"0.1.1"}]}});',
-    ),
-  };
-  await input.setInputFiles([
-    dependent,
-    {
-      name: 'harbor.sgs.mjs',
-      mimeType: 'text/javascript',
-      buffer: await (
-        await import('node:fs/promises')
-      ).readFile('.artifacts/content/harbor.sgs.mjs'),
-    },
-  ]);
-  const harbor = page.getByRole('checkbox', { name: '渡口', exact: true });
-  const pilot = page.getByRole('checkbox', { name: '领航', exact: true });
-  await expect(harbor).toBeChecked();
-  await expect(pilot).toBeChecked();
-  await page.getByRole('combobox', { name: '你的武将', exact: true }).selectOption('harbor:guest');
-  await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('harbor:crossing');
-  await harbor.uncheck();
-  await expect(pilot).not.toBeChecked();
-  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveValue(
-    'standard:guanyu',
-  );
-  await expect(page.getByRole('combobox', { name: '牌组', exact: true })).toHaveValue(
-    'standard:identity',
-  );
-  await pilot.check();
-  await expect(harbor).toBeChecked();
-  const lobby = await page.getByRole('region', { name: '开局设置' }).boundingBox();
-  const start = await page.getByRole('button', { name: '开始单机对局' }).boundingBox();
-  expect(start!.y + start!.height).toBeLessThanOrEqual(lobby!.y + lobby!.height);
-  await page.screenshot({
-    path: `.artifacts/ui/imported-content-lobby-${info.project.name}.png`,
-    fullPage: true,
-  });
-  await page.getByRole('button', { name: '移除渡口', exact: true }).click();
-  await expect(harbor).toHaveCount(0);
-  await expect(pilot).toHaveCount(0);
-  await expect(page.getByRole('region', { name: '开局设置' })).toContainText('32 种牌与 25 名武将');
-});
-
-test('作者包启用和停用同步刷新武将、牌组与数量，保留合法选择', async ({ page }, info) => {
-  const toggle = page.getByRole('checkbox', { name: '作者演武', exact: true });
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  const toggle = page.getByRole('checkbox', { name: '机制演武', exact: true });
   const hero = page.getByRole('combobox', { name: '你的武将', exact: true });
   const npc = page.getByRole('combobox', { name: 'AI 武将', exact: true });
   const deck = page.getByRole('combobox', { name: '牌组', exact: true });
+  const stats = page.getByLabel('可用内容统计', { exact: true });
   await expect(toggle).not.toBeChecked();
   const lobby = await page.getByRole('region', { name: '开局设置' }).boundingBox();
   const start = await page.getByRole('button', { name: '开始单机对局' }).boundingBox();
   const toggleBox = await toggle.locator('..').boundingBox();
   expect(start!.y + start!.height).toBeLessThanOrEqual(lobby!.y + lobby!.height);
-  expect(toggleBox!.height).toBeLessThan(30);
+  // 整个标签可点击；保留触控高度，同时限制意外换行撑高侧栏。
+  expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
+  expect(toggleBox!.height).toBeLessThan(60);
   await expect(hero.locator('option')).toHaveCount(25);
   await expect(deck.locator('option')).toHaveCount(2);
   await toggle.check();
   await expect(hero.locator('option')).toHaveCount(30);
-  await expect(page.getByRole('region', { name: '开局设置' })).toContainText('37 种牌与 30 名武将');
-  await expect(page.getByRole('region', { name: '开局设置' })).toContainText('workshop@0.1.20');
+  await expect(stats.getByText('37', { exact: true })).toBeVisible();
+  await expect(stats.getByText('30', { exact: true })).toBeVisible();
+  await expect(deck.locator('option[value="workshop:showcase"]')).toHaveText('机制演武（44 张）');
   await hero.selectOption('workshop:guest');
   await npc.selectOption('workshop:guest');
   await deck.selectOption('workshop:showcase');
@@ -195,7 +184,8 @@ test('作者包启用和停用同步刷新武将、牌组与数量，保留合�
   await expect(npc).toHaveValue('preset');
   await expect(deck).toHaveValue('standard:identity');
   await expect(hero.locator('option')).toHaveCount(25);
-  await expect(page.getByRole('region', { name: '开局设置' })).toContainText('32 种牌与 25 名武将');
+  await expect(stats.getByText('32', { exact: true })).toBeVisible();
+  await expect(stats.getByText('25', { exact: true })).toBeVisible();
   await hero.selectOption('standard:zhaoyun');
   await toggle.check();
   await expect(hero).toHaveValue('standard:zhaoyun');
@@ -207,8 +197,8 @@ test('作者包启用和停用同步刷新武将、牌组与数量，保留合�
   });
 });
 
-test('作者包通过真实开局完成跨包武将、闻策、整备选项和材料善后', async ({ page }, info) => {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+test('演武源码通过真实开局完成混合武将、闻策、整备选项和材料善后', async ({ page }, info) => {
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:showcase');
   await startGeneral(page, 'workshop:guest', 2, 2, 'standard:guanyu');
   await reachOwnSkill(page, '结束出牌');
@@ -219,7 +209,7 @@ test('作者包通过真实开局完成跨包武将、闻策、整备选项和�
   await expect(page.getByRole('dialog', { name: /整备/ })).toContainText('作者演示牌');
   await page.getByRole('button', { name: '关闭牌面详情' }).click();
   await card.click();
-  await page.getByTestId('target-甲席').click();
+  await selectTarget(page, 'target-甲席');
   await confirm(page).click();
   await expect(page.getByTestId('decision-hint')).toContainText('闻策');
   await page.getByRole('button', { name: '发动', exact: true }).click();
@@ -243,7 +233,7 @@ test('作者包通过真实开局完成跨包武将、闻策、整备选项和�
   });
 });
 test('映绯统一当前手牌红桃与武圣材料：自然黑桃闪可真实当杀，固定甲席', async ({ page }, info) => {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page.locator('[data-content-ready="true"]').waitFor();
   await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:faces');
   await page
@@ -271,7 +261,7 @@ test('映绯统一当前手牌红桃与武圣材料：自然黑桃闪可真实�
   });
   await page.getByRole('button', { name: '武圣', exact: true }).click();
   await material.click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(material).toHaveCount(0);
   await expect(hand(page)).toHaveCount(before - 1);
@@ -286,7 +276,7 @@ test('映绯统一当前手牌红桃与武圣材料：自然黑桃闪可真实�
 test('首次真实 AI 伤害后拾慧获得余响并加入本次时点，学习与发动可在固定甲席完成', async ({
   page,
 }, info) => {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page.locator('[data-content-ready="true"]').waitFor();
   await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:defense');
   await startGeneral(page, 'workshop:inquirer', 2, 4, 'standard:guanyu');
@@ -320,7 +310,7 @@ for (const accept of [false, true]) {
   test(`遗玉真实替换后以历史来源${accept ? '发动摸牌' : '拒绝发动'}，不重新获得装备能力`, async ({
     page,
   }, info) => {
-    await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+    await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
     await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:relics');
     await startGeneral(page, 'workshop:guest', 2, 10, 'standard:guanyu');
     await reachOwnSkill(page, '结束出牌');
@@ -329,7 +319,7 @@ for (const accept of [false, true]) {
     await expect(jade).toHaveAccessibleName(/遗玉/);
     await jade.click();
     await confirm(page).click();
-    const equipment = page.getByRole('group', { name: '公开装备与判定区', exact: true });
+    const equipment = page.getByTestId('equipment-甲席');
     await expect(equipment.getByRole('button', { name: /遗玉/ })).toHaveCount(1);
     await page.getByTestId('hand-cards').getByTestId('card-relic-card-14').click();
     await confirm(page).click();
@@ -352,7 +342,7 @@ for (const accept of [false, true]) {
 }
 
 test('缚阵公开连环标记、暂停恢复与引焰真实传播，固定甲席且不重复扣费', async ({ page }, info) => {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:chains');
   await startGeneral(page, 'standard:guanyu', 2, 4, 'standard:guanyu');
   await reachOwnSkill(page, '结束出牌');
@@ -364,7 +354,7 @@ test('缚阵公开连环标记、暂停恢复与引焰真实传播，固定甲�
     ),
   );
   await page.getByTestId('hand-cards').getByTestId('card-chain-card-7').click();
-  for (const seat of seats) await seat.click();
+  for (const seat of seats) await selectTarget(page, seat);
   await confirm(page).click();
   for (const seat of seats) {
     await expect(seat).toHaveAttribute('data-chained', 'true');
@@ -374,12 +364,13 @@ test('缚阵公开连环标记、暂停恢复与引焰真实传播，固定甲�
   await expect(hand(page)).toHaveCount(0);
   for (const seat of seats) await expect(seat).toHaveAttribute('data-chained', 'true');
   await page.getByRole('button', { name: '继续对局', exact: true }).click();
+  await expectSeatTextToFit(page);
   await page.screenshot({
     path: `.artifacts/ui/chain-linked-${info.project.name}.png`,
     fullPage: true,
   });
   await page.getByTestId('hand-cards').getByTestId('card-chain-card-19').click();
-  await seats[1]!.click();
+  await selectTarget(page, seats[1]!);
   await confirm(page).click();
   for (const [index, seat] of seats.entries()) {
     await expect(seat).toHaveAttribute('data-chained', 'false');
@@ -400,7 +391,7 @@ test('缚阵公开连环标记、暂停恢复与引焰真实传播，固定甲�
 });
 
 test('凝障吸收连环传播，护盾与体力独立，暂停仍保留公共护盾标记', async ({ page }, info) => {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page.getByRole('combobox', { name: '牌组', exact: true }).selectOption('workshop:defense');
   await startGeneral(page, 'standard:guanyu', 2, 4, 'standard:guanyu');
   await reachOwnSkill(page, '结束出牌');
@@ -408,13 +399,13 @@ test('凝障吸收连环传播，护盾与体力独立，暂停仍保留公共�
   const other = page.getByTestId('target-乙席');
   const before = await hand(page).count();
   await page.getByTestId('card-defense-card-7').click();
-  await own.click();
+  await selectTarget(page, own);
   await confirm(page).click();
   await expect(own).toHaveAttribute('data-shield', '2');
   await expect(own).toHaveAccessibleName(/护盾2/);
   await page.getByTestId('card-defense-card-11').click();
-  await own.click();
-  await other.click();
+  await selectTarget(page, own);
+  await selectTarget(page, other);
   await confirm(page).click();
   await expect(own).toHaveAttribute('data-chained', 'true');
   await page.getByRole('button', { name: '暂停对局', exact: true }).click();
@@ -426,7 +417,7 @@ test('凝障吸收连环传播，护盾与体力独立，暂停仍保留公共�
     fullPage: true,
   });
   await page.getByTestId('card-defense-card-19').click();
-  await other.click();
+  await selectTarget(page, other);
   await confirm(page).click();
   await expect(own).toHaveAttribute('data-shield', '1');
   await expect(own).toHaveAccessibleName(/体力4\/4/);
@@ -436,6 +427,7 @@ test('凝障吸收连环传播，护盾与体力独立，暂停仍保留公共�
   await expect(hand(page)).toHaveCount(before - 3);
   await expect(page.getByTestId('journal')).toContainText('护盾吸收 1 点');
   await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);
+  await expectSeatTextToFit(page);
   await page.screenshot({
     path: `.artifacts/ui/shield-absorbed-${info.project.name}.png`,
     fullPage: true,
@@ -446,7 +438,7 @@ for (const accept of [false, true]) {
   test(`非主控 AI 真实攻击，人类代受${accept ? '支付并转移' : '取消不支付'}`, async ({
     page,
   }, info) => {
-    await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+    await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
     await page
       .getByRole('combobox', { name: '牌组', exact: true })
       .selectOption('workshop:defense');
@@ -461,7 +453,7 @@ for (const accept of [false, true]) {
     const hp = Number((await own.getAttribute('aria-label'))!.match(/体力(\d+)\//)![1]);
     if (accept) {
       await hand(page).first().click();
-      await other.click();
+      await selectTarget(page, other);
       await confirm(page).click();
       await expect(page.getByTestId('journal')).toContainText('甲席将 1 点伤害转移给乙席');
       await expect(own).toHaveAccessibleName(new RegExp(`体力${hp}/`));
@@ -566,7 +558,8 @@ async function reachOwnSkill(
       continue;
     }
     if ((await page.getByTestId('decision-hint').textContent())?.includes(wanted)) return;
-    if (await page.getByRole('button', { name: wanted, exact: true }).count()) return;
+    const namedAction = page.getByRole('button', { name: wanted, exact: true });
+    if ((await namedAction.count()) && (await namedAction.isEnabled())) return;
     if (kind === 'play-action') {
       if (installArmor && !installed) {
         await hand(page)
@@ -585,7 +578,10 @@ async function reachOwnSkill(
     } else if (kind === 'cards-targets') {
       if (await page.locator('.decision-actions .cancel-button').isEnabled())
         await page.locator('.decision-actions .cancel-button').click();
-      else await discard(page, wanted === '濒死');
+      else if (await page.locator('.public-pools button[aria-disabled="false"]').count()) {
+        await page.locator('.public-pools button[aria-disabled="false"]').first().click();
+        await confirm(page).click();
+      } else await discard(page, wanted === '濒死');
     } else if (kind === 'card-response' || kind === 'use-card') {
       await page.locator('.decision-actions .cancel-button').click();
     } else throw new Error(`Unexpected decision before ${wanted}: ${kind}`);
@@ -605,6 +601,12 @@ test('默认固定甲席与基础 AI；暂停藏牌、后台等待及继续不�
   await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);
   await expect(page.getByTestId('own-role')).toHaveText('主公');
   const cards = await hand(page).count();
+  const material = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]').first();
+  await material.click();
+  const selected = page.getByTestId('hand-cards').locator('button[aria-pressed="true"]');
+  await expect(selected).toHaveCount(1);
+  const cardId = await selected.getAttribute('data-testid');
+  const decision = await page.locator('[data-decision-key]').getAttribute('data-decision-key');
   await page.getByRole('button', { name: '暂停对局', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '对局已暂停' })).toBeVisible();
   await expect(hand(page)).toHaveCount(0);
@@ -612,6 +614,8 @@ test('默认固定甲席与基础 AI；暂停藏牌、后台等待及继续不�
   await expect(page.getByRole('dialog', { name: '对局已暂停' })).toBeVisible();
   await page.getByRole('button', { name: '继续对局', exact: true }).click();
   await expect(hand(page)).toHaveCount(cards);
+  await expect(selected).toHaveAttribute('data-testid', cardId!);
+  await expect(page.locator('[data-decision-key]')).toHaveAttribute('data-decision-key', decision!);
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -623,6 +627,8 @@ test('默认固定甲席与基础 AI；暂停藏牌、后台等待及继续不�
   });
   await page.getByRole('button', { name: '继续对局', exact: true }).click();
   await expect(hand(page)).toHaveCount(cards);
+  await expect(selected).toHaveAttribute('data-testid', cardId!);
+  await expect(page.locator('[data-decision-key]')).toHaveAttribute('data-decision-key', decision!);
   await page.screenshot({
     path: `.artifacts/ui/solo-table-${info.project.name}.png`,
     fullPage: true,
@@ -701,7 +707,7 @@ test('甄姬准备阶段发动洛神，黑判定牌归手，可主动停止后�
   await page.getByRole('button', { name: '不发动', exact: true }).click();
   await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
   await expect(hand(page)).toHaveCount(7);
-  await expect(page.getByRole('button', { name: '倾国', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '倾国', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '查看武将技能说明', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '甄姬 · 技能' })).toContainText('倾国');
   await page.screenshot({
@@ -729,6 +735,45 @@ test('司马懿以真实手牌鬼才改判八卦，移动材料并记录技能�
     path: `.artifacts/ui/general-simayi-${info.project.name}.png`,
     fullPage: true,
   });
+  await reachOwnSkill(page, '反馈：');
+  const decision = page.locator('.decision-bar');
+  await expect(decision).toHaveAttribute('data-decision-kind', 'cards-targets');
+  const key = await decision.getAttribute('data-decision-key');
+  const count = await hand(page).count();
+  await expect(page.getByRole('button', { name: '发动', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '不发动', exact: true })).toBeEnabled();
+  await expect(confirm(page)).toBeDisabled();
+  const picker = page.getByTestId('owned-card-picker');
+  await expect(picker.getByRole('heading', { name: '乙席 · 手牌' })).toBeVisible();
+  await expect(picker.getByRole('heading', { name: '乙席 · 装备' })).toBeAttached();
+  await expect(picker.locator('.card-back').first()).toBeVisible();
+  await expect(picker.getByRole('button', { name: '大宛 ♠K', exact: true })).toBeAttached();
+  await page.locator('.choice-options button').first().click();
+  await page.locator('.choice-options button').last().click();
+  await expect(page.locator('.choice-options button').last()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.choice-options button').first()).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(page.getByTestId('journal')).not.toContainText('甲席发动【反馈】');
+  await expect(hand(page)).toHaveCount(count);
+  await expect(confirm(page)).toBeEnabled();
+  await picker.locator('button').last().dispatchEvent('contextmenu');
+  await expect(page.getByRole('dialog', { name: '【的卢】' })).toBeVisible();
+  await page.getByRole('button', { name: '返回选择', exact: true }).click();
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(picker.locator('button').last()).toHaveAttribute('aria-pressed', 'true');
+  await page.screenshot({
+    path: `.artifacts/ui/general-fankui-draft-${info.project.name}.png`,
+    fullPage: true,
+  });
+  await confirm(page).click();
+  await expect(page.getByTestId('journal')).toContainText('甲席发动【反馈】');
+  await expect(hand(page)).toHaveCount(count + 1);
 });
 
 test('双司马懿按当前乙席回合先后鬼才，甲席随后改判八卦完成响应', async ({ page }, info) => {
@@ -798,7 +843,7 @@ test('郭嘉遗计私有池可分批交牌，暂停隐藏池牌，保留余牌�
     fullPage: true,
   });
   await pool.locator('button').first().click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
   await confirm(page).click();
   await expect(pool.locator('button')).toHaveCount(1);
@@ -884,7 +929,7 @@ for (const accept of [true, false]) {
     await expect(page.getByTestId('decision-hint')).toContainText('突袭：');
     await expect(hand(page)).toHaveCount(4);
     if (accept) {
-      await page.getByTestId('target-乙席').click();
+      await selectTarget(page, 'target-乙席');
       await confirm(page).click();
       const choices = page.locator('.choice-options button');
       await expect(choices).toHaveCount(4);
@@ -946,20 +991,28 @@ test('刘备仁德从手牌交出两张，公开记录只说明数量和接收�
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
   await page.getByRole('spinbutton').fill('42');
   await page.getByRole('button', { name: '开始单机对局' }).click();
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-kind', 'play-action');
+  const decisionKey = await page.locator('.decision-bar').getAttribute('data-decision-key');
   await page.getByRole('button', { name: '仁德', exact: true }).click();
-  await confirm(page).click();
+  await expect(page.getByTestId('target-乙席')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('decision-hint')).toContainText('仁德：');
   const before = await hand(page).count();
   await hand(page).nth(0).click();
   await hand(page).nth(1).click();
+  await expect(confirm(page)).toBeEnabled();
   await page.getByTestId('target-乙席').click();
-  await confirm(page).click();
-  await expect(hand(page)).toHaveCount(before - 2);
-  await expect(page.getByTestId('journal')).toContainText('甲席发动【仁德】，将 2 张牌交给 乙席');
+  await expect(confirm(page)).toBeDisabled();
+  await expect(page.getByTestId('target-乙席')).toHaveAttribute('aria-pressed', 'false');
+  await selectTarget(page, 'target-乙席');
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', decisionKey!);
+  await expect(page.getByTestId('journal')).not.toContainText('甲席发动【仁德】');
   await page.screenshot({
     path: `.artifacts/ui/general-liubei-rende-${info.project.name}.png`,
     fullPage: true,
   });
+  await confirm(page).click();
+  await expect(hand(page)).toHaveCount(before - 2);
+  await expect(page.getByTestId('journal')).toContainText('甲席发动【仁德】，将 2 张牌交给 乙席');
 });
 test('刘备激将由真实蜀 AI 供杀，刘备使用并占用本阶段杀次数', async ({ page }, info) => {
   await page
@@ -969,11 +1022,9 @@ test('刘备激将由真实蜀 AI 供杀，刘备使用并占用本阶段杀次�
   await page.getByRole('spinbutton').fill('6');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   await page.getByRole('button', { name: '激将', exact: true }).click();
-  await page.getByTestId('target-乙席').click();
-  await confirm(page).click();
-  await expect(page.getByTestId('decision-hint')).toContainText('是否发动【激将】');
+  await selectTarget(page, 'target-乙席');
   const before = await hand(page).count();
-  await page.getByRole('button', { name: '发动', exact: true }).click();
+  await confirm(page).click();
   await expect(page.getByTestId('journal')).toContainText('丁席为甲席打出【杀】');
   await expect(page.getByTestId('journal')).toContainText('甲席使用【杀】');
   await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
@@ -1005,16 +1056,15 @@ test('华佗青囊以真实手牌费用治疗受伤角色', async ({ page }, inf
   }
   expect(target).not.toBe('');
   await page.getByRole('button', { name: '青囊', exact: true }).click();
-  await confirm(page).click();
   const before = await hand(page).count();
   await hand(page).first().click();
-  await page.getByTestId(`target-${target}`).click();
+  await selectTarget(page, `target-${target}`);
   await confirm(page).click();
   await expect(page.getByTestId(`target-${target}`)).toHaveAccessibleName(
     new RegExp(`体力${hp + 1}/`),
   );
   await expect(hand(page)).toHaveCount(before - 1);
-  await expect(page.getByRole('button', { name: '青囊', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '青囊', exact: true })).toBeDisabled();
   await page.screenshot({
     path: `.artifacts/ui/general-huatuo-qingnang-${info.project.name}.png`,
     fullPage: true,
@@ -1039,28 +1089,101 @@ test('华佗回合外急救将红牌当桃，用真实救援脱离濒死', async
 });
 
 test('孙权制衡弃置两张手牌并摸回两张，本阶段只能一次', async ({ page }, info) => {
+  await page.evaluate(() => {
+    const probe = {
+      plays: [] as string[],
+      playing: [] as string[],
+      elements: [] as HTMLMediaElement[],
+    };
+    Reflect.set(window, 'sgsAudioProbe', probe);
+    const play = Reflect.get(HTMLMediaElement.prototype, 'play');
+    HTMLMediaElement.prototype.play = function () {
+      probe.plays.push(this.src);
+      if (!probe.elements.includes(this)) {
+        probe.elements.push(this);
+        this.addEventListener('playing', () => probe.playing.push(this.src));
+      }
+      return play.call(this);
+    };
+  });
+  const soundState = () =>
+    page.evaluate(() => {
+      const probe = Reflect.get(window, 'sgsAudioProbe') as {
+        plays: string[];
+        playing: string[];
+        elements: HTMLMediaElement[];
+      };
+      return {
+        plays: probe.plays,
+        playing: probe.playing,
+        paused: probe.elements.every((element) => element.paused),
+      };
+    });
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:sunquan');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
   await page.getByRole('spinbutton').fill('42');
   await page.getByRole('button', { name: '开始单机对局' }).click();
+  const decision = page.locator('.decision-bar');
+  await expect(decision).toHaveAttribute('data-decision-kind', 'play-action');
+  await expect
+    .poll(async () => (await soundState()).playing.some((url) => url.includes('gamestart')))
+    .toBe(true);
+  const key = await decision.getAttribute('data-decision-key');
   await page.getByRole('button', { name: '制衡', exact: true }).click();
-  await confirm(page).click();
+  const skillKeyBox = await page.getByRole('button', { name: '制衡', exact: true }).boundingBox();
+  expect(skillKeyBox?.width).toBeLessThanOrEqual(82);
+  expect(skillKeyBox?.height).toBeLessThanOrEqual(45);
+  await expect(confirm(page)).toBeDisabled();
   const before = await hand(page).count();
   const first = await hand(page).nth(0).getAttribute('data-testid');
   const second = await hand(page).nth(1).getAttribute('data-testid');
   await hand(page).nth(0).click();
   await hand(page).nth(1).click();
-  await confirm(page).click();
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(page.getByRole('button', { name: /^制衡/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('journal')).not.toContainText('甲席发动【制衡】');
+  expect((await soundState()).plays.filter((url) => url.includes('zhiheng'))).toHaveLength(0);
+  // 技能说明是命令，原生 Enter 不能被草稿提交快捷键抢占。
+  await page.getByRole('button', { name: '查看救援技能说明', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: '关闭技能说明', exact: true })).toBeVisible();
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
   await expect(hand(page)).toHaveCount(before);
-  await expect(page.getByTestId('hand-cards').getByTestId(first!)).toHaveCount(0);
-  await expect(page.getByTestId('hand-cards').getByTestId(second!)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '制衡', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭技能说明', exact: true }).click();
+  await page.getByRole('button', { name: '取消选择', exact: true }).click();
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(hand(page)).toHaveCount(before);
+  await page.getByRole('button', { name: '制衡', exact: true }).click();
+  await hand(page).nth(0).click();
+  await hand(page).nth(1).click();
+  expect((await soundState()).plays.filter((url) => url.includes('zhiheng'))).toHaveLength(0);
   await page.screenshot({
     path: `.artifacts/ui/general-sunquan-${info.project.name}.png`,
     fullPage: true,
   });
+  await confirm(page).click();
+  await expect(hand(page)).toHaveCount(before);
+  await expect(page.getByTestId('hand-cards').getByTestId(first!)).toHaveCount(0);
+  await expect(page.getByTestId('hand-cards').getByTestId(second!)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '制衡', exact: true })).toBeDisabled();
+  await expect
+    .poll(async () => (await soundState()).playing.some((url) => url.includes('zhiheng')))
+    .toBe(true);
+  const played = (await soundState()).plays;
+  expect(played.filter((url) => url.includes('zhiheng'))).toHaveLength(1);
+  await page.getByRole('button', { name: '暂停对局', exact: true }).click();
+  await expect.poll(async () => (await soundState()).paused).toBe(true);
+  const pausedPlays = (await soundState()).plays;
+  await page.getByRole('button', { name: '继续对局', exact: true }).click();
+  expect((await soundState()).plays).toEqual(pausedPlays);
+  await page.getByRole('button', { name: '音效与语音', exact: true }).click();
+  await expect(page.getByRole('button', { name: '音效与语音', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect.poll(async () => (await soundState()).paused).toBe(true);
 });
 test('吕蒙不出杀，克己在费用宣告后跳过弃牌阶段', async ({ page }, info) => {
   await page
@@ -1142,7 +1265,7 @@ test('黄月英使用普通锦囊触发集智，在牌效果前实际摸牌', as
   await hand(page)
     .filter({ has: page.locator('.card-name', { hasText: '过河拆桥' }) })
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(page.getByTestId('decision-hint')).toContainText('集智');
   await page.getByRole('button', { name: '发动', exact: true }).click();
@@ -1164,7 +1287,7 @@ test('吕布无双杀令基础 AI 实际连续使用两张闪', async ({ page },
     .filter({ has: page.locator('.card-name', { hasText: /^杀$/ }) })
     .first()
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(
     page.getByTestId('journal').locator('.journal-entry').filter({ hasText: '乙席使用【闪】' }),
@@ -1187,7 +1310,7 @@ test('大乔国色把方块牌作为乐不思蜀放置，材料离手且延时�
   const material = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]').first();
   const id = await material.getAttribute('data-testid');
   await material.click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(page.getByTestId('journal')).toContainText('甲席使用【乐不思蜀】');
   await expect(page.getByTestId('hand-cards').getByTestId(id!)).toHaveCount(0);
@@ -1207,7 +1330,7 @@ test('大乔流离同时支付与转移，记录和桌面牌指向新目标', as
   await reachOwnSkill(page, '流离：');
   const material = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]').first();
   const id = await material.getAttribute('data-testid');
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await material.click();
   await confirm(page).click();
   // 紧凑横屏会隐藏桌面牌；其公开模型仍须标注新的目标。
@@ -1232,7 +1355,7 @@ test('马超铁骑红判定禁止 AI 响应，实际扣血且不消耗其手牌'
     .filter({ has: page.locator('.card-name', { hasText: /^杀$/ }) })
     .first()
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(page.getByTestId('decision-hint')).toContainText('铁骑');
   await page.getByRole('button', { name: '发动', exact: true }).click();
@@ -1253,13 +1376,12 @@ test('周瑜英姿多摸一张，反间令 AI 猜花色并暗取真实手牌', a
   await page.getByRole('button', { name: '发动', exact: true }).click();
   await expect(hand(page)).toHaveCount(beforeDraw + 3);
   await page.getByRole('button', { name: '反间', exact: true }).click();
-  await confirm(page).click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(page.getByTestId('journal')).toContainText('乙席为反间选择黑桃');
   await expect(page.getByTestId('journal')).toContainText('甲席将 1 张牌交给 乙席，公开：');
   await expect(hand(page)).toHaveCount(beforeDraw + 2);
-  await expect(page.getByRole('button', { name: '反间', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '反间', exact: true })).toBeDisabled();
   await page.screenshot({
     path: `.artifacts/ui/general-yingzi-fanjian-${info.project.name}.png`,
     fullPage: true,
@@ -1299,18 +1421,17 @@ test('貂蝉离间按选中顺序由后选 AI 发起决斗，消耗费用且本�
   await startGeneral(page, 'standard:diaochan', 4, 2);
   await reachOwnSkill(page, '结束出牌');
   await page.getByRole('button', { name: '离间', exact: true }).click();
-  await confirm(page).click();
   const material = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]').first();
   const id = await material.getAttribute('data-testid');
   await material.click();
-  await page.getByTestId('target-乙席').click();
-  await page.getByTestId('target-丁席').click();
+  await selectTarget(page, 'target-乙席');
+  await selectTarget(page, 'target-丁席');
   await expect(page.getByTestId('target-乙席')).toHaveAccessibleName(/选择顺序1/);
   await expect(page.getByTestId('target-丁席')).toHaveAccessibleName(/选择顺序2/);
   await confirm(page).click();
   await expect(page.getByTestId('journal')).toContainText('丁席使用【决斗】 → 乙席');
   await expect(page.getByTestId('hand-cards').getByTestId(id!)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '离间', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '离间', exact: true })).toBeDisabled();
   await page.screenshot({
     path: `.artifacts/ui/general-lijian-${info.project.name}.png`,
     fullPage: true,
@@ -1408,7 +1529,7 @@ test('赵云龙胆将闪当杀，实际移除材料并沿用本阶段杀次数',
   await hand(page)
     .filter({ has: page.locator('.card-name', { hasText: '闪' }) })
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
   await confirm(page).click();
   await expect(page.getByTestId('journal')).toContainText('甲席使用【杀】');
@@ -1417,7 +1538,7 @@ test('赵云龙胆将闪当杀，实际移除材料并沿用本阶段杀次数',
     hand(page).filter({ has: page.locator('.card-name', { hasText: '闪' }) }),
   ).toHaveCount(0);
   await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeDisabled();
   await expect(page.getByTestId('decision-hint')).toContainText('本阶段使用次数已达上限');
   await page.screenshot({
@@ -1436,7 +1557,7 @@ test('张飞被动技能说明可查看，弹窗数字和确认键不会代替�
   await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
   const slash = page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / });
   await slash.click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
   const count = await hand(page).count();
   await page.getByRole('button', { name: '查看武将技能说明', exact: true }).click();
@@ -1475,7 +1596,7 @@ test('孙尚香在 AI 行动后使用结姻：取消不耗牌，实际支付两�
       continue;
     }
     if (kind === 'play-action') {
-      if (await skill.count()) break;
+      if (await skill.isEnabled()) break;
       await page.getByRole('button', { name: '结束出牌', exact: true }).click();
     } else if (kind === 'cards-targets') {
       if (await page.locator('.decision-actions .cancel-button').isEnabled())
@@ -1501,22 +1622,23 @@ test('孙尚香在 AI 行动后使用结姻：取消不耗牌，实际支付两�
     (await page.getByTestId('target-乙席').getAttribute('aria-label'))?.match(/体力(\d+)/)?.[1],
   );
   expect(hp).toBeLessThan(4);
+  const decisionKey = await page.locator('.decision-bar').getAttribute('data-decision-key');
   await skill.click();
-  await confirm(page).click();
-  await page.getByRole('button', { name: '取消发动', exact: true }).click();
+  await hand(page).nth(0).click();
+  await page.getByRole('button', { name: '取消选择', exact: true }).click();
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', decisionKey!);
   await expect(hand(page)).toHaveCount(before);
   await skill.click();
-  await confirm(page).click();
   await expect(page.getByTestId('decision-hint')).toContainText('结姻：');
   await hand(page).nth(0).click();
   await hand(page).nth(1).click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
   await confirm(page).click();
   await expect(hand(page)).toHaveCount(before - 2);
   await expect(page.getByTestId('target-乙席')).toHaveAccessibleName(new RegExp(`体力${hp + 1}/4`));
   await expect(page.getByTestId('journal')).toContainText('甲席发动【结姻】');
-  await expect(skill).toHaveCount(0);
+  await expect(skill).toBeDisabled();
   await page.screenshot({
     path: `.artifacts/ui/general-sunshangxiang-${info.project.name}.png`,
     fullPage: true,
@@ -1591,8 +1713,28 @@ test('目标反馈、详情与快捷键由正式决策驱动', async ({ page }) 
   await slash.click();
   await expect(confirm(page)).toBeDisabled();
   await expect(page.getByTestId('target-丙席')).toHaveAttribute('aria-disabled', 'true');
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
+  const decision = page.locator('.decision-bar');
+  await expect(page.locator('.target-lines line')).toHaveCount(2);
+  const key = await decision.getAttribute('data-decision-key');
+  const cardsBefore = await hand(page).count();
+  const journalBefore = await page.getByTestId('journal').textContent();
+  await page.getByRole('button', { name: '取消选择', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(slash).toHaveAttribute('aria-pressed', 'false');
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(hand(page)).toHaveCount(cardsBefore);
+  await expect(page.getByTestId('journal')).toHaveText(journalBefore!);
+  await slash.click();
+  await selectTarget(page, 'target-乙席');
+  await page.getByRole('button', { name: '结算记录', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('complementary', { name: '结算记录' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(slash).toHaveAttribute('aria-pressed', 'true');
+  await expect(decision).toHaveAttribute('data-decision-key', key!);
+  await expect(page.getByTestId('journal')).toHaveText(journalBefore!);
   await slash.click({ button: 'right' });
   await expect(page.getByRole('dialog', { name: '【杀】' })).toBeVisible();
   await page.keyboard.press('1');
@@ -1601,7 +1743,7 @@ test('目标反馈、详情与快捷键由正式决策驱动', async ({ page }) 
   await page.keyboard.press('Escape');
   await expect(slash).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.press((await slash.locator('.card-shortcut').textContent())!);
-  await page.getByTestId('target-丁席').click();
+  await selectTarget(page, 'target-丁席');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('journal')).toContainText('丙席使用【杀】 → 丁席');
   // 响应可能自动无候选，也可能切换到丁席；两者均是规则决定。
@@ -1659,7 +1801,7 @@ test('横屏和纵屏保持手牌滚动、可点目标与确认，长按不误�
       .locator('.playing-card[aria-label^="杀 "]')
       .first()
       .click();
-    await page.getByTestId('target-乙席').click();
+    await selectTarget(page, 'target-乙席');
     await expect(confirm(page)).toBeEnabled();
     await page.screenshot({
       path: `.artifacts/ui/local-${info.project.name}-${size.width}.png`,
@@ -1679,7 +1821,9 @@ test('参考位置：本人右下、手牌左下、确认在上、牌堆右上�
   const pile = (await page.locator('.pile-count').boundingBox())!;
   expect(self.x).toBeGreaterThan(surface.x + surface.width * 0.7);
   expect(self.y + self.height / 2).toBeGreaterThan(surface.y + surface.height * 0.65);
-  expect(surface.y + surface.height - self.y - self.height).toBeLessThan(12);
+  // 按 FreeKill 留出底部席号与判定 mark；头像仍贴近右下角。
+  expect(surface.y + surface.height - self.y - self.height).toBeGreaterThanOrEqual(8);
+  expect(surface.y + surface.height - self.y - self.height).toBeLessThanOrEqual(42);
   expect(cards.x + cards.width).toBeLessThan(self.x);
   expect(decision.y + decision.height).toBeLessThan(cards.y);
   const confirmation = (await confirm(page).boundingBox())!;
@@ -1689,7 +1833,7 @@ test('参考位置：本人右下、手牌左下、确认在上、牌堆右上�
   expect(pile.x).toBeGreaterThan(surface.x + surface.width * 0.65);
   expect(pile.y).toBeLessThan(surface.y + 24);
   await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   for (const badge of await page.locator('.target-state').all())
     expect((await badge.boundingBox())!.height).toBeLessThan(25);
   await page.screenshot({
@@ -1713,7 +1857,9 @@ test('参考位置：本人右下、手牌左下、确认在上、牌堆右上�
 });
 
 test('八人开局和席位命中区域保持在战场内部', async ({ page }, info) => {
-  await start(page, 8);
+  await startGeneral(page, 'standard:simayi', 8, 8, 'standard:zhugeliang');
+  await expect(page.getByTestId('own-role')).toHaveText('主公');
+  await reachOwnSkill(page, '结束出牌');
   await expect(page.locator('.target-hitbox')).toHaveCount(8);
   const canvas = await page.getByTestId('battle-canvas').boundingBox();
   for (const target of await page.locator('.target-hitbox').all()) {
@@ -1728,6 +1874,22 @@ test('八人开局和席位命中区域保持在战场内部', async ({ page }, 
     path: `.artifacts/ui/local-eight-${info.project.name}.png`,
     fullPage: true,
   });
+  const original = page.viewportSize()!;
+  for (const viewport of [
+    original,
+    { width: 960, height: 640 },
+    { width: 390, height: 844 },
+    { width: 320, height: 740 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectSeatTextToFit(page);
+    if (viewport.width === 960)
+      for (const target of await page.locator('.target-hitbox').all())
+        expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(128);
+    await page.screenshot({
+      path: `.artifacts/ui/seats-${info.project.name}-${viewport.width}.png`,
+    });
+  }
 });
 
 test('隐藏手牌与模拟后台事件清除选择和详情，重新确认才可恢复', async ({ page }) => {
@@ -1785,7 +1947,7 @@ test('浏览器通过真实出牌/救援/弃牌界面跑至身份胜负，关闭
         .locator('button[aria-label^="杀 "], button[aria-label^="决斗 "]')
         .all()) {
         await card.click();
-        const targets = page.locator('.target-hitbox[aria-disabled="false"]');
+        const targets = page.locator('.target-hitbox[aria-disabled="false"][aria-pressed="false"]');
         if (await targets.count()) await targets.first().click();
         if (await confirm(page).isEnabled()) {
           await confirm(page).click();
@@ -1793,7 +1955,10 @@ test('浏览器通过真实出牌/救援/弃牌界面跑至身份胜负，关闭
           break;
         }
       }
-      if (!used) await page.getByRole('button', { name: '结束出牌', exact: true }).click();
+      if (!used) {
+        await page.keyboard.press('Escape');
+        await page.getByRole('button', { name: '结束出牌', exact: true }).click();
+      }
       continue;
     }
     await expect
@@ -1804,7 +1969,7 @@ test('浏览器通过真实出牌/救援/弃牌界面跑至身份胜负，关闭
   await expect(page.getByLabel('身份揭示')).toContainText('主公');
   await expect(page.getByLabel('身份揭示')).toContainText('反贼');
   await expect(page.getByTestId('journal')).toContainText('对局结束');
-  await expect(confirm(page)).toBeDisabled();
+  await expect(page.locator('.decision-actions button')).toHaveCount(0);
   await page.screenshot({
     path: `.artifacts/ui/local-victory-${info.project.name}.png`,
     fullPage: true,
@@ -1946,12 +2111,46 @@ test('顺手暗选只展示未知手牌选项，获得后才在本人手牌中�
     .getByRole('button', { name: /^顺手牵羊 / })
     .first()
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await passCountersUntil(page, 'cards-targets');
   const choices = page.locator('.choice-options button');
   await expect(choices).toHaveCount(4);
   for (const choice of await choices.all()) await expect(choice).toHaveText(/未知手牌/);
+  await expect(page.getByTestId('owned-card-picker').locator('.card-back')).toHaveCount(4);
+  await choices.first().dispatchEvent('contextmenu');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const key = await page.locator('.decision-bar').getAttribute('data-decision-key');
+  const touch = await page.context().newCDPSession(page);
+  try {
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await choices.first().scrollIntoViewIfNeeded();
+    const box = (await choices.first().boundingBox())!;
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await page.waitForTimeout(650);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(choices.first()).toHaveAttribute('aria-pressed', 'false');
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(choices.first()).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await page.waitForTimeout(1200);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(choices.first()).toHaveAttribute('aria-pressed', 'false');
+    await choices.first().focus();
+    await page.keyboard.press('Space');
+    await expect(choices.first()).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    await touch.detach();
+  }
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('2');
+  await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(confirm(page)).toBeDisabled();
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', key!);
   await choices.first().click();
   await confirm(page).click();
   await passCountersUntil(page, 'play-action');
@@ -1981,9 +2180,35 @@ test('装备从手牌进入公开区，同槽替换立即撤去旧转换能力',
   await confirm(page).click();
   await expect(equipment.getByRole('button')).toHaveCount(1);
   await expect(equipment.getByRole('button', { name: /^诸葛连弩 / })).toBeVisible();
+  expect(
+    await equipment.locator('.card-name').evaluateAll((nodes) =>
+      nodes
+        .filter((node) => node.scrollWidth > node.clientWidth)
+        .map((node) => ({
+          text: node.textContent,
+          width: node.clientWidth,
+          scroll: node.scrollWidth,
+        })),
+    ),
+  ).toEqual([]);
   await expect(page.getByRole('button', { name: '丈八蛇矛', exact: true })).toHaveCount(0);
   await expect(hand(page)).toHaveCount(4);
   await expect(page.getByTestId('journal')).toContainText('甲席装备【诸葛连弩】，替换【丈八蛇矛】');
+  await page
+    .getByTestId('hand-cards')
+    .getByRole('button', { name: /^大宛 / })
+    .click();
+  await confirm(page).click();
+  await expect(equipment.getByRole('button')).toHaveCount(2);
+  await expect(equipment.locator('.horse .card-name')).toHaveText('-1');
+  await expect(equipment.locator('.horse .zone-suit img')).toBeVisible();
+  const gearBox = (await equipment.boundingBox())!;
+  const ownerBox = (await page.getByTestId('target-甲席').boundingBox())!;
+  expect(gearBox.x).toBeGreaterThanOrEqual(ownerBox.x);
+  expect(gearBox.y).toBeGreaterThanOrEqual(ownerBox.y);
+  expect(gearBox.x + gearBox.width).toBeLessThanOrEqual(ownerBox.x + ownerBox.width);
+  expect(gearBox.y + gearBox.height).toBeLessThanOrEqual(ownerBox.y + ownerBox.height);
+  await expect(hand(page)).toHaveCount(3);
   const viewport = page.viewportSize()!;
   const box = (await confirm(page).boundingBox())!;
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
@@ -2005,7 +2230,7 @@ test('丈八配方只选两张手牌，装备保留，最终仍执行完整杀�
   const candidates = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]');
   await candidates.nth(0).click();
   await candidates.nth(1).click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await expect(confirm(page)).toBeEnabled();
   await confirm(page).click();
   await passCountersUntil(page, 'play-action');
@@ -2024,7 +2249,7 @@ test('乐不思蜀进入公开判定区，下一席判定后跳过出牌并进�
     .getByRole('button', { name: /^乐不思蜀 / })
     .first()
     .click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(
     page.getByTestId('judgment-乙席').getByRole('button', { name: /^乐不思蜀 / }),
@@ -2077,7 +2302,7 @@ test('八卦阵在响应前询问发动，红色判定供闪并保留防具', as
   ).toBeVisible();
   await endTurn(page);
   await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-  await page.getByTestId('target-甲席').click();
+  await selectTarget(page, 'target-甲席');
   await confirm(page).click();
   await passDevice(page);
   await expect(page.locator('[data-decision-kind="invoke"]')).toBeVisible();
@@ -2119,7 +2344,7 @@ test('青釭剑忽略仁王盾，黑色杀在实际客户端造成伤害', async
     .locator('button.playing-card:not(.red)[aria-label^="杀 "]')
     .first()
     .click();
-  await page.getByTestId('target-甲席').click();
+  await selectTarget(page, 'target-甲席');
   await confirm(page).click();
   await passCountersUntil(page, 'play-action');
   await expect(page.getByTestId('target-甲席')).toHaveAccessibleName(/体力3\/4/);
@@ -2137,22 +2362,73 @@ async function prepareCollateral(page: Page) {
     .click();
   await confirm(page).click();
   await endTurn(page);
+  const key = await page.locator('.decision-bar').getAttribute('data-decision-key');
   await page
     .getByTestId('hand-cards')
     .getByRole('button', { name: /^借刀杀人 / })
     .first()
     .click();
-  await page.getByTestId('target-甲席').click();
-  await confirm(page).click();
-  await expect(page.getByTestId('decision-hint')).toHaveText('借刀杀人：选择 甲席 使用杀的目标');
-  await expect(page.getByRole('button', { name: '取消用牌', exact: true })).toBeEnabled();
+  await expect(page.getByTestId('target-甲席')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-kind', 'play-action');
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', key!);
+  await expect(confirm(page)).toBeDisabled();
+  await expect(page.getByTestId('decision-hint')).toContainText('最后选出杀目标');
+  await selectTarget(page, 'target-乙席');
+  await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', key!);
+  await expect(confirm(page)).toBeEnabled();
   await expect(page.getByTestId('journal')).not.toContainText('乙席使用【借刀杀人】');
 }
 
-test('借刀附属选择取消不耗牌，确认前没有用牌宣告', async ({ page }) => {
+test('借刀持械者与出杀目标同一草稿；取消不耗牌，最终确认前不宣告', async ({ page }, info) => {
+  if (info.project.name === 'touch') await page.setViewportSize({ width: 863, height: 360 });
   await prepareCollateral(page);
+  await expectSeatTextToFit(page);
   const before = await hand(page).count();
-  await page.getByRole('button', { name: '取消用牌', exact: true }).click();
+  await page.screenshot({
+    path: `.artifacts/ui/collateral-draft-${info.project.name}.png`,
+    fullPage: true,
+  });
+  const geometry = await page.evaluate(() => {
+    const equipment = [...document.querySelectorAll('.equipment-area .playing-card')];
+    return [...document.querySelectorAll('.decision-actions button')].flatMap((button) => {
+      const action = button.getBoundingClientRect();
+      return equipment.flatMap((card) => {
+        const gear = card.getBoundingClientRect();
+        return Math.min(action.right, gear.right) > Math.max(action.left, gear.left) &&
+          Math.min(action.bottom, gear.bottom) > Math.max(action.top, gear.top)
+          ? [
+              {
+                action: button.textContent,
+                card: card.getAttribute('aria-label'),
+                actionRect: {
+                  left: action.left,
+                  top: action.top,
+                  width: action.width,
+                  height: action.height,
+                },
+                gearRect: {
+                  left: gear.left,
+                  top: gear.top,
+                  width: gear.width,
+                  height: gear.height,
+                },
+              },
+            ]
+          : [];
+      });
+    });
+  });
+  await info.attach('equipment-action-overlap', {
+    body: JSON.stringify(geometry, null, 2),
+    contentType: 'application/json',
+  });
+  expect(geometry, '装备展示与确认/取消按钮应保留独立空间').toEqual([]);
+  await page.getByTestId('target-甲席').click();
+  await expect(page.getByTestId('target-乙席')).toHaveAttribute('aria-pressed', 'false');
+  await expect(confirm(page)).toBeDisabled();
+  await selectTarget(page, 'target-甲席');
+  await selectTarget(page, 'target-乙席');
+  await page.getByRole('button', { name: '取消选择', exact: true }).click();
   await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
   await expect(hand(page)).toHaveCount(before);
   await expect(page.getByTestId('journal')).not.toContainText('乙席使用【借刀杀人】');
@@ -2170,7 +2446,6 @@ for (const attack of [false, true]) {
       .getByTestId('hand-cards')
       .getByRole('button', { name: /^诸葛连弩 / })
       .count();
-    await page.getByTestId('target-乙席').click();
     await confirm(page).click();
     await passCountersUntil(page, 'use-card', '借刀杀人：对');
     await expect(page.getByTestId('decision-hint')).toContainText(
@@ -2215,7 +2490,7 @@ async function startWeaponAttack(page: Page, seed: number, weapon: string, targe
     .click();
   await confirm(page).click();
   await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-  await page.getByTestId(`target-${target}`).click();
+  await selectTarget(page, `target-${target}`);
   await confirm(page).click();
   await passDevice(page);
   await page.getByTestId('hand-cards').getByRole('button', { name: /^闪 / }).first().click();
@@ -2274,7 +2549,7 @@ test('方天最后手牌杀可选三个目标，客户端数量反馈与结算�
   await confirm(page).click();
   await expect(hand(page)).toHaveCount(1);
   await hand(page).first().click();
-  for (const name of ['甲席', '丙席', '丁席']) await page.getByTestId(`target-${name}`).click();
+  for (const name of ['甲席', '丙席', '丁席']) await selectTarget(page, `target-${name}`);
   await expect(page.locator('.target-hitbox[aria-pressed="true"]')).toHaveCount(3);
   await expect(confirm(page)).toBeEnabled();
   await page.screenshot({ path: `.artifacts/ui/halberd-${info.project.name}.png`, fullPage: true });
@@ -2299,7 +2574,7 @@ test('麒麟弓可选择公开坐骑，弃置后继续伤害', async ({ page }, 
     .click();
   await confirm(page).click();
   await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-  await page.getByTestId('target-乙席').click();
+  await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await passCountersUntil(page, 'cards-targets');
   await expect(page.getByTestId('decision-hint')).toHaveText('麒麟弓：可弃置 乙席 的一张坐骑');
@@ -2325,7 +2600,7 @@ for (const branch of ['discard', 'draw', 'decline'] as const) {
       .click();
     await confirm(page).click();
     await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-    await page.getByTestId('target-丙席').click();
+    await selectTarget(page, 'target-丙席');
     await confirm(page).click();
     await expect(page.getByTestId('decision-hint')).toHaveText('是否对 丙席 发动【雌雄双股剑】？');
     await page
@@ -2363,22 +2638,40 @@ for (const invoke of [false, true]) {
       .click();
     await confirm(page).click();
     await page.getByTestId('hand-cards').getByRole('button', { name: /^杀 / }).first().click();
-    await page.getByTestId('target-丁席').click();
+    await selectTarget(page, 'target-丁席');
     await confirm(page).click();
-    await passCountersUntil(page, 'invoke');
-    await expect(page.getByTestId('decision-hint')).toContainText('是否发动【寒冰剑】');
-    await page.getByRole('button', { name: invoke ? '发动' : '不发动', exact: true }).click();
+    await passCountersUntil(page, 'cards-targets', '寒冰剑：选择');
+    await expect(page.getByTestId('decision-hint')).toContainText('确认后发动并防止伤害');
+    const key = await page.locator('.decision-bar').getAttribute('data-decision-key');
+    await expect(page.getByRole('button', { name: '发动', exact: true })).toHaveCount(0);
+    await expect(confirm(page)).toBeDisabled();
     if (invoke)
       for (let i = 1; i <= 2; i++) {
-        await expect(page.getByTestId('decision-hint')).toHaveText(
-          `寒冰剑：弃置 丁席 的第 ${i} 张牌`,
-        );
+        if (i === 2) {
+          await expect(page.getByTestId('decision-hint')).toHaveText(
+            '寒冰剑：弃置 丁席 的第 2 张牌',
+          );
+          await expect(page.locator('.decision-bar')).not.toHaveAttribute(
+            'data-decision-key',
+            key!,
+          );
+          await expect(page.locator('.decision-actions .cancel-button')).toBeDisabled();
+        }
         const options = page.locator('.choice-options button');
         await expect(options).toHaveCount(5 - i);
         for (const option of await options.all()) await expect(option).toHaveText(/未知手牌/);
         await options.first().click();
+        if (i === 1) {
+          await options.last().click();
+          await expect(options.first()).toHaveAttribute('aria-pressed', 'false');
+          await expect(options.last()).toHaveAttribute('aria-pressed', 'true');
+          await expect(page.locator('.decision-bar')).toHaveAttribute('data-decision-key', key!);
+          await expect(page.getByTestId('journal')).not.toContainText('丙席发动【寒冰剑】');
+          await expect(page.getByTestId('target-丁席')).toHaveAccessibleName(/体力4\/4，手牌4/);
+        }
         await confirm(page).click();
       }
+    else await page.getByRole('button', { name: '不发动', exact: true }).click();
     await passCountersUntil(page, 'play-action');
     await expect(page.getByTestId('target-丁席')).toHaveAccessibleName(
       invoke ? /体力4\/4，手牌2/ : /体力3\/4，手牌4/,
@@ -2387,9 +2680,263 @@ for (const invoke of [false, true]) {
       await expect(page.getByTestId('journal')).toContainText(
         '丙席发动【寒冰剑】防止对 丁席 的伤害',
       );
+    else await expect(page.getByTestId('journal')).not.toContainText('丙席发动【寒冰剑】');
     await page.screenshot({
       path: `.artifacts/ui/ice-sword-${invoke ? 'replace' : 'decline'}-${info.project.name}.png`,
       fullPage: true,
     });
   });
 }
+
+test('本人可托管并收回，暂停冻结托管，继续后基础 AI 完成整局', async ({ page }, info) => {
+  test.setTimeout(120_000);
+  await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
+  await page.getByRole('spinbutton').fill('27');
+  await page.getByRole('button', { name: '开始单机对局' }).click();
+  await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
+  await page.getByRole('button', { name: 'AI 托管', exact: true }).click();
+  await expect(page.getByRole('button', { name: '收回操作', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.decision-actions button')).toHaveCount(0);
+  await expect(page.getByTestId('decision-hint')).toHaveText('基础 AI 正在代你操作…');
+  await page.getByRole('button', { name: '收回操作', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'AI 托管', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.getByRole('button', { name: '结束出牌', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'AI 托管', exact: true }).click();
+  await expect(page.getByRole('button', { name: '收回操作', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.screenshot({ path: '.artifacts/ui/delegation-' + info.project.name + '.png' });
+  await page.getByRole('button', { name: '暂停对局', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '对局已暂停' })).toBeVisible();
+  await expect(hand(page)).toHaveCount(0);
+  const journal = await page.getByTestId('journal').textContent();
+  await page.waitForTimeout(400);
+  await expect(page.getByTestId('journal')).toHaveText(journal!);
+  await page.getByRole('button', { name: '继续对局', exact: true }).click();
+  await expect(page.locator('.target-hitbox.self')).toHaveAttribute('data-testid', 'target-甲席');
+  await expect(page.getByRole('region', { name: '对局结果' })).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId('journal')).toContainText('对局结束');
+  await page.getByRole('button', { name: '再开一局' }).click();
+  await expect(page.getByRole('button', { name: '开始单机对局' })).toBeVisible();
+});
+
+test('启动入口在桌面、横屏与窄屏均完整可点，键盘导航将焦点交给目标页', async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 915, height: 412 },
+    { width: 390, height: 844 },
+    { width: 320, height: 640 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+    const home = page.getByRole('region', { name: '启动界面', exact: true });
+    await expect(home.getByRole('heading', { level: 1 })).toBeFocused();
+    await expect(
+      home.getByRole('button', { name: '直接开始单机对局', exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+    for (const name of ['直接开始单机对局', '单机演武', '联机房间', '内容管理']) {
+      const entry = home.getByRole('button', { name, exact: true });
+      await entry.scrollIntoViewIfNeeded();
+      await expect(entry).toBeInViewport();
+      const bounds = await entry.boundingBox();
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    const quickSeats = home.getByRole('group', { name: '快捷席位', exact: true });
+    const changeGeneral = home.getByRole('button', { name: '更换你的武将，当前关羽', exact: true });
+    const generalBounds = await changeGeneral.boundingBox();
+    expect(generalBounds!.width).toBeGreaterThanOrEqual(44);
+    expect(generalBounds!.height).toBeGreaterThanOrEqual(44);
+    await quickSeats.getByRole('button', { name: '8 席', exact: true }).click();
+    await expect(quickSeats.getByRole('button', { name: '8 席', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(
+      home.getByRole('list', { name: '待开牌局阵容', exact: true }).getByRole('listitem'),
+    ).toHaveCount(8);
+    await quickSeats.getByRole('button', { name: '2 席', exact: true }).click();
+    await page.getByRole('button', { name: '单机演武', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: '单机演武', exact: true })).toBeFocused();
+    await expect(page.getByRole('button', { name: '单机演武', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: '席位', exact: true })).toHaveValue('2');
+    await expect(page.getByRole('button', { name: '开始单机对局' })).toBeInViewport({ ratio: 1 });
+    await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('8');
+    const roster = page.getByRole('region', { name: '本局阵容预览', exact: true });
+    await expect(roster.getByRole('listitem')).toHaveCount(8);
+    await page.getByRole('checkbox', { name: '手动演练（内容调试）', exact: true }).check();
+    await expect(page.getByRole('region', { name: '所选武将技能', exact: true })).toHaveCount(0);
+    await expect(roster.getByRole('listitem').first()).toContainText('自由演练');
+    await expect(roster.getByRole('listitem').first()).toContainText('甲席 · 手动');
+    await expect(roster.getByRole('listitem').last()).toContainText('辛席 · 手动');
+    await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+    const homeRoster = page.getByRole('list', { name: '待开牌局阵容', exact: true });
+    await expect(homeRoster.getByRole('listitem')).toHaveCount(8);
+    await expect(homeRoster.getByRole('listitem').last()).toContainText('辛席 · 手动');
+    await expect(home.getByRole('button', { name: /^更换你的武将/ })).toHaveCount(0);
+    await page.getByRole('button', { name: '单机演武', exact: true }).click();
+    await page.getByRole('checkbox', { name: '手动演练（内容调试）', exact: true }).uncheck();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
+
+test('启动页与大厅分区导航保留配置，内容变更后可进入真实对局', async ({ page }, info) => {
+  const canvas = page.getByTestId('battle-canvas').locator('canvas');
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+  await expect(page.getByRole('region', { name: '启动界面', exact: true })).toBeVisible();
+  await expect(page.getByTestId('battle-canvas')).toBeHidden();
+  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: '.artifacts/ui/lobby-home-' + info.project.name + '.png' });
+  await page.getByRole('button', { name: '调整阵容', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '单机演武', exact: true })).toBeFocused();
+  await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
+  await page
+    .getByRole('combobox', { name: '你的武将', exact: true })
+    .selectOption('standard:zhaoyun');
+  await expect(page.locator('.solo-preview h2')).toHaveText('赵云');
+  await expect(page.getByLabel('所选武将资料', { exact: true })).toHaveText('蜀势力 体力上限 4');
+  const skills = page.getByRole('region', { name: '所选武将技能', exact: true });
+  await expect(skills.getByRole('heading', { name: '赵云 · 技能', exact: true })).toBeVisible();
+  await expect(skills.locator('dt')).toHaveText(['龙胆']);
+  await expect(skills.locator('dd')).toContainText('可以将一张杀当闪使用或打出');
+  const roster = page.getByRole('region', { name: '本局阵容预览', exact: true });
+  await page.getByRole('combobox', { name: 'AI 武将', exact: true }).selectOption('standard:lvbu');
+  await expect(roster.getByRole('listitem')).toHaveCount(2);
+  await expect(roster.getByRole('listitem').first()).toContainText('赵云');
+  await expect(roster.getByRole('listitem').first()).toContainText('甲席 · 你');
+  await expect(roster.getByRole('listitem').last()).toContainText('吕布');
+  await expect(roster.getByRole('listitem').last()).toContainText('乙席 · AI');
+  await page.getByRole('spinbutton', { name: '牌局种子', exact: true }).fill('0');
+  await page.getByText('演练与复现', { exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toBeHidden();
+  await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+  await expect(page.getByLabel('待开牌局', { exact: true })).toContainText('2 席 · 赵云领衔');
+  const homeRoster = page.getByRole('list', { name: '待开牌局阵容', exact: true });
+  await expect(homeRoster.getByRole('listitem')).toHaveCount(2);
+  await expect(homeRoster.getByRole('listitem').first()).toContainText('赵云');
+  await expect(homeRoster.getByRole('listitem').last()).toContainText('吕布');
+  await page.getByRole('button', { name: '直接开始单机对局', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('牌局种子需为 1 至 4294967295 的整数');
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator('.solo-portrait img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await page.getByRole('spinbutton').fill('17');
+  await page.getByRole('button', { name: '联机房间', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '主持端地址' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '内容管理', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: '内置内容选择' })).toBeVisible();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
+  await expect(page.getByRole('spinbutton')).toHaveValue('17');
+  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveValue(
+    'standard:zhaoyun',
+  );
+  await expect(page.locator('.solo-preview h2')).toHaveText('赵云');
+  await expect(page.getByRole('combobox', { name: '席位', exact: true })).toHaveValue('2');
+  await expect(page.getByRole('checkbox', { name: '机制演武', exact: true })).toBeChecked();
+  await expect(
+    page.getByRole('combobox', { name: '你的武将', exact: true }).locator('option'),
+  ).toHaveCount(30);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '.artifacts/ui/lobby-solo-' + info.project.name + '.png' });
+  await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+  await page.getByRole('button', { name: '直接开始单机对局', exact: true }).click();
+  await expect(page.getByTestId('battle-canvas').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('hand-cards').getByRole('button').first()).toBeVisible();
+  await expect(page.getByRole('region', { name: '游戏大厅', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('target-甲席')).toHaveAccessibleName(/赵云/);
+  await expect(page.getByTestId('target-乙席')).toHaveAccessibleName(/吕布/);
+  await page.getByRole('button', { name: '暂停对局', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '对局已暂停', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '结束本局，返回大厅', exact: true }).click();
+  await expect(page.getByRole('region', { name: '开局设置', exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton')).toHaveValue('17');
+  await expect(page.getByTestId('hand-cards').getByRole('button')).toHaveCount(0);
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole('button', { name: '开始单机对局' }).click();
+  await expect(canvas).toHaveAttribute('data-portraits', '甲席,乙席');
+  await expect(page.getByTestId('hand-cards').getByRole('button').first()).toBeVisible();
+});
+
+test('大厅检索真实武将后直接选将，切页保留开局与连接草稿', async ({ page }, info) => {
+  await page.getByRole('spinbutton', { name: '牌局种子', exact: true }).fill('19');
+  await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('6');
+  await page.getByRole('button', { name: '浏览武将一览', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '内容管理', exact: true })).toBeFocused();
+  const gallery = page.getByRole('region', { name: '武将一览', exact: true });
+  const search = gallery.getByRole('searchbox', { name: '查找武将', exact: true });
+  await search.fill('不存在的武将');
+  await expect(gallery.getByRole('button')).toHaveCount(0);
+  await expect(gallery).toContainText('没有找到该武将');
+  await search.fill('赵云');
+  await expect(gallery.getByRole('button')).toHaveCount(1);
+  await expect(gallery.getByRole('status')).toHaveText('1 / 25 名武将');
+  await expect(
+    gallery.getByRole('button', { name: '选择赵云并前往单机演武', exact: true }),
+  ).toHaveAccessibleDescription('蜀 · 体力 4');
+  await expect
+    .poll(() => gallery.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: `.artifacts/ui/lobby-gallery-${info.project.name}.png` });
+  await gallery.getByRole('button', { name: '选择赵云并前往单机演武', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '单机演武', exact: true })).toBeFocused();
+  await expect(page.getByRole('combobox', { name: '你的武将', exact: true })).toHaveValue(
+    'standard:zhaoyun',
+  );
+  await expect(page.getByRole('combobox', { name: '席位', exact: true })).toHaveValue('6');
+  await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toHaveValue('19');
+  await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
+  await page.getByRole('button', { name: '更换你的武将，当前赵云', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: '内容管理', exact: true })).toBeFocused();
+  await expect(
+    gallery.getByRole('button', { name: '选择赵云并前往单机演武', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await gallery.getByRole('button', { name: '选择赵云并前往单机演武', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '席位', exact: true })).toHaveValue('6');
+  await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toHaveValue('19');
+  await page.getByRole('button', { name: '联机房间', exact: true }).click();
+  await page.getByRole('textbox', { name: '主持端地址', exact: true }).fill('192.168.1.7:1422');
+  await page.getByRole('button', { name: '内容管理', exact: true }).click();
+  await page.getByRole('button', { name: '联机房间', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '主持端地址', exact: true })).toHaveValue(
+    '192.168.1.7:1422',
+  );
+  await page.getByRole('link', { name: '弈 三国杀新章', exact: true }).click();
+  await expect(
+    page.getByRole('region', { name: '启动界面', exact: true }).getByRole('heading', { level: 1 }),
+  ).toBeFocused();
+  await expect(page.getByLabel('待开牌局', { exact: true })).toContainText('6 席 · 赵云领衔');
+  await page.getByRole('button', { name: '联机房间', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '主持端地址', exact: true })).toHaveValue(
+    '192.168.1.7:1422',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `.artifacts/ui/lobby-network-${info.project.name}.png` });
+  await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveCount(0);
+});

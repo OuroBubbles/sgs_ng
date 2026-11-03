@@ -17,15 +17,17 @@ test.beforeEach(async ({ page }) => {
     });
   });
   await page.goto('/');
+  await page.getByRole('button', { name: '单机演武', exact: true }).click();
+  await page.getByText('演练与复现', { exact: true }).click();
   await expect(page.locator('[data-content-ready="true"]')).toBeVisible();
-  await expect(page.getByText('WebGL 战场已就绪')).toBeAttached();
+  await expect(page.getByTestId('battle-canvas').locator('canvas')).toHaveCount(0);
 });
 test.afterEach(({ page }) => {
   expect(errors.get(page)).toEqual([]);
 });
 
 async function start(page: Page, ai = false) {
-  await page.getByRole('checkbox', { name: '作者演武', exact: true }).check();
+  await page.getByRole('checkbox', { name: '机制演武', exact: true }).check();
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption(ai ? 'standard:guanyu' : 'workshop:quartermaster');

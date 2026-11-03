@@ -1,30 +1,34 @@
 # 宣告前准备与借刀杀人
 
-更新：2026-10-17。本批实现借刀杀人，该批验收时练习牌组扩至 26 种牌、240 张测试配比；最新进度见 [STATUS](STATUS.md)。它仍不等同于标准包数量与花色分布。
+更新：2026-10-26。借刀杀人的持械者与出杀目标已合并到同一草稿，最新验收与平台边界见 [STATUS](STATUS.md)。
 
 ## 真实目标和附属选择
 
 借刀选择持武器者 A 和受害者 B，但只有 A 是锦囊目标。B 是随后杀的指定目标，不单独产生一份借刀效果、无懈机会或借刀目标禁止检查。
 
-现有单一目标列表可以继续表示真正目标。附属选择通过可选的 `UseRules.prepare` 完成：
+出牌阶段用 `book.useSelection` 解释玩家草稿。牌定义可提供纯同步的 `UseRules.selection`，复用普通 Decision / JointSelection，将有序选择转换为真正目标和附属参数：
 
 ```text
-选择牌和真正目标 → 初步验证 → prepare（可 await 选择）
-  → 冻结参数 → 再次完整验证 → 支付与宣告
+选择牌、持械者与出杀目标（同一草稿）
+  → 最终确认一次 → 转为真实目标与参数 → 完整验证 → 支付与宣告
   → 确认目标 / 反制 / 逐目标结算 → 收束
 ```
 
-准备发生在处理区创建和 `card.used` 之前。取消、准备失败或最终验证失败都不支付，不开放用牌/反制窗口。确认初始目标后，客户端继续用普通目标选择面板指定 B；“取消用牌”回到出牌阶段，手牌保留。
+借刀按“持械者在前，出杀目标在最后”选择，保留额外目标查询允许的多个持械者；它们共用最后选定的 B。未完成组合不能提交；取消选择只清空草稿，不支付或开放反制窗口。UI 与基础 AI 消费同一个主持端预览，界面不按牌名另写合法性。真正的出杀响应仍在结算时由 A 决定。
 
 ## 作者接口
 
-`UseIntent.parameters?: unknown` 允许规则调用者预填选项；输入在流程开始时复制。普通主动用牌 wire reply 不直接透传它，客户端通过 prepare 的标准决策完成选择。
+`UseIntent.parameters?: unknown` 允许规则调用者预填选项；输入在流程开始时复制。普通主动用牌回复仍是 choice / targets，不能直接透传附属参数；selection 把草稿映射为 `{ targets, parameters? }`。阶段句柄、actor 和 timing 留在主持流程，不进入选择回复。
+
+selection 的工厂、反馈与验证必须同步、只读；返回的 Decision 可以使用普通对象、原型方法和私有字段。适配入口保留声明字段、原方法与接收者，动态可用性仍逐次读取；出牌草稿直接调用 validate 时也先检查 available，再映射选择并通过统一 `validateUse` 完整检查。执行和支付前仍再次重查。借刀的纯映射不需要挂起流程；规则代码直接调用 `book.use` 时必须提供完整 victim。
+
+需要在宣告前执行异步准备的其他牌，仍可使用：
 
 ```ts
-prepare(ctx, request, book): Validation<unknown> | Promise<Validation<unknown>>
+prepare(ctx, { request, book }): Validation<unknown> | Promise<Validation<unknown>>
 ```
 
-准备返回 `{ ok: true, value: parameters }` 或带原因的失败结果。`value` 必须是可冻结的普通数据；它取代预填参数，随后进入原有 `validateUse` 和支付前最终检查。作者在 `canUse`、`target` 等纯函数中解释和验证它。初步验证时参数可能未选择，应检查是否存在合法完成；准备完成后则验证实际参数。
+准备返回 `{ ok: true, value: parameters }` 或带原因的失败结果。`value` 必须是可冻结的普通数据；它取代预填参数，随后进入原有 `validateUse` 和支付前最终检查。作者在 `canUse`、`target` 等纯函数中解释和验证它。准备发生在处理区与宣告前；失败或取消不支付，不开放用牌/反制窗口。若准备前允许缺省参数，牌定义应明确验证其可完成性。
 
 `UsePlanView.parameters` 给整牌执行函数读取，非空参数进入 `card.used` 和 `UseSnapshot`；未提供或 null 时执行句柄读作 null，快照省略空字段。规则内核不解释 `victim`，也没有借刀牌名分支。处理不同选项、分支和循环的代码继续属于牌定义。
 
@@ -42,13 +46,13 @@ prepare 应用于选择与参数整理。它是普通受管理流程，不是可
 - A 死亡则跳过效果；B 死亡导致无法用杀时走交武器分支。借刀者死亡不抹去已声明的要求用杀，但死亡者不会再获得武器。
 - 目标转移保留本次已选 B；显式重复效果独立要求用杀。当前参数属于整张牌，尚无一张牌中为不同主目标分别编辑不同 B 的专用面板。
 
-规则文本与边界参考本地 [FreeKill collateral](../freekill/packages/standard_cards/pkg/skills/collateral.lua) 与 [noname standard.js](../noname/resources/app/card/standard.js) 的 jiedao。界面吸收其“被借刀 / 出杀目标”的职责区分，使用现有决策和投影实现，没有导入旧全局状态。
+规则文本与边界参考本地 [FreeKill collateral](../../freekill/packages/standard_cards/pkg/skills/collateral.lua) 与 [noname standard.js](../../noname/resources/app/card/standard.js) 的 jiedao。界面吸收其“被借刀 / 出杀目标”的职责区分，使用现有决策和投影实现，没有导入旧全局状态。
 
 ## 验证与范围
 
-- [借刀场景](../tests/scenarios/collateral.test.ts)：21 项，覆盖准备/取消、真实目标、禁令、转换、限次、装备变化、三方死亡、无懈、转移、重复、输入快照和状态重建。
-- [准备场景](../tests/scenarios/use-preparation.test.ts)：3 项，覆盖准备输出拒绝、材料位置变化、自动目标变化。
+- [借刀场景](../tests/scenarios/collateral.test.ts)：覆盖真实出牌阶段的一次提交/取消、真实目标、禁令、转换、限次、装备变化、三方死亡、无懈、转移、重复、追加持械者、输入快照和状态重建。
+- [准备场景](../tests/scenarios/use-preparation.test.ts)：覆盖附属选择的方法与资格、映射后最终校验、准备输出拒绝、材料位置变化及自动目标变化。
 - [浏览器场景](../tests/browser/client.spec.ts)：桌面和触屏从正常开局验证取消、交武器、完整出杀三条路径。日志区分用牌、实际出杀与武器获得。
-- [原生验证](../scripts/smoke-native.mjs) 增加真实借刀准备和武器转移。当前最终报告与平台界限见 [STATUS](STATUS.md)。
+- [原生验证](../scripts/smoke-native.mjs) 检查借刀一次提交和武器转移。当前最终报告与平台界限见 [STATUS](STATUS.md)。
 
-这一批没有交付完整标准包、剩余武器或武将；没有把 prepare 扩展成任意参数表单或暂停调用栈存档。离线内容和复杂技能继续先于 AI 与联机。
+selection 只转换选择，prepare 仍是普通受管理流程；两者都不是任意参数表单、事务或暂停调用栈存档。

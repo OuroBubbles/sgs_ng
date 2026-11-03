@@ -1,5 +1,5 @@
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { isGameOver } from '../game/end';
 import { enterDying } from './life';
@@ -18,7 +18,7 @@ export interface HpLossResult {
 }
 export const hpLost = defineWindow<HpLossResult>('hp.lost');
 
-export function loseHp(ctx: Context, request: HpLossInput): Promise<FlowResult<HpLossResult>> {
+export function loseHp(ctx: Context, request: HpLossInput): Promise<HpLossResult> {
   return ctx.flow(
     'loseHp',
     async (child) => {
@@ -41,12 +41,11 @@ export function loseHp(ctx: Context, request: HpLossInput): Promise<FlowResult<H
         result,
       );
       if (result.afterHp <= 0) {
-        const dying = await enterDying(child, {
+        await enterDying(child, {
           player: input.player,
           killer: null,
           cause: { kind: 'hp-loss', seq: fact.seq, data: result },
         });
-        if (dying.kind === 'aborted') return child.abort(dying.reason);
       }
       if (!isGameOver(child.world)) await child.window(hpLost, result, { subject: input.player });
       return result;

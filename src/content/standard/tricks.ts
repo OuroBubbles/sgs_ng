@@ -10,9 +10,15 @@ import {
   moveDelayed,
   resolveAttack,
 } from '../../sdk';
-import type { CardDefinition, Context, CardEffect, CardBook } from '../../sdk';
+import type {
+  CardDefinition,
+  Context,
+  CardEffect,
+  CardBook,
+  CardFixedTargetsInput,
+} from '../../sdk';
 
-const otherLiving = (ctx: Context, actor: string) =>
+const otherLiving = (ctx: Context, { actor }: CardFixedTargetsInput) =>
   ctx.world.snapshot.players
     .filter((player) => player.alive && player.id !== actor)
     .map((player) => player.id);
@@ -35,28 +41,28 @@ async function takeOrDiscard(
     reason: effect.card.name,
     discard: !take,
   });
-  if (chosen.kind === 'aborted') return ctx.abort(chosen.reason);
-  if (chosen.value.kind === 'unavailable') return;
-  if (chosen.value.kind === 'delayed') {
+
+  if (chosen.kind === 'unavailable') return;
+  if (chosen.kind === 'delayed') {
     const moved = take
-      ? await moveDelayed(ctx, chosen.value.id, `${effect.actor}:hand`)
+      ? await moveDelayed(ctx, chosen.id, `${effect.actor}:hand`)
       : await discardCards(ctx, book, {
           actor: effect.actor,
           owner: effect.target,
-          cards: [chosen.value.id],
+          cards: [chosen.id],
           reason: effect.card.name,
         });
-    if (moved.kind === 'aborted') return ctx.abort(moved.reason);
-    if (moved.value.kind !== 'unavailable')
+
+    if (moved.kind !== 'unavailable')
       ctx.commit(take ? 'card.taken.delayed' : 'card.discarded.delayed', [], {
         actor: effect.actor,
         target: effect.target,
-        card: chosen.value.card,
-        cards: moved.value.cards,
+        card: chosen.card,
+        cards: moved.cards,
       });
     return;
   }
-  const { card, from } = chosen.value;
+  const { card, from } = chosen;
   const open = ctx.world.zone(from).kind !== 'hand';
   const moved = take
     ? await moveCards(
@@ -70,8 +76,8 @@ async function takeOrDiscard(
         cards: [card],
         reason: effect.card.name,
       });
-  if (moved.kind === 'aborted') return ctx.abort(moved.reason);
-  if (moved.value.kind === 'unavailable') return;
+
+  if (moved.kind === 'unavailable') return;
   ctx.commit(take ? 'card.taken' : 'card.discarded.by-effect', [], {
     actor: effect.actor,
     target: effect.target,
@@ -91,8 +97,8 @@ export const trickCards: readonly CardDefinition[] = [
     use: {
       count: { min: 0, max: 0 },
       fixedTargets: otherLiving,
-      target: (_ctx, request, target) => target !== request.actor,
-      resolve: (ctx, effect, book) =>
+      target: (_ctx, { request, target }) => target !== request.actor,
+      resolve: (ctx, { effect, book }) =>
         resolveAttack(ctx, effect, book, { name: 'standard:slash', purpose: 'response' }),
     },
   },
@@ -104,8 +110,8 @@ export const trickCards: readonly CardDefinition[] = [
     use: {
       count: { min: 0, max: 0 },
       fixedTargets: otherLiving,
-      target: (_ctx, request, target) => target !== request.actor,
-      resolve: (ctx, effect, book) =>
+      target: (_ctx, { request, target }) => target !== request.actor,
+      resolve: (ctx, { effect, book }) =>
         resolveAttack(ctx, effect, book, { name: 'standard:jink', purpose: 'response' }),
     },
   },
@@ -118,11 +124,10 @@ export const trickCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       fixedTargets: allLiving,
       target: () => true,
-      canResolve: (ctx, effect) =>
+      canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.target).hp < ctx.world.player(effect.target).maxHp,
-      async resolve(ctx, effect) {
-        await recover(ctx, { from: effect.actor, to: effect.target, amount: 1, card: effect });
-      },
+      resolve: (ctx, { effect }) =>
+        recover(ctx, { from: effect.actor, to: effect.target, amount: 1, card: effect }),
     },
   },
   {
@@ -132,10 +137,10 @@ export const trickCards: readonly CardDefinition[] = [
     counterable: true,
     use: {
       count: { min: 1, max: 1 },
-      target: (ctx, request, target) => target !== request.actor && hasCards(ctx, target),
-      canResolve: (ctx, effect) =>
+      target: (ctx, { request, target }) => target !== request.actor && hasCards(ctx, target),
+      canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.actor).alive && hasCards(ctx, effect.target),
-      resolve: (ctx, effect, book) => takeOrDiscard(ctx, effect, book, false),
+      resolve: (ctx, { effect, book }) => takeOrDiscard(ctx, effect, book, false),
     },
   },
   {
@@ -145,13 +150,13 @@ export const trickCards: readonly CardDefinition[] = [
     counterable: true,
     use: {
       count: { min: 1, max: 1 },
-      target: (ctx, request, target, book) =>
+      target: (ctx, { request, target, book }) =>
         target !== request.actor &&
         hasCards(ctx, target) &&
         book.withinDistance(ctx, request, target, 1),
-      canResolve: (ctx, effect) =>
+      canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.actor).alive && hasCards(ctx, effect.target),
-      resolve: (ctx, effect, book) => takeOrDiscard(ctx, effect, book, true),
+      resolve: (ctx, { effect, book }) => takeOrDiscard(ctx, effect, book, true),
     },
   },
   {
@@ -163,8 +168,8 @@ export const trickCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       fixedTargets: allLiving,
       target: () => true,
-      async execute(ctx, use, book, resolveTargets) {
-        const result = await withRevealedCards(
+      async execute(ctx, { use, book, resolveTargets }) {
+        await withRevealedCards(
           ctx,
           {
             // 后席的确认窗口也可能令已经 ready 的前席死亡或被禁止。
@@ -177,22 +182,20 @@ export const trickCards: readonly CardDefinition[] = [
             reason: 'standard:amazing_grace',
           },
           async (at, pool) => {
-            await resolveTargets(at, async (child, effect) => {
+            await resolveTargets(at, async (child, { effect }) => {
               const model = new JointSelection({
                 cards: () =>
                   pool.remaining().map((id) => ({
                     id,
                     label: `${book.definition(child.world.card(id).name).label} · ${child.world.card(id).suit} ${child.world.card(id).rank}`,
                   })),
-                targets: () => [],
                 cardCount: { min: 1, max: 1 },
-                targetCount: { min: 0, max: 0 },
               });
               const answer = await child.ask(
                 model.decision(effect.target, '五谷丰登：选择一张公开牌'),
               );
               if (answer.kind !== 'chosen') return;
-              const moved = await moveCards(
+              await moveCards(
                 child,
                 [
                   {
@@ -204,7 +207,7 @@ export const trickCards: readonly CardDefinition[] = [
                 ],
                 'standard:amazing_grace',
               );
-              if (moved.kind === 'aborted') return child.abort(moved.reason);
+
               child.commit('card.taken.public', [], {
                 actor: effect.target,
                 cards: answer.value.cards,
@@ -213,7 +216,6 @@ export const trickCards: readonly CardDefinition[] = [
             });
           },
         );
-        if (result.kind === 'aborted') return ctx.abort(result.reason);
       },
     },
   },

@@ -48,18 +48,23 @@ it('护盾增减有实际量与尝试量，减少至零，无变化不发事实/
   });
   await game.room.run('change', async (ctx) => {
     expect(shieldOf(ctx.world, 'b')).toBe(0);
-    expect(
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 3, reason: 'gain' })),
-    ).toMatchObject({ before: 0, after: 3, amount: 3 });
-    expect(
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: -8, reason: 'lose' })),
-    ).toMatchObject({ before: 3, after: 0, amount: -3, attemptedAmount: -8 });
-    expect(
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 0, reason: 'same' })).kind,
-    ).toBe('unchanged');
-    expect(
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: -1, reason: 'empty' })).kind,
-    ).toBe('unchanged');
+    expect(await changeShield(ctx, { player: 'b', amount: 3, reason: 'gain' })).toMatchObject({
+      before: 0,
+      after: 3,
+      amount: 3,
+    });
+    expect(await changeShield(ctx, { player: 'b', amount: -8, reason: 'lose' })).toMatchObject({
+      before: 3,
+      after: 0,
+      amount: -3,
+      attemptedAmount: -8,
+    });
+    expect((await changeShield(ctx, { player: 'b', amount: 0, reason: 'same' })).kind).toBe(
+      'unchanged',
+    );
+    expect((await changeShield(ctx, { player: 'b', amount: -1, reason: 'empty' })).kind).toBe(
+      'unchanged',
+    );
   });
   expect(changes).toEqual([3, -3]);
   expect(game.room.history.facts('shield.changed')).toHaveLength(2);
@@ -139,7 +144,7 @@ it.each(['prevent', 'zero'])('%s 不消耗护盾，也不发护盾消耗窗口',
     },
   });
   await game.room.run('hit', async (ctx) => {
-    const result = ctx.unwrap(await damage(ctx, hit));
+    const result = await damage(ctx, hit);
     expect(result).toMatchObject({ shieldLost: 0, hpLoss: 0, beforeShield: 3, afterShield: 3 });
   });
   expect(shieldOf(game.room.world, 'b')).toBe(3);
@@ -163,7 +168,7 @@ it('护盾读取窗口结算后的当前状态，来源快照与最终伤害不�
     eligible: () => true,
     async run(ctx, draft) {
       draft.setAmount(2, 'cap');
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 1, reason: 'fresh' }));
+      await changeShield(ctx, { player: 'b', amount: 1, reason: 'fresh' });
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -182,7 +187,7 @@ it('全部抵消的属性伤害仍解链并按伤害量传播，每个目标独�
   await ward(game, 'b', 3);
   await ward(game, 'c', 1);
   await game.room.run('link', async (ctx) => {
-    for (const player of ['b', 'c', 'd']) ctx.unwrap(await setChained(ctx, player, true, 'setup'));
+    for (const player of ['b', 'c', 'd']) await setChained(ctx, player, true, 'setup');
   });
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire' }));
   expect(dealt(game).map((result) => result.amount)).toEqual([2, 2, 2]);
@@ -197,7 +202,7 @@ it('忽略护盾只属于当前伤害，连环下一名角色正常吸收', asyn
   await ward(game, 'b', 3);
   await ward(game, 'c', 3);
   await game.room.run('link', async (ctx) => {
-    for (const player of ['b', 'c']) ctx.unwrap(await setChained(ctx, player, true, 'setup'));
+    for (const player of ['b', 'c']) await setChained(ctx, player, true, 'setup');
   });
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire', bypassShield: true }));
   expect(dealt(game).map((result) => result.hpLoss)).toEqual([2, 0]);
@@ -237,7 +242,7 @@ it('消耗后新获得护盾不回写已提交伤害，实际 World 与事实快
     owner: 'b',
     eligible: (_ctx, event) => event.damage !== undefined,
     async run(ctx) {
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 3, reason: 'refresh' }));
+      await changeShield(ctx, { player: 'b', amount: 3, reason: 'refresh' });
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -250,8 +255,8 @@ it('失去体力与回复不消耗或恢复护盾', async () => {
   const game = cardGame();
   await ward(game, 'b', 2);
   await game.room.run('health', async (ctx) => {
-    ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 1, reason: 'cost' }));
-    ctx.unwrap(await recover(ctx, { from: 'b', to: 'b', amount: 1 }));
+    await loseHp(ctx, { player: 'b', amount: 1, reason: 'cost' });
+    await recover(ctx, { from: 'b', to: 'b', amount: 1 });
   });
   expect(shieldOf(game.room.world, 'b')).toBe(2);
   expect(game.room.world.player('b').hp).toBe(4);
@@ -272,7 +277,7 @@ it('护盾全抵消时不新开濒死，即使角色已由外层规则处于零�
   });
   await game.room.run('hit', async (ctx) => {
     ctx.commit('setup.hp', [{ kind: 'vitality', player: 'b', hp: 0 }], null);
-    ctx.unwrap(await damage(ctx, hit));
+    await damage(ctx, hit);
   });
   expect(dying).toBe(0);
   expect(game.room.world.player('b')).toMatchObject({ alive: true, hp: 0 });
@@ -335,9 +340,9 @@ it('纯查询、已关闭 Context 与终局均不能改变护盾', async () => {
       ctx.query(() => changeShield(ctx, { player: 'b', amount: 1, reason: 'bad' })),
     ).toThrow('Pure queries');
     await finishGame(ctx, { winners: ['a'], reason: 'done' });
-    expect(
-      ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 1, reason: 'ended' })).kind,
-    ).toBe('unavailable');
+    expect((await changeShield(ctx, { player: 'b', amount: 1, reason: 'ended' })).kind).toBe(
+      'unavailable',
+    );
   });
   expect(() => changeShield(closed!, { player: 'b', amount: 1, reason: 'closed' })).toThrow();
   expect(shieldOf(game.room.world, 'b')).toBe(0);

@@ -12,8 +12,8 @@ import zipfile
 
 
 project = Path(__file__).resolve().parent.parent
-downloads = project / ".tools" / "downloads"
 sdk = Path(os.environ["ANDROID_HOME"]).resolve()
+downloads = Path(os.environ.get("SGS_ANDROID_TOOLS_ROOT", sdk.parent)) / "downloads"
 packages = [
     ("build-tools_r36_windows.zip", "build-tools/36.0.0", "f16ccffd34de8790dede813a6c7d8e2c11a27b50"),
     ("platform-36_r02.zip", "platforms/android-36", "2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576"),

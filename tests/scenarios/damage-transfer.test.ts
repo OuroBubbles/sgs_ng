@@ -35,13 +35,13 @@ function redirect(game: Game, to = 'c') {
     owner: 'b',
     eligible: (ctx, draft) => draft.input.to === 'b' && draft.canTransfer(ctx, to),
     async run(ctx, draft) {
-      ctx.unwrap(await draft.transfer(ctx, to, 'redirect'));
+      await draft.transfer(ctx, to, 'redirect');
     },
   });
 }
 async function link(game: Game, players: readonly string[]) {
   await game.room.run('link', async (ctx) => {
-    for (const player of players) ctx.unwrap(await setChained(ctx, player, true, 'setup'));
+    for (const player of players) await setChained(ctx, player, true, 'setup');
   });
 }
 
@@ -49,8 +49,8 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
   const game = cardGame();
   const steps: string[] = [];
   await game.room.run('shield', async (ctx) => {
-    ctx.unwrap(await changeShield(ctx, { player: 'b', amount: 3, reason: 'setup' }));
-    ctx.unwrap(await changeShield(ctx, { player: 'c', amount: 1, reason: 'setup' }));
+    await changeShield(ctx, { player: 'b', amount: 3, reason: 'setup' });
+    await changeShield(ctx, { player: 'c', amount: 1, reason: 'setup' });
   });
   game.room.on(damageCausing, {
     id: 'source-plus',
@@ -76,7 +76,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
     async run(ctx, draft) {
       steps.push('b');
       draft.setAmount(2, 'cap');
-      const result = ctx.unwrap(await draft.transfer(ctx, 'c', 'redirect'));
+      const result = await draft.transfer(ctx, 'c', 'redirect');
       expect(result).toMatchObject({ kind: 'transferred', damage: { amount: 3, hpLoss: 2 } });
       expect(draft.pending).toBe(false);
       steps.push('after');
@@ -109,7 +109,7 @@ it('转移保留来源快照和当前量，只重开新接收方防御，原接�
   });
   let parent!: DamageResult;
   await game.room.run('hit', async (ctx) => {
-    parent = ctx.unwrap(await damage(ctx, hit));
+    parent = await damage(ctx, hit);
   });
   expect(steps).toEqual(['source', 'replace', 'b', 'c', 'received:c', 'after']);
   expect(parent).toMatchObject({ kind: 'transferred', hpLoss: 0, shieldLost: 0, afterHp: 4 });
@@ -146,7 +146,7 @@ it('普通代码可有限次转回旧角色，不由内核禁止 B→C→B', asy
     eligible: () => count < 2,
     async run(ctx, draft) {
       count++;
-      ctx.unwrap(await draft.transfer(ctx, draft.input.to === 'b' ? 'c' : 'b', 'bounce'));
+      await draft.transfer(ctx, draft.input.to === 'b' ? 'c' : 'b', 'bounce');
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -171,7 +171,7 @@ it.each(['same', 'dead', 'missing'])('%s 接收方不宣告，原伤害照常结
     async run(ctx, draft) {
       const to = kind === 'same' ? 'b' : kind === 'dead' ? 'c' : 'missing';
       expect(draft.canTransfer(ctx, to)).toBe(false);
-      expect(ctx.unwrap(await draft.transfer(ctx, to, 'invalid'))).toEqual({
+      expect(await draft.transfer(ctx, to, 'invalid')).toEqual({
         kind: 'unavailable',
         damage: null,
       });
@@ -199,7 +199,7 @@ it.each(['prevent', 'zero', 'die'])('新目标 %s 不恢复原目标伤害或消
   });
   let result!: DamageResult;
   await game.room.run('hit', async (ctx) => {
-    result = ctx.unwrap(await damage(ctx, hit));
+    result = await damage(ctx, hit);
   });
   expect(result.kind).toBe('transferred');
   expect(game.room.world.player('b').hp).toBe(4);
@@ -220,7 +220,7 @@ it('伤害替代窗口可转移，原目标不再开防御窗口；来源在防�
     owner: 'a',
     eligible: () => true,
     async run(ctx, draft) {
-      ctx.unwrap(await draft.transfer(ctx, 'c', 'replacement'));
+      await draft.transfer(ctx, 'c', 'replacement');
     },
   });
   game.room.on(damageInflicting, {
@@ -264,24 +264,22 @@ it.each(['receiver', 'owner'])('支付时先宣告，弃牌后效令 %s 死亡�
     async run(ctx, event) {
       draft = event;
       plan = event.prepareTransfer(ctx, 'c', 'relay');
-      const paid = ctx.unwrap(
-        await pay(ctx, {
-          actor: 'b',
-          cards: ['fee'],
-          to: 'discard',
-          reason: 'relay',
-          intent: plan,
-          declaration: plan.data,
-        }),
-      );
+      const paid = await pay(ctx, {
+        actor: 'b',
+        cards: ['fee'],
+        to: 'discard',
+        reason: 'relay',
+        intent: plan,
+        declaration: plan.data,
+      });
       expect(paid.kind).toBe('paid');
-      const next = ctx.unwrap(await plan.resolve(ctx));
+      const next = await plan.resolve(ctx);
       expect(next).toMatchObject({
         kind: 'transferred',
         damage: { kind: kind === 'receiver' ? 'unavailable' : 'dealt' },
       });
-      expect(ctx.unwrap(await plan.resolve(ctx))).toEqual({ kind: 'unavailable', damage: null });
-      expect(ctx.unwrap(await event.transfer(ctx, 'd', 'again')).kind).toBe('unavailable');
+      expect(await plan.resolve(ctx)).toEqual({ kind: 'unavailable', damage: null });
+      expect((await event.transfer(ctx, 'd', 'again')).kind).toBe('unavailable');
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -300,18 +298,16 @@ it('费用同批状态令接收方死亡，仍完成已承诺转移；没有支�
     eligible: (_ctx, draft) => draft.input.to === 'b',
     async run(ctx, draft) {
       const intent = draft.prepareTransfer(ctx, 'c', 'relay');
-      const paid = ctx.unwrap(
-        await pay(ctx, {
-          actor: 'b',
-          cards: ['fee'],
-          to: 'discard',
-          reason: 'relay',
-          intent,
-          changes: [{ kind: 'vitality', player: 'c', hp: 0, alive: false }],
-        }),
-      );
+      const paid = await pay(ctx, {
+        actor: 'b',
+        cards: ['fee'],
+        to: 'discard',
+        reason: 'relay',
+        intent,
+        changes: [{ kind: 'vitality', player: 'c', hp: 0, alive: false }],
+      });
       expect(paid.kind).toBe('paid');
-      expect(ctx.unwrap(await intent.resolve(ctx))).toMatchObject({
+      expect(await intent.resolve(ctx)).toMatchObject({
         kind: 'transferred',
         damage: { kind: 'unavailable' },
       });
@@ -336,17 +332,15 @@ it.each(['invalid-fee', 'recipient-dies', 'prevented'])(
         if (kind === 'recipient-dies')
           ctx.commit('death', [{ kind: 'vitality', player: 'c', hp: 0, alive: false }], {});
         if (kind === 'prevented') draft.prevent('other');
-        const paid = ctx.unwrap(
-          await pay(ctx, {
-            actor: 'b',
-            cards: kind === 'invalid-fee' ? ['missing'] : ['fee'],
-            to: 'discard',
-            reason: 'relay',
-            intent,
-          }),
-        );
+        const paid = await pay(ctx, {
+          actor: 'b',
+          cards: kind === 'invalid-fee' ? ['missing'] : ['fee'],
+          to: 'discard',
+          reason: 'relay',
+          intent,
+        });
         expect(paid.kind).toBe('unavailable');
-        expect(ctx.unwrap(await intent.resolve(ctx))).toEqual({
+        expect(await intent.resolve(ctx)).toEqual({
           kind: 'unavailable',
           damage: null,
         });
@@ -378,7 +372,7 @@ it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭�
       const intent = draft.prepareTransfer(ctx, 'c', 'relay');
       draft.adjust(-1, 'defense');
       expect(
-        ctx.unwrap(
+        (
           await pay(ctx, {
             actor: 'b',
             cards: ['fee'],
@@ -386,10 +380,10 @@ it('意图在提交时取当前量；费用窗口仅见冻结数据，不把闭�
             reason: 'relay',
             intent,
             declaration: intent.data,
-          }),
+          })
         ).kind,
       ).toBe('paid');
-      ctx.unwrap(await intent.resolve(ctx));
+      await intent.resolve(ctx);
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, hit));
@@ -459,7 +453,7 @@ it('直接伤害转移到连环角色，在实际接收方冻结新计划；原�
     owner: 'b',
     eligible: (_ctx, draft) => draft.input.to === 'b' && isDirectDamage(draft.input),
     async run(ctx, draft) {
-      ctx.unwrap(await draft.transfer(ctx, 'c', 'relay'));
+      await draft.transfer(ctx, 'c', 'relay');
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire' }));
@@ -479,7 +473,7 @@ it('传播包被转移仍属于原连环，不重新扩张；已解链的新目�
     owner: 'c',
     eligible: (_ctx, draft) => draft.input.to === 'c',
     async run(ctx, draft) {
-      ctx.unwrap(await draft.transfer(ctx, 'd', 'relay'));
+      await draft.transfer(ctx, 'd', 'relay');
     },
   });
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire' }));
@@ -499,7 +493,7 @@ it('忽略护盾随本次伤害转移，来源归属保持，后续连环各自�
   await link(game, ['c', 'd']);
   await game.room.run('shield', async (ctx) => {
     for (const player of ['c', 'd'])
-      ctx.unwrap(await changeShield(ctx, { player, amount: 3, reason: 'setup' }));
+      await changeShield(ctx, { player, amount: 3, reason: 'setup' });
   });
   redirect(game);
   await game.room.run('hit', (ctx) => damage(ctx, { ...hit, nature: 'fire', bypassShield: true }));
@@ -523,7 +517,7 @@ it('新目标后效结束整局，原结果仍为已转移并停止原防御候�
   });
   let result!: DamageResult;
   await game.room.run('hit', async (ctx) => {
-    result = ctx.unwrap(await damage(ctx, hit));
+    result = await damage(ctx, hit);
   });
   expect(result.kind).toBe('transferred');
   expect(game.room.world.player('b').hp).toBe(4);

@@ -1,5 +1,6 @@
 import type { Change } from '../model/state';
 import { immutable } from '../model/value';
+import type { DeepReadonly } from '../model/value';
 
 export interface Cause {
   readonly flowId: string;
@@ -32,7 +33,7 @@ export interface Fact<T = unknown> extends Cause {
   readonly type: 'commit';
   readonly data: {
     readonly kind: string;
-    readonly detail: T;
+    readonly detail: DeepReadonly<T>;
     readonly revision: number;
     readonly changes: readonly Change[];
   };
@@ -48,6 +49,9 @@ export interface HistoryReader {
 /** 单调序号与父子因果分别保存；中文叙事不参与状态还原。 */
 export class Journal {
   #entries: JournalEntry[] = [];
+  // 与总历史共享同一冻结事实；按种类查询不必反复扫描流程轨迹。
+  #facts: Fact[] = [];
+  #factsByKind = new Map<string, Fact[]>();
   #observers = new Set<() => void>();
   #scheduled = false;
 
@@ -73,13 +77,11 @@ export class Journal {
   }
 
   facts(kind?: string, withinScope?: string): readonly Fact[] {
+    const facts = kind === undefined ? this.#facts : (this.#factsByKind.get(kind) ?? []);
     return Object.freeze(
-      this.#entries.filter(
-        (entry): entry is Fact =>
-          entry.type === 'commit' &&
-          (kind === undefined || entry.data.kind === kind) &&
-          (withinScope === undefined || entry.scopePath.includes(withinScope)),
-      ),
+      withinScope === undefined
+        ? [...facts]
+        : facts.filter((fact) => fact.scopePath.includes(withinScope)),
     );
   }
 
@@ -90,21 +92,31 @@ export class Journal {
     return entry;
   }
 
-  commit<T>(
+  /** 先快照完整事实；调用方在只读边界执行，再以同一份变化准备状态。 */
+  prepare<T>(
     cause: Cause,
     revision: number,
     kind: string,
     changes: readonly Change[],
     detail: T,
   ): Fact<T> {
-    const fact: Fact<T> = immutable({
+    return immutable({
       ...cause,
       seq: this.#entries.length + 1,
       type: 'commit',
       data: { kind, revision, changes, detail },
     });
+  }
+
+  /** 状态准备成功后发布；不在输入复制中写入部分事实。 */
+  append(fact: Fact): void {
+    if (fact.seq !== this.#entries.length + 1) throw new Error('Prepared fact sequence is stale.');
     this.#entries.push(fact);
+    this.#facts.push(fact);
+    const kind = fact.data.kind;
+    const sameKind = this.#factsByKind.get(kind) ?? [];
+    if (!this.#factsByKind.has(kind)) this.#factsByKind.set(kind, sameKind);
+    sameKind.push(fact);
     this.#notify();
-    return fact;
   }
 }

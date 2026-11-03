@@ -5,6 +5,8 @@ describe('战场绘制与输入共用布局', () => {
   it('私有双牌池保持在结算区，并给各席位的目标中心留出点击位置', () => {
     for (const [width, height] of [
       [1100, 690],
+      [932, 518],
+      [932, 600],
       [366, 680],
       [865, 286],
       [700, 260],
@@ -13,9 +15,9 @@ describe('战场绘制与输入共用布局', () => {
         const layout = layoutTable(width!, height!, count, 0);
         const cardHeight = Math.max(32, Math.min(122, layout.arena.height - 28));
         const x = cardPoolCenter(layout, 2, cardHeight, true, layout.seats);
-        const cardWidth = cardHeight * 0.72;
+        const cardWidth = (cardHeight * 93) / 130;
         const total = cardWidth * 2 + 8;
-        const top = layout.arena.height / 2 - cardHeight / 2 + 9;
+        const top = layout.arena.top + layout.arena.height / 2 - cardHeight / 2 + 9;
         expect(top + cardHeight).toBeLessThan(layout.decision.top);
         expect(x - total / 2).toBeGreaterThanOrEqual(0);
         expect(x + total / 2).toBeLessThanOrEqual(width!);
@@ -58,6 +60,9 @@ describe('战场绘制与输入共用布局', () => {
   });
   it('所有席位互不覆盖，装备区和操作区均在完整牌桌内', () => {
     for (const [width, height] of [
+      [833, 250],
+      [932, 518],
+      [932, 600],
       [1100, 690],
       [366, 680],
       [865, 286],
@@ -65,6 +70,8 @@ describe('战场绘制与输入共用布局', () => {
     ])
       for (const count of [2, 4, 6, 8]) {
         const layout = layoutTable(width!, height!, count, 0);
+        if (width === 932 && count === 8)
+          for (const seat of layout.seats) expect(seat.height).toBeGreaterThanOrEqual(128);
         for (let i = 0; i < layout.seats.length; i++)
           for (let j = i + 1; j < layout.seats.length; j++) {
             const a = layout.seats[i]!;
@@ -74,11 +81,25 @@ describe('战场绘制与输入共用布局', () => {
                 Math.abs(a.y - b.y) >= (a.height + b.height) / 2,
             ).toBe(true);
           }
-        for (const region of [layout.hand, layout.decision, layout.skills, ...layout.equipment]) {
+        for (const region of [
+          layout.hand,
+          layout.decision,
+          layout.skills,
+          layout.ownedChoices,
+          ...layout.equipment,
+        ]) {
           expect(region.left).toBeGreaterThanOrEqual(0);
           expect(region.top).toBeGreaterThanOrEqual(0);
           expect(region.left + region.width).toBeLessThanOrEqual(layout.width);
           expect(region.top + region.height).toBeLessThanOrEqual(layout.height);
+        }
+        expect(layout.ownedChoices.height).toBeGreaterThanOrEqual(70);
+        expect(layout.ownedChoices.top + layout.ownedChoices.height).toBeLessThan(
+          layout.decision.top,
+        );
+        for (const [index, region] of layout.equipment.entries()) {
+          if (index === layout.focus) continue;
+          expect(region.top + region.height).toBeLessThanOrEqual(layout.decision.top);
         }
       }
   });

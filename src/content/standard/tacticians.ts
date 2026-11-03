@@ -1,6 +1,4 @@
 import {
-  defineSkill,
-  viewAs,
   ownedCards,
   on,
   modify,
@@ -13,7 +11,6 @@ import {
   draw,
   JointSelection,
   payDiscard,
-  isGameOver,
 } from '../../sdk';
 import type {
   CardBook,
@@ -24,93 +21,86 @@ import type {
   CardEffect,
   JointChoice,
 } from '../../sdk';
+import type { SkillDefinition } from '../../sdk';
 
 /** 跟随实体/零材料虚拟牌；有材料的转换牌不发动标准集智。 */
 export function jizhi(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'standard:jizhi',
     name: '集智',
     description: '当你使用非转化的普通锦囊牌时，你可以摸一张牌。',
-    effects: [
+    triggers: [
       on(useDeclared, {
-        id: 'trick-draw',
         order: 'choose',
-        when: (_ctx, use, self) =>
+        when: (_ctx, { payload: use, self }) =>
           use.actor === self.owner &&
           book.definition(use.card.name).type === 'trick' &&
           !book.definition(use.card.name).delayed &&
           (use.card.source === null || use.card.materials.length === 0),
-        async run(ctx, _use, self) {
+        async run(ctx, { self }) {
           const accepted = await invoke(ctx, self, '集智：是否摸一张牌？');
-          if (accepted.kind === 'aborted') return ctx.abort(accepted.reason);
-          if (accepted.value && ctx.world.player(self.owner).alive && !isGameOver(ctx.world))
-            await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
+
+          if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }
 export function qicai(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'standard:qicai',
     name: '奇才',
     description: '锁定技，你使用锦囊牌无距离限制；仍须满足其他目标条件。',
-    effects: [],
     modifiers: [
-      modify(cardQueries.ignoreDistance, (_ctx, request, self) =>
+      modify(cardQueries.ignoreDistance, (_ctx, { input: request, self }) =>
         request.actor === self.owner && book.definition(request.card.name).type === 'trick'
           ? true
           : undefined,
       ),
     ],
-  });
+  } satisfies SkillDefinition;
 }
-export const wushuang = defineSkill({
+export const wushuang = {
   id: 'standard:wushuang',
   name: '无双',
   description: '锁定技，你使用杀需要目标连续使用两张闪；与你决斗的角色每次需连续打出两张杀。',
-  effects: [
+  triggers: [
     on(targetSpecified, {
-      id: 'attacking',
-      when: (_ctx, { effect }, self) =>
+      when: (_ctx, { payload: { effect }, self }) =>
         effect.actor === self.owner &&
         effect.state === 'targeting' &&
         ['standard:slash', 'standard:duel'].includes(effect.card.name),
-      run(ctx, { effect }, self) {
+      run(ctx, { payload: { effect }, self }) {
         effect.requireResponses(ctx, effect.target, 2, self.skill);
       },
     }),
     on(targetConfirmed, {
-      id: 'defending-duel',
-      when: (_ctx, { effect }, self) =>
+      when: (_ctx, { payload: { effect }, self }) =>
         effect.target === self.owner &&
         effect.state === 'targeting' &&
         effect.card.name === 'standard:duel',
-      run(ctx, { effect }, self) {
+      run(ctx, { payload: { effect }, self }) {
         effect.requireResponses(ctx, effect.actor, 2, self.skill);
       },
     }),
   ],
-});
-export const guose = defineSkill({
+} satisfies SkillDefinition;
+export const guose = {
   id: 'standard:guose',
   name: '国色',
   description: '可以将一张方块手牌或装备牌当乐不思蜀使用。',
-  effects: [],
   viewAs: [
-    viewAs({
+    {
       id: 'diamond-indulgence',
-      label: '国色',
-      names: () => ['standard:indulgence'],
       count: { min: 1, max: 1 },
-      materials: (ctx, self, book) =>
+      materials: (ctx, { self, book }) =>
         ownedCards(ctx.world, self.owner, ['hand', 'equipment']).filter(
           (id) => book.face(ctx, id).suit === 'diamond',
         ),
-      make: () => ({ name: 'standard:indulgence' }),
-    }),
+      make: { name: 'standard:indulgence' },
+    },
   ],
-});
+} satisfies SkillDefinition;
 
 function liuliSelection(
   ctx: Context,
@@ -151,11 +141,10 @@ function liuliSelection(
     );
   return new JointSelection({
     cards: () => cards().map((id) => ({ id, label: ctx.world.card(id).name })),
-    targets: () => targets().map((id) => ({ id, label: id })),
+    targets,
     cardCount: { min: 1, max: 1 },
     targetCount: { min: 1, max: 1 },
     constraints: {
-      partial: () => null,
       canComplete,
       complete: (choice) =>
         legal(choice.cards[0]!, choice.targets[0]!) ? null : '不满足流离的范围或目标条件。',
@@ -163,28 +152,26 @@ function liuliSelection(
   });
 }
 export function liuli(book: CardBook) {
-  return defineSkill({
+  return {
     id: 'standard:liuli',
     name: '流离',
     description:
       '当你成为杀的目标时，可以弃置一张手牌或装备，将此杀转移给你攻击范围内的一名其他角色（不能是出杀者）。弃置的装备不再提供范围。',
-    effects: [
+    triggers: [
       on(targetConfirming, {
-        id: 'redirect',
         order: 'choose',
-        when: (ctx, { use, effect }, self) =>
+        when: (ctx, { payload: { use, effect }, self }) =>
           effect.target === self.owner &&
           effect.actor !== self.owner &&
           effect.card.name === 'standard:slash' &&
           effect.state === 'targeting' &&
-          liuliSelection(ctx, self, book, use, effect).inspect({ cards: [], targets: [] }).valid,
-        async run(ctx, { use, effect }, self) {
+          liuliSelection(ctx, self, book, use, effect).available(),
+        async run(ctx, { payload: { use, effect }, self }) {
           const model = liuliSelection(ctx, self, book, use, effect);
           const decision = model.decision(
             self.owner,
             '流离：弃置一张牌，将杀转移给攻击范围内的其他角色',
-            true,
-            { reason: self.skill, cancelLabel: '不发动流离' },
+            { optional: true, reason: self.skill, cancelLabel: '不发动流离' },
           );
           const answer = await ctx.ask({
             ...decision,
@@ -197,8 +184,7 @@ export function liuli(book: CardBook) {
           });
           if (answer.kind !== 'chosen') return;
           const target = answer.value.targets[0]!;
-          const paid = await payDiscard(ctx, book, {
-            actor: self.owner,
+          await payDiscard(ctx, book, {
             skill: self,
             cards: answer.value.cards,
             reason: self.skill,
@@ -216,9 +202,8 @@ export function liuli(book: CardBook) {
               redirect: { useId: use.id, from: self.owner, to: target },
             },
           });
-          if (paid.kind === 'aborted') return ctx.abort(paid.reason);
         },
       }),
     ],
-  });
+  } satisfies SkillDefinition;
 }

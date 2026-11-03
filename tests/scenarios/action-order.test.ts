@@ -62,7 +62,7 @@ function observe<T>(
     });
 }
 async function fire(ctx: Context, value: string, subject = 'c') {
-  ctx.unwrap(await ctx.window(probe, value, { subject }));
+  await ctx.window(probe, value, { subject });
 }
 async function answer(room: Room, value: unknown) {
   const request = await nextRequest(room);
@@ -223,7 +223,17 @@ it('未知主体即使被显式覆盖也拒绝，避免窗口描述与已知席�
 
 it('组优先级与无主系统规则保留；模式只决定各组内部玩家顺序', async () => {
   const room = generic(() => 'c');
-  const window = defineWindow<null>('probe.groups-order', ['before', 'main']);
+  const groups = ['before', 'main'];
+  let groupReads = 0;
+  Object.defineProperty(groups, '0', {
+    get: () => (++groupReads === 1 ? 'before' : 'main'),
+  });
+  const window = defineWindow<null>('probe.groups-order', groups);
+  expect(groupReads).toBe(1);
+  groups[1] = 'before';
+  expect(() => defineWindow('bad.groups', new Array<string>(1))).toThrow(
+    'Window requires an ID and distinct named groups.',
+  );
   const seen: string[] = [];
   room.on(window, {
     id: 'system',
@@ -279,9 +289,7 @@ it('标准模式：活动 b 回合优先于 c 主体，回合结束后恢复 c �
   const seen: string[] = [];
   observe(game.room, probe, seen, (owner, name) => `${name}:${owner}`);
   await game.room.run('host', async (ctx) => {
-    ctx.unwrap(
-      await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => fire(at, 'turn') }),
-    );
+    await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => fire(at, 'turn') });
     await fire(ctx, 'outside');
   });
   expect(seen).toEqual([
@@ -305,7 +313,7 @@ it('标准活动回合内，作者显式指定 d 起点仍可覆盖默认 b 政�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        at.unwrap(await at.window(probe, '', { subject: 'c', anchor: 'd' }));
+        await at.window(probe, '', { subject: 'c', anchor: 'd' });
       },
     }),
   );
@@ -322,15 +330,13 @@ for (const abortInner of [false, true]) {
         phases: ['play'],
         async body(at) {
           await fire(at, 'before');
-          at.unwrap(
-            await runTurn(at, game.book, 'd', {
-              phases: ['play'],
-              async body(inner) {
-                await fire(inner, 'inner');
-                if (abortInner) inner.abort('local inner phase');
-              },
-            }),
-          );
+          await runTurn(at, game.book, 'd', {
+            phases: ['play'],
+            async body(inner) {
+              await fire(inner, 'inner');
+              if (abortInner) inner.abort('local inner phase');
+            },
+          });
           await fire(at, 'after');
         },
       }),
@@ -375,7 +381,7 @@ it('当前回合角色死亡后保留其席位起点，其他角色按后续座�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        at.unwrap(await kill(at, { player: 'b', killer: null, cause: death, reason: 'rule' }));
+        await kill(at, { player: 'b', killer: null, cause: death, reason: 'rule' });
         await fire(at, '', 'a');
       },
     }),
@@ -404,7 +410,7 @@ it('孤立阶段不冒充回合，重建事实里的旧回合 ID 也不冒充当
       ],
       {},
     );
-    ctx.unwrap(await runPhase(ctx, game.book, 'a', 'play', (at) => fire(at, '')));
+    await runPhase(ctx, game.book, 'a', 'play', (at) => fire(at, ''));
   });
   expect(seen).toEqual(['c', 'd', 'a', 'b']);
 });
@@ -416,7 +422,9 @@ for (const custom of [false, true]) {
       seed: 42,
       players: seats.map((id) => ({ id })),
       deck: [],
-      cards: standardCards,
+      content: {
+        cards: standardCards,
+      },
       ...(custom ? { actionAnchor: () => 'c' } : {}),
     });
     const seen: string[] = [];
@@ -452,7 +460,7 @@ it('b 回合由 d 用多目标牌：四层遍历与实际生效按模式排序�
         ...orderCard,
         use: {
           ...orderCard.use!,
-          resolve: (_ctx, effect) => {
+          resolve: (_ctx, { effect }) => {
             resolved.push(effect.target);
           },
         },
@@ -474,7 +482,7 @@ it('b 回合由 d 用多目标牌：四层遍历与实际生效按模式排序�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = at.unwrap(await game.book.use(at, orderIntent(['a', 'd', 'c'])));
+        const result = await game.book.use(at, orderIntent(['a', 'd', 'c']));
         expect(result).toMatchObject({
           kind: 'used',
           use: {
@@ -504,7 +512,7 @@ it('确认中追加更早的 b 身份：按冻结行动序补齐时点，不重�
         ...orderCard,
         use: {
           ...orderCard.use!,
-          resolve: (_ctx, effect) => {
+          resolve: (_ctx, { effect }) => {
             resolved.push(effect.target);
           },
         },
@@ -525,7 +533,7 @@ it('确认中追加更早的 b 身份：按冻结行动序补齐时点，不重�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        at.unwrap(await game.book.use(at, orderIntent(['c'])));
+        await game.book.use(at, orderIntent(['c']));
       },
     }),
   );
@@ -551,7 +559,7 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     id: 'probe:inner-card',
     use: {
       ...orderCard.use!,
-      resolve: (_ctx, effect) => {
+      resolve: (_ctx, { effect }) => {
         resolved.push(`inner:${effect.target}`);
       },
     },
@@ -560,29 +568,25 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     ...orderCard,
     use: {
       ...orderCard.use!,
-      async resolve(ctx, effect, book) {
+      async resolve(ctx, { effect, book }) {
         resolved.push(`outer:${effect.target}`);
         if (effect.target !== 'c') return;
-        ctx.unwrap(
-          await runTurn(ctx, book, 'a', {
-            phases: ['play'],
-            async body(at) {
-              expect(outer!.actionOrder).toEqual(['b', 'c', 'd', 'a']);
-              outer!.addTarget(at, 'b', 'probe');
-              const intent = orderIntent(['c', 'b']);
-              const result = at.unwrap(
-                await book.use(at, {
-                  ...intent,
-                  choice: { ...intent.choice, face: { name: innerCard.id } },
-                }),
-              );
-              expect(result).toMatchObject({
-                kind: 'used',
-                use: { actionOrder: ['a', 'b', 'c', 'd'] },
-              });
-            },
-          }),
-        );
+        await runTurn(ctx, book, 'a', {
+          phases: ['play'],
+          async body(at) {
+            expect(outer!.actionOrder).toEqual(['b', 'c', 'd', 'a']);
+            outer!.addTarget(at, 'b', 'probe');
+            const intent = orderIntent(['c', 'b']);
+            const result = await book.use(at, {
+              ...intent,
+              choice: { ...intent.choice, face: { name: innerCard.id } },
+            });
+            expect(result).toMatchObject({
+              kind: 'used',
+              use: { actionOrder: ['a', 'b', 'c', 'd'] },
+            });
+          },
+        });
       },
     },
   };
@@ -599,7 +603,7 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        at.unwrap(await game.book.use(at, orderIntent(['a', 'c'])));
+        await game.book.use(at, orderIntent(['a', 'c']));
       },
     }),
   );
@@ -616,14 +620,12 @@ it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        at.unwrap(
-          await game.book.use(at, {
-            actor: 'a',
-            choice: { kind: 'physical', card: 's' },
-            targets: ['c'],
-            timing: { kind: 'effect', ignoreDistance: true },
-          }),
-        );
+        await game.book.use(at, {
+          actor: 'a',
+          choice: { kind: 'physical', card: 's' },
+          targets: ['c'],
+          timing: { kind: 'effect', ignoreDistance: true },
+        });
       },
     }),
   );
@@ -647,7 +649,7 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
   const game = cardGame({
     hands: { a: [], c: [card('replacement', 'peach', 'heart')] },
     draw: [card('top', 'slash')],
-    skills: (book) => [guicai(book)],
+    skills: [guicai],
   });
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'c', skill: 'standard:guicai', source }),
@@ -660,13 +662,11 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = at.unwrap(
-          await judge(at, game.book, {
-            player: 'd',
-            reason: 'probe',
-            match: (_at, card) => card.suit === 'heart',
-          }),
-        );
+        const result = await judge(at, game.book, {
+          player: 'd',
+          reason: 'probe',
+          match: (_at, card) => card.suit === 'heart',
+        });
         expect(result).toMatchObject({ kind: 'judged', player: 'd', matched: true });
       },
     }),
@@ -703,14 +703,12 @@ for (const custom of [false, true]) {
       runTurn(ctx, game.book, 'b', {
         phases: ['play'],
         async body(at) {
-          at.unwrap(
-            await game.book.use(at, {
-              actor: 'a',
-              choice: { kind: 'physical', card: 'trick' },
-              targets: ['a'],
-              timing: { kind: 'effect' },
-            }),
-          );
+          await game.book.use(at, {
+            actor: 'a',
+            choice: { kind: 'physical', card: 'trick' },
+            targets: ['a'],
+            timing: { kind: 'effect' },
+          });
         },
       }),
     );
@@ -736,7 +734,7 @@ for (const custom of [false, true]) {
       runTurn(ctx, game.book, 'b', {
         phases: ['play'],
         async body(at) {
-          at.unwrap(await loseHp(at, { player: 'a', amount: 4, reason: 'probe' }));
+          await loseHp(at, { player: 'a', amount: 4, reason: 'probe' });
         },
       }),
     );
@@ -761,20 +759,18 @@ for (const custom of [false, true]) {
     });
     await game.room.run('grant', async (ctx) => {
       ctx.commit('kingdoms', [kingdomChange(ctx, 'b', '魏'), kingdomChange(ctx, 'd', '魏')], {});
-      ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: hujia.id, source }));
+      await game.skills.grant(ctx, { owner: 'a', skill: hujia.id, source });
     });
     const running = game.room.run('turn', (ctx) =>
       runTurn(ctx, game.book, 'b', {
         phases: ['play'],
         async body(at) {
-          at.unwrap(
-            await game.book.use(at, {
-              actor: 'c',
-              choice: { kind: 'physical', card: 's' },
-              targets: ['a'],
-              timing: { kind: 'effect', ignoreDistance: true },
-            }),
-          );
+          await game.book.use(at, {
+            actor: 'c',
+            choice: { kind: 'physical', card: 's' },
+            targets: ['a'],
+            timing: { kind: 'effect', ignoreDistance: true },
+          });
         },
       }),
     );
@@ -800,7 +796,7 @@ for (const custom of [false, true]) {
     });
     const granted = await game.room.run('grant', async (ctx) => {
       ctx.commit('kingdoms', [kingdomChange(ctx, 'b', '蜀'), kingdomChange(ctx, 'd', '蜀')], {});
-      return ctx.unwrap(await game.skills.grant(ctx, { owner: 'a', skill: jijiang.id, source }));
+      return await game.skills.grant(ctx, { owner: 'a', skill: jijiang.id, source });
     });
     if (granted.kind !== 'resolved') throw new Error('Grant must resolve.');
     const instance = game.room.world.snapshot.skills.find(
@@ -810,14 +806,12 @@ for (const custom of [false, true]) {
       runTurn(ctx, game.book, 'b', {
         phases: ['play'],
         async body(at) {
-          const result = at.unwrap(
-            await game.book.use(at, {
-              actor: 'a',
-              choice: { kind: 'viewAs', instance, recipe: 'ask-slash', materials: [] },
-              targets: ['c'],
-              timing: { kind: 'effect', ignoreDistance: true },
-            }),
-          );
+          const result = await game.book.use(at, {
+            actor: 'a',
+            choice: { kind: 'viewAs', instance, recipe: 'ask-slash', materials: [] },
+            targets: ['c'],
+            timing: { kind: 'effect', ignoreDistance: true },
+          });
           expect(result).toMatchObject({
             kind: 'used',
             use: { actor: 'a', card: { source: { origin: { actor: custom ? 'd' : 'b' } } } },
@@ -825,7 +819,6 @@ for (const custom of [false, true]) {
         },
       }),
     );
-    await answer(game.room, true);
     const supplied = await answer(game.room, { kind: 'physical', card: custom ? 'sd' : 'sb' });
     expect(supplied.player).toBe(custom ? 'd' : 'b');
     await running;
@@ -846,7 +839,9 @@ it('真实身份局调度插入 d 额外回合后恢复 b 正常轮转，窗口�
     players: seats.map((id) => ({ id })),
     roles: ['lord', 'loyalist', 'rebel', 'renegade'],
     deck: [],
-    cards: standardCards,
+    content: {
+      cards: standardCards,
+    },
     async phaseBody(ctx, phase) {
       if (phase.kind !== 'play') return;
       turns.push(phase.owner);
@@ -895,14 +890,12 @@ it('真实五谷在 b 回合由 d 使用：共享牌池按 b、c、d、a 依次�
     runTurn(ctx, game.book, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = at.unwrap(
-          await game.book.use(at, {
-            actor: 'd',
-            choice: { kind: 'physical', card: 'grace' },
-            targets: [],
-            timing: { kind: 'effect' },
-          }),
-        );
+        const result = await game.book.use(at, {
+          actor: 'd',
+          choice: { kind: 'physical', card: 'grace' },
+          targets: [],
+          timing: { kind: 'effect' },
+        });
         expect(result).toMatchObject({
           kind: 'used',
           use: {

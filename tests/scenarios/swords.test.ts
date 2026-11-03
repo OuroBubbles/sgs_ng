@@ -6,6 +6,9 @@ import {
   damageInflicting,
   damageReplacing,
   differentGender,
+  defineSkill,
+  modify,
+  cardQueries,
   genderOf,
   kill,
   moveCards,
@@ -92,7 +95,9 @@ it('RoleMatch 初始化显式性别，未指定为无性别，提交可重建', 
     seed: 7,
     players: [{ id: 'a', gender: 'female' }, { id: 'b' }],
     deck: [],
-    cards: standardCards,
+    content: {
+      cards: standardCards,
+    },
   });
   await match.prepare();
   expect(genderOf(match.room.world, 'a')).toBe('female');
@@ -289,14 +294,28 @@ it('寒冰在来源快照之后替代伤害，连续两次暗选并停止目标�
     },
   });
   const running = use(game, strike);
-  await answer(game, true);
+  const request = await nextRequest(game.room);
+  expect(request.kind).toBe('cards-targets');
+  expect(request.optional).toBe(true);
+  expect(request.data).toMatchObject({
+    purpose: 'owned-card',
+    reason: 'standard:ice_sword-ability',
+  });
+  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.decisions.submit(request.id, request.token, true)).toMatchObject({
+    kind: 'rejected',
+    reason: 'invalid',
+  });
+  expect(game.room.history.facts('weapon.damage-replaced')).toEqual([]);
   await chooseFirst(game);
+  expect((await nextRequest(game.room)).optional).toBe(false);
   await chooseFirst(game);
   await running;
   expect(source).toBe(3);
   expect(receiving).toBe(0);
   expect(game.room.world.player('b').hp).toBe(4);
   expect(game.room.world.zone('b:hand').cards).toEqual([]);
+  expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
   expect(game.room.history.facts('damage.dealt')).toHaveLength(0);
   expect(game.room.history.facts('damage.prevented')).toMatchObject([
     {
@@ -310,7 +329,6 @@ it.each([0, 1])('寒冰目标无牌不发动，只有一张则只弃一张：%s'
   const game = create('ice_sword', count);
   const running = use(game, strike);
   if (count) {
-    await answer(game, true);
     await chooseFirst(game);
   }
   await running;
@@ -321,10 +339,14 @@ it.each([0, 1])('寒冰目标无牌不发动，只有一张则只弃一张：%s'
 it('寒冰不发动则正常伤害，不触碰目标手牌', async () => {
   const game = create('ice_sword', 2);
   const running = use(game, strike);
-  await answer(game, false);
+  const request = await nextRequest(game.room);
+  expect(request.kind).toBe('cards-targets');
+  expect(game.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.world.zone('b:hand').cards).toHaveLength(2);
+  expect(game.room.history.facts('skill.invoked')).toEqual([]);
+  expect(game.room.history.facts('card.chosen')).toEqual([]);
 });
 
 it('寒冰第二次重新生成选项，包括第一次移牌后效获得的新牌', async () => {
@@ -347,7 +369,6 @@ it('寒冰第二次重新生成选项，包括第一次移牌后效获得的新�
     },
   });
   const running = use(game, strike);
-  await answer(game, true);
   const request = await nextRequest(game.room);
   const cards = (request.data as { preview: { cards: { id: string; label: string }[] } }).preview
     .cards;
@@ -393,7 +414,6 @@ it.each(['weapon', 'source', 'target'])(
       },
     });
     const running = use(game, strike);
-    await answer(game, true);
     await chooseFirst(game);
     if (lost === 'weapon') await chooseFirst(game);
     await running;
@@ -445,10 +465,63 @@ it('寒冰发动支付后出现其他防止时不覆盖原因，也不继续弃�
     run: () => draft.prevent('other'),
   });
   const running = use(game, strike);
-  await answer(game, true);
+  await chooseFirst(game);
   await running;
   expect(game.room.history.facts('damage.prevented')).toMatchObject([
     { data: { detail: { prevention: 'other' } } },
   ]);
   expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(0);
+});
+
+it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已宣告弃牌', async () => {
+  for (const branch of ['moved', 'protected', 'weapon'] as const) {
+    let protectedCard = false;
+    const lock = defineSkill({
+      id: 'test:protect-first',
+      name: '保护',
+      triggers: [],
+      modifiers: [
+        modify(
+          cardQueries.prohibitDiscard,
+          (_ctx, { input }) => protectedCard && input.card === 'b0',
+        ),
+      ],
+    });
+    const game = cardGame({
+      hands: { a: [card('s', 'slash', 'heart')], b: [card('b0', 'peach')] },
+      equipment: { a: [card('weapon', 'ice_sword')] },
+      skills: [lock],
+    });
+    await game.room.run('grant', (ctx) =>
+      game.skills.grant(ctx, {
+        owner: 'b',
+        skill: lock.id,
+        source: { kind: 'general', id: 'test' },
+      }),
+    );
+    game.room.on(costPaid, {
+      id: 'after-first-choice',
+      owner: null,
+      eligible: (_ctx, receipt) => receipt.skill === 'standard:ice_sword-ability',
+      async run(ctx) {
+        if (branch === 'protected') protectedCard = true;
+        else {
+          const [card, from] = branch === 'weapon' ? ['weapon', 'a:equipment'] : ['b0', 'b:hand'];
+          await moveCards(ctx, [{ cards: [card], from, to: 'c:hand', place: 'bottom' }], 'probe');
+        }
+      },
+    });
+    const running = use(game, strike);
+    await chooseFirst(game);
+    await running;
+    expect(game.room.history.facts('skill.invoked')).toHaveLength(1);
+    expect(game.room.history.facts('weapon.card-discarded')).toHaveLength(
+      branch === 'weapon' ? 1 : 0,
+    );
+    expect(game.room.history.facts('damage.dealt')).toEqual([]);
+    expect(game.room.history.facts('damage.prevented')).toHaveLength(1);
+    expect(game.room.world.player('b').hp).toBe(4);
+    expect(game.room.decisions.pending).toEqual([]);
+    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+  }
 });

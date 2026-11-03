@@ -1,15 +1,14 @@
+import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
 import { cardsMoved, costPaid, kill, finishGame, privateCardPools, runPhase } from '../../src/sdk';
 import { allotment } from '../../src/content/workshop/allotment';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { availablePackages, createOfflineMatch } from '../../src/app/offline/practice';
-import { resolvePackages } from '../../src/sdk';
+import { createOfflineMatch } from '../../src/app/offline/practice';
+import { practiceContent } from '../../src/app/offline/practice';
 import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 
 const source = { kind: 'general', id: 'test' } as const;
 const top = [
@@ -19,7 +18,7 @@ const top = [
   card('red-two', 'peach', 'diamond'),
 ];
 function create() {
-  return cardGame({ hands: { a: [] }, draw: top, skills: (book) => [allotment(book)] });
+  return cardGame({ hands: { a: [] }, draw: top, skills: [allotment] });
 }
 type Game = ReturnType<typeof create>;
 async function grant(game: Game) {
@@ -124,14 +123,12 @@ it('发动支付后某接收者死亡，候选组从当前存活角色派生，�
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
     async run(ctx) {
-      ctx.unwrap(
-        await kill(ctx, {
-          player: 'b',
-          killer: null,
-          reason: 'rule',
-          cause: { kind: 'rule', seq: null, data: null },
-        }),
-      );
+      await kill(ctx, {
+        player: 'b',
+        killer: null,
+        reason: 'rule',
+        cause: { kind: 'rule', seq: null, data: null },
+      });
     },
   });
   const running = prepare(game);
@@ -160,14 +157,12 @@ it.each(['dead', 'finished'] as const)(
       async run(ctx) {
         if (boundary === 'finished') await finishGame(ctx, { winners: ['b'], reason: 'stop' });
         else
-          ctx.unwrap(
-            await kill(ctx, {
-              player: 'a',
-              killer: null,
-              reason: 'rule',
-              cause: { kind: 'rule', seq: null, data: null },
-            }),
-          );
+          await kill(ctx, {
+            player: 'a',
+            killer: null,
+            reason: 'rule',
+            cause: { kind: 'rule', seq: null, data: null },
+          });
       },
     });
     const running = prepare(game);
@@ -188,7 +183,7 @@ it('发动后失去技能不撤回已宣告的分配', async () => {
     owner: null,
     eligible: (_ctx, receipt) => receipt.skill === 'workshop:allotment',
     async run(ctx) {
-      ctx.unwrap(await game.skills.revoke(ctx, 'a', 'workshop:allotment', source));
+      await game.skills.revoke(ctx, 'a', 'workshop:allotment', source);
     },
   });
   const running = prepare(game);
@@ -203,64 +198,33 @@ it('发动后失去技能不撤回已宣告的分配', async () => {
 it.each([4, 17])(
   '筹策客真实四席身份局由基础 AI 经同一合法分配模型至胜负，seed=%s',
   async (seed) => {
-    const content = resolvePackages(availablePackages, ['workshop']);
-    const match = createOfflineMatch(
-      4,
+    const content = practiceContent;
+    const match = createOfflineMatch({
       seed,
-      'standard:identity',
-      ['workshop:quartermaster', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],
+      preset: 'standard:identity',
+      lineup: ['workshop:quartermaster', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],
       content,
-    );
-    const running = match.start();
-    let decisions = 0;
+    });
     let assignments = 0;
-    try {
-      for (let step = 0; step < 20_000 && !match.result; step++) {
-        await setImmediate();
-        expect(match.room.status).not.toBe('faulted');
-        const request = match.room.decisions.pending[0];
-        if (!request) continue;
-        if (++decisions > 2400) throw new Error('Assignment match decision budget exhausted.');
-        if (
-          request.kind === 'arrange' &&
-          (request.data as { reason: string }).reason === 'workshop:allotment'
-        ) {
-          assignments++;
-          const view = projectMatch(match, request.player, request);
-          expect(view.decision).toMatchObject({ kind: 'arrange', presentation: 'distribution' });
-          const observer = match.room.world.snapshot.players.find(
-            (player) => player.id !== request.player,
-          )!.id;
-          expect(observeAgent(match, observer).pools).toEqual([]);
-          expect(
-            projectMatch(match, observer, null).pools.filter(
-              (pool) => pool.visibility === 'private',
-            ),
-          ).toEqual([]);
-        }
-        const answer = decideBasic(observeAgent(match, request.player), request, (value) =>
-          match.room.decisions.preview(request.id, value),
-        );
-        if (answer.kind === 'unsupported') throw new Error(answer.reason);
+    await playMatch(match, { steps: 20000, decisions: 2400 }, (request) => {
+      if (
+        request.kind === 'arrange' &&
+        (request.data as { reason: string }).reason === 'workshop:allotment'
+      ) {
+        assignments++;
+        const view = projectMatch(match, request.player, request);
+        expect(view.decision).toMatchObject({ kind: 'arrange', presentation: 'distribution' });
+        const observer = match.room.world.snapshot.players.find(
+          (player) => player.id !== request.player,
+        )!.id;
+        expect(observeAgent(match, observer).pools).toEqual([]);
         expect(
-          answer.kind === 'cancel'
-            ? match.room.decisions.cancel(request.id, request.token)
-            : match.room.decisions.submit(request.id, request.token, answer.value),
-        ).toEqual({ kind: 'accepted' });
+          projectMatch(match, observer, null).pools.filter((pool) => pool.visibility === 'private'),
+        ).toEqual([]);
       }
-      expect(match.result).not.toBeNull();
-      await running;
-      expect(assignments).toBeGreaterThan(0);
-      expect(match.room.history.facts('cards.distributed').length).toBeGreaterThan(0);
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-      expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(
-        false,
-      );
-    } finally {
-      if (match.room.status !== 'ended') match.room.abort('test stopped');
-    }
+    });
+    expect(assignments).toBeGreaterThan(0);
+    expect(match.room.history.facts('cards.distributed').length).toBeGreaterThan(0);
   },
   30_000,
 );

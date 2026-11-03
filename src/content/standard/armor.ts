@@ -1,7 +1,6 @@
 import {
   equipmentCard,
   equipmentEffectiveFor,
-  defineSkill,
   on,
   invoke,
   judge,
@@ -10,6 +9,7 @@ import {
   effectStarting,
 } from '../../sdk';
 import type { CardChoice } from '../../sdk';
+import type { SkillDefinition } from '../../sdk';
 
 const jink: CardChoice = {
   kind: 'generated',
@@ -23,43 +23,37 @@ export const eightDiagram = equipmentCard({
   label: '八卦阵',
   slot: 'armor',
   skill: (book) =>
-    defineSkill({
+    ({
       id: 'standard:eight_diagram-ability',
       name: '八卦阵',
-      effects: [
+      triggers: [
         on(responseRequested, {
-          id: 'judge-jink',
           order: 'choose',
-          when: (ctx, request, self) =>
+          when: (ctx, { payload: request, self }) =>
             request.actor === self.owner &&
             equipmentEffectiveFor(ctx.world, self, request.to, 'armor') &&
             request.canProvide(ctx, jink),
-          async run(ctx, request, self) {
-            const invoked = ctx.unwrap(
-              await invoke(
-                ctx,
-                self,
-                '是否发动【八卦阵】进行判定？',
-                (at) =>
-                  equipmentEffectiveFor(at.world, self, request.to, 'armor') &&
-                  request.canProvide(at, jink),
-              ),
+          async run(ctx, { payload: request, self }) {
+            const invoked = await invoke(
+              ctx,
+              self,
+              '是否发动【八卦阵】进行判定？',
+              (at) =>
+                equipmentEffectiveFor(at.world, self, request.to, 'armor') &&
+                request.canProvide(at, jink),
             );
             if (!invoked) return;
-            const result = ctx.unwrap(
-              await judge(ctx, book, {
-                player: self.owner,
-                reason: 'standard:eight_diagram',
-                match: (_at, card) => card.color === 'red',
-              }),
-            );
+            const result = await judge(ctx, book, {
+              player: self.owner,
+              reason: 'standard:eight_diagram',
+              match: (_at, card) => card.color === 'red',
+            });
             // 发动已宣告，判定期间装备离场不撤销效果；供牌仍重查请求、禁令与材料。
-            if (result.matched && request.canProvide(ctx, jink))
-              ctx.unwrap(await request.provide(ctx, jink));
+            if (result.matched && request.canProvide(ctx, jink)) await request.provide(ctx, jink);
           },
         }),
       ],
-    }),
+    }) satisfies SkillDefinition,
 });
 
 export const qinggangSword = equipmentCard({
@@ -67,17 +61,16 @@ export const qinggangSword = equipmentCard({
   label: '青釭剑',
   slot: 'weapon',
   range: 2,
-  skill: defineSkill({
+  skill: {
     id: 'standard:qinggang_sword-ability',
     name: '青釭剑',
-    effects: [
+    triggers: [
       on(targetSpecified, {
-        id: 'ignore-armor',
-        when: (_ctx, { effect }, self) =>
+        when: (_ctx, { payload: { effect }, self }) =>
           effect.actor === self.owner &&
           effect.card.name === 'standard:slash' &&
           effect.state === 'targeting',
-        run(ctx, { use, effect }, self) {
+        run(ctx, { payload: { use, effect }, self }) {
           effect.ignoreEquipment(ctx, 'armor', 'standard:qinggang_sword');
           ctx.commit('equipment.ignored', [], {
             actor: self.owner,
@@ -90,26 +83,25 @@ export const qinggangSword = equipmentCard({
         },
       }),
     ],
-  }),
+  } satisfies SkillDefinition,
 });
 
 export const niohShield = equipmentCard({
   id: 'standard:nioh_shield',
   label: '仁王盾',
   slot: 'armor',
-  skill: defineSkill({
+  skill: {
     id: 'standard:nioh_shield-ability',
     name: '仁王盾',
-    effects: [
+    triggers: [
       on(effectStarting, {
-        id: 'black-slash',
-        when: (ctx, { effect }, self) =>
+        when: (ctx, { payload: { effect }, self }) =>
           effect.target === self.owner &&
           effect.state === 'ready' &&
           effect.card.name === 'standard:slash' &&
           effect.card.color === 'black' &&
           equipmentEffectiveFor(ctx.world, self, effect, 'armor'),
-        run(ctx, { effect }, self) {
+        run(ctx, { payload: { effect }, self }) {
           effect.cancel(ctx, 'standard:nioh_shield');
           ctx.commit('equipment.blocked', [], {
             actor: self.owner,
@@ -119,5 +111,5 @@ export const niohShield = equipmentCard({
         },
       }),
     ],
-  }),
+  } satisfies SkillDefinition,
 });

@@ -1,6 +1,6 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 import { defineState, readState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
@@ -44,10 +44,7 @@ export function shieldChange(ctx: Context, player: string, value: number) {
   return stateChange(ctx, shield, target(player), value);
 }
 
-export function changeShield(
-  ctx: Context,
-  request: ShieldInput,
-): Promise<FlowResult<ShieldResult>> {
+export function changeShield(ctx: Context, request: ShieldInput): Promise<ShieldResult> {
   const input = immutable(request);
   return ctx.flow('shield.change', async (at) => {
     if (!Number.isSafeInteger(input.amount) || !input.reason.trim())
@@ -68,7 +65,7 @@ export function changeShield(
     });
     if (amount) {
       at.commit('shield.changed', [shieldChange(at, input.player, after)], result);
-      at.unwrap(await at.window(shieldChanged, result, { subject: input.player }));
+      await at.window(shieldChanged, result, { subject: input.player });
     }
     return result;
   });

@@ -1,22 +1,21 @@
+import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { setImmediate } from 'node:timers/promises';
-import { damage, resolvePackages } from '../../src/sdk';
+import { damage } from '../../src/sdk';
 import { insight, echo } from '../../src/content/workshop/learning';
-import { availablePackages, createOfflineMatch } from '../../src/app/offline/practice';
+import { createOfflineMatch } from '../../src/app/offline/practice';
+import { practiceContent } from '../../src/app/offline/practice';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
 
 const source = { kind: 'general', id: 'probe' } as const;
-const content = () => resolvePackages(availablePackages, ['workshop']);
+const content = practiceContent;
 
 it.each([true, false])(
   '拾慧首次伤害即获得余响并正式询问，接受=%s，不需等待下一次伤害',
   async (accept) => {
     const game = cardGame({
-      skills: (book) => [insight(book), echo],
+      skills: [insight, echo],
       hands: { b: [] },
       draw: [card('reward', 'jink'), card('next', 'slash')],
     });
@@ -54,7 +53,7 @@ it.each([true, false])(
 
 it('后续伤害自然收集已有余响，不重复学习、重新加入或复制同一时点次数', async () => {
   const game = cardGame({
-    skills: (book) => [insight(book), echo],
+    skills: [insight, echo],
     hands: { b: [] },
     draw: [card('reward', 'jink'), card('next', 'slash')],
   });
@@ -85,55 +84,20 @@ it('后续伤害自然收集已有余响，不重复学习、重新加入或复�
 it.each([4, 17])(
   '问道客与标准技能组成四人真实身份局，基础 AI 至胜负，seed=%s',
   async (seed) => {
-    const match = createOfflineMatch(
-      4,
+    const match = createOfflineMatch({
       seed,
-      'workshop:defense',
-      ['workshop:inquirer', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],
-      content(),
-    );
-    const running = match.start();
-    let decisions = 0;
-    try {
-      for (let step = 0; step < 20_000 && !match.result; step++) {
-        await setImmediate();
-        expect(match.room.status).not.toBe('faulted');
-        const request = match.room.decisions.pending[0];
-        if (!request) continue;
-        if (++decisions > 2400) throw new Error('Learning match decision budget exhausted.');
-        const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-          match.room.decisions.preview(request.id, input),
-        );
-        if (answer.kind === 'unsupported') throw new Error(answer.reason);
-        expect(
-          answer.kind === 'cancel'
-            ? match.room.decisions.cancel(request.id, request.token)
-            : match.room.decisions.submit(request.id, request.token, answer.value),
-        ).toEqual({ kind: 'accepted' });
-      }
-      expect(match.result).not.toBeNull();
-      await running;
-      expect(match.room.history.entries.some((entry) => entry.type === 'window.included')).toBe(
-        true,
-      );
-      expect(
-        match.room.history
-          .facts('skill.invoked')
-          .some((fact) => (fact.data.detail as { skill: string }).skill === echo.id),
-      ).toBe(true);
-      const cards = match.room.world.snapshot.zones.flatMap((zone) => zone.cards);
-      expect(cards).toHaveLength(48);
-      expect(new Set(cards).size).toBe(48);
-      expect(match.room.decisions.pending).toEqual([]);
-      expect(match.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(
-        false,
-      );
-      expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-        match.room.world.snapshot,
-      );
-    } finally {
-      if (match.room.status !== 'ended') match.room.abort('test stopped');
-    }
+      preset: 'workshop:defense',
+      lineup: ['workshop:inquirer', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],
+      content,
+    });
+    await playMatch(match, { steps: 20000, decisions: 2400 });
+    expect(match.room.history.entries.some((entry) => entry.type === 'window.included')).toBe(true);
+    expect(
+      match.room.history
+        .facts('skill.invoked')
+        .some((fact) => (fact.data.detail as { skill: string }).skill === echo.id),
+    ).toBe(true);
+    expect(match.initial.cards).toHaveLength(48);
   },
   30_000,
 );

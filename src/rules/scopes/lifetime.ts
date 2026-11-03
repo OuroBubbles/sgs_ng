@@ -1,6 +1,6 @@
 import type { Change, SkillInstance, StateEntry, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
-import type { Context, FlowResult } from '../../core/runtime/room';
+import type { Context } from '../../core/runtime/room';
 import { defineWindow } from '../../core/runtime/window';
 
 /** 只有显式领域 lifetime 才管理状态/授予到期，普通子 Flow 不自动冒充阶段或回合。 */
@@ -37,8 +37,8 @@ export async function withLifetime<T>(
   ctx: Context,
   kind: string,
   body: (ctx: Context, lifetime: Lifetime) => T | Promise<T>,
-): Promise<FlowResult<T>> {
-  const outer = await ctx.flow(`lifetime:${kind}`, async (owner) => {
+): Promise<T> {
+  return ctx.flow(`lifetime:${kind}`, async (owner) => {
     let active = true;
     owner.defer(() => {
       active = false;
@@ -51,7 +51,7 @@ export async function withLifetime<T>(
       },
       belongsTo: (world: WorldReader) => world === owner.world,
     });
-    const result = await owner.flow(kind, (child) => body(child, lifetime));
+    const result = await owner.attempt(kind, (child) => body(child, lifetime));
     active = false;
 
     const states = owner.world.snapshot.states.filter((state) => state.scopeId === lifetime.id);
@@ -77,7 +77,7 @@ export async function withLifetime<T>(
     });
     owner.commit('lifetime.ended', changes, ended);
     await owner.window(lifetimeEnded, ended);
-    return result;
+    if (result.kind === 'aborted') return owner.abort(result.reason);
+    return result.value;
   });
-  return outer.kind === 'resolved' ? outer.value : outer;
 }

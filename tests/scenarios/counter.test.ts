@@ -182,13 +182,13 @@ it('转换无懈走同一用牌管线，失去来源不吞掉已经宣告的反�
   const skill = defineSkill({
     id: 'probe:counter',
     name: '反制',
-    effects: [],
+    triggers: [],
     viewAs: [
       viewAs({
         id: 'counter',
         label: '反制',
         names: () => ['standard:nullification'],
-        materials: (ctx, self) => ownedCards(ctx.world, self.owner),
+        materials: (ctx, { self }) => ownedCards(ctx.world, self.owner),
         count: { min: 1, max: 1 },
         make: () => ({ name: 'standard:nullification' }),
       }),
@@ -298,8 +298,9 @@ it('自定义反制牌可替代默认无懈名称，后续层保留同一规则�
         use: {
           count: { min: 0, max: 0 },
           target: () => false,
-          canUse: (_ctx, request) => (request.timing.kind === 'counter' ? null : 'Counter only'),
-          execute: (ctx, use, book) => resolveCounter(ctx, use, book),
+          canUse: (_ctx, { request }) =>
+            request.timing.kind === 'counter' ? null : 'Counter only',
+          execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
         },
       },
     ],

@@ -69,6 +69,8 @@ export interface WorldReader {
   readonly snapshot: WorldSnapshot;
   player(id: PlayerId): Player;
   card(id: CardId): Card;
+  /** 局内状态按 ID 读取；未设置或已移除时返回 undefined。 */
+  state(id: string): StateEntry | undefined;
   zone(id: ZoneId): Zone;
   position(id: CardId): ZoneId;
 }

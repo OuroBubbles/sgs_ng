@@ -34,9 +34,7 @@ function conserved(game: Game) {
 }
 async function lateCost(ctx: Context) {
   ctx.commit('test.late-candidate', [], null);
-  ctx.unwrap(
-    await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:too-late' }),
-  );
+  await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:too-late' });
 }
 
 it.each(['dead', 'finished'] as const)(
@@ -52,7 +50,7 @@ it.each(['dead', 'finished'] as const)(
       async run(ctx, draft) {
         held = draft;
         draft.adjust(2, 'first');
-        if (boundary === 'dead') ctx.unwrap(await kill(ctx, death));
+        if (boundary === 'dead') await kill(ctx, death);
         else await finishGame(ctx, { winners: ['a'], reason: 'during recovery' });
       },
     });
@@ -63,7 +61,7 @@ it.each(['dead', 'finished'] as const)(
       run: lateCost,
     });
     await game.room.run('heal', async (ctx) => {
-      expect(ctx.unwrap(await recover(ctx, heal))).toMatchObject({
+      expect(await recover(ctx, heal)).toMatchObject({
         kind: 'unavailable',
         amount: 0,
         attemptedAmount: 3,
@@ -92,8 +90,8 @@ it.each(['prevented', 'rescued', 'dead', 'finished'] as const)(
       async run(ctx, draft) {
         held = draft;
         if (boundary === 'prevented') draft.prevent('already handled');
-        else if (boundary === 'rescued') ctx.unwrap(await recover(ctx, heal));
-        else if (boundary === 'dead') ctx.unwrap(await kill(ctx, death));
+        else if (boundary === 'rescued') await recover(ctx, heal);
+        else if (boundary === 'dead') await kill(ctx, death);
         else await finishGame(ctx, { winners: ['a'], reason: 'during death' });
       },
     });
@@ -104,7 +102,7 @@ it.each(['prevented', 'rescued', 'dead', 'finished'] as const)(
       run: lateCost,
     });
     await game.room.run('death', async (ctx) => {
-      expect(ctx.unwrap(await kill(ctx, { ...death, reason: 'dying' }))).toMatchObject({
+      expect(await kill(ctx, { ...death, reason: 'dying' })).toMatchObject({
         kind: boundary === 'dead' || boundary === 'finished' ? 'unavailable' : boundary,
         event: null,
         reason: boundary === 'prevented' ? 'already handled' : null,
@@ -134,7 +132,7 @@ it('濒死死亡请求在入口已经恢复正体力时直接返回 rescued，�
     run: lateCost,
   });
   await game.room.run('death', async (ctx) => {
-    expect(ctx.unwrap(await kill(ctx, { ...death, reason: 'dying' }))).toEqual({
+    expect(await kill(ctx, { ...death, reason: 'dying' })).toEqual({
       kind: 'rescued',
       event: null,
       reason: null,
@@ -154,12 +152,12 @@ it('规则直接死亡不套用濒死正体力豁免，窗口中回复后仍可�
     owner: null,
     eligible: () => true,
     async run(ctx) {
-      ctx.unwrap(await recover(ctx, heal));
+      await recover(ctx, heal);
     },
   });
   game.room.on(beforeDeath, { id: 'b-cost', owner: null, eligible: () => true, run: lateCost });
   await game.room.run('death', async (ctx) => {
-    expect(ctx.unwrap(await kill(ctx, death))).toMatchObject({
+    expect(await kill(ctx, death)).toMatchObject({
       kind: 'dead',
       event: { before: { hp: 2, alive: true } },
     });
@@ -185,7 +183,7 @@ it('回复数暂时为零不等于窗口失效，后续修正仍可增加并完�
     run: (_ctx, draft) => draft.adjust(2, 'later'),
   });
   await game.room.run('heal', async (ctx) => {
-    expect(ctx.unwrap(await recover(ctx, heal))).toMatchObject({
+    expect(await recover(ctx, heal)).toMatchObject({
       kind: 'recovered',
       amount: 2,
       beforeHp: 1,
@@ -203,7 +201,7 @@ it('回复来源死亡不取消对仍存活目标的已声明回复，后续修�
     owner: null,
     eligible: () => true,
     async run(ctx) {
-      ctx.unwrap(await kill(ctx, { ...death, player: 'a' }));
+      await kill(ctx, { ...death, player: 'a' });
     },
   });
   game.room.on(recovering, {
@@ -213,7 +211,7 @@ it('回复来源死亡不取消对仍存活目标的已声明回复，后续修�
     run: (_ctx, draft) => draft.adjust(1, 'bonus'),
   });
   await game.room.run('heal', async (ctx) => {
-    expect(ctx.unwrap(await recover(ctx, heal))).toMatchObject({ kind: 'recovered', amount: 2 });
+    expect(await recover(ctx, heal)).toMatchObject({ kind: 'recovered', amount: 2 });
   });
   expect(game.room.world.player('a').alive).toBe(false);
   expect(game.room.world.player('b').hp).toBe(3);
@@ -228,7 +226,7 @@ it('回复已经提交后目标死亡不改写实际回复快照，完成窗口�
     owner: null,
     eligible: () => true,
     async run(ctx) {
-      ctx.unwrap(await kill(ctx, death));
+      await kill(ctx, death);
     },
   });
   game.room.on(recovered, {
@@ -242,7 +240,7 @@ it('回复已经提交后目标死亡不改写实际回复快照，完成窗口�
     },
   });
   await game.room.run('heal', async (ctx) => {
-    expect(ctx.unwrap(await recover(ctx, heal))).toMatchObject({ kind: 'recovered', amount: 1 });
+    expect(await recover(ctx, heal)).toMatchObject({ kind: 'recovered', amount: 1 });
   });
   expect(game.room.history.facts('test.committed-recovery')).toHaveLength(1);
   expect(game.room.history.facts('hp.recovered')).toHaveLength(1);
@@ -277,7 +275,7 @@ it('死亡已提交后终局仍完成既有死亡事实与埋葬善后，不能�
     },
   });
   await game.room.run('death', async (ctx) => {
-    expect(ctx.unwrap(await kill(ctx, death)).kind).toBe('dead');
+    expect((await kill(ctx, death)).kind).toBe('dead');
   });
   expect(seen).toEqual(['death', 'burial']);
   expect(game.room.world.position('legacy')).toBe('discard');
@@ -300,7 +298,7 @@ it.each(['dead', 'finished'] as const)(
       owner: null,
       eligible: () => true,
       async run(ctx) {
-        if (boundary === 'dead') ctx.unwrap(await kill(ctx, { ...death, player: 'a' }));
+        if (boundary === 'dead') await kill(ctx, { ...death, player: 'a' });
         else await finishGame(ctx, { winners: ['b'], reason: 'peach boundary' });
       },
     });
@@ -333,22 +331,23 @@ it('真正濒死在死亡前由已宣告桃救回，后续死亡费用不执行�
     eligible: () => true,
     async run(ctx) {
       expect(
-        ctx.unwrap(
+        (
           await game.book.use(ctx, {
             actor: 'a',
             choice: { kind: 'physical', card: 'peach' },
             targets: ['b'],
             timing: { kind: 'rescue', dying: 'b' },
-          }),
+          })
         ).kind,
       ).toBe('used');
     },
   });
   game.room.on(beforeDeath, { id: 'b-cost', owner: null, eligible: () => true, run: lateCost });
   await game.room.run('loss', async (ctx) => {
-    expect(
-      ctx.unwrap(await loseHp(ctx, { player: 'b', amount: 4, reason: 'probe' })),
-    ).toMatchObject({ kind: 'lost', afterHp: 0 });
+    expect(await loseHp(ctx, { player: 'b', amount: 4, reason: 'probe' })).toMatchObject({
+      kind: 'lost',
+      afterHp: 0,
+    });
   });
   expect(game.room.world.player('b')).toMatchObject({ hp: 1, alive: true });
   expect(game.room.history.facts('test.late-candidate')).toEqual([]);
@@ -371,16 +370,15 @@ it('已支付的死亡防止费用保留，只停止本次后续候选', async (
     eligible: () => true,
     async run(ctx, draft) {
       expect(
-        ctx.unwrap(
-          await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:prevention' }),
-        ).kind,
+        (await pay(ctx, { actor: 'c', cards: ['fee'], to: 'discard', reason: 'probe:prevention' }))
+          .kind,
       ).toBe('paid');
       draft.prevent('paid prevention');
     },
   });
   game.room.on(beforeDeath, { id: 'b-cost', owner: null, eligible: () => true, run: lateCost });
   await game.room.run('death', async (ctx) => {
-    expect(ctx.unwrap(await kill(ctx, death))).toMatchObject({
+    expect(await kill(ctx, death)).toMatchObject({
       kind: 'prevented',
       reason: 'paid prevention',
     });
@@ -402,7 +400,7 @@ it('满体力不会提前关闭回复准备，扩展提高上限后仍可实际�
     },
   });
   await game.room.run('heal', async (ctx) => {
-    expect(ctx.unwrap(await recover(ctx, heal))).toMatchObject({
+    expect(await recover(ctx, heal)).toMatchObject({
       kind: 'recovered',
       beforeHp: 4,
       afterHp: 5,
@@ -486,13 +484,13 @@ it.each(['recovery', 'death'] as const)(
       game.room.on(recovering, { id: 'a-local', owner: null, eligible: () => true, run: stop });
       game.room.on(recovering, { id: 'b-next', owner: null, eligible: () => true, run: lateCost });
       await game.room.run('heal', async (ctx) => {
-        expect(ctx.unwrap(await recover(ctx, heal)).kind).toBe('recovered');
+        expect((await recover(ctx, heal)).kind).toBe('recovered');
       });
     } else {
       game.room.on(beforeDeath, { id: 'a-local', owner: null, eligible: () => true, run: stop });
       game.room.on(beforeDeath, { id: 'b-next', owner: null, eligible: () => true, run: lateCost });
       await game.room.run('death', async (ctx) => {
-        expect(ctx.unwrap(await kill(ctx, death)).kind).toBe('dead');
+        expect((await kill(ctx, death)).kind).toBe('dead');
       });
     }
     expect(game.room.history.facts('cost.paid')).toHaveLength(1);
