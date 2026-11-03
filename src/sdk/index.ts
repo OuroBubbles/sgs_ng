@@ -48,6 +48,7 @@ export {
   skillLost,
   blockSkill,
   skillsChanged,
+  rulesOf,
 } from '../rules/skills/skills';
 export type {
   SkillDefinition,
@@ -59,12 +60,56 @@ export type {
   SkillBinding,
   SkillProvider,
   SkillChange,
+  SkillAi,
+  AiView,
+  AiSeat,
 } from '../rules/skills/skills';
 export { defineQuery, modify } from '../rules/skills/query';
 export { genderOf, genderChange, setGender, differentGender } from '../rules/characters/gender';
 export type { Gender } from '../rules/characters/gender';
 export { kingdomOf, kingdomChange, setKingdom } from '../rules/characters/kingdom';
-export { askInvoke, invoke } from '../rules/skills/invoke';
+export { askInvoke, invoke, declare } from '../rules/skills/invoke';
+export type { Declaration } from '../rules/skills/invoke';
+// 作者门面：多数武将只需要这一组。
+export {
+  HE,
+  alive,
+  others,
+  otherAlive,
+  face,
+  cardDef,
+  cardLabel,
+  handOf,
+  canDiscard,
+  discardable,
+  wounded,
+  isMale,
+  peers,
+  turnOwner,
+  nth,
+  obtain,
+  obtainJudgment,
+  takeCard,
+  give,
+  select,
+  selection,
+  askDiscard,
+  trigger,
+  action,
+  convert,
+  skill,
+  general,
+} from '../rules/author';
+export type {
+  Areas,
+  MoveFact,
+  AskOptions,
+  Picked,
+  TriggerSpec,
+  ActionContext,
+  ActionSpec,
+  AuthoredGeneral,
+} from '../rules/author';
 export { activeOffers, validateActive, activate } from '../rules/skills/active';
 export type {
   ActiveSkill,
@@ -345,7 +390,6 @@ export { createContent } from '../content/catalog';
 export type {
   ContentDefinition,
   ContentCatalog,
-  SkillEntry,
   CardPresentation,
   GeneralPresentation,
   DeckDefinition,
