@@ -5,7 +5,7 @@ import { defineSkill, isSkillBlocked } from '../skills/skills';
 import type { SkillBinding, SkillDefinition, SkillHandle, SkillProvider } from '../skills/skills';
 import { modify } from '../skills/query';
 import { attackRange } from './queries';
-import { moveCards, Cards } from './move';
+import { moveCards, Cards, declared } from './move';
 import type { MoveResult } from './move';
 import type { CardBook } from './book';
 import type { CardDefinition, EffectRef } from './types';
@@ -14,9 +14,27 @@ import { defineEvent } from '../../core/runtime/event';
 import { timing } from '../../core/runtime/event';
 
 export const Equipment = defineEvent('equipment', {
-  equipped: timing<unknown>(),
-  ignored: timing<unknown>(),
-  blocked: timing<unknown>(),
+  equipped: declared<{
+    readonly kind: 'equipped';
+    readonly card: string;
+    readonly owner: string;
+    readonly replaced: readonly string[];
+  }>(),
+  ignored: timing<
+    unknown,
+    {
+      readonly actor: string;
+      readonly name: string;
+      readonly use: string;
+      readonly effect: string;
+      readonly target: string;
+      readonly slot: EquipmentSlot;
+    }
+  >(),
+  blocked: timing<
+    unknown,
+    { readonly actor: string; readonly name: string; readonly effect: string }
+  >(),
 });
 
 /** 标准槽位为 weapon/armor/offensive-horse/defensive-horse；扩展可直接命名新槽位。 */

@@ -256,7 +256,7 @@ it('顺手暗选不给出隐藏牌 ID/牌名，实体 ID 不能冒充选项，�
   });
   await running;
   expect(game.room.world.position('secret-b')).toBe('a:hand');
-  expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail).toMatchObject({
+  expect(game.room.history.facts(CardEvent.taken)[0]!.data.detail.declaration).toMatchObject({
     card: 'secret-b',
     open: false,
   });

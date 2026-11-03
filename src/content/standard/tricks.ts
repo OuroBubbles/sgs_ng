@@ -3,13 +3,14 @@ import {
   recover,
   ownedCards,
   chooseOwnedCard,
-  moveCards,
   discardCards,
   withRevealedCards,
   delayedCards,
   moveDelayed,
   resolveAttack,
   CardEvent,
+  takeCard,
+  obtain,
 } from '../../sdk';
 import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
 
@@ -24,58 +25,32 @@ const hasCards = (ctx: Context, player: string) =>
   ownedCards(ctx.world, player, areas).length > 0 || delayedCards(ctx.world, player).length > 0;
 
 async function takeOrDiscard(ctx: Context, effect: CardEffect, take: boolean): Promise<void> {
-  const chosen = await chooseOwnedCard(ctx, {
-    actor: effect.actor,
-    target: effect.target,
-    areas,
-    reason: effect.card.name,
-    discard: !take,
-  });
-
+  const { actor, target } = effect;
+  const reason = effect.card.name;
+  const chosen = await chooseOwnedCard(ctx, { actor, target, areas, reason, discard: !take });
   if (chosen.kind === 'unavailable') return;
   if (chosen.kind === 'delayed') {
     const moved = take
-      ? await moveDelayed(ctx, chosen.id, `${effect.actor}:hand`)
-      : await discardCards(ctx, {
-          actor: effect.actor,
-          owner: effect.target,
-          cards: [chosen.id],
-          reason: effect.card.name,
-        });
-
+      ? await moveDelayed(ctx, chosen.id, `${actor}:hand`)
+      : await discardCards(ctx, { actor, owner: target, cards: [chosen.id], reason });
     if (moved.kind !== 'unavailable')
       ctx.commit(take ? CardEvent.takenDelayed : CardEvent.discardedDelayed, [], {
-        actor: effect.actor,
-        target: effect.target,
+        actor,
+        target,
         card: chosen.card,
         cards: moved.cards,
       });
     return;
   }
   const { card, from } = chosen;
+  if (take) {
+    await takeCard(ctx, { actor, target, card, from, reason });
+    return;
+  }
   const open = ctx.world.zone(from).kind !== 'hand';
-  const moved = take
-    ? await moveCards(
-        ctx,
-        [{ cards: [card], from, to: `${effect.actor}:hand`, place: 'bottom' }],
-        effect.card.name,
-      )
-    : await discardCards(ctx, {
-        actor: effect.actor,
-        owner: effect.target,
-        cards: [card],
-        reason: effect.card.name,
-      });
-
-  if (moved.kind === 'unavailable') return;
-  ctx.commit(take ? CardEvent.taken : CardEvent.discardedByEffect, [], {
-    actor: effect.actor,
-    target: effect.target,
-    card,
-    from,
-    open,
-    reason: effect.card.name,
-  });
+  const moved = await discardCards(ctx, { actor, owner: target, cards: [card], reason });
+  if (moved.kind === 'discarded')
+    ctx.commit(CardEvent.discardedByEffect, [], { actor, target, card, open, reason });
 }
 
 export const trickCards: readonly CardDefinition[] = [
@@ -185,23 +160,13 @@ export const trickCards: readonly CardDefinition[] = [
                 model.decision(effect.target, '五谷丰登：选择一张公开牌'),
               );
               if (answer.kind !== 'chosen') return;
-              await moveCards(
-                child,
-                [
-                  {
-                    cards: answer.value.cards,
-                    from: pool.zone,
-                    to: `${effect.target}:hand`,
-                    place: 'bottom',
-                  },
-                ],
-                'standard:amazing_grace',
-              );
-
-              child.commit(CardEvent.takenPublic, [], {
-                actor: effect.target,
-                cards: answer.value.cards,
-                reason: 'standard:amazing_grace',
+              await obtain(child, effect.target, answer.value.cards, 'standard:amazing_grace', {
+                kind: CardEvent.takenPublic,
+                data: {
+                  actor: effect.target,
+                  cards: answer.value.cards,
+                  reason: 'standard:amazing_grace',
+                },
               });
             });
           },

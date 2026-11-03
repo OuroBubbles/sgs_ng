@@ -13,18 +13,29 @@ import type {
   EffectSnapshot,
   SemanticCard,
 } from './types';
-import { moveCards, Cards } from './move';
+import { moveCards, Cards, declared } from './move';
 import { withProcessing } from './processing';
 import { Death } from '../combat/life-events';
 import { defineEvent } from '../../core/runtime/event';
 import { timing } from '../../core/runtime/event';
 
 export const Delayed = defineEvent('delayed', {
-  placed: timing<unknown>(),
-  effectDeclared: timing<unknown>(),
+  placed: declared<{
+    readonly zone: string;
+    readonly owner: string;
+    readonly source: CardUseRef;
+  }>(),
+  effectDeclared: timing<unknown, { readonly useId: string }>(),
   effectFinished: timing<unknown>(),
-  removed: timing<unknown>(),
-  resolving: timing<unknown>(),
+  removed: declared<{
+    readonly kind: 'moved';
+    readonly owner: string;
+    readonly card: SemanticCard;
+    readonly cards: readonly string[];
+    readonly zone: string;
+    readonly to: string;
+  }>(),
+  resolving: declared<{ readonly entry: DelayedCard; readonly processing: string }>(),
 });
 
 /** 判定阶段的具名输入；正常生效保留可操作效果，取消后效使用已封口快照。 */

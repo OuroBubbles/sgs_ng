@@ -766,9 +766,7 @@ it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，�
   await answer(game.room, true);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual([]);
-  const result = game.room.history.facts(Draw.completed)[0]!.data.detail as {
-    edits: { reason: string; after: number }[];
-  };
+  const result = game.room.history.facts(Draw.completed)[0]!.data.detail;
   expect(result.edits.map((edit) => [edit.reason, edit.after])).toEqual([
     ['standard:yingzi', 1],
     ['standard:luoyi', 0],

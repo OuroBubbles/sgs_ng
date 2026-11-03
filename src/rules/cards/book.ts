@@ -43,7 +43,7 @@ import { isGameOver } from '../game/end';
 import { requestResponse, Response } from './response';
 import type { ResponseIntent, ResponseResult, ResponseConsumer } from './response';
 import { defineEvent, timing } from '../../core/runtime/event';
-import { CardEvent } from './move';
+import { CardEvent, declared } from './move';
 import { Delayed } from './delayed';
 
 export type { ResponseResult } from './response';
@@ -90,7 +90,12 @@ export const Use = defineEvent('use', {
   declared: timing<UsePlanView>(),
   targets: timing<UsePlanView>(),
   finished: timing<UseSnapshot>(),
-  materialsObtained: timing<unknown>(),
+  materialsObtained: declared<{
+    readonly actor: string;
+    readonly useId: string;
+    readonly cards: readonly string[];
+    readonly reason: string;
+  }>(),
 });
 export const Target = defineEvent('target', {
   specifying: timing<{

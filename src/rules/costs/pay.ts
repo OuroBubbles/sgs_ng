@@ -66,13 +66,13 @@ export interface PaymentIntent {
   committed(ctx: Context): void;
 }
 
-export interface PaymentReceipt {
+export interface PaymentReceipt<D = unknown> {
   readonly actor: string;
   readonly cards: readonly string[];
   readonly reason: string;
   readonly skill: string | null;
   readonly instance: string | null;
-  readonly declaration: unknown;
+  readonly declaration: D;
 }
 
 export type PaymentResult =

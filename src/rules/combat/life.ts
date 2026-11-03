@@ -20,7 +20,7 @@ import { defineEvent } from '../../core/runtime/event';
 import { timing } from '../../core/runtime/event';
 
 export const PlayerEvent = defineEvent('player', {
-  died: timing<unknown>(),
+  died: timing<unknown, DeathEvent>(),
   buried: timing<unknown>(),
 });
 

@@ -1,8 +1,13 @@
-import { defineEvent, equipmentInSlot, obtain, timing, victimOf } from '../../sdk';
+import { declared, defineEvent, equipmentInSlot, obtain, victimOf } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
 
 export const Collateral = defineEvent('collateral', {
-  weaponTaken: timing<unknown>(),
+  weaponTaken: declared<{
+    readonly actor: string;
+    readonly holder: string;
+    readonly victim: string;
+    readonly cards: readonly string[];
+  }>(),
 });
 
 export const collateral: CardDefinition = {

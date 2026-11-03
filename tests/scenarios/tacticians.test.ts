@@ -604,7 +604,13 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
   expect(useDeclarations(match.room.world)).toEqual([]);
   await match.room.run('later public history', (ctx) => {
     for (let i = 0; i < 110; i++)
-      ctx.commit(Draw.completed, [], { input: { player: 'a' }, cards: [] });
+      ctx.commit(Draw.completed, [], {
+        kind: 'drawn',
+        input: { player: 'a', count: 0, reason: 'test' },
+        count: 0,
+        cards: [],
+        edits: [],
+      });
   });
   const later = projectMatch(match, 'a', null);
   expect(

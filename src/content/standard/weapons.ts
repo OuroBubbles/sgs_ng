@@ -19,11 +19,33 @@ import {
 } from '../../sdk';
 import type { CardDefinition, Context, SkillHandle } from '../../sdk';
 
+interface WeaponDiscard {
+  readonly actor: string;
+  readonly name: string;
+  readonly target: string;
+  readonly card: string;
+}
 export const Weapon = defineEvent('weapon', {
-  followUp: timing<unknown>(),
-  horseDiscarded: timing<unknown>(),
-  cardDiscarded: timing<unknown>(),
-  damageReplaced: timing<unknown>(),
+  followUp: timing<
+    unknown,
+    {
+      readonly actor: string;
+      readonly name: string;
+      readonly fromEffect: string;
+      readonly use: string;
+    }
+  >(),
+  horseDiscarded: timing<unknown, WeaponDiscard>(),
+  cardDiscarded: timing<unknown, WeaponDiscard & { readonly from: string }>(),
+  damageReplaced: timing<
+    unknown,
+    {
+      readonly actor: string;
+      readonly name: string;
+      readonly target: string;
+      readonly effect: string;
+    }
+  >(),
 });
 
 function axeMaterials(ctx: Context, self: SkillHandle): readonly string[] {

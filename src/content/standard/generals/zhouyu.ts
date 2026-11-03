@@ -17,7 +17,10 @@ import {
 } from '../../../sdk';
 
 export const Fanjian = defineEvent('fanjian', {
-  guessed: timing<unknown>(),
+  guessed: timing<
+    unknown,
+    { readonly actor: string; readonly owner: string; readonly suit: string }
+  >(),
 });
 
 export const yingzi = skill({
@@ -70,7 +73,7 @@ export const fanjian = skill({
           }),
         );
         if (guess.kind !== 'chosen') return;
-        ctx.commit(Fanjian.guessed, [], { actor: target, owner: self.owner, suit: guess.value });
+        ctx.commit(Fanjian.guessed, [], { actor: target!, owner: self.owner, suit: guess.value });
         const picked = await chooseOwnedCard(ctx, {
           actor: target!,
           target: self.owner,

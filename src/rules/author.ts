@@ -81,12 +81,12 @@ export const nth = (at: TriggerOccurrence): string =>
 // ───────────────────────── 动词
 
 /** 牌从当前位置进入 player 的手牌；接收者阵亡或终局时不移动。 */
-export async function obtain(
+export async function obtain<D>(
   ctx: Context,
   player: string,
   cards: string | readonly string[],
   reason: string,
-  fact?: MoveDeclaration,
+  fact?: MoveDeclaration<D>,
 ): Promise<MoveResult | null> {
   const ids = typeof cards === 'string' ? [cards] : cards;
   if (!ids.length || !alive(ctx, player) || isGameOver(ctx.world)) return null;

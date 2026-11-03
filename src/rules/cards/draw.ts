@@ -8,7 +8,7 @@ import { defineEvent } from '../../core/runtime/event';
 import { timing } from '../../core/runtime/event';
 
 export const Draw = defineEvent('draw', {
-  completed: timing<unknown>(),
+  completed: timing<unknown, DrawResult>(),
 });
 
 export const Deck = defineEvent('deck', {

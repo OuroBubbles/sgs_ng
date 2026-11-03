@@ -30,6 +30,30 @@ import { isChained } from '../../rules/combat/chain';
 import { shieldOf } from '../../rules/combat/shield';
 import { CardEvent } from '../../rules/cards/move';
 import { Cards } from '../../rules/cards/move';
+import { isFact } from '../../core/history/journal';
+import type { Fact } from '../../core/history/journal';
+import type { Timing } from '../../core/runtime/event';
+import type { Card } from '../../core/model/state';
+import { victimOf } from '../../rules/cards/types';
+import type { UseSnapshot } from '../../rules/cards/types';
+import { Skill } from '../../rules/skills/skills';
+import { Discard } from '../../rules/cards/discard';
+import { Equipment } from '../../rules/cards/equipment';
+import { Draw } from '../../rules/cards/draw';
+import { Damage } from '../../rules/combat/damage';
+import { Shield } from '../../rules/combat/shield';
+import { Chain } from '../../rules/combat/chain';
+import { Hp } from '../../rules/combat/recover';
+import { PlayerEvent } from '../../rules/combat/life';
+import { Turn, Phase } from '../../rules/turn/turn';
+import { Game } from '../../rules/game/end';
+import { Delayed } from '../../rules/cards/delayed';
+import { Judgment } from '../../rules/cards/judge';
+import { Use } from '../../rules/cards/book';
+import { Counter } from '../../rules/cards/counter';
+import { Collateral } from '../../content/standard/collateral';
+import { Weapon } from '../../content/standard/weapons';
+import { Fanjian } from '../../content/standard/generals/zhouyu';
 
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -74,10 +98,9 @@ export function candidates(value: unknown): readonly CandidateView[] {
       })
     : [];
 }
-function face(match: RoleMatch, id: string, input: unknown): CardView {
-  const card = record(input);
-  const name = text(card.name);
-  const rank = typeof card.rank === 'number' ? card.rank : 0;
+type Face = Pick<Card, 'name' | 'suit' | 'rank'> & { readonly color?: string };
+function face(match: RoleMatch, id: string, card: Face): CardView {
+  const { name, rank } = card;
   const presentation = match.content?.cardViews[name];
   const definition = match.book.definition(name);
   return {
@@ -88,13 +111,13 @@ function face(match: RoleMatch, id: string, input: unknown): CardView {
     ...(presentation?.icon ? { icon: presentation.icon } : {}),
     ...(presentation?.image ? { image: presentation.image } : {}),
     ...(definition.equipment ? { slot: definition.equipment.slot } : {}),
-    suit: suitNames[text(card.suit)] ?? '·',
+    suit: suitNames[card.suit] ?? '·',
     color:
       card.color === 'red' || card.color === 'black' || card.color === 'none'
         ? card.color
-        : ['heart', 'diamond'].includes(text(card.suit))
+        : ['heart', 'diamond'].includes(card.suit)
           ? 'red'
-          : ['spade', 'club'].includes(text(card.suit))
+          : ['spade', 'club'].includes(card.suit)
             ? 'black'
             : 'none',
     rank: rank === 0 ? '—' : ({ 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }[rank] ?? String(rank)),
@@ -188,7 +211,7 @@ export function decisionView(match: RoleMatch, request: DecisionRequest): Decisi
           group.cards.push({
             id: candidate.id,
             label: candidate.label,
-            face: item.face === null ? null : face(match, candidate.id, item.face),
+            face: item.face === null ? null : face(match, candidate.id, item.face as Face),
           });
         }
       const cardGroups: readonly CardChoiceGroupView[] = [...groups.values()];
@@ -272,26 +295,241 @@ function publicHistory(
     return voices?.length ? voices[seq % voices.length] : undefined;
   };
   const actionUses = new Map<number, string>();
-  const targetsOf = (effects: readonly unknown[], edits: readonly unknown[]) => {
+  const targetsOf = (
+    effects: readonly { readonly effectId: string; readonly target: string }[],
+    edits: UseSnapshot['edits'],
+  ) => {
     // 效果被防止/无懈不等于移除用牌目标；只有显式的目标编辑改变公开指向。
     const removed = new Set(
-      edits
-        .map(record)
-        .flatMap((edit) =>
-          edit.kind === 'remove'
-            ? [text(edit.effectId)]
-            : edit.kind === 'replace'
-              ? [text(edit.fromEffectId)]
-              : [],
-        ),
+      edits.flatMap((edit) =>
+        edit.kind === 'remove'
+          ? [edit.effectId]
+          : edit.kind === 'replace'
+            ? [edit.fromEffectId]
+            : [],
+      ),
     );
-    return effects
-      .map(record)
-      .filter((effect) => !removed.has(text(effect.effectId)))
-      .map((effect) => text(effect.target));
+    return effects.filter((effect) => !removed.has(effect.effectId)).map((effect) => effect.target);
   };
   const declarations = new Map(
     useDeclarations(world).map((use) => [use.id, targetsOf(use.effects, use.edits)]),
+  );
+  const cardName = (id: string) => `【${printedCardView(match, id).name}】`;
+  const label = (card: { readonly name: string }) => match.book.definition(card.name).label;
+  const processing = (zone: string) => world.snapshot.zones.some((item) => item.id === zone);
+  type Narrator = (fact: Fact, play: (audio: LogView['audio']) => void) => string;
+  const narrate = new Map<string, Narrator>();
+  const on = <R>(
+    kinds: Timing<unknown, R> | readonly Timing<unknown, R>[],
+    render: (
+      detail: Fact<R>['data']['detail'],
+      fact: Fact<R>,
+      play: (audio: LogView['audio']) => void,
+    ) => string | undefined,
+  ) => {
+    for (const kind of [kinds].flat())
+      narrate.set(kind.id, (fact, play) =>
+        isFact(fact, kind) ? (render(fact.data.detail, fact, play) ?? '') : '',
+      );
+  };
+  on([CardEvent.used, CardEvent.responded], ({ actor, declaration }, fact, play) => {
+    const card = face(match, `action:${fact.seq}`, declaration.card);
+    const source = declaration.card.source;
+    const voice =
+      skillVoice(actor, source?.kind === 'viewAs' ? source.skill : '', fact.seq) ??
+      match.content?.cardViews[declaration.card.name]?.voices?.[
+        genderOf(world, actor) === 'female' ? 'female' : 'male'
+      ];
+    if (voice) play({ voice });
+    const targets = declaration.targets ?? [];
+    if (actions.length < 3) actionUses.set(fact.seq, declaration.useId ?? '');
+    const responding = fact.data.kind === CardEvent.responded.id;
+    actions.push({
+      seq: fact.seq,
+      actor,
+      card,
+      targets,
+      kind: responding ? 'response' : 'use',
+      processing: processing(declaration.processing),
+    });
+    const { beneficiary } = declaration;
+    return `${actor}${responding && beneficiary && beneficiary !== actor ? `为${beneficiary}` : ''}${responding ? '打出' : '使用'}【${card.name}】${targets.length ? ` → ${targets.join('、')}` : ''}${declaration.card.name === 'standard:collateral' ? `，令其对 ${victimOf(declaration)} 使用杀` : ''}`;
+  });
+  on(
+    Collateral.weaponTaken,
+    ({ declaration: d }) =>
+      `${d.actor}因【借刀杀人】获得 ${d.holder} 的${d.cards.map(cardName).join('、')}`,
+  );
+  on(Skill.invoked, ({ actor, skill, cards, declaration }, fact, play) => {
+    const voice = skillVoice(actor, skill ?? '', fact.seq);
+    if (voice) play({ voice });
+    // 技能宣告是各技能自定的数据；作者层总会写入 label，个别技能附带公开目标。
+    const declared = declaration as {
+      readonly label?: string;
+      readonly targets?: readonly string[];
+      readonly redirect?: { readonly from: string; readonly to: string };
+    };
+    return `${actor}发动【${declared.label || '技能'}】${skill === 'standard:rende' ? `，将 ${cards.length} 张牌交给 ${(declared.targets ?? []).join('、')}` : ''}${skill === 'standard:liuli' && declared.redirect ? `，将杀从 ${declared.redirect.from} 转移给 ${declared.redirect.to}` : ''}`;
+  });
+  on(
+    Discard.limited,
+    (d) => `${d.actor}有无法弃置的手牌，本阶段需弃置 ${d.count} 张（原需 ${d.required} 张）`,
+  );
+  on(Weapon.followUp, (d) => `${d.actor}通过【${d.name}】追杀`);
+  on(
+    [Weapon.cardDiscarded, Weapon.horseDiscarded],
+    (d) => `${d.actor}以【${d.name}】弃置 ${d.target} 的${cardName(d.card)}`,
+  );
+  on(Weapon.damageReplaced, (d) => `${d.actor}发动【${d.name}】防止对 ${d.target} 的伤害`);
+  on(Equipment.ignored, (d) => `${d.actor}的【青釭剑】使此杀忽略目标防具`);
+  on(Equipment.blocked, (d) => `${d.actor}的【仁王盾】抵消黑色杀`);
+  on(Draw.completed, (d, _fact, play) => {
+    play({ effect: 'draw' });
+    return `${d.input.player}摸了 ${d.cards.length} 张牌`;
+  });
+  on(Damage.dealt, (d, _fact, play) => {
+    const { nature, origin } = d.input;
+    play({
+      effect:
+        nature === 'fire' ? 'fire-damage' : nature === 'thunder' ? 'thunder-damage' : 'damage',
+    });
+    const natures: Readonly<Record<string, string>> = { normal: '', fire: '火焰', thunder: '雷电' };
+    return `${d.input.to}受到 ${d.amount} 点${natures[nature] ?? '属性'}伤害（${d.beforeHp} → ${d.afterHp}）${d.shieldLost > 0 ? `，护盾吸收 ${d.shieldLost} 点` : ''}${origin?.kind === 'chain' || (origin?.kind === 'transfer' && origin.chain) ? '，连环传播' : ''}${origin?.kind === 'transfer' ? '，转移伤害' : ''}${d.unchained ? '，解除连环' : ''}`;
+  });
+  on(Damage.transferring, (d) => `${d.player}将 ${d.amount} 点伤害转移给${d.target}`);
+  on(
+    Shield.changed,
+    (d) =>
+      `${d.player}${d.amount > 0 ? '获得' : '失去'} ${Math.abs(d.amount)} 点护盾（${d.before} → ${d.after}）`,
+  );
+  on(Chain.changed, (d) => `${d.player}${d.after ? '进入连环' : '解除连环'}`);
+  on(Hp.recovered, (d) => `${d.input.to}回复 ${d.amount} 点体力`);
+  on(Hp.lost, (d) => `${d.input.player}失去 ${d.amount} 点体力`);
+  on(PlayerEvent.died, ({ player }, _fact, play) => {
+    const voice = generalMedia(player)?.deathVoice;
+    if (voice) play({ voice });
+    return `${player}阵亡，身份为${roleNames[roleOf(world, player)] ?? '未知'}`;
+  });
+  on(Cards.discarded, (d) => `${d.actor}弃置 ${d.cards.length} 张牌`);
+  on(Cards.peeked, ({ declaration: d }) => `${d.player}查看牌堆顶 ${d.cards.length} 张牌`);
+  on(
+    Cards.arranged,
+    ({ declaration: d }) =>
+      `${d.player}整理牌堆：${d.top.length} 张置顶，${d.bottom.length} 张置底`,
+  );
+  on(Cards.given, ({ declaration: d }, fact) => {
+    if (!d.visible) return `${d.actor}将 ${d.count} 张牌交给 ${d.target}`;
+    const cards = (d.cards ?? []).map((id) => printedCardView(match, id));
+    // 逆序读取事实时，单条事实中的多个动作也要逆序，最终统一恢复显示顺序。
+    for (const card of [...cards].reverse())
+      actions.push({
+        seq: fact.seq,
+        actor: d.actor,
+        targets: [d.target],
+        card,
+        kind: 'reveal',
+        processing: false,
+      });
+    return `${d.actor}将 ${d.count} 张牌交给 ${d.target}，公开：${cards.map((card) => `【${card.name}】${card.suit}${card.rank}`).join('、')}`;
+  });
+  on(
+    Cards.distributed,
+    ({ declaration: d }) =>
+      `${d.actor}分配牌：${d.allocations.map((entry) => `${entry.target} ${entry.count} 张`).join('、')}`,
+  );
+  on(Fanjian.guessed, (d) => {
+    const suits: Readonly<Record<string, string>> = {
+      spade: '黑桃',
+      heart: '红桃',
+      club: '梅花',
+      diamond: '方块',
+    };
+    return `${d.actor}为反间选择${suits[d.suit] ?? '未知花色'}`;
+  });
+  on(Turn.started, (d) => `${d.owner}的${d.origin.kind === 'extra' ? '额外回合' : '回合'}`);
+  on(Game.finished, (d, _fact, play) => {
+    play({ effect: 'finish' });
+    return `对局结束：${d.winners.join('、') || '无人'}获胜`;
+  });
+  on(Cards.revealed, (d) => `公开展示 ${d.cards.length} 张牌`);
+  on(Delayed.placed, ({ declaration: d }) => `${d.owner}的判定区置入【${label(d.source.card)}】`);
+  on(Delayed.resolving, ({ declaration: d }, fact) => {
+    const card = face(match, `action:${fact.seq}`, d.entry.source.card);
+    const actor = d.entry.owner;
+    actions.push({
+      seq: fact.seq,
+      actor,
+      card,
+      targets: [actor],
+      kind: 'delayed',
+      processing: processing(d.processing),
+    });
+    return `${actor}结算【${card.name}】`;
+  });
+  on(Judgment.finished, (d, fact) => {
+    if (d.card === null) return;
+    const card = face(match, `action:${fact.seq}`, d.card);
+    actions.push({
+      seq: fact.seq,
+      actor: d.player,
+      card,
+      targets: [],
+      kind: 'judgment',
+      processing: processing(d.processing),
+    });
+    return `${d.player}的${match.content?.cardViews[d.reason] ? match.book.definition(d.reason).label : '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
+  });
+  on(Judgment.cardObtained, ({ declaration: d }) => `${d.player}获得判定牌${cardName(d.card)}`);
+  on(
+    Use.materialsObtained,
+    ({ declaration: d }) => `${d.actor}获得造成伤害的材料牌${d.cards.map(cardName).join('')}`,
+  );
+  on(Judgment.replaced, ({ declaration: d }, fact) => {
+    const card = face(match, `action:${fact.seq}`, d.card);
+    const invoked = d.invocation;
+    const label = invoked ? (invoked.declaration as { readonly label?: string }).label : '';
+    return `${invoked ? `${invoked.actor}发动【${label ?? ''}】，` : ''}${d.player}的判定牌改为 ${card.suit}${card.rank}【${card.name}】`;
+  });
+  on(Phase.skipped, (d) => {
+    const labels: Readonly<Record<string, string>> = {
+      prepare: '准备',
+      judge: '判定',
+      draw: '摸牌',
+      play: '出牌',
+      discard: '弃牌',
+      finish: '结束',
+    };
+    return `${d.owner}跳过了${labels[d.kind] ?? d.kind}阶段`;
+  });
+  on(
+    CardEvent.takenDelayed,
+    (d) => `${d.actor}移除了 ${d.target} 的【${label(d.card)}】，获得 ${d.cards.length} 张材料牌`,
+  );
+  on(CardEvent.discardedDelayed, (d) => `${d.actor}移除了 ${d.target} 的【${label(d.card)}】`);
+  on(Equipment.equipped, ({ declaration: d }) =>
+    d.replaced.length
+      ? `${d.owner}装备${cardName(d.card)}，替换${d.replaced.map(cardName).join('')}`
+      : `${d.owner}装备${cardName(d.card)}`,
+  );
+  on(Counter.finished, (d) => {
+    if (d.by === null) return;
+    const { subject } = d;
+    if (subject.kind === 'effect')
+      return d.kind === 'countered'
+        ? `【${label(subject.effect.card)}】对 ${subject.effect.target} 的效果被【${label(d.by.card)}】抵消`
+        : `对 ${subject.effect.target} 的原效果继续生效`;
+    if (d.kind === 'countered')
+      return `${subject.use.actor} 的【${label(subject.use.card)}】被反制`;
+  });
+  on(
+    CardEvent.taken,
+    ({ declaration: d }) =>
+      `${d.actor}从 ${d.target} 获得${d.open ? cardName(d.card) : '一张手牌'}`,
+  );
+  on(CardEvent.discardedByEffect, (d) => `${d.actor}弃置了 ${d.target} 的${cardName(d.card)}`);
+  on(
+    CardEvent.takenPublic,
+    ({ declaration: d }) => `${d.actor}获得${d.cards.map(cardName).join('')}`,
   );
   // 结果只展示最近 100 条日志和 3 个动作；从末尾解释到满足实际输出为止。
   // 仍按当前投影解释角色、牌名与处理区，不缓存过去的 World 或格式化结果。
@@ -301,279 +539,8 @@ function publicHistory(
     index--
   ) {
     const fact = facts[index]!;
-    const detail = record(fact.data.detail);
-    const input = record(detail.input);
-    let message = '';
     let audio: LogView['audio'];
-    switch (fact.data.kind) {
-      case 'card.used':
-      case 'card.responded': {
-        const declaration = record(detail.declaration);
-        const semantic = record(declaration.card);
-        const card = face(match, `action:${fact.seq}`, semantic);
-        const actor = text(detail.actor);
-        const source = record(semantic.source);
-        const cardVoices = match.content?.cardViews[text(semantic.name)]?.voices;
-        const voice =
-          skillVoice(actor, text(source.skill), fact.seq) ??
-          cardVoices?.[genderOf(world, actor) === 'female' ? 'female' : 'male'];
-        if (voice) audio = { voice };
-        const originalTargets = strings(declaration.targets);
-        if (actions.length < 3) actionUses.set(fact.seq, text(declaration.useId));
-        const responding = fact.data.kind === 'card.responded';
-        const processing = world.snapshot.zones.some((zone) => zone.id === declaration.processing);
-        actions.push({
-          seq: fact.seq,
-          actor,
-          card,
-          targets: originalTargets,
-          kind: responding ? 'response' : 'use',
-          processing,
-        });
-        const beneficiary = text(declaration.beneficiary);
-        message = `${actor}${responding && beneficiary && beneficiary !== actor ? `为${beneficiary}` : ''}${responding ? '打出' : '使用'}【${card.name}】${originalTargets.length ? ` → ${originalTargets.join('、')}` : ''}`;
-        if (semantic.name === 'standard:collateral')
-          message += `，令其对 ${text(record(declaration.parameters).victim)} 使用杀`;
-        break;
-      }
-      case 'collateral.weapon-taken': {
-        const taken = record(detail.declaration);
-        message = `${text(taken.actor)}因【借刀杀人】获得 ${text(taken.holder)} 的${strings(
-          taken.cards,
-        )
-          .map((id) => `【${printedCardView(match, id).name}】`)
-          .join('、')}`;
-        break;
-      }
-      case 'skill.invoked': {
-        const voice = skillVoice(text(detail.actor), text(detail.skill), fact.seq);
-        if (voice) audio = { voice };
-        message = `${text(detail.actor)}发动【${text(record(detail.declaration).label) || '技能'}】`;
-        if (detail.skill === 'standard:rende')
-          message += `，将 ${strings(detail.cards).length} 张牌交给 ${strings(record(detail.declaration).targets).join('、')}`;
-        if (detail.skill === 'standard:liuli') {
-          const redirect = record(record(detail.declaration).redirect);
-          message += `，将杀从 ${text(redirect.from)} 转移给 ${text(redirect.to)}`;
-        }
-        break;
-      }
-      case 'discard.limited':
-        message = `${text(detail.actor)}有无法弃置的手牌，本阶段需弃置 ${String(detail.count)} 张（原需 ${String(detail.required)} 张）`;
-        break;
-      case 'weapon.follow-up':
-        message = `${text(detail.actor)}通过【${text(detail.name)}】追杀`;
-        break;
-      case 'weapon.card-discarded':
-        message = `${text(detail.actor)}以【${text(detail.name)}】弃置 ${text(detail.target)} 的【${printedCardView(match, text(detail.card)).name}】`;
-        break;
-      case 'weapon.damage-replaced':
-        message = `${text(detail.actor)}发动【${text(detail.name)}】防止对 ${text(detail.target)} 的伤害`;
-        break;
-      case 'weapon.horse-discarded':
-        message = `${text(detail.actor)}以【${text(detail.name)}】弃置 ${text(detail.target)} 的【${printedCardView(match, text(detail.card)).name}】`;
-        break;
-      case 'equipment.ignored':
-        message = `${text(detail.actor)}的【青釭剑】使此杀忽略目标防具`;
-        break;
-      case 'equipment.blocked':
-        message = `${text(detail.actor)}的【仁王盾】抵消黑色杀`;
-        break;
-      case 'draw.completed':
-        audio = { effect: 'draw' };
-        message = `${text(input.player)}摸了 ${Array.isArray(detail.cards) ? detail.cards.length : 0} 张牌`;
-        break;
-      case 'damage.dealt':
-        audio = {
-          effect:
-            input.nature === 'fire'
-              ? 'fire-damage'
-              : input.nature === 'thunder'
-                ? 'thunder-damage'
-                : 'damage',
-        };
-        message = `${text(input.to)}受到 ${String(detail.amount)} 点${input.nature === 'normal' ? '' : input.nature === 'fire' ? '火焰' : input.nature === 'thunder' ? '雷电' : '属性'}伤害（${String(detail.beforeHp)} → ${String(detail.afterHp)}）${typeof detail.shieldLost === 'number' && detail.shieldLost > 0 ? `，护盾吸收 ${detail.shieldLost} 点` : ''}${record(input.origin).kind === 'chain' || typeof record(input.origin).chain === 'string' ? '，连环传播' : ''}${record(input.origin).kind === 'transfer' ? '，转移伤害' : ''}${detail.unchained === true ? '，解除连环' : ''}`;
-        break;
-      case 'damage.transferring':
-        message = `${text(detail.player)}将 ${String(detail.amount)} 点伤害转移给${text(detail.target)}`;
-        break;
-      case 'shield.changed':
-        message = `${text(detail.player)}${Number(detail.amount) > 0 ? '获得' : '失去'} ${Math.abs(Number(detail.amount))} 点护盾（${String(detail.before)} → ${String(detail.after)}）`;
-        break;
-      case 'chain.changed':
-        audio = { effect: 'chain' };
-        message = `${text(detail.player)}${detail.after === true ? '进入连环' : '解除连环'}`;
-        break;
-      case 'hp.recovered':
-        message = `${text(input.to)}回复 ${String(detail.amount)} 点体力`;
-        break;
-      case 'hp.lost':
-        audio = { effect: 'lose-hp' };
-        message = `${text(input.player)}失去 ${String(detail.amount)} 点体力`;
-        break;
-      case 'player.died': {
-        const voice = generalMedia(text(detail.player))?.deathVoice;
-        if (voice) audio = { voice };
-        message = `${text(detail.player)}阵亡，身份为${roleNames[roleOf(world, text(detail.player))] ?? '未知'}`;
-        break;
-      }
-      case 'cards.discarded':
-        message = `${text(detail.actor)}弃置 ${Array.isArray(detail.cards) ? detail.cards.length : 0} 张牌`;
-        break;
-      case 'cards.peeked': {
-        const peeked = record(detail.declaration);
-        message = `${text(peeked.player)}查看牌堆顶 ${strings(peeked.cards).length} 张牌`;
-        break;
-      }
-      case 'cards.arranged': {
-        const arranged = record(detail.declaration);
-        message = `${text(arranged.player)}整理牌堆：${strings(arranged.top).length} 张置顶，${strings(arranged.bottom).length} 张置底`;
-        break;
-      }
-      case 'cards.given': {
-        const given = record(detail.declaration);
-        message = `${text(given.actor)}将 ${String(given.count)} 张牌交给 ${text(given.target)}`;
-        if (given.visible === true) {
-          const cards = strings(given.cards).map((id) => printedCardView(match, id));
-          message += `，公开：${cards.map((card) => `【${card.name}】${card.suit}${card.rank}`).join('、')}`;
-          // 逆序读取事实时，单条事实中的多个动作也要逆序，最终统一恢复显示顺序。
-          for (const card of [...cards].reverse())
-            actions.push({
-              seq: fact.seq,
-              actor: text(given.actor),
-              targets: [text(given.target)],
-              card,
-              kind: 'reveal',
-              processing: false,
-            });
-        }
-        break;
-      }
-      case 'cards.distributed': {
-        const given = record(detail.declaration);
-        const allocations = Array.isArray(given.allocations) ? given.allocations.map(record) : [];
-        message = `${text(given.actor)}分配牌：${allocations.map((entry) => `${text(entry.target)} ${Number(entry.count)} 张`).join('、')}`;
-        break;
-      }
-      case 'fanjian.guessed':
-        message = `${text(detail.actor)}为反间选择${({ spade: '黑桃', heart: '红桃', club: '梅花', diamond: '方块' } as Readonly<Record<string, string>>)[text(detail.suit)] ?? '未知花色'}`;
-        break;
-      case 'turn.started':
-        message = `${text(detail.owner)}的${record(detail.origin).kind === 'extra' ? '额外回合' : '回合'}`;
-        break;
-      case 'game.finished':
-        audio = { effect: 'finish' };
-        message = `对局结束：${strings(detail.winners).join('、') || '无人'}获胜`;
-        break;
-      case 'cards.revealed':
-        message = `公开展示 ${strings(detail.cards).length} 张牌`;
-        break;
-      case 'delayed.placed': {
-        const placed = record(detail.declaration);
-        message = `${text(placed.owner)}的判定区置入【${match.book.definition(text(record(record(placed.source).card).name)).label}】`;
-        break;
-      }
-      case 'delayed.resolving': {
-        const resolving = record(detail.declaration);
-        const entry = record(resolving.entry);
-        const card = face(match, `action:${fact.seq}`, record(record(entry.source).card));
-        const actor = text(entry.owner);
-        actions.push({
-          seq: fact.seq,
-          actor,
-          card,
-          targets: [actor],
-          kind: 'delayed',
-          processing: world.snapshot.zones.some((zone) => zone.id === resolving.processing),
-        });
-        message = `${actor}结算【${card.name}】`;
-        break;
-      }
-      case 'judgment.finished': {
-        if (detail.card === null) break;
-        const card = face(match, `action:${fact.seq}`, detail.card);
-        const actor = text(detail.player);
-        actions.push({
-          seq: fact.seq,
-          actor,
-          card,
-          targets: [],
-          kind: 'judgment',
-          processing: world.snapshot.zones.some((zone) => zone.id === detail.processing),
-        });
-        message = `${actor}的${match.content?.cardViews[text(detail.reason)] ? match.book.definition(text(detail.reason)).label : '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
-        break;
-      }
-      case 'judgment.card-obtained': {
-        const obtained = record(detail.declaration);
-        message = `${text(obtained.player)}获得判定牌【${printedCardView(match, text(obtained.card)).name}】`;
-        break;
-      }
-      case 'use.materials-obtained': {
-        const obtained = record(detail.declaration);
-        message = `${text(obtained.actor)}获得造成伤害的材料牌${strings(obtained.cards)
-          .map((id) => `【${printedCardView(match, id).name}】`)
-          .join('')}`;
-        break;
-      }
-      case 'judgment.replaced': {
-        const changed = record(detail.declaration);
-        const card = face(match, `action:${fact.seq}`, changed.card);
-        const invoked = record(changed.invocation);
-        message = `${typeof invoked.actor === 'string' ? `${text(invoked.actor)}发动【${text(record(invoked.declaration).label)}】，` : ''}${text(changed.player)}的判定牌改为 ${card.suit}${card.rank}【${card.name}】`;
-        break;
-      }
-      case 'phase.skipped': {
-        const labels: Record<string, string> = {
-          prepare: '准备',
-          judge: '判定',
-          draw: '摸牌',
-          play: '出牌',
-          discard: '弃牌',
-          finish: '结束',
-        };
-        message = `${text(detail.owner)}跳过了${labels[text(detail.kind)] ?? text(detail.kind)}阶段`;
-        break;
-      }
-      case 'card.taken-delayed':
-      case 'card.discarded-delayed':
-        message = `${text(detail.actor)}移除了 ${text(detail.target)} 的【${match.book.definition(text(record(detail.card).name)).label}】${fact.data.kind === 'card.taken-delayed' ? `，获得 ${strings(detail.cards).length} 张材料牌` : ''}`;
-        break;
-      case 'equipment.equipped': {
-        const equipment = record(detail.declaration);
-        message = `${text(equipment.owner)}装备【${printedCardView(match, text(equipment.card)).name}】`;
-        if (strings(equipment.replaced).length)
-          message += `，替换${strings(equipment.replaced)
-            .map((id) => `【${printedCardView(match, id).name}】`)
-            .join('')}`;
-        break;
-      }
-      case 'counter.finished': {
-        if (detail.by === null) break;
-        const subject = record(detail.subject);
-        const effect = record(subject.effect);
-        if (subject.kind === 'effect')
-          message =
-            detail.kind === 'countered'
-              ? `【${match.book.definition(text(record(effect.card).name)).label}】对 ${text(effect.target)} 的效果被【${match.book.definition(text(record(record(detail.by).card).name)).label}】抵消`
-              : `对 ${text(effect.target)} 的原效果继续生效`;
-        else if (detail.kind === 'countered')
-          message = `${text(record(subject.use).actor)} 的【${match.book.definition(text(record(record(subject.use).card).name)).label}】被反制`;
-        break;
-      }
-      case 'card.taken': {
-        const taken = detail.declaration ? record(detail.declaration) : detail;
-        message = `${text(taken.actor)}从 ${text(taken.target)} 获得${taken.open === true ? `【${printedCardView(match, text(taken.card)).name}】` : '一张手牌'}`;
-        break;
-      }
-      case 'card.discarded-by-effect':
-        message = `${text(detail.actor)}弃置了 ${text(detail.target)} 的【${printedCardView(match, text(detail.card)).name}】`;
-        break;
-      case 'card.taken-public':
-        message = `${text(detail.actor)}获得${strings(detail.cards)
-          .map((id) => `【${printedCardView(match, id).name}】`)
-          .join('')}`;
-        break;
-    }
+    const message = narrate.get(fact.data.kind)?.(fact, (value) => (audio = value)) ?? '';
     if (message && log.length < 100)
       log.push({ seq: fact.seq, text: message, ...(audio ? { audio } : {}) });
     if (actions.length > 3) actions.length = 3;
@@ -585,21 +552,13 @@ function publicHistory(
   const neededUses = new Set(actionUses.values());
   const finishedTargets = new Map<string, readonly string[]>();
   for (const fact of history.facts(Cards.revealed)) {
-    const detail = record(fact.data.detail);
-    const zone = text(detail.zone);
-    if (zones.has(zone)) revealed.set(zone, strings(detail.cards));
+    const { zone, cards } = fact.data.detail;
+    if (zones.has(zone)) revealed.set(zone, cards);
   }
   for (const fact of history.facts(CardEvent.finished)) {
-    const use = record(fact.data.detail);
-    const id = text(use.id);
-    if (neededUses.has(id) && !declarations.has(id))
-      finishedTargets.set(
-        id,
-        targetsOf(
-          Array.isArray(use.effects) ? use.effects : [],
-          Array.isArray(use.edits) ? use.edits : [],
-        ),
-      );
+    const use = fact.data.detail;
+    if (neededUses.has(use.id) && !declarations.has(use.id))
+      finishedTargets.set(use.id, targetsOf(use.effects, use.edits));
   }
   const pools = [...revealed].flatMap(([zone, ids]) =>
     world.snapshot.zones.some((item) => item.id === zone)

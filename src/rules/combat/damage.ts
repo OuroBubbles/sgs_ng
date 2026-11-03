@@ -122,7 +122,16 @@ export const Damage = defineEvent('damage', {
   unavailable: timing<DamageResult>(),
   prevented: timing<DamageResult>(),
   zero: timing<DamageResult>(),
-  transferring: timing<unknown>(),
+  transferring: timing<
+    unknown,
+    {
+      readonly damage: string;
+      readonly player: string;
+      readonly target: string;
+      readonly reason: string;
+      readonly amount: number;
+    }
+  >(),
 });
 
 class Draft implements DamageDraft {

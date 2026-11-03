@@ -152,8 +152,8 @@ export type {
   PaymentReceipt,
   PaymentIntent,
 } from '../rules/costs/pay';
-export { moveCards } from '../rules/cards/move';
-export type { MoveResult, MoveDeclaration } from '../rules/cards/move';
+export { moveCards, declared } from '../rules/cards/move';
+export type { MoveResult, MoveDeclaration, Declared } from '../rules/cards/move';
 export { discardCards } from '../rules/cards/discard';
 export type { DiscardRequest, DiscardQuery, DiscardResult } from '../rules/cards/discard';
 export { withProcessing } from '../rules/cards/processing';

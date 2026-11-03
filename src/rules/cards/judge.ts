@@ -11,7 +11,8 @@ import type { CardBook } from './book';
 import type { CardColor } from './types';
 import { withProcessing } from './processing';
 import { reshuffle } from './draw';
-import { moveCards } from './move';
+import { moveCards, declared } from './move';
+import type { Declared } from './move';
 import type { SkillHandle } from '../skills/skills';
 import type { PaymentReceipt } from '../costs/pay';
 import { Response } from './response';
@@ -58,11 +59,34 @@ export interface Judgment {
 }
 
 export const Judgment = defineEvent('judgment', {
-  revealed: timing<Judgment>(),
+  revealed: timing<
+    Judgment,
+    Declared<
+      Pick<JudgmentInput, 'player' | 'reason'> & {
+        readonly id: string;
+        readonly processing: string;
+        readonly card: JudgmentCard;
+      }
+    >
+  >(),
   retrial: timing<Judgment>(),
   finished: timing<JudgmentResult>(),
-  replaced: timing<unknown>(),
-  cardObtained: timing<unknown>(),
+  replaced: declared<{
+    readonly id: string;
+    readonly player: string;
+    readonly reason: string;
+    readonly processing: string;
+    readonly before: JudgmentCard | null;
+    readonly card: JudgmentCard;
+    readonly invocation?: PaymentReceipt;
+    readonly response?: SemanticCard;
+  }>(),
+  cardObtained: declared<{
+    readonly judgment: string;
+    readonly player: string;
+    readonly reason: string;
+    readonly card: string;
+  }>(),
 });
 const currentCard = defineState<JudgmentCard | null>(
   'core:judgment-card',

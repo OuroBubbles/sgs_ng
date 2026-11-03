@@ -100,7 +100,7 @@ export const Phase = defineEvent('phase', {
   started: timing<PhaseView, PhaseSnapshot>(),
   ending: timing<PhaseView>(),
   finished: timing<unknown>(),
-  skipped: timing<unknown>(),
+  skipped: timing<unknown, PhaseSnapshot>(),
   skipPlanned: timing<unknown>(),
   skipScheduled: timing<unknown>(),
   skipDeclared: timing<unknown>(),

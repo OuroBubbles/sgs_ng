@@ -6,6 +6,7 @@ import type { Timing } from '../../core/runtime/event';
 import type { DrawDraft, DrawResult } from './draw';
 import type { RevealedCards } from './reveal';
 import type { PaymentReceipt } from '../costs/pay';
+import type { SemanticCard, TimingSnapshot, UseSnapshot } from './types';
 
 export interface MoveResult {
   readonly kind: 'moved' | 'unchanged';
@@ -17,10 +18,38 @@ export interface MoveResult {
 }
 
 /** cards.moved 写入历史的记录；declaration 来自 MoveDeclaration.data。 */
-export interface MoveRecord {
+export interface MoveRecord<D = unknown> {
   readonly moves: readonly CardMove[];
   readonly before: readonly Zone[];
-  readonly declaration?: unknown;
+  readonly declaration?: D;
+}
+/** 随移动同次提交的领域宣告，历史记录携带宣告数据 D。 */
+export interface Declared<D> extends MoveRecord<D> {
+  readonly declaration: D;
+}
+/** 声明一个随移动写入的历史事实，其宣告数据为 D。 */
+export const declared = <D>() => timing<unknown, Declared<D>>();
+
+export interface GivenCards {
+  readonly actor: string;
+  readonly target: string;
+  readonly count: number;
+  readonly cards?: readonly string[];
+  readonly visible?: boolean;
+  readonly reason: string;
+}
+export interface TakenCard {
+  readonly actor: string;
+  readonly target: string;
+  readonly card: string;
+  readonly open: boolean;
+  readonly reason: string;
+}
+export interface RemovedDelayed {
+  readonly actor: string;
+  readonly target: string;
+  readonly card: SemanticCard;
+  readonly cards: readonly string[];
 }
 
 export const Cards = defineEvent('cards', {
@@ -30,41 +59,69 @@ export const Cards = defineEvent('cards', {
   revealed: timing<RevealedCards>(),
 
   discarded: timing<PaymentReceipt>(),
-  given: timing<unknown>(),
-  peeked: timing<unknown>(),
-  arranged: timing<unknown>(),
-  distributed: timing<unknown>(),
+  given: declared<GivenCards>(),
+  peeked: declared<{
+    readonly player: string;
+    readonly reason: string;
+    readonly zone: string;
+    readonly cards: readonly string[];
+  }>(),
+  arranged: declared<{
+    readonly player: string;
+    readonly reason: string;
+    readonly top: readonly string[];
+    readonly bottom: readonly string[];
+  }>(),
+  distributed: declared<{
+    readonly actor: string;
+    readonly reason: string;
+    readonly allocations: readonly { readonly target: string; readonly count: number }[];
+  }>(),
 });
 
+/** 用牌与打出宣告的公共字段；打出没有 useId 与目标。 */
+export interface CardPlay {
+  readonly card: SemanticCard;
+  readonly processing: string;
+  readonly useId?: string;
+  readonly targets?: readonly string[];
+  readonly beneficiary?: string;
+  readonly parameters?: unknown;
+  readonly context?: TimingSnapshot;
+}
 export const CardEvent = defineEvent('card', {
-  used: timing<PaymentReceipt>(),
-  responded: timing<PaymentReceipt>(),
+  used: timing<PaymentReceipt<CardPlay>>(),
+  responded: timing<PaymentReceipt<CardPlay>>(),
   chosen: timing<unknown>(),
-  finished: timing<unknown>(),
+  finished: timing<unknown, UseSnapshot>(),
   targeting: timing<unknown>(),
   effect: timing<unknown>(),
   planChanged: timing<unknown>(),
   targetReplaced: timing<unknown>(),
-  taken: timing<unknown>(),
-  takenPublic: timing<unknown>(),
-  takenDelayed: timing<unknown>(),
-  discardedDelayed: timing<unknown>(),
-  discardedByEffect: timing<unknown>(),
+  taken: declared<TakenCard>(),
+  takenPublic: declared<{
+    readonly actor: string;
+    readonly cards: readonly string[];
+    readonly reason: string;
+  }>(),
+  takenDelayed: timing<unknown, RemovedDelayed>(),
+  discardedDelayed: timing<unknown, RemovedDelayed>(),
+  discardedByEffect: timing<unknown, TakenCard>(),
 });
 
-export interface MoveDeclaration {
-  readonly kind: Timing<unknown, unknown>;
-  readonly data: unknown;
+export interface MoveDeclaration<D = unknown> {
+  readonly kind: Timing<unknown, Declared<D>>;
+  readonly data: D;
   /** 与移动同次提交的领域元数据；额外移动必须放在 moves 中，不能绕过移动后效。 */
   readonly changes?: readonly Exclude<Change, { readonly kind: 'move' }>[];
 }
 
 /** 批内整体验证/提交，提交后才开放后效；离场信息来自明确的 before 快照。 */
-export function moveCards(
+export function moveCards<D>(
   ctx: Context,
   moves: readonly CardMove[],
   reason: string,
-  declaration?: MoveDeclaration,
+  declaration?: MoveDeclaration<D>,
 ): Promise<MoveResult> {
   return ctx.flow(
     'moveCards',
@@ -75,7 +132,7 @@ export function moveCards(
       if (!effective.length && !declaration?.changes?.length)
         return immutable({ kind: 'unchanged', moves: effective, before, after: before });
 
-      child.commit(
+      child.commit<MoveRecord<unknown>>(
         declaration?.kind ?? Cards.moved,
         [
           ...effective.map((move): Change => ({ kind: 'move', ...move })),

@@ -3,13 +3,21 @@ import type { Card, CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { delayedCards } from './delayed';
-import { moveCards } from './move';
+import { moveCards, declared } from './move';
 import { defineEvent } from '../../core/runtime/event';
 import { timing } from '../../core/runtime/event';
 
 export const Discard = defineEvent('discard', {
-  limited: timing<unknown>(),
-  committed: timing<unknown>(),
+  limited: timing<
+    unknown,
+    { readonly actor: string; readonly required: number; readonly count: number }
+  >(),
+  committed: declared<
+    Omit<DiscardRequest, 'card'> & {
+      readonly subjects: readonly string[];
+      readonly cards: readonly string[];
+    }
+  >(),
 });
 
 export interface DiscardRequest {

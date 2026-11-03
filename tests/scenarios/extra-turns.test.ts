@@ -238,9 +238,9 @@ it('重复的真实出牌阶段各自计算杀次数，第一阶段已用杀不�
   expect(game.room.world.player('b').hp).toBe(2);
   const uses = game.room.history
     .facts(CardEvent.used)
-    .map((fact) => fact.data.detail as { declaration: { context: { phase: string } } });
+    .map((fact) => fact.data.detail.declaration.context);
   expect(uses).toHaveLength(2);
-  expect(uses[0]!.declaration.context.phase).not.toBe(uses[1]!.declaration.context.phase);
+  expect(uses[0]).not.toEqual(uses[1]);
   rebuilt(game);
 });
 

@@ -660,12 +660,25 @@ it('日志窗口之外的公开牌池仍存活，同次公开多张牌保留展�
           'public gift',
           {
             kind: Cards.given,
-            data: { actor: 'a', target: 'b', cards: gifts, count: gifts.length, visible: true },
+            data: {
+              actor: 'a',
+              target: 'b',
+              cards: gifts,
+              count: gifts.length,
+              visible: true,
+              reason: 'public gift',
+            },
           },
         );
         // 后续公开叙事足够长，但不能使仍在处理中的旧公开牌池消失。
         for (let i = 0; i < 110; i++)
-          at.commit(Draw.completed, [], { input: { player: 'a' }, cards: [] });
+          at.commit(Draw.completed, [], {
+            kind: 'drawn',
+            input: { player: 'a', count: 0, reason: 'test' },
+            count: 0,
+            cards: [],
+            edits: [],
+          });
         const shown = projectMatch(match, null, null);
         expect(shown.log).toHaveLength(100);
         expect(shown.log.every((entry) => entry.text === 'a摸了 0 张牌')).toBe(true);
