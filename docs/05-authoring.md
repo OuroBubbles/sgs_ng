@@ -7,14 +7,14 @@
 标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general({...})`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件，不再改任何登记列表。`general({ id, name, kingdom, hp, gender?, skills })` 直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
 ```ts
-import { draw, general, skill, trigger, useDeclared, cardDef } from '../../../sdk';
+import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';
 
 export const study = skill({
   id: 'study',
   name: '研习',
   description: '当你使用锦囊牌时，你可以摸一张牌。',
   triggers: [
-    trigger(useDeclared, {
+    on(useDeclared, {
       who: (use) => use.actor, // 只在事件主体是技能拥有者时触发
       when: (ctx, use) => cardDef(ctx, use.card.name).type === 'trick',
       ask: '是否发动【研习】摸一张牌？', // 询问 + 宣告由引擎完成
@@ -28,16 +28,36 @@ export default general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, s
 
 技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。
 
-## 触发技：两段式 trigger
+## 触发技：唯一的 on
 
-`trigger(window, spec)` 是 `on` 之上的分段写法：
+`on(Event.timing, spec)` 是技能和独立效果共用的唯一触发入口（原 `trigger` / 技能 `on` / `effectOn` 已合并）。所有回调都是位置参数 `(ctx, event, self, ...)`：
 
-- `who(event)`：事件主体，不等于拥有者时不触发；`when` / `times` 同 `on`，参数为 `(ctx, event, self)`。
-- 非锁定技默认 `order: 'choose'`；`locked: true` 表示锁定技，不询问、不宣告。
-- `ask`：询问是否发动并宣告（skill.invoke）；可为字符串或 `(ctx, event, self, occurrence) => string`，多次触发用 `nth(occurrence)` 追加「第 i/n 次」。
+- `who(event)`：事件主体，不等于拥有者时不触发。
+- `when(ctx, event, self, at)`：纯查询；`times(ctx, event, self)`：本窗口有限次数快照，每次独立重查。
+- 非锁定技默认 `order: 'choose'`；`locked: true` 表示锁定技，不询问、不宣告、自动排序。
+- `ask`：询问是否发动并宣告（skill.invoke）；可为字符串或 `(ctx, event, self, at) => string`，多次触发用 `nth(at)` 追加「第 i/n 次」。
 - `cost`：先由玩家完成选择（返回 null/false 视为不发动），再宣告；`declare` 返回随宣告同次提交的附加数据、状态变更或代价。
 - `keep`：宣告时的合法条件，与「未终局」一起由引擎检查。
-- `effect`：宣告即生效，之后失去技能或条件改变不撤销；只有终局会截断 effect。效果内若文本要求再查（如奸雄要求材料仍在处理区），在 effect 里普通地判断。
+- `retain(ctx, event, self)`：已失去的来源仍可处理本次事件；`allowDead`：已阵亡拥有者仍可处理。
+- `effect(ctx, event, self, value, at)`：宣告即生效，之后失去技能或条件改变不撤销；只有终局会截断 effect。效果内若文本要求再查（如奸雄要求材料仍在处理区），在 effect 里普通地判断。
+
+同一声明放进独立效果的 `create(self).triggers` 时，默认自动排序，不支持 `ask` / `cost` / `retain` / `allowDead`（效果不询问、不宣告）；资格为「效果实例仍存在」加 who/when，self 是该效果实例的只读视图（owner 为效果记录的 owner，skill 为效果类型）。spec 在 on 调用时读取固定，之后改写原对象不影响对局；回调按普通函数调用，不保留类实例的 `this`。
+
+## 事件：时点、草案与历史同一身份
+
+规则时点由 `defineEvent` 声明，ID 统一为 `事件.时点`（驼峰转 kebab）：
+
+```ts
+import { defineEvent, timing } from '../../../sdk';
+
+export const Provision = defineEvent('provision', {
+  finished: timing<ProvisionResult>(), // ID: provision.finished
+});
+// 开窗：await ctx.window(Provision.finished, result, { subject: result.target });
+// 订阅：on(Provision.finished, { who: (r) => r.target, effect: ... })
+```
+
+`timing<T, R = T>(...groups)` 的 T 是挂钩载荷（可变草案或结果），R 是同名历史事实的记录类型。提交历史时直接传事件：`ctx.commit(Damage.dealt, changes, detail)`，detail 按 R 检查；读取时 `ctx.history.facts(Damage.dealt)` 返回 `Fact<DamageResult>[]`，遍历混合事实用 `isFact(fact, Turn.started)` 收窄。不再手写 `Fact<unknown>` 与字符串 kind 比较。窗口候选在开窗时一次收集，没有中途入窗（include / listen 已删除）。
 
 ## 主动技：action
 
@@ -59,30 +79,30 @@ export default general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, s
 
 [研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留[内容组合接口](39-source-packages.md)。
 
-底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 与 effectOn 可省略局部 id；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，见 [装备与查询](18-equipment-queries.md#小而可组合的纯查询)；卡牌 use 回调见 [语义牌与用牌](13-card-use.md#一次用牌)。
+底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 可省略局部 id（默认取时点 ID）；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，见 [装备与查询](18-equipment-queries.md#小而可组合的纯查询)；卡牌 use 回调见 [语义牌与用牌](13-card-use.md#一次用牌)。
 
 ## ctx、self 与普通函数
 
-`on` 的 `when/run` 接受 `(ctx, { payload, self, occurrence })`，按需解构，例如 `run(ctx, { self })`。`times/retain` 只依赖载荷与来源，接受 `(ctx, { payload, self })`。独立函数或类方法可标注 `SkillTriggerInput<T>` / `SkillTriggerOccurrenceInput<T>`。`self.owner` 是技能拥有者，`self.id` 是本次技能实例，`self.skill` 是定义 ID；`ctx` 携带本次结算的状态读取、原因、历史和作用域。没有 `ctx.owner`、`ctx.draw` 或隐藏的全局“当前事件”。
+`on` 的回调接受位置参数 `(ctx, event, self, …)`，独立函数直接按 `(ctx: Context, event: DamageResult, self: SkillHandle)` 标注即可。`self.owner` 是技能拥有者，`self.id` 是本次技能实例，`self.skill` 是定义 ID；`ctx` 携带本次结算的状态读取、原因、历史和作用域。没有 `ctx.owner`、`ctx.draw` 或隐藏的全局“当前事件”。
 
 规则操作直接调用 `await draw(ctx, input)`、`await damage(ctx, input)` 等普通函数。分支、循环和局部变量由 TypeScript 表达；父流程等待所有嵌套后效结束才恢复。不要并行写同一局；直接 await 或返回子操作的 Promise。
 
 临时处理区使用 `withProcessing(ctx, materials, body, cleanup?)`：直接编写主体，默认只弃置结尾仍在该区的余牌；特殊目的区域或善后函数放在最后。body 可返回领域值，自定义善后可根据 resolved/aborted 处理余牌，不要求把技能改写成生命周期配置。
 
-只有一步时可直接写 `run: (ctx) => draw(ctx, input)`；技能、卡牌与领域后效的执行回调会等待返回的操作，忽略其结果。需要按 `paid/unavailable` 等结果分支时仍用普通 `await`；返回值本身不改变取消或中止语义。
+只有一步时可直接写 `effect: (ctx) => draw(ctx, input)`；技能、卡牌与领域后效的执行回调会等待返回的操作，忽略其结果。需要按 `paid/unavailable` 等结果分支时仍用普通 `await`；返回值本身不改变取消或中止语义。
 
 `ctx.flow(...)` 返回领域值，中止默认向外传播。只有确实允许局部中止并继续的边界才使用 `ctx.attempt(...)`；故障和整局关闭不能因此恢复。无需给每个技能包一层 attempt，或逐层检查 aborted。
 
 ## 选哪种能力入口
 
-| 需求                         | 作者层入口（优先）                                       | 底层入口（作者层不够时）                                    | 可运行源码                                                |
-| ---------------------------- | -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| 在时点参与结算               | `trigger(window, { who, when, ask/cost, keep, effect })` | `on`；`when` 为纯查询，`run` 可等待                         | [刚烈](../src/content/standard/generals/xiahoudun.ts)     |
-| 出牌阶段主动发动             | `action({ limit, cards, targets, pay, effect })`         | `active` 中的 `available` / `selection` / `run`             | [结姻](../src/content/standard/generals/sunshangxiang.ts) |
-| 将材料解释为另一张牌         | `convert(id, { as, match, areas })`                      | `viewAs`；用牌与响应规则继续由 CardBook 处理                | [武圣](../src/content/standard/generals/guanyu.ts)        |
-| 修正牌面、距离或限制         | —                                                        | `modify` + 具名 `cardQueries`；自定义组合可用 `defineQuery` | [谦逊](../src/content/standard/generals/luxun.ts)         |
-| 创建失去技能后仍可存在的效果 | —                                                        | `EffectDefinition` / `EffectBook`，实例数据存 World         | [裸衣](../src/content/standard/generals/xuchu.ts)         |
-| 定义新的规则时点             | —                                                        | `defineWindow<T>` + `ctx.window`，跨文件直接共享对象        | [渡口](../examples/content/harbor/index.ts)               |
+| 需求                         | 作者层入口（优先）                                        | 底层入口（作者层不够时）                                                 | 可运行源码                                                |
+| ---------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
+| 在时点参与结算               | `on(Event.timing, { who, when, ask/cost, keep, effect })` | —（技能与独立效果共用）；`when` 为纯查询，`effect` 可等待                | [刚烈](../src/content/standard/generals/xiahoudun.ts)     |
+| 出牌阶段主动发动             | `action({ limit, cards, targets, pay, effect })`          | `active` 中的 `available` / `selection` / `run`                          | [结姻](../src/content/standard/generals/sunshangxiang.ts) |
+| 将材料解释为另一张牌         | `convert(id, { as, match, areas })`                       | `viewAs`；用牌与响应规则继续由 CardBook 处理                             | [武圣](../src/content/standard/generals/guanyu.ts)        |
+| 修正牌面、距离或限制         | —                                                         | `modify` + 具名 `cardQueries`；自定义组合可用 `defineQuery`              | [谦逊](../src/content/standard/generals/luxun.ts)         |
+| 创建失去技能后仍可存在的效果 | —                                                         | `EffectDefinition` / `EffectBook`，实例数据存 World                      | [裸衣](../src/content/standard/generals/xuchu.ts)         |
+| 定义新的规则时点             | —                                                         | `defineEvent(id, { x: timing<T>() })` + `ctx.window`，跨文件直接共享对象 | [渡口](../examples/content/harbor/index.ts)               |
 
 一个技能可以混用两层，也可直接编排公开规则函数。作者层只是同一套 `on` / `active` / `viewAs` 声明的写法，不是第二套机制；新 helper 应来自真实重复的语义，而不是为隐藏一个循环建立通用框架。
 
@@ -118,11 +138,11 @@ World、事实和接纳后的决策值在类型与运行时均只读；需要本
 
 具名 Query 的开始值、贡献与合并函数、来源资格、retain、状态与独立效果的数据校验器、独立效果行为工厂及自定义触发绑定都必须同步。主动技能的 `available` / `selection`、用牌的 `UseRules.selection`、转换的候选/资格/数量/构牌函数，以及选择模型的候选与约束也遵循此约定；用牌目标和响应资格的最终重查仍是纯查询。
 
-规则层在组合前逐项检查其直接调用的回调，避免 Promise 被布尔运算、数组或行为对象访问隐藏。执行侧查询违规时立即冻结；本地投影、预览或回复出错则由主持侧停止本局并显示错误。普通内容继续直接使用现有入口，无需自行包裹守卫；异步后效仍放在 run / onEnd 中。作者函数内部的普通表达式仍由作者负责，类型检查不能省略。
+规则层在组合前逐项检查其直接调用的回调，避免 Promise 被布尔运算、数组或行为对象访问隐藏。执行侧查询违规时立即冻结；本地投影、预览或回复出错则由主持侧停止本局并显示错误。普通内容继续直接使用现有入口，无需自行包裹守卫；异步后效仍放在 effect / onEnd 中。作者函数内部的普通表达式仍由作者负责，类型检查不能省略。
 
 ## 扩展与验证的边界
 
-普通文件可以导出函数、Window 和 Query，由相对 import 共享同一实例；资源使用静态 import 或调用者提供的 URL。见 [跨文件协作](39-source-packages.md#跨模块代码共享) 与 [资源](39-source-packages.md#资源与所有权)。不在挂起技能中途热换定义，也不引入签名或沙箱体系。
+普通文件可以导出函数、事件（defineEvent）和 Query，由相对 import 共享同一实例；资源使用静态 import 或调用者提供的 URL。见 [跨文件协作](39-source-packages.md#跨模块代码共享) 与 [资源](39-source-packages.md#资源与所有权)。不在挂起技能中途热换定义，也不引入签名或沙箱体系。
 
 当前客户端支持已登记的选择形态。自定义 `ctx.ask` 类型能在规则层运行，不代表 UI 和基础 AI 已自动具备该交互；不支持的必选决策会中止基础 AI 对局。先复用现有选择模型，确有新交互需求时再补完整执行、投影和客户端路径。
 

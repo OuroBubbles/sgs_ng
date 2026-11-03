@@ -18,17 +18,16 @@
 
 ## 作者接口仍是普通代码
 
-[on](../src/rules/skills/skills.ts) 将 times 传入内核，when/run 的具名输入提供 payload、self 与 occurrence，按需解构。times 在候选展开前固定次数，retain 为来源资格后备；它们的输入只包含 payload 与 self。
+[on](../src/rules/skills/on.ts) 将 times 传入内核；回调为位置参数，when / effect 额外收到本次 occurrence（`at`）。times 在候选展开前固定次数，retain 为来源资格后备；它们只收到 `(ctx, event, self)`。
 
 ```ts
-on(damageReceived, {
+on(Damage.received, {
   id: 'per-point',
-  order: 'choose',
-  times: (_ctx, { payload: hit }) => hit.hpLoss,
-  when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
-  async run(ctx, { payload: hit, self, occurrence }) {
+  times: (_ctx, hit) => hit.hpLoss,
+  when: (_ctx, hit, self) => hit.input.to === self.owner,
+  async effect(ctx, hit, self, _value, at) {
     // 一次独立发动；选择、费用、闭包、循环、子结算仍由普通代码表达。
-    await handleOnePoint(ctx, hit, self, occurrence);
+    await handleOnePoint(ctx, hit, self, at);
   },
 });
 ```

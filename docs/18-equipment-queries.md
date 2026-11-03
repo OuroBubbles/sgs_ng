@@ -60,14 +60,14 @@ TriggerSource 在开窗时取得本次 payload。装备提供者在 cardsMoved �
 `on` 的 retain 是明确的资格后备，配合 when 限定本次事实。装备能力可用以下普通谓词，两处引用同一函数：
 
 ```ts
-const lost = (ctx: Context, { payload: event, self }: SkillTriggerInput<MoveResult>) =>
+const lost = (ctx: Context, event: MoveResult, self: SkillHandle) =>
   equipmentLost(ctx.world, event, self);
 
-on(cardsMoved, {
+on(Cards.moved, {
   id: 'lost',
   retain: lost,
   when: lost,
-  run(ctx, { self }) {
+  effect(ctx, event, self) {
     // 这里可继续普通 async 结算；self.origin 指向具体离场装备。
   },
 });

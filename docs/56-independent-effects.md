@@ -25,9 +25,9 @@ EffectHandle.current(world) 返回当前挂接中的实例记录；实例结束�
 
 独立效果直接用普通对象声明 id、name、纯 accepts、普通 create 函数和可选 onEnd，使用 `satisfies EffectDefinition<Data>` 获得类型提示。createContent / EffectBook.register 固定声明并保留原接收者；需要主动提前规范化时仍可使用 defineEffect。
 
-create 取得类型化句柄，返回普通 triggers/modifiers 列表；作者可以用条件、循环和闭包构造行为，用 effectOn / effectModify 连接现有窗口和查询。effectOn 的 times 使用 `(ctx, { payload })`，when/run 使用 `(ctx, { payload, occurrence })`，按需解构；self 保留在 create 的类型化闭包中。结束后效使用 `onEnd(ctx, { before, reason })`，before 保留声明的数据类型。自定义 bind 也必须同步；候选收集、执行前重绑及按实例显式入窗都会在读取绑定结果前检查，不会把 Promise 当作无触发或无身份。
+create 取得类型化句柄，返回普通 triggers/modifiers 列表；作者可以用条件、循环和闭包构造行为，用与技能相同的 `on(Event.timing, spec)` / effectModify 连接现有时点和查询；回调为 `(ctx, event, self, …)`，效果中默认自动排序且不询问、不宣告，类型化 self 保留在 create 的闭包中。结束后效使用 `onEnd(ctx, { before, reason })`，before 保留声明的数据类型。自定义 bind 也必须同步；候选收集与执行前重绑都会在读取绑定结果前检查，不会把 Promise 当作无触发或无身份。
 
-accepts / create / onEnd 与 effectOn 的条件、次数和执行支持普通方法及原型方法，装配固定入口并保留原接收者，不冻结作者对象。defineEffect 重复接收本入口已固定的声明时直接复用；外部原对象不作缓存，方法内部读取的可变数据仍由开发者管理。实例创建继续核对登记工厂，核对使用绑定前的函数身份，避免方法绑定把同一实现误认作不同声明；同名但不同工厂仍被拒绝。
+accepts / create / onEnd 支持普通方法及原型方法，装配固定入口并保留原接收者，不冻结作者对象。defineEffect 重复接收本入口已固定的声明时直接复用；外部原对象不作缓存，方法内部读取的可变数据仍由开发者管理。实例创建继续核对登记工厂，核对使用绑定前的函数身份，避免方法绑定把同一实现误认作不同声明；同名但不同工厂仍被拒绝。
 
 句柄字段始终是本次绑定的不可变快照。行为工厂与自定义 bind 在候选执行前读取最新记录重新绑定；当前查询也按当前记录构造行为。自定义 bind 返回的 Trigger 可以使用原型字段、方法和私有字段；目录补充标签时保留其原接收者。候选的身份、组、座次与次数仍在入场时固定。
 
@@ -58,7 +58,7 @@ add 产生独立身份并提交 effect.added；update 保留身份，提交 befo
 
 prepare / add / update 先在纯查询内固定整份记录，再校验其中实际保存的 data；accepts 取得的同一份只读数据进入 World。原始 getter 不会在校验后再次读取，origin 与 data 的别名保持，复制过程也不能重入规则写操作。原始输入仍由调用者持有，后续修改不会改变已固定的记录。
 
-查询仍经 SkillBook.query 的原组合函数，undefined 表示不贡献，null 等值由查询自己定义。效果贡献不借用技能拥有者的默认存活判断；需要这一条件时，作者在查询中直接检查角色。普通自定义 EffectTrigger 绑定也受支持，显式入窗不要求 ID 采用某种可解析格式。
+查询仍经 SkillBook.query 的原组合函数，undefined 表示不贡献，null 等值由查询自己定义。效果贡献不借用技能拥有者的默认存活判断；需要这一条件时，作者在查询中直接检查角色。
 
 ## 生存期和结束
 
@@ -99,7 +99,7 @@ prepare 返回普通记录与 Change，交给调用方在 legal 中重查费用�
 
 [守约示例](../examples/effects/covenant.ts) 用普通代码组合：受益者手牌上限加一、下次正伤害在防御窗口减一并消耗次数、受益者回合结束撤销并摸一张牌，受益者死亡则撤销且不摸牌。宣告者死亡后仍持续。这是源码/规则场景示例；标准裸衣由现有正式界面与基础 AI 使用。
 
-普通 `ContentDefinition` 直接声明 `effects: [covenant]`，通过 `createContent(standard, { effects: [covenant] })` 组合；重复定义在装配期拒绝，每局创建自己的目录。效果不必通过技能工厂的登记副作用安装，也没有命名空间、包解析或专用文件格式要求。普通 import 共享实际 effectOn、Query 和 Window 身份，所有内容复用同一效果库。
+普通 `ContentDefinition` 直接声明 `effects: [covenant]`，通过 `createContent(standard, { effects: [covenant] })` 组合；重复定义在装配期拒绝，每局创建自己的目录。效果不必通过技能工厂的登记副作用安装，也没有命名空间、包解析或专用文件格式要求。普通 import 共享实际触发声明、Query 和事件身份，所有内容复用同一效果库。
 
 ## 验证与边界
 

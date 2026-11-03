@@ -23,7 +23,7 @@
 
 绑定引用在回调正常返回、局部中止和故障时都会关闭。父流程、兄弟后效、其他 Room 和之后的新流程不能借用这份引用支付；重新装备同一张实体牌也不会重新打开旧回调的资格。新来源应重新从当前目录取得。
 
-各个 occurrence 分别绑定资格。拒绝第一次不吞掉第二次，也不能在第二次中复用已经关闭的第一次引用。`SkillHandle` 可以由普通 class 提供，包装会保留原方法的接收者，不依赖展开对象复制原型方法。
+各个 occurrence 分别绑定资格。拒绝第一次不吞掉第二次，也不能在第二次中复用已经关闭的第一次引用。`SkillHandle` 可以由普通 class 提供，包装会保留原方法的接收者；触发声明本身（on 的 spec）在声明时读取固定，回调按普通函数调用。
 
 引用、谓词和 Context 只留在执行侧。支付事实继续保存实际 `skill/instance` 和声明数据；历史来源的实例 ID 没有改写为新授予。World/事实重建不保存回调，也不恢复挂起执行。
 
@@ -32,8 +32,8 @@
 [SkillBook.registerSnapshots](../src/rules/skills/skills.ts) 在装配期登记一个窗口的普通读取函数：
 
 ```ts
-const changed = defineWindow<{ before: readonly SkillInstance[] }>('my:changed');
-skills.registerSnapshots(changed, (event) => event.before);
+const My = defineEvent('my', { changed: timing<{ before: readonly SkillInstance[] }>() });
+skills.registerSnapshots(My.changed, (event) => event.before);
 ```
 
 读取函数只用于该窗口的候选收集，不能提交规则操作。目录挂接后封口，重复登记拒绝；返回非数组、同一实例 ID 对应不同角色/技能等错误，在执行效果前报告。当前实例优先，同一历史身份重复出现不会复制技能或发动次数。
@@ -53,17 +53,15 @@ skills.registerSnapshots(changed, (event) => event.before);
 [skillLost](../src/rules/skills/skills.ts) 匹配事件中的原实例、角色与技能，要求原来有启用授予、当前已不存在该实例，并检查当前失效状态。撤销部分来源或只是暂停授予，不等于失去整个技能；失去后重新获得的新实例也不替换旧身份。
 
 ```ts
-const lost = (ctx: Context, { payload: change, self }: SkillTriggerInput<SkillChange>) =>
+const lost = (ctx: Context, change: SkillChange, self: SkillHandle) =>
   skillLost(ctx.world, change.before, self);
 
-on(skillsChanged, {
+on(Skill.changed, {
   id: 'after-loss',
   retain: lost,
   when: lost,
-  async run(ctx, { self }) {
-    if (await invoke(ctx, self, '是否发动？'))
-      await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
-  },
+  ask: '是否发动？',
+  effect: (ctx, _change, self) => draw(ctx, { player: self.owner, count: 1, reason: self.skill }),
 });
 ```
 

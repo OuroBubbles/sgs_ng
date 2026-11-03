@@ -20,7 +20,7 @@ defineSkill / viewAs 可重复调用；本入口已固定的声明原样复用�
 
 开窗时，核心通过 TriggerSource 从权威状态收集候选，不导入技能包。自定义 bind 返回的 Trigger 同样支持原型字段与方法；目录补充标签时固定声明字段、原方法及接收者，不冻结作者对象。候选保留实例 ID，执行前重查授予和失效；新获得技能从下一窗口开始。常规效果检查角色存活；死亡后效果显式声明 allowDead，该声明不绕过技能所有权。
 
-触发的 when/run 使用 `(ctx, { payload, self, occurrence })`，times/retain 使用 `(ctx, { payload, self })`；按需解构，payload 保留原窗口载荷的对象身份与接口。self 提供 id/owner/skill/origin 与 effective(world)。一个效果开始后，不自动截断所有后续；选择/费用等关键节点按规则重查。装备来源派生与离场 retain 已实现，见 [18 · 装备与查询](18-equipment-queries.md)；allowDead 本身不表示来源保留。
+触发统一写 `on(Event.timing, spec)`：when 使用 `(ctx, event, self, at)`，times/retain 使用 `(ctx, event, self)`，effect 使用 `(ctx, event, self, value, at)`；event 保留原窗口载荷的对象身份与接口。self 提供 id/owner/skill/origin 与 effective(world)。一个效果开始后，不自动截断所有后续；选择/费用等关键节点按规则重查。装备来源派生与离场 retain 已实现，见 [18 · 装备与查询](18-equipment-queries.md)；allowDead 本身不表示来源保留。
 
 历史来源现在可以普通 invoke/pay，规则与当前所有权分开：`effective(world)` 不恢复，`skillAvailable(ctx, self)` 只授权本次后效及子流程。撤销、到期与实际埋葬快照，以及自定义窗口登记见 [43](43-retained-effects.md)。
 
