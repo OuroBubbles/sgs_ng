@@ -461,15 +461,17 @@ describe('显式生存期、状态与授予到期', () => {
     await expect(
       game.run('turn', (ctx) =>
         withLifetime(ctx, 'turn', async (turn, lifetime) => {
-          turn.listen(window, {
-            id: 'bad',
-            owner: 'a',
-            eligible: (query) => {
-              setState(query, marker, { owner: 'a', source: null, lifetime }, 1);
-              return true;
-            },
-            run: () => undefined,
-          });
+          turn.defer(
+            game.on(window, {
+              id: 'bad',
+              owner: 'a',
+              eligible: (query) => {
+                setState(query, marker, { owner: 'a', source: null, lifetime }, 1);
+                return true;
+              },
+              run: () => undefined,
+            }),
+          );
           await turn.window(window, null);
         }),
       ),

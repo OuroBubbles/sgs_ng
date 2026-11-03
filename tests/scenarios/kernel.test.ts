@@ -828,14 +828,16 @@ describe('Window 候选、行动顺序与纯查询', () => {
     const window = testTiming<null>('temporary');
     const hits: string[] = [];
     await game.run('phase', async (ctx) => {
-      ctx.listen(window, {
-        id: 'temporary',
-        owner: 'a',
-        eligible: () => true,
-        run: () => {
-          hits.push('hit');
-        },
-      });
+      ctx.defer(
+        game.on(window, {
+          id: 'temporary',
+          owner: 'a',
+          eligible: () => true,
+          run: () => {
+            hits.push('hit');
+          },
+        }),
+      );
       await ctx.window(window, null);
     });
     await game.run('next-phase', (ctx) => ctx.window(window, null));

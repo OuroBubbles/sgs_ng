@@ -15,8 +15,6 @@ import type {
   Timing,
   TriggerOccurrence,
   ActionAnchor,
-  WindowRef,
-  WindowAdmission,
 } from './event';
 
 export type FlowBody<T> = (ctx: Context) => T | Promise<T>;
@@ -39,13 +37,6 @@ interface Operations {
   readonly commit: <T>(kind: string, changes: readonly Change[], detail: T) => Fact<T>;
   readonly random: (bound: number) => number;
   readonly actionOrder: (subject?: string) => readonly string[];
-  readonly listen: <T>(type: Timing<T, unknown>, trigger: Trigger<T>) => () => void;
-  readonly windowOf: <T>(type: Timing<T, unknown>) => WindowRef<T> | null;
-  readonly include: <T>(
-    window: WindowRef<T>,
-    source: TriggerSource,
-    select?: (trigger: Trigger<T>) => boolean,
-  ) => WindowAdmission;
 }
 
 /** 显式因果上下文；一个上下文同一时刻只能等待一个子操作。 */
@@ -94,21 +85,6 @@ export class Context {
     );
   }
 
-  /** 最近的同类型祖先窗口；可在进入同名嵌套窗口前捕获明确的外层引用。 */
-  windowOf<T>(type: Timing<T, unknown>): WindowRef<T> | null {
-    return this.query(() => this.operations.windowOf(type));
-  }
-
-  /** 显式收集一个已挂接来源的新候选；不复活已处理身份、不倒退窗口游标。 */
-  include<T>(
-    window: WindowRef<T>,
-    source: TriggerSource,
-    select?: (trigger: Trigger<T>) => boolean,
-  ): WindowAdmission {
-    this.#assertIdle();
-    return this.operations.include(window, source, select);
-  }
-
   /** 按本局模式取得当前完整座次序，包含死亡席位；调用者再按实时资格筛选。 */
   actionOrder(subject?: string): readonly string[] {
     return this.query(() => this.operations.actionOrder(subject));
@@ -135,12 +111,6 @@ export class Context {
   query<T>(body: () => T): T {
     this.lifetime.assertActive();
     return this.operations.query(body);
-  }
-
-  listen<T>(type: Timing<T, unknown>, trigger: Trigger<T>): void {
-    this.#assertIdle();
-    const unregister = this.operations.listen(type, trigger);
-    this.lifetime.onClose(unregister);
   }
 
   defer(cleanup: () => void): void {
@@ -220,16 +190,6 @@ interface WindowCandidate {
   readonly occurrence: TriggerOccurrence;
 }
 
-interface ActiveWindow {
-  readonly ref: WindowRef<unknown>;
-  readonly scopeId: string;
-  include(
-    caller: Context,
-    source: TriggerSource,
-    select?: (trigger: unknown) => boolean,
-  ): WindowAdmission;
-}
-
 export interface RoomOptions {
   readonly id: string;
   readonly seed: number;
@@ -254,7 +214,6 @@ export class Room {
   #windows = new Map<string, object>();
   #triggers = new Map<string, Registration>();
   #sources = new Map<TriggerSource, object>();
-  #openWindows = new Map<object, ActiveWindow>();
   #finishReason: string | null = null;
   #actionAnchor: ActionAnchor | null;
 
@@ -301,9 +260,6 @@ export class Room {
       ask: deny,
       commit: deny,
       random: deny,
-      listen: deny,
-      windowOf: () => null,
-      include: deny,
     });
     try {
       return this.#query(() => body(ctx));
@@ -519,9 +475,6 @@ export class Room {
         this.history.trace(cause, 'random', { bound, value });
         return value;
       },
-      listen: (type, trigger) => this.on(type, trigger),
-      windowOf: (type) => this.#windowOf(ctx, type),
-      include: (window, source, select) => this.#include(ctx, window, source, select),
     });
     let outcome = 'faulted';
     let result: FlowResult<T> | null = null;
@@ -568,73 +521,40 @@ export class Room {
     this.#windows.set(type.id, type);
   }
 
-  #windowOf<T>(ctx: Context, type: Timing<T, unknown>): WindowRef<T> | null {
-    for (const active of [...this.#openWindows.values()].reverse()) {
-      if (active.ref.type === type && ctx.cause.scopePath.includes(active.scopeId))
-        return active.ref as WindowRef<T>;
-    }
-    return null;
-  }
-
-  #include<T>(
-    ctx: Context,
-    ref: WindowRef<T>,
-    source: TriggerSource,
-    select?: (trigger: Trigger<T>) => boolean,
-  ): WindowAdmission {
-    const active = this.#openWindows.get(ref);
-    if (!active || ctx.world !== this.world || !ctx.cause.scopePath.includes(active.scopeId))
-      throw new Error('Window is closed or is not an ancestor of this Context.');
-    if (!this.#sources.has(source)) throw new Error('Window source is not attached to this Room.');
-    return active.include(
-      ctx,
-      source,
-      select ? (candidate) => select(candidate as Trigger<T>) : undefined,
-    );
-  }
-
   #collectSource<T>(
     ctx: Context,
     type: Timing<T, unknown>,
     payload: T,
     source: TriggerSource,
-    select?: (trigger: unknown) => boolean,
   ): Registration[] {
     const registration = this.#sources.get(source);
     if (!registration) throw new Error('Window source is not attached to this Room.');
     const candidates = ctx.query(() => source.collect(type, this.world, payload));
-    return candidates
-      .filter((candidate) => {
-        if (!select) return true;
-        const chosen = ctx.query(() => select(candidate));
-        if (typeof chosen !== 'boolean') throw new Error('Window selection must return a boolean.');
-        return chosen;
-      })
-      .map((candidate) => {
-        if (!candidate.id || (candidate.owner === null && candidate.order === 'choose'))
-          throw new Error('Invalid sourced trigger identity or owner.');
-        if (candidate.owner !== null) this.world.player(candidate.owner);
-        const group = candidate.group ?? 'main';
-        if (!type.groups.includes(group)) throw new Error(`Unknown window group: ${group}`);
-        return {
-          token: type,
-          id: candidate.id,
-          label: candidate.label ?? candidate.id,
-          owner: candidate.owner,
-          group,
-          order: candidate.order ?? 'automatic',
-          active: true,
-          ...(candidate.times === undefined
-            ? {}
-            : {
-                times: (child: Context, data: unknown) => candidate.times!(child, data as T),
-              }),
-          eligible: (child, data, occurrence) =>
-            this.#sources.get(source) === registration &&
-            candidate.eligible(child, data as T, occurrence),
-          run: (child, data, occurrence) => candidate.run(child, data as T, occurrence),
-        };
-      });
+    return candidates.map((candidate) => {
+      if (!candidate.id || (candidate.owner === null && candidate.order === 'choose'))
+        throw new Error('Invalid sourced trigger identity or owner.');
+      if (candidate.owner !== null) this.world.player(candidate.owner);
+      const group = candidate.group ?? 'main';
+      if (!type.groups.includes(group)) throw new Error(`Unknown window group: ${group}`);
+      return {
+        token: type,
+        id: candidate.id,
+        label: candidate.label ?? candidate.id,
+        owner: candidate.owner,
+        group,
+        order: candidate.order ?? 'automatic',
+        active: true,
+        ...(candidate.times === undefined
+          ? {}
+          : {
+              times: (child: Context, data: unknown) => candidate.times!(child, data as T),
+            }),
+        eligible: (child, data, occurrence) =>
+          this.#sources.get(source) === registration &&
+          candidate.eligible(child, data as T, occurrence),
+        run: (child, data, occurrence) => candidate.run(child, data as T, occurrence),
+      };
+    });
   }
 
   #actionOrder(ctx: Context, subject?: string, override?: string): readonly string[] {
@@ -661,18 +581,7 @@ export class Room {
     options: WindowOptions,
   ): Promise<void> {
     this.#checkWindow(type);
-    const ref: WindowRef<T> = Object.freeze({ id: ctx.cause.flowId, type, payload });
-    let admission: ActiveWindow['include'] | null = null;
-    this.#openWindows.set(ref, {
-      ref,
-      scopeId: ctx.scope.id,
-      include: (...args) => {
-        if (!admission) throw new Error('Window is still collecting initial candidates.');
-        return admission(...args);
-      },
-    });
-    ctx.defer(() => this.#openWindows.delete(ref));
-    try {
+    {
       const isOpen = () => {
         if (!options.active) return true;
         const active = ctx.query(() => options.active!(ctx));
@@ -694,16 +603,8 @@ export class Room {
         override: options.anchor !== undefined,
       });
       const registrations = [...this.#triggers.values()].filter((entry) => entry.token === type);
-      const known = new Map<string, TriggerSource | null>(
-        registrations.map((entry) => [entry.id, null]),
-      );
       for (const source of this.#sources.keys()) {
-        const collected = this.#collectSource(ctx, type, payload, source);
-        for (const candidate of collected) {
-          if (known.has(candidate.id)) throw new Error('Duplicate window candidate ID.');
-          known.set(candidate.id, source);
-          registrations.push(candidate);
-        }
+        registrations.push(...this.#collectSource(ctx, type, payload, source));
       }
       if (new Set(registrations.map((candidate) => candidate.id)).size !== registrations.length)
         throw new Error('Duplicate window candidate ID.');
@@ -739,55 +640,6 @@ export class Room {
           ),
         ),
       );
-      const slot = (entry: Registration) =>
-        type.groups.indexOf(entry.group) * owners.length + owners.indexOf(entry.owner);
-      const occurrenceIds = new Set(snapshot.map((entry) => entry.id));
-      let cursor = 0;
-      const include: ActiveWindow['include'] = (caller, source, select) => {
-        if (options.active && !isOpen())
-          return Object.freeze({
-            state: 'stopped',
-            added: Object.freeze([]),
-            skipped: Object.freeze([]),
-          });
-        const candidates = this.#collectSource(ctx, type, payload, source, select);
-        if (new Set(candidates.map((entry) => entry.id)).size !== candidates.length)
-          throw new Error('Duplicate window candidate ID.');
-        const added: Registration[] = [];
-        const skipped: { id: string; reason: 'known' | 'past' }[] = [];
-        for (const candidate of candidates) {
-          if (known.has(candidate.id)) {
-            if (known.get(candidate.id) !== source)
-              throw new Error('Window candidate ID belongs to another source.');
-            skipped.push({ id: candidate.id, reason: 'known' });
-          } else if (slot(candidate) < cursor) skipped.push({ id: candidate.id, reason: 'past' });
-          else added.push(candidate);
-        }
-        // 整批先校验和固定次数，任何作者错误都不能留下半批队列。
-        const prepared = added.flatMap(occurrences);
-        const ids = new Set(occurrenceIds);
-        for (const entry of prepared) {
-          if (ids.has(entry.id)) throw new Error('Duplicate window occurrence ID.');
-          ids.add(entry.id);
-        }
-        for (const entry of added) known.set(entry.id, source);
-        for (const entry of prepared) {
-          occurrenceIds.add(entry.id);
-          queues[slot(entry.registration)]!.push(entry);
-        }
-        const result: WindowAdmission = Object.freeze({
-          state: 'open',
-          added: Object.freeze(added.map((entry) => entry.id)),
-          skipped: Object.freeze(skipped.map((entry) => Object.freeze(entry))),
-        });
-        this.history.trace(caller.cause, 'window.included', {
-          window: type.id,
-          id: ref.id,
-          ...result,
-        });
-        return result;
-      };
-      admission = include;
       const eligible = (entry: WindowCandidate) =>
         entry.registration.active &&
         ctx.query(() => entry.registration.eligible(ctx, payload, entry.occurrence));
@@ -800,7 +652,7 @@ export class Room {
           outcome,
         });
 
-      for (cursor = 0; cursor < queues.length; cursor++) {
+      for (let cursor = 0; cursor < queues.length; cursor++) {
         const owner = owners[cursor % owners.length]!;
         const pending = queues[cursor]!;
         while (pending.length) {
@@ -867,7 +719,6 @@ export class Room {
           const candidate = selected;
           const skipped = prefixes.get(candidate.registration) ?? [];
           const consumed = new Set([candidate, ...skipped]);
-          // 保持数组身份：同席位的显式加入会追加到这份尚未完成的队列。
           for (let index = pending.length - 1; index >= 0; index--)
             if (consumed.has(pending[index]!)) pending.splice(index, 1);
           for (const entry of skipped) trace(entry, 'ineligible');
@@ -885,8 +736,6 @@ export class Room {
           if (stopped()) return;
         }
       }
-    } finally {
-      this.#openWindows.delete(ref);
     }
   }
 }

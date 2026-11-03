@@ -4,14 +4,7 @@ import type { DeepReadonly } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
 import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
-import type {
-  Trigger,
-  TriggerSource,
-  TriggerOccurrence,
-  Timing,
-  WindowRef,
-  WindowAdmission,
-} from '../../core/runtime/event';
+import type { Trigger, TriggerSource, TriggerOccurrence, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import type { QueryType } from '../skills/query';
 import { isGameOver } from '../game/end';
@@ -479,30 +472,5 @@ export class EffectBook implements TriggerSource {
           }),
       );
     });
-  }
-
-  include<Payload>(
-    ctx: Context,
-    window: WindowRef<Payload>,
-    instances?: readonly string[],
-  ): WindowAdmission {
-    if (instances === undefined) return ctx.include(window, this);
-    const ids = new Set(instances);
-    const triggers = new Set(
-      ctx.query(() =>
-        this.instances(ctx.world)
-          .filter((record) => ids.has(record.id))
-          .flatMap((record) => {
-            const self = this.#handle(ctx.world, record);
-            return (this.#behavior(self).triggers ?? [])
-              .filter((trigger) => trigger.window === window.type)
-              .map(
-                (trigger) =>
-                  syncQueryValue(trigger.bind(self), `${record.type}/${trigger.id}.bind`).id,
-              );
-          }),
-      ),
-    );
-    return ctx.include(window, this, (trigger) => triggers.has(trigger.id));
   }
 }

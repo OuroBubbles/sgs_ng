@@ -130,9 +130,6 @@ it('投影拒绝提交、随机、监听、清理登记、中止和子流程，�
     expect(() => ctx.abort('bad')).toThrow('read-only');
     expect(() => ctx.flow('bad', () => {})).toThrow('read-only');
     expect(() => ctx.window(window, null)).toThrow('read-only');
-    expect(() =>
-      ctx.listen(window, { id: 'bad', owner: null, eligible: () => true, run: () => {} }),
-    ).toThrow('read-only');
     expect(() => game.run('escape', () => {})).toThrow('Pure queries');
     expect(() => game.abort('escape')).toThrow('Pure queries');
   });

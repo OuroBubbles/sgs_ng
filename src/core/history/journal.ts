@@ -17,7 +17,6 @@ export type TraceKind =
   | 'window.candidate'
   | 'window.order'
   | 'window.stopped'
-  | 'window.included'
   | 'decision.open'
   | 'decision.close'
   | 'random'

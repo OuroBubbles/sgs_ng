@@ -17,12 +17,11 @@ export const echo = {
   ],
 } satisfies SkillDefinition;
 
-/** 普通学习技能：授予是 World 事实，是否处理当前时点则由作者显式决定。 */
+/** 普通学习技能：授予是 World 事实；新技能从下一次时点开始参与收集。 */
 export const insight = {
   id: 'workshop:insight',
   name: '拾慧',
-  description:
-    '锁定技。受到伤害后，若你没有余响，获得余响，并将新实例加入本次受伤时点。仍可选择是否发动余响。',
+  description: '锁定技。受到伤害后，若你没有余响，获得余响（自下一次受到伤害起生效）。',
   triggers: [
     on(Damage.received, {
       when: (ctx, { payload: hit, self }) =>
@@ -31,8 +30,6 @@ export const insight = {
           (skill) => skill.owner === self.owner && skill.skill === echo.id,
         ),
       async run(ctx, { self }) {
-        const window = ctx.windowOf(Damage.received);
-        if (!window) throw new Error('Insight requires its damage window.');
         const paid = await pay(ctx, {
           skill: self,
           reason: self.skill,
@@ -41,12 +38,11 @@ export const insight = {
         });
         if (paid.kind !== 'paid' || !ctx.world.player(self.owner).alive || isGameOver(ctx.world))
           return;
-        const change = await rulesOf(ctx).skills.grant(ctx, {
+        await rulesOf(ctx).skills.grant(ctx, {
           owner: self.owner,
           skill: echo.id,
           source: { kind: 'effect', id: self.skill },
         });
-        if (change.after) rulesOf(ctx).skills.include(ctx, window, [change.after.id]);
       },
     }),
   ],

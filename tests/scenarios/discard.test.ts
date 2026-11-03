@@ -137,24 +137,28 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
       expect(game.room.history.facts(spec.factKind)).toEqual([]);
 
       const order: string[] = [];
-      at.listen(Cards.moved, {
-        id: 'prototype-move',
-        owner: null,
-        eligible: () => true,
-        run(child) {
-          expect(child.world.position('fee')).toBe('discard');
-          expect(used(child.world, 'a', limit)).toBe(1);
-          order.push('moved');
-        },
-      });
-      at.listen(Cost.paid, {
-        id: 'prototype-paid',
-        owner: null,
-        eligible: () => true,
-        run: () => {
-          order.push('paid');
-        },
-      });
+      at.defer(
+        game.room.on(Cards.moved, {
+          id: 'prototype-move',
+          owner: null,
+          eligible: () => true,
+          run(child) {
+            expect(child.world.position('fee')).toBe('discard');
+            expect(used(child.world, 'a', limit)).toBe(1);
+            order.push('moved');
+          },
+        }),
+      );
+      at.defer(
+        game.room.on(Cost.paid, {
+          id: 'prototype-paid',
+          owner: null,
+          eligible: () => true,
+          run: () => {
+            order.push('paid');
+          },
+        }),
+      );
       spec.enable();
       expect(await payDiscard(at, spec)).toMatchObject({
         kind: 'paid',
@@ -200,15 +204,17 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
       expect(at.world.zone('a:hand').cards).toEqual(['guarded', 'free']);
       expect(used(at.world, 'a', limit)).toBe(0);
       await game.skills.revoke(at, 'a', skill.id, source);
-      at.listen(Cards.moved, {
-        id: 'atomic',
-        owner: null,
-        eligible: () => true,
-        run(child) {
-          expect(child.world.zone('a:hand').cards).toEqual([]);
-          expect(used(child.world, 'a', limit)).toBe(1);
-        },
-      });
+      at.defer(
+        game.room.on(Cards.moved, {
+          id: 'atomic',
+          owner: null,
+          eligible: () => true,
+          run(child) {
+            expect(child.world.zone('a:hand').cards).toEqual([]);
+            expect(used(child.world, 'a', limit)).toBe(1);
+          },
+        }),
+      );
       materialReads = 0;
       expect(await payDiscard(at, spec)).toMatchObject({ kind: 'paid' });
       expect(materialReads).toBe(1);
@@ -362,14 +368,16 @@ for (const count of [0, 2]) {
       }
       const remaining = delayedCards(ctx.world, 'b', true)[0]!.cards;
       await game.skills.revoke(ctx, 'b', 'test:protection', source);
-      ctx.listen(Cards.moved, {
-        id: 'atomic-removal',
-        owner: null,
-        eligible: () => true,
-        run(child) {
-          expect(delayedCards(child.world, 'b')).toEqual([]);
-        },
-      });
+      ctx.defer(
+        game.room.on(Cards.moved, {
+          id: 'atomic-removal',
+          owner: null,
+          eligible: () => true,
+          run(child) {
+            expect(delayedCards(child.world, 'b')).toEqual([]);
+          },
+        }),
+      );
       expect(await discardCards(ctx, input)).toMatchObject({
         kind: 'discarded',
         cards: remaining,

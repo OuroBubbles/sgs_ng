@@ -7,8 +7,6 @@ export type {
   WindowOptions,
   ActionAnchor,
   TriggerSource,
-  WindowRef,
-  WindowAdmission,
 } from '../core/runtime/event';
 export { turnActionAnchor } from '../rules/turn/order';
 export type { Context, FlowBody, FlowResult } from '../core/runtime/room';

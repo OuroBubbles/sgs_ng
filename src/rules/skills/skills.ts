@@ -3,14 +3,7 @@ import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
 import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
-import type {
-  Trigger,
-  TriggerSource,
-  Timing,
-  TriggerOccurrence,
-  WindowRef,
-  WindowAdmission,
-} from '../../core/runtime/event';
+import type { Trigger, TriggerSource, Timing, TriggerOccurrence } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import { defineState, setState } from '../state/state';
 import type { ViewAs } from '../cards/types';
@@ -618,28 +611,6 @@ export class SkillBook implements TriggerSource {
           ),
         );
     });
-  }
-
-  /** 只加入本次显式选中的当前实例；省略 instances 时重新收集本目录的新候选。 */
-  include<T>(ctx: Context, window: WindowRef<T>, instances?: readonly string[]): WindowAdmission {
-    if (instances === undefined) return ctx.include(window, this);
-    const wanted = new Set(instances);
-    const ids = ctx.query(
-      () =>
-        new Set(
-          this.bindings(ctx.world, { type: window.type, payload: window.payload })
-            .filter(({ self }) => wanted.has(self.id))
-            .flatMap(({ self, definition }) =>
-              definition.triggers
-                .filter((trigger) => trigger.window === window.type)
-                .map(
-                  (trigger) =>
-                    syncQueryValue(trigger.bind(self), `${definition.id}/${trigger.id}.bind`).id,
-                ),
-            ),
-        ),
-    );
-    return ctx.include(window, this, (trigger) => ids.has(trigger.id));
   }
 
   grant(ctx: Context, input: GrantSkill): Promise<SkillChange> {

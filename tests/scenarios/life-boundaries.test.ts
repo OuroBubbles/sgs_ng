@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { finishGame, kill, pay, loseHp, recover, Death, Hp } from '../../src/sdk';
-import type { Context, DeathDraft, RecoveryDraft, TriggerSource, WindowRef } from '../../src/sdk';
+import type { Context, DeathDraft, RecoveryDraft } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 
@@ -398,70 +398,6 @@ it('满体力不会提前关闭回复准备，扩展提高上限后仍可实际�
   });
   conserved(game);
 });
-
-it.each(['recovery', 'death'] as const)(
-  '待决 %s 失效后显式加入返回 stopped，不收集新来源或读取新次数',
-  async (kind) => {
-    const game = create();
-    await wound(game);
-    let joined = false;
-    let collections = 0;
-    let counts = 0;
-    const source: TriggerSource = {
-      collect() {
-        collections++;
-        return joined
-          ? [
-              {
-                id: 'new',
-                owner: null,
-                times: () => {
-                  counts++;
-                  return 1;
-                },
-                eligible: () => true,
-                run: lateCost,
-              },
-            ]
-          : [];
-      },
-    };
-    game.room.addTriggerSource(source);
-    const include = <T>(ctx: Context, window: WindowRef<T> | null) => {
-      expect(window).not.toBeNull();
-      const before = collections;
-      joined = true;
-      expect(ctx.include(window!, source)).toEqual({ state: 'stopped', added: [], skipped: [] });
-      expect(collections).toBe(before);
-      expect(counts).toBe(0);
-    };
-    if (kind === 'recovery') {
-      game.room.on(Hp.recovering, {
-        id: 'close',
-        owner: null,
-        eligible: () => true,
-        async run(ctx) {
-          await finishGame(ctx, { winners: ['a'], reason: 'include boundary' });
-          include(ctx, ctx.windowOf(Hp.recovering));
-        },
-      });
-      await game.room.run('heal', (ctx) => recover(ctx, heal));
-    } else {
-      game.room.on(Death.before, {
-        id: 'close',
-        owner: null,
-        eligible: () => true,
-        run(ctx, draft) {
-          draft.prevent('handled');
-          include(ctx, ctx.windowOf(Death.before));
-        },
-      });
-      await game.room.run('death', (ctx) => kill(ctx, death));
-    }
-    expect(game.room.history.facts('test.late-candidate')).toEqual([]);
-    conserved(game);
-  },
-);
 
 it.each(['recovery', 'death'] as const)(
   '单个 %s 触发回调局部中止不等于整个待决操作失效，仍继续合法候选',

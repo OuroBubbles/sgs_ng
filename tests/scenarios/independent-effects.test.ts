@@ -25,8 +25,6 @@ import type {
   EffectDefinition,
   EffectRecord,
   Lifetime,
-  WindowAdmission,
-  EffectTrigger,
   EffectTriggerDefinition,
   EffectEnd,
   Trigger,
@@ -230,71 +228,6 @@ it('异步行为工厂立即报告定义位置，不被当作空行为，已提�
   expect(game.room.status).toBe('faulted');
   expect(game.room.history.facts('effect.added')).toHaveLength(1);
   expect(game.room.history.entries.filter((entry) => entry.type === 'fault')).toHaveLength(1);
-  replay(game);
-});
-it('显式入窗逐项检查自定义绑定，首次错误返回 Promise 也不能晚到写入', async () => {
-  let active: Context | undefined;
-  let first = true;
-  let lateError = '';
-  const game = create({
-    behavior: () => ({
-      triggers: [
-        {
-          id: 'custom',
-          window: tick,
-          bind: ((self: EffectHandle) => {
-            const bound = {
-              id: `custom:${self.id}`,
-              owner: self.owner,
-              eligible: () => true,
-              run: () => {},
-            };
-            if (!active || !first) return bound;
-            first = false;
-            const at = active;
-            return (async () => {
-              await Promise.resolve();
-              try {
-                at.commit('invalid.bind.late', [{ kind: 'vitality', player: 'b', hp: 1 }], null);
-              } catch (error) {
-                lateError = (error as Error).message;
-              }
-              return bound;
-            })();
-          }) as EffectTrigger['bind'],
-        },
-      ],
-    }),
-  });
-  game.room.on(tick, {
-    id: 'add',
-    group: 'before',
-    owner: null,
-    eligible: () => true,
-    async run(ctx) {
-      const added = await game.effects.add(ctx, game.definition, {
-        owner: 'b',
-        data: { amount: 1 },
-      });
-      active = ctx;
-      game.effects.include(ctx, ctx.windowOf(tick)!, [added.id]);
-      await Promise.resolve();
-    },
-  });
-  let failure: unknown;
-  try {
-    await game.room.run('tick', (ctx) => ctx.window(tick, null));
-  } catch (error) {
-    failure = error;
-  }
-  await Promise.resolve();
-  expect(game.room.world.player('b').hp).toBe(4);
-  expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toBe('Queries cannot await (probe:lasting/custom.bind).');
-  expect(lateError).toContain('Queries cannot await');
-  expect(game.room.status).toBe('faulted');
-  expect(game.room.history.facts('invalid.bind.late')).toEqual([]);
-  expect(game.room.history.facts('effect.added')).toHaveLength(1);
   replay(game);
 });
 it('相同定义的多个实例独立叠加、更新与移除，不共享技能次数或数据', async () => {
@@ -602,36 +535,6 @@ it('前组结束效果后，已收集的后组候选不再执行或收费', asyn
   await game.room.run('tick', (ctx) => ctx.window(tick, null));
   expect(charged).toBe(0);
   expect(game.room.history.facts('cost.paid')).toEqual([]);
-  replay(game);
-});
-it.each([false, true])('窗口中新增效果是否显式加入：%s，已有身份不会重复入场', async (include) => {
-  const game = create();
-  let admission: WindowAdmission | null = null;
-  let duplicate: WindowAdmission | null = null;
-  game.room.on(tick, {
-    id: 'create',
-    group: 'before',
-    owner: null,
-    eligible: () => game.effects.instances(game.room.world).length === 0,
-    async run(ctx) {
-      const added = await game.effects.add(ctx, game.definition, {
-        owner: 'b',
-        data: { amount: 1 },
-      });
-      if (include) {
-        admission = game.effects.include(ctx, ctx.windowOf(tick)!, [added.id]);
-        duplicate = game.effects.include(ctx, ctx.windowOf(tick)!, [added.id]);
-      }
-    },
-  });
-  await game.room.run('tick', (ctx) => ctx.window(tick, null));
-  expect(game.fired).toHaveLength(include ? 1 : 0);
-  if (include) {
-    expect(admission).toMatchObject({ state: 'open', added: [expect.any(String)] });
-    expect(duplicate).toMatchObject({ added: [], skipped: [{ reason: 'known' }] });
-  }
-  await game.room.run('next-tick', (ctx) => ctx.window(tick, null));
-  expect(game.fired).toHaveLength(include ? 2 : 1);
   replay(game);
 });
 it('自定义效果绑定保留原型身份与次数，执行仍按最新数据重绑', async () => {
@@ -1015,45 +918,6 @@ it('装配期批量登记原子拒绝重复定义，挂接后不能追加定义'
   expect(() => other.register([game.definition, game.definition])).toThrow('Duplicate');
   expect(() => other.register([game.definition])).not.toThrow();
   expect(() => game.effects.register([])).toThrow('sealed');
-});
-it('作者可用普通自定义绑定与身份，不要求解析某种 ID 格式才能显式入窗', async () => {
-  let fired = 0;
-  const game = create({
-    behavior: () => ({
-      triggers: [
-        {
-          id: 'custom',
-          window: tick,
-          bind: (self) => ({
-            id: `custom:${self.id}`,
-            owner: self.owner,
-            eligible: (ctx) => self.current(ctx.world) !== null,
-            run() {
-              fired++;
-            },
-          }),
-        },
-      ],
-    }),
-  });
-  game.room.on(tick, {
-    id: 'add',
-    group: 'before',
-    owner: null,
-    eligible: () => true,
-    async run(ctx) {
-      const added = await game.effects.add(ctx, game.definition, {
-        owner: 'b',
-        data: { amount: 1 },
-      });
-      expect(game.effects.include(ctx, ctx.windowOf(tick)!, [added.id]).added).toEqual([
-        `custom:${added.id}`,
-      ]);
-    },
-  });
-  await game.room.run('tick', (ctx) => ctx.window(tick, null));
-  expect(fired).toBe(1);
-  replay(game);
 });
 it('嵌套领域到期只移除自己的实例，外层与独立实例继续贡献', async () => {
   const game = create();

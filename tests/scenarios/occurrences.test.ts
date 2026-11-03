@@ -121,7 +121,7 @@ it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, null, undefined, '
     expect(target.history.facts()).toEqual([]);
   },
 );
-it.each(['commit', 'random', 'listen', 'unregister'] as const)(
+it.each(['commit', 'random', 'defer', 'unregister'] as const)(
   '次数函数在纯查询中执行，拒绝 %s',
   async (action) => {
     const target = room();
@@ -139,8 +139,7 @@ it.each(['commit', 'random', 'listen', 'unregister'] as const)(
       times(ctx) {
         if (action === 'commit') ctx.commit('bad', [], {});
         if (action === 'random') ctx.randomInt(2);
-        if (action === 'listen')
-          ctx.listen(window, { id: 'new', owner: 'a', eligible: () => true, run: () => {} });
+        if (action === 'defer') ctx.defer(() => {});
         if (action === 'unregister') remove();
         return 2;
       },
@@ -537,15 +536,17 @@ it('作用域监听完成后注销整个来源，后续窗口不保留任何次�
   const window = testTiming<null>('repeat.scoped');
   let count = 0;
   await target.run('host', async (ctx) => {
-    ctx.listen(window, {
-      id: 'scoped',
-      owner: 'a',
-      times: () => 2,
-      eligible: () => true,
-      run() {
-        count++;
-      },
-    });
+    ctx.defer(
+      target.on(window, {
+        id: 'scoped',
+        owner: 'a',
+        times: () => 2,
+        eligible: () => true,
+        run() {
+          count++;
+        },
+      }),
+    );
     await ctx.window(window, null);
   });
   await target.run('later', (ctx) => ctx.window(window, null));

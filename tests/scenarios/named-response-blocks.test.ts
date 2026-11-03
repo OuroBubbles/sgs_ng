@@ -12,7 +12,7 @@ import {
   Response,
 } from '../../src/sdk';
 import { qingguo } from '../../src/content/standard/generals/zhenji';
-import type { CardEffect, ResponseOpportunity, TriggerSource } from '../../src/sdk';
+import type { CardEffect } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -580,67 +580,5 @@ it('纯查询修正可按响应牌名计算次数，具名禁止仍优先于追�
     },
   });
   await use(game, attack);
-  replay(game);
-});
-
-it('供牌暂时忙碌只阻止并发支付，不假关闭窗口；新候选接纳后仍因实际供牌完成而不执行', async () => {
-  const game = create();
-  let enabled = false;
-  let added = false;
-  let held: ResponseOpportunity | undefined;
-  const source: TriggerSource = {
-    collect(type) {
-      return type === Response.requested && enabled
-        ? [
-            {
-              id: 'post-payment-new',
-              owner: null,
-              eligible: () => true,
-              run(ctx) {
-                ctx.commit('test.unneeded-provider', [], null);
-              },
-            },
-          ]
-        : [];
-    },
-  };
-  game.room.addTriggerSource(source);
-  game.room.on(Response.requested, {
-    id: 'supply',
-    owner: null,
-    eligible: () => true,
-    async run(ctx, request) {
-      held = request;
-      await request.provide(ctx, { kind: 'physical', card: 'answer' });
-    },
-  });
-  game.room.on(Response.finished, {
-    id: 'join-during-aftereffects',
-    owner: null,
-    eligible: () => true,
-    run(ctx) {
-      expect(held!.available(ctx)).toBe(false);
-      enabled = true;
-      expect(ctx.include(ctx.windowOf(Response.requested)!, source)).toEqual({
-        state: 'open',
-        added: ['post-payment-new'],
-        skipped: [],
-      });
-      added = true;
-    },
-  });
-  game.room.on(Resolve.starting, {
-    id: 'probe',
-    owner: null,
-    eligible: () => true,
-    async run(ctx, { effect }) {
-      effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
-      await game.book.respond(ctx, 'b', ['standard:slash'], effect);
-    },
-  });
-  await use(game, attack);
-  expect(added).toBe(true);
-  expect(game.room.history.facts('test.unneeded-provider')).toEqual([]);
-  expect(game.room.history.facts('card.responded')).toHaveLength(1);
   replay(game);
 });

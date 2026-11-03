@@ -92,7 +92,7 @@ CardBook.hasOffers 与 offers 共用候选迭代，activeAvailable 与 activeOff
 
 本地 FreeKill 参考：`packages/standard/pkg/skills/wusheng.lua` 将转换与牌执行分开；`standard_cards/pkg/skills/slash.lua` 独立检查次数/目标；`ltk/server/events/skill.lua:206`、`ltk/core/player.lua:996` 提供来源/失效/存活参考；`standard/pkg/skills/yiji.lua` 展示循环和联合选择需求。没有复制代码或兼容接口。
 
-后续已实现语义牌/材料分离、用牌/目标效果身份、转换、基本响应、阶段驱动、反制链、席位投影与装备派生能力。[普通内容组合](39-source-packages.md)、[模式顺序策略](41-action-order.md) 和 [显式历史来源后效](43-retained-effects.md) 也已接入。[窗口中新来源显式加入](51-window-admission.md) 可通过 SkillBook.include 按实际技能实例请求，继续使用普通 on/invoke/pay。独立效果基础登记见 [56](56-independent-effects.md)；当前交付与后续范围以 [STATUS](STATUS.md) 为准。
+后续已实现语义牌/材料分离、用牌/目标效果身份、转换、基本响应、阶段驱动、反制链、席位投影与装备派生能力。[普通内容组合](39-source-packages.md)、[模式顺序策略](41-action-order.md) 和 [显式历史来源后效](43-retained-effects.md) 也已接入。窗口中新获得的技能从下一个时点参与。独立效果基础登记见 [56](56-independent-effects.md)；当前交付与后续范围以 [STATUS](STATUS.md) 为准。
 
 稳定 ID/可读文本的具名选择使用 chooseOne + ctx.ask；客户端与最终校验复用同一决策，见 [35](35-response-blocks-intrigue.md)。
 

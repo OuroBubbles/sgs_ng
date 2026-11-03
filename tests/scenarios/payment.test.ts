@@ -235,19 +235,21 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
   await game.run('turn', (ctx) =>
     withLifetime(ctx, 'phase', async (phase, lifetime) => {
       const limit: UsageLimit = { key: 'activation', source: 'test:skill', lifetime, max: 1 };
-      phase.listen(Cards.moved, {
-        id: 'observe-payment',
-        owner: 'b',
-        eligible: (_child, event) => event.moves.some((move) => move.cards.includes('a1')),
-        run: (child) => {
-          observed.push({
-            hand: child.world.zone('a:hand').cards,
-            discard: child.world.zone('discard').cards,
-            uses: used(child.world, 'a', limit),
-            declaration: child.history.facts('cost.paid')[0]?.data.detail,
-          });
-        },
-      });
+      phase.defer(
+        game.on(Cards.moved, {
+          id: 'observe-payment',
+          owner: 'b',
+          eligible: (_child, event) => event.moves.some((move) => move.cards.includes('a1')),
+          run: (child) => {
+            observed.push({
+              hand: child.world.zone('a:hand').cards,
+              discard: child.world.zone('discard').cards,
+              uses: used(child.world, 'a', limit),
+              declaration: child.history.facts('cost.paid')[0]?.data.detail,
+            });
+          },
+        }),
+      );
       const result = await pay(phase, {
         actor: 'a',
         cards: ['a1'],

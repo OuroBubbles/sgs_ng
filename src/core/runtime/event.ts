@@ -96,19 +96,3 @@ export type ActionAnchor = (ctx: Context, subject: string | null) => string | nu
 export interface TriggerSource {
   collect<T>(type: Timing<T, unknown>, world: WorldReader, payload: T): readonly Trigger<T>[];
 }
-
-/** 执行中的具体窗口；不是存档数据。相同 type 的嵌套窗口有不同引用和 ID。 */
-export interface WindowRef<T> {
-  readonly id: string;
-  readonly type: Timing<T, unknown>;
-  readonly payload: T;
-}
-
-export interface WindowAdmission {
-  readonly state: 'open' | 'stopped';
-  readonly added: readonly string[];
-  readonly skipped: readonly {
-    readonly id: string;
-    readonly reason: 'known' | 'past';
-  }[];
-}

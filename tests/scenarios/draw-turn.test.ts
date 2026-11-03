@@ -371,18 +371,20 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
     eligible: (_ctx, current) => current.kind === 'draw',
     run: async (ctx, current) => {
       const limit = { key: 'skip-draw', source: 'test:skip', lifetime: current.lifetime, max: 1 };
-      ctx.listen(Cost.paid, {
-        id: 'observe-skip',
-        owner: 'b',
-        eligible: () => true,
-        run: (atPay) => {
-          observations.push(
-            current.skipped &&
-              used(atPay.world, 'a', limit) === 1 &&
-              atPay.world.zone('discard').cards.includes('slash1'),
-          );
-        },
-      });
+      ctx.defer(
+        game.room.on(Cost.paid, {
+          id: 'observe-skip',
+          owner: 'b',
+          eligible: () => true,
+          run: (atPay) => {
+            observations.push(
+              current.skipped &&
+                used(atPay.world, 'a', limit) === 1 &&
+                atPay.world.zone('discard').cards.includes('slash1'),
+            );
+          },
+        }),
+      );
       const result = await pay(ctx, {
         actor: 'a',
         cards: ['slash1'],
