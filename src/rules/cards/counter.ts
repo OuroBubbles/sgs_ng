@@ -58,7 +58,7 @@ export function contestCounter(
         subject,
         by: null,
       };
-      child.commit('counter.finished', [], result);
+      child.commit(Counter.finished, [], result);
       await child.window(Counter.finished, immutable(result), { subject: root.target });
       return immutable(result);
     }
@@ -120,7 +120,7 @@ export function contestCounter(
     }
     // 最后一席准备失败或嵌套用牌也可能关闭原机会，此后不一定还有下一轮循环。
     if (!live()) result = { ...result, kind: 'unavailable' };
-    child.commit('counter.finished', [], result);
+    child.commit(Counter.finished, [], result);
     await child.window(Counter.finished, immutable(result), { subject: root.target });
     return immutable(result);
   });

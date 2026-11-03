@@ -277,7 +277,10 @@ export interface TriggerSpec<T, V> {
   ) => unknown;
 }
 
-export function trigger<T, V = true>(window: Timing<T>, spec: TriggerSpec<T, V>): SkillTrigger {
+export function trigger<T, V = true>(
+  window: Timing<T, unknown>,
+  spec: TriggerSpec<T, V>,
+): SkillTrigger {
   const { who, when, times, locked, ask, cost, keep, declare: extra, effect } = spec;
   const staged = ask !== undefined || cost !== undefined;
   return on(window, {

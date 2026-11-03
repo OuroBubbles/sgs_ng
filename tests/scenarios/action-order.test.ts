@@ -43,7 +43,7 @@ function generic(actionAnchor?: ActionAnchor) {
 }
 function observe<T>(
   room: Room,
-  window: Timing<T>,
+  window: Timing<T, unknown>,
   seen: string[],
   describe?: (owner: string, data: T) => string,
 ) {

@@ -270,7 +270,7 @@ export class RoleMatch {
         await draw(ctx, { player: id, count: 4, reason: 'match:initial-hand' });
       }
       ctx.commit(
-        'match.prepared',
+        Match.prepared,
         [stateChange(ctx, matchState, matchTarget, { stage: 'ready', turns: 0, next: lord })],
         { first: lord },
       );

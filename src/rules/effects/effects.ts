@@ -128,7 +128,7 @@ export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDe
 
 /** 只描述一个普通触发；身份、生存资格、行动序与有限次数仍走原有 Window。 */
 export function effectOn<Payload>(
-  window: Timing<Payload>,
+  window: Timing<Payload, unknown>,
   input: EffectTriggerDefinition<Payload>,
 ): EffectTrigger {
   const { id = window.id } = input;
@@ -329,7 +329,7 @@ export class EffectBook implements TriggerSource {
   ): Promise<EffectRecord<Data>> {
     return ctx.flow('effect.add', async (at) => {
       const prepared = this.#prepare(at, definition, input);
-      at.commit('effect.added', [prepared.change], prepared.record);
+      at.commit(Effect.added, [prepared.change], prepared.record);
       await at.window(
         Effect.added,
         prepared.record,
@@ -348,7 +348,7 @@ export class EffectBook implements TriggerSource {
       const after = at.query(() => immutable({ ...before, data })) as EffectRecord<Data>;
       if (!at.query(() => this.#definition(before.type).accepts(after.data)))
         throw new Error('Invalid updated effect data.');
-      at.commit('effect.changed', [{ kind: 'setState', state: { ...entry, value: after } }], {
+      at.commit(Effect.changed, [{ kind: 'setState', state: { ...entry, value: after } }], {
         before,
         after,
       });
@@ -376,7 +376,7 @@ export class EffectBook implements TriggerSource {
 
   async #finished(ctx: Context, before: EffectRecord, reason: string): Promise<void> {
     const ended = immutable({ before, reason });
-    ctx.commit('effect.ended', [], ended);
+    ctx.commit(Effect.ended, [], ended);
     await ctx.window(Effect.ended, ended, before.owner === null ? {} : { subject: before.owner });
     const onEnd = this.#definition(before.type).onEnd;
     if (onEnd) await ctx.flow('effect.after-end', (at) => onEnd(at, ended));
@@ -425,7 +425,10 @@ export class EffectBook implements TriggerSource {
     return behavior;
   }
 
-  collect<Payload>(type: Timing<Payload>, world: WorldReader): readonly Trigger<Payload>[] {
+  collect<Payload>(
+    type: Timing<Payload, unknown>,
+    world: WorldReader,
+  ): readonly Trigger<Payload>[] {
     if (!this.#attachments.has(world)) return [];
     return this.instances(world).flatMap((record) => {
       const self = this.#handle(world, record);

@@ -58,7 +58,7 @@ export function setChained(
       kind,
     });
     if (kind === 'changed') {
-      at.commit('chain.changed', [chainChange(at, player, value)], result);
+      at.commit(Chain.changed, [chainChange(at, player, value)], result);
       await at.window(Chain.changed, result, { subject: player });
     }
     return result;

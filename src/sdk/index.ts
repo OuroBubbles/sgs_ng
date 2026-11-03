@@ -24,6 +24,7 @@ export type {
   WorldReader,
 } from '../core/model/state';
 export type { Fact, HistoryReader } from '../core/history/journal';
+export { isFact } from '../core/history/journal';
 export type { DeepReadonly } from '../core/model/value';
 export { JointSelection } from '../core/decisions/selection';
 export { chooseOne } from '../core/decisions/choice';

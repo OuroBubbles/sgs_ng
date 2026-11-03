@@ -39,7 +39,7 @@ export async function finishGame(ctx: Context, input: GameResult): Promise<GameR
   if (!result.reason || new Set(result.winners).size !== result.winners.length)
     throw new Error('Invalid game result.');
   for (const id of result.winners) ctx.world.player(id);
-  ctx.commit('game.finished', [stateChange(ctx, gameResult, gameTarget, result)], result);
+  ctx.commit(Game.finished, [stateChange(ctx, gameResult, gameTarget, result)], result);
   await ctx.window(Game.finished, result);
   return result;
 }

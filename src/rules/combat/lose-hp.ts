@@ -35,7 +35,7 @@ export function loseHp(ctx: Context, request: HpLossInput): Promise<HpLossResult
       });
       if (!amount) return result;
       const fact = child.commit(
-        'hp.lost',
+        Hp.lost,
         [{ kind: 'vitality', player: input.player, hp: result.afterHp }],
         result,
       );

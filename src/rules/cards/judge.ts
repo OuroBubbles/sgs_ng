@@ -147,7 +147,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
         card,
         matched,
       });
-      at.commit('judgment.finished', [], sealed);
+      at.commit(Judgment.finished, [], sealed);
       await at.window(Judgment.finished, sealed, { subject: input.player });
       if (onResult) await onResult(at, sealed);
       return sealed;

@@ -77,7 +77,7 @@ export async function withLifetime<T>(
       statesBefore: states,
       skillsBefore: skills,
     });
-    owner.commit('lifetime.ended', changes, ended);
+    owner.commit(Lifetime.ended, changes, ended);
     await owner.window(Lifetime.ended, ended);
     if (result.kind === 'aborted') return owner.abort(result.reason);
     return result.value;

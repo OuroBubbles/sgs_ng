@@ -66,7 +66,7 @@ export function changeShield(ctx: Context, request: ShieldInput): Promise<Shield
       kind: !available ? 'unavailable' : amount ? 'changed' : 'unchanged',
     });
     if (amount) {
-      at.commit('shield.changed', [shieldChange(at, input.player, after)], result);
+      at.commit(Shield.changed, [shieldChange(at, input.player, after)], result);
       await at.window(Shield.changed, result, { subject: input.player });
     }
     return result;

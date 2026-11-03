@@ -94,12 +94,19 @@ export function currentPhase(ctx: Context): PhaseView | null {
   return phase?.lifetime.active && ctx.cause.scopePath.includes(phase.id) ? phase : null;
 }
 export const Phase = defineEvent('phase', {
-  before: timing<PhaseView>(),
-  started: timing<PhaseView>(),
+  before: timing<PhaseView, PhaseSnapshot>(),
+  started: timing<PhaseView, PhaseSnapshot>(),
   ending: timing<PhaseView>(),
 });
+/** 回合开始写入历史的快照。 */
+export interface TurnStart {
+  readonly id: string;
+  readonly owner: string;
+  readonly origin: TurnOrigin;
+  readonly phases: readonly PhaseKind[];
+}
 export const Turn = defineEvent('turn', {
-  started: timing<TurnView>(),
+  started: timing<TurnView, TurnStart>(),
   ending: timing<TurnView>(),
 });
 
@@ -397,7 +404,7 @@ export function runPhase(
         child.defer(() => phase.close());
         control = phase;
         child.commit(
-          'phase.before',
+          Phase.before,
           [
             stateChange(child, activePhase, activeTarget, {
               id: phase.id,
@@ -437,7 +444,7 @@ export function runPhase(
           return { phase: phase.snapshot(), exit: 'skipped', reason: phase.snapshot().reason };
         }
         child.commit(
-          'phase.started',
+          Phase.started,
           [
             stateChange(child, activePhase, activeTarget, {
               id: phase.id,
@@ -532,7 +539,7 @@ export function runTurn(
           },
         });
         child.commit(
-          'turn.started',
+          Turn.started,
           [stateChange(child, activeTurn, activeTarget, { id: turn.id, owner, origin })],
           { id: turn.id, owner, origin, phases },
         );

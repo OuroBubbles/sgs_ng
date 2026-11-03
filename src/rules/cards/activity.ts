@@ -1,6 +1,9 @@
+import { isFact } from '../../core/history/journal';
 import type { Fact } from '../../core/history/journal';
+import { Lifetime } from '../scopes/lifetime';
 import { immutable } from '../../core/model/value';
 import type { SemanticCard } from './types';
+import { Phase, Turn } from '../turn/turn';
 import type { PhaseKind } from '../turn/turn';
 
 /** 宣告发生时真正执行中的阶段；准备窗口、结束后的后效和外层暂停阶段不混入。 */
@@ -52,13 +55,13 @@ export function cardActivities(
   return immutable(
     // 先按事实顺序建立边界，再筛选活动；祖先开始记录可能在 withinScope 之外。
     facts.flatMap((fact): CardActivity[] => {
-      if (fact.data.kind === 'turn.started') {
-        turns.set((fact.data.detail as { id: string }).id, true);
-      } else if (fact.data.kind === 'phase.before' || fact.data.kind === 'phase.started') {
-        const { id, owner, kind } = fact.data.detail as CardActivityPhase;
-        phases.set(id, { view: { id, owner, kind }, active: fact.data.kind === 'phase.started' });
-      } else if (fact.data.kind === 'lifetime.ended') {
-        const { id } = fact.data.detail as { id: string };
+      if (isFact(fact, Turn.started)) {
+        turns.set(fact.data.detail.id, true);
+      } else if (isFact(fact, Phase.before) || isFact(fact, Phase.started)) {
+        const { id, owner, kind } = fact.data.detail;
+        phases.set(id, { view: { id, owner, kind }, active: isFact(fact, Phase.started) });
+      } else if (isFact(fact, Lifetime.ended)) {
+        const { id } = fact.data.detail;
         if (turns.has(id)) turns.set(id, false);
         const phase = phases.get(id);
         if (phase) phases.set(id, { ...phase, active: false });

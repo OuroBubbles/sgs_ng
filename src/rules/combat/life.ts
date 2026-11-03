@@ -152,7 +152,7 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
     if (!player.alive || player.hp > 0 || isGameOver(child.world))
       return { kind: 'unavailable', event };
     child.commit(
-      'dying.started',
+      Dying.started,
       [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, true)],
       event,
     );
@@ -185,7 +185,7 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
     }
     const result: DyingResult = immutable({ kind, event });
     child.commit(
-      'dying.finished',
+      Dying.finished,
       [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, false)],
       result,
     );

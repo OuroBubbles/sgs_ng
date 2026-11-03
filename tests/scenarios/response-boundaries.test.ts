@@ -26,7 +26,7 @@ import { card, cardGame, use } from '../fixtures/cards';
 import { worldSeed, nextRequest } from '../fixtures/room';
 
 const owners = ['a', 'b', 'c', 'd'];
-function watchOrder<T>(game: ReturnType<typeof cardGame>, window: Timing<T>): string[] {
+function watchOrder<T>(game: ReturnType<typeof cardGame>, window: Timing<T, unknown>): string[] {
   const seen: string[] = [];
   // 所有席位均有被动观察者，令首席锚点错误成为可见的规则差异。
   for (const owner of owners)

@@ -5,19 +5,22 @@ import type { WorldReader } from '../model/state';
  * 事件的一个具名时点。同一个对象既是触发时机（ctx.window / on），也是历史记录的种类
  * （ctx.commit / history.facts）；id 统一由「事件.时点」推导。
  */
-export interface Timing<T> {
+export interface Timing<T, R = T> {
   readonly id: string;
   readonly groups: readonly string[];
-  /** 只参与类型推导，不存运行时 payload。 */
+  /** 只参与类型推导：触发时的载荷（可为可修改草稿）。 */
   readonly payload?: T;
+  /** 只参与类型推导：写入历史的记录形状（草稿的可序列化快照）；默认与载荷相同。 */
+  readonly record?: R;
 }
 
 /** 时点声明：载荷类型与可选的结算分组（默认单组 main）。 */
-export interface TimingSpec<T> {
+export interface TimingSpec<T, R = T> {
   readonly groups: readonly string[];
   readonly payload?: T;
+  readonly record?: R;
 }
-export function timing<T>(...groups: string[]): TimingSpec<T> {
+export function timing<T, R = T>(...groups: string[]): TimingSpec<T, R> {
   const fixed = groups.length ? [...groups] : ['main'];
   if (fixed.some((group) => !group) || new Set(fixed).size !== fixed.length)
     throw new Error('Timing requires distinct named groups.');
@@ -25,11 +28,11 @@ export function timing<T>(...groups: string[]): TimingSpec<T> {
 }
 
 export type EventTimings<S> = {
-  readonly [K in keyof S]: S[K] extends TimingSpec<infer T> ? Timing<T> : never;
+  readonly [K in keyof S]: S[K] extends TimingSpec<infer T, infer R> ? Timing<T, R> : never;
 };
 
 /** 声明一个事件及其全部时点：defineEvent('damage', { received: timing<DamageResult>() }) → Damage.received。 */
-export function defineEvent<const S extends Record<string, TimingSpec<unknown>>>(
+export function defineEvent<const S extends Record<string, TimingSpec<unknown, unknown>>>(
   id: string,
   timings: S,
 ): EventTimings<S> {
@@ -91,13 +94,13 @@ export type ActionAnchor = (ctx: Context, subject: string | null) => string | nu
 
 /** 开窗时从权威状态生成候选，核心不需要导入技能定义或内容包。 */
 export interface TriggerSource {
-  collect<T>(type: Timing<T>, world: WorldReader, payload: T): readonly Trigger<T>[];
+  collect<T>(type: Timing<T, unknown>, world: WorldReader, payload: T): readonly Trigger<T>[];
 }
 
 /** 执行中的具体窗口；不是存档数据。相同 type 的嵌套窗口有不同引用和 ID。 */
 export interface WindowRef<T> {
   readonly id: string;
-  readonly type: Timing<T>;
+  readonly type: Timing<T, unknown>;
   readonly payload: T;
 }
 

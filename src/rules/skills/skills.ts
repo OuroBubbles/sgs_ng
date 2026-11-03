@@ -151,7 +151,10 @@ export interface SkillTriggerDefinition<T> {
   readonly run: (ctx: Context, input: SkillTriggerOccurrenceInput<T>) => unknown;
 }
 
-export function on<T>(window: Timing<T>, definition: SkillTriggerDefinition<T>): SkillTrigger {
+export function on<T>(
+  window: Timing<T, unknown>,
+  definition: SkillTriggerDefinition<T>,
+): SkillTrigger {
   const { id = window.id } = definition;
   // 展开对象不会复制原型方法；固定入口时保留作者对象作为接收者。
   const handler = Object.freeze({
@@ -407,7 +410,10 @@ export class SkillBook implements TriggerSource {
   }
 
   /** 装配期声明窗口中的历史来源。只有该窗口收集候选，不进入当前能力目录。 */
-  registerSnapshots<T>(window: Timing<T>, read: (payload: T) => readonly SkillInstance[]): void {
+  registerSnapshots<T>(
+    window: Timing<T, unknown>,
+    read: (payload: T) => readonly SkillInstance[],
+  ): void {
     if (this.#sealed) throw new Error('Skill snapshots are sealed after attachment.');
     if (this.#snapshots.has(window)) throw new Error('Duplicate skill snapshot reader.');
     this.#snapshots.set(window, (payload) => read(payload as T));
@@ -601,7 +607,7 @@ export class SkillBook implements TriggerSource {
     });
   }
 
-  collect<T>(type: Timing<T>, world: WorldReader, payload: T): readonly Trigger<T>[] {
+  collect<T>(type: Timing<T, unknown>, world: WorldReader, payload: T): readonly Trigger<T>[] {
     return this.bindings(world, { type, payload }).flatMap(({ self, definition }) => {
       return definition.triggers
         .filter((trigger) => trigger.window === type)
@@ -701,9 +707,9 @@ export class SkillBook implements TriggerSource {
     after: SkillInstance | null,
   ): Promise<SkillChange> {
     const result: SkillChange = immutable({ kind: 'changed', before, after });
-    if (after) ctx.commit('skill.changed', [{ kind: 'setSkill', skill: after }], result);
+    if (after) ctx.commit(Skill.changed, [{ kind: 'setSkill', skill: after }], result);
     else if (before)
-      ctx.commit('skill.changed', [{ kind: 'removeSkill', instance: before.id }], result);
+      ctx.commit(Skill.changed, [{ kind: 'removeSkill', instance: before.id }], result);
     else throw new Error('Empty skill change.');
     await ctx.window(Skill.changed, result, { subject: (after ?? before)!.owner });
     return result;

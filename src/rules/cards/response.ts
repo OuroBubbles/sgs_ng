@@ -85,9 +85,21 @@ interface ParentResponse {
   readonly actors: readonly string[];
   readonly live: (ctx: Context) => boolean;
 }
+/** 响应请求写入历史的快照。 */
+export interface ResponseRequest {
+  readonly id: string;
+  readonly actor: string;
+  readonly purpose: Purpose;
+  readonly beneficiary: string;
+  readonly requestedNames: readonly string[];
+  readonly names: readonly string[];
+  readonly to: EffectRef;
+  readonly actors: readonly string[];
+  readonly parent: string | null;
+}
 export const Response = defineEvent('response', {
   finished: timing<CardResponse>(),
-  requested: timing<ResponseOpportunity>(),
+  requested: timing<ResponseOpportunity, ResponseRequest>(),
 });
 
 /** 响应机会只拥有待决请求；使用、打出、材料交接由 CardBook 原有领域管线执行。 */
@@ -271,7 +283,7 @@ export function requestResponse(
           }
         }),
     });
-    const snapshot = {
+    const snapshot: ResponseRequest = {
       id: lifetime.id,
       actor,
       purpose,
@@ -285,7 +297,7 @@ export function requestResponse(
     const offerPurpose =
       purpose === 'use' ? { kind: 'response' as const, opportunity: useOpportunity } : 'response';
     const offers = () => book.offers(child, actor, offerPurpose, names);
-    child.commit('response.requested', [], snapshot);
+    child.commit(Response.requested, [], snapshot);
     if (available(child))
       await child.window(Response.requested, opportunity, { subject: actor, active: pending });
     let result: ResponseResult;

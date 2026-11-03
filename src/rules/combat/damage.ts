@@ -408,7 +408,7 @@ function resolveDamage(
     );
     if (kind === 'dealt') {
       const fact = child.commit(
-        'damage.dealt',
+        Damage.dealt,
         [
           { kind: 'vitality', player: input.to, hp: result.afterHp },
           ...(unchained ? [chainChange(child, input.to, false)] : []),

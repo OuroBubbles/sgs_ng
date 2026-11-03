@@ -40,7 +40,7 @@ export function withRevealedCards<T>(
         ? [{ cards, from: 'draw', to: pool.zone, place: 'bottom' as const }]
         : [];
       at.commit(
-        'cards.revealed',
+        Cards.revealed,
         moves.map((move) => ({ kind: 'move', ...move })),
         event,
       );

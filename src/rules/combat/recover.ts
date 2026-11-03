@@ -87,7 +87,7 @@ export function recover(ctx: Context, request: RecoveryInput): Promise<RecoveryR
     });
     if (amount) {
       child.commit(
-        'hp.recovered',
+        Hp.recovered,
         [{ kind: 'vitality', player: input.to, hp: result.afterHp }],
         result,
       );

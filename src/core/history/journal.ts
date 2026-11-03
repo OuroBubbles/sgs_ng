@@ -1,6 +1,7 @@
 import type { Change } from '../model/state';
 import { immutable } from '../model/value';
 import type { DeepReadonly } from '../model/value';
+import type { Timing } from '../runtime/event';
 
 export interface Cause {
   readonly flowId: string;
@@ -41,8 +42,17 @@ export interface Fact<T = unknown> extends Cause {
 
 export type JournalEntry = Trace | Fact;
 
+/** 历史记录的种类：事件时点本身（带类型）或其序列化 id。 */
+export type FactKind = Timing<unknown, unknown> | string;
+export const factKind = (kind: FactKind): string => (typeof kind === 'string' ? kind : kind.id);
+
+/** 按事件时点收窄一条历史记录的载荷类型。 */
+export const isFact = <R>(fact: Fact, kind: Timing<unknown, R>): fact is Fact<R> =>
+  fact.data.kind === kind.id;
+
 export interface HistoryReader {
   readonly entries: readonly JournalEntry[];
+  facts<R>(kind: Timing<unknown, R>, withinScope?: string): readonly Fact<R>[];
   facts(kind?: string, withinScope?: string): readonly Fact[];
 }
 
@@ -76,8 +86,10 @@ export class Journal {
     return Object.freeze([...this.#entries]);
   }
 
-  facts(kind?: string, withinScope?: string): readonly Fact[] {
-    const facts = kind === undefined ? this.#facts : (this.#factsByKind.get(kind) ?? []);
+  facts<R>(kind: Timing<unknown, R>, withinScope?: string): readonly Fact<R>[];
+  facts(kind?: string, withinScope?: string): readonly Fact[];
+  facts(kind?: FactKind, withinScope?: string): readonly Fact[] {
+    const facts = kind === undefined ? this.#facts : (this.#factsByKind.get(factKind(kind)) ?? []);
     return Object.freeze(
       withinScope === undefined
         ? [...facts]

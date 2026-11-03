@@ -26,7 +26,7 @@ export interface AttackResult {
   readonly damage: DamageResult | null;
 }
 export const Attack = defineEvent('attack', {
-  defended: timing<DefenseDraft>(),
+  defended: timing<DefenseDraft, Pick<DefenseDraft, 'effect' | 'responses'>>(),
 });
 
 /** 作者可保留完整响应/突破管线，仅以普通函数指定命中后的伤害。 */
@@ -82,7 +82,7 @@ export async function resolveAttack(
       },
     });
     if (defended && live()) {
-      at.commit('attack.defended', [], { effect, responses });
+      at.commit(Attack.defended, [], { effect, responses });
       await at.window(Attack.defended, draft, { subject: effect.actor });
     }
     open = false;
