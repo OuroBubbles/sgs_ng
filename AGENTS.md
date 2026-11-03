@@ -7,4 +7,4 @@
 - 在项目目录安装：`pnpm install --frozen-lockfile`（pnpm 11.25.0）；开发：`pnpm dev`。
 - 类型检查：`pnpm typecheck`；收尾执行完整检查 `pnpm check`。网页渲染、交互或前端资源变化另跑 `pnpm test:ui`；仅原生壳/打包变化按[平台入口](docs/08-development-guide.md)验收对应实际程序。
 - 同一时间仅一个代码写入者；在 STATUS 记录任务范围、验收与剩余边界。参考源码保持只读。
-- 写武将/技能：一将一文件放 `src/content/standard/generals/`（glob 自动登记，`export default general(id, name, kingdom, hp, skills)`），触发统一用 `on(Event.timing, { who, when, ask/cost, effect })`（技能与独立效果共用），新时点用 `defineEvent`，历史按事件类型查询（`ctx.history.facts(Event.timing)` / `isFact`）；主动与转换用 `action` / `convert` 与自带存活/终局处理的动词，见 [05](docs/05-authoring.md)。技能回调经 `rulesOf(ctx)` 取本局目录，不写 `(book) =>` 工厂；AI 提示写在技能的 `ai` 字段，不在基础 AI 里按技能 ID 分支。
+- 写武将/技能：一将一文件放 `src/content/standard/generals/`（glob 自动登记，`export default general(id, name, kingdom, hp, skills)`；武将顺序决定大厅列表与按种子抽将，由 `generals/index.ts` 的 `order` 固定，新武将追加到末尾），触发统一用 `on(Event.timing, { who, when, ask/cost, effect })`（技能与独立效果共用），新时点用 `defineEvent`，历史按事件类型查询（`ctx.history.facts(Event.timing)` / `isFact`）；主动与转换用 `action` / `convert` 与自带存活/终局处理的动词，见 [05](docs/05-authoring.md)。技能回调经 `rulesOf(ctx)` 取本局目录，不写 `(book) =>` 工厂；AI 提示写在技能的 `ai` 字段，不在基础 AI 里按技能 ID 分支。
