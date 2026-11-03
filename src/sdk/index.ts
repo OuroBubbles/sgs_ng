@@ -42,7 +42,6 @@ export {
   defineSkill,
   SkillBook,
   skillEffective,
-  skillAvailable,
   skillLost,
   blockSkill,
   rulesOf,

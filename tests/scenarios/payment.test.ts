@@ -462,7 +462,7 @@ it('技能已失效或材料被取走时最终支付返回 unavailable', async (
       skill: 'test:limited',
       name: 'limited',
       origin: null,
-      effective: () => skillEffective(ctx.world, id),
+      active: (at: import('../../src/sdk').Context) => skillEffective(at.world, id),
     };
     await book.revoke(ctx, 'a', 'test:limited', source);
     expect(

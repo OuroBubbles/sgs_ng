@@ -18,11 +18,11 @@ defineSkill / viewAs 可重复调用；本入口已固定的声明原样复用�
 
 同一角色同一技能只有一个实例，多个来源分别授予。最后一个来源移除才结束实例；之后重新获得创建新 ID，不能复活开窗快照中的旧候选。单个来源可以关闭；多个有效来源不会使技能重复触发。定义目录可跨 Room 共享，不在定义中存局内计数。
 
-开窗时，核心通过 TriggerSource 从权威状态收集候选，不导入技能包。自定义 bind 返回的 Trigger 同样支持原型字段与方法；目录补充标签时固定声明字段、原方法及接收者，不冻结作者对象。候选保留实例 ID，执行前重查授予和失效；新获得技能从下一窗口开始。常规效果检查角色存活；死亡后效果显式声明 allowDead，该声明不绕过技能所有权。
+开窗时，核心通过 TriggerSource 从权威状态收集候选，不导入技能包。自定义 bind 返回的 Trigger 同样支持原型字段与方法；目录补充标签时固定声明字段、原方法及接收者，不冻结作者对象。候选保留实例 ID，执行前重查授予和失效；新获得技能从下一窗口开始。来源资格为 self.active(ctx)（含拥有者存活）；死亡后效果用 retain 显式表达。
 
-触发统一写 `on(Event.timing, spec)`：when 使用 `(ctx, event, self, at)`，times/retain 使用 `(ctx, event, self)`，effect 使用 `(ctx, event, self, value, at)`；event 保留原窗口载荷的对象身份与接口。self 提供 id/owner/skill/origin 与 effective(world)。一个效果开始后，不自动截断所有后续；选择/费用等关键节点按规则重查。装备来源派生与离场 retain 已实现，见 [18 · 装备与查询](18-equipment-queries.md)；allowDead 本身不表示来源保留。
+触发统一写 `on(Event.timing, spec)`：when 使用 `(ctx, event, self, at)`，times/retain 使用 `(ctx, event, self)`，effect 使用 `(ctx, event, self, value, at)`；event 保留原窗口载荷的对象身份与接口。self 提供 id/owner/skill/origin 与 active(ctx)。一个效果开始后，不自动截断所有后续；选择/费用等关键节点按规则重查。装备来源派生与离场 retain 已实现，见 [18 · 装备与查询](18-equipment-queries.md)。
 
-历史来源现在可以普通 invoke/pay，规则与当前所有权分开：`effective(world)` 不恢复，`skillAvailable(ctx, self)` 只授权本次后效及子流程。撤销、到期与实际埋葬快照，以及自定义窗口登记见 [43](43-retained-effects.md)。
+历史来源现在可以普通 invoke/pay，on 绑定的 `self.active(ctx)` 只授权本次后效及子流程，不恢复当前所有权。撤销、到期与实际埋葬快照，以及自定义窗口登记见 [43](43-retained-effects.md)。
 
 动态 Provider 登记与卸载已补齐，见 [44](44-provider-lifecycle.md)：旧候选和支付引用只属于原登记，retain 不绕过卸载，同对象重新登记不复活旧引用。装配期 `addProvider(provider)`；运行期 `addProvider(provider, ctx)` 与 `remove(ctx)`，Context 必须属于该目录唯一挂接的 Room。通常仍采用固定 Provider 从 World 派生能力。
 

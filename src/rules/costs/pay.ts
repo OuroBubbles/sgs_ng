@@ -4,7 +4,7 @@ import type { Context } from '../../core/runtime/room';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
-import { rulesOf, skillAvailable } from '../skills/skills';
+import { rulesOf } from '../skills/skills';
 import { readState, stateChange, useCount } from '../state/state';
 import { isGameOver } from '../game/end';
 import type { CardBook } from '../cards/book';
@@ -129,7 +129,7 @@ function performPayment(
       if ((materials === undefined) !== (to === undefined))
         throw new Error('Payment materials and destination must be provided together.');
       if (to !== undefined) child.world.zone(to);
-      if (skill ? !skillAvailable(child, skill) : !child.world.player(actor).alive)
+      if (skill ? !child.query(() => skill.active(child)) : !child.world.player(actor).alive)
         return { kind: 'unavailable', reason: 'Actor or skill is no longer available.' };
       if (limit && used(child.world, actor, limit) >= limit.max)
         return { kind: 'unavailable', reason: 'Usage limit reached.' };

@@ -11,16 +11,9 @@ import {
   ownedCards,
   pay,
   runPhase,
-  skillAvailable,
   SkillBook,
 } from '../../src/sdk';
-import type {
-  Context,
-  SkillDefinition,
-  SkillHandle,
-  SkillProvider,
-  WorldReader,
-} from '../../src/sdk';
+import type { Context, SkillDefinition, SkillHandle, SkillProvider } from '../../src/sdk';
 import type { TriggerSource } from '../../src/core/runtime/event';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest, room } from '../fixtures/room';
@@ -33,7 +26,7 @@ const source: SkillHandle = {
   skill: 'probe:provider',
   name: '派生来源',
   origin: { kind: 'effect', id: 'provider' },
-  effective: () => true,
+  active: () => true,
 };
 
 function rebuilt(game: ReturnType<typeof cardGame>) {
@@ -41,38 +34,34 @@ function rebuilt(game: ReturnType<typeof cardGame>) {
   expect(game.room.decisions.pending).toEqual([]);
 }
 
-it.each([false, true])(
-  '卸载 Provider 后不执行剩余次数，retain 为 %s 也不能绕过',
-  async (retained) => {
-    let remove: (ctx?: Context) => void;
-    const seen: number[] = [];
-    const definition = defineSkill({
-      id: source.skill,
-      name: source.name,
-      triggers: [
-        on(window, {
-          locked: true,
-          id: 'repeat',
-          times: () => 3,
-          retain: () => retained,
-          effect(ctx, _event, _self, _value, occurrence) {
-            seen.push(occurrence.index);
-            ctx.commit('probe.provider', [], occurrence);
-            remove(ctx);
-          },
-        }),
-      ],
-    });
-    const game = cardGame();
-    await game.room.run('install', async (ctx) => {
-      remove = game.skills.addProvider({ collect: () => [{ self: source, definition }] }, ctx);
-      await ctx.window(window, null);
-    });
-    expect(seen).toEqual([1]);
-    expect(game.room.history.facts('probe.provider')).toHaveLength(1);
-    rebuilt(game);
-  },
-);
+it('卸载 Provider 后不执行剩余次数', async () => {
+  let remove: (ctx?: Context) => void;
+  const seen: number[] = [];
+  const definition = defineSkill({
+    id: source.skill,
+    name: source.name,
+    triggers: [
+      on(window, {
+        locked: true,
+        id: 'repeat',
+        times: () => 3,
+        effect(ctx, _event, _self, _value, occurrence) {
+          seen.push(occurrence.index);
+          ctx.commit('probe.provider', [], occurrence);
+          remove(ctx);
+        },
+      }),
+    ],
+  });
+  const game = cardGame();
+  await game.room.run('install', async (ctx) => {
+    remove = game.skills.addProvider({ collect: () => [{ self: source, definition }] }, ctx);
+    await ctx.window(window, null);
+  });
+  expect(seen).toEqual([1]);
+  expect(game.room.history.facts('probe.provider')).toHaveLength(1);
+  rebuilt(game);
+});
 
 it('底层 TriggerSource 重新挂接也不复活原窗口，旧卸载函数只属于原登记', async () => {
   const target = room();
@@ -159,7 +148,6 @@ it('顺序选择返回后重查 Provider 登记，旧选项被跳过且不影响
       on(window, {
         id: 'choose',
 
-        retain: () => true,
         effect() {
           seen.push('A');
         },
@@ -270,7 +258,6 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
       on(window, {
         locked: true,
         id: 'invoke',
-        retain: () => true,
         async effect(ctx, _event, self) {
           at = ctx;
           old = self;
@@ -289,8 +276,7 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
   expect(request.kind).toBe('invoke');
   remove!(at!);
   if (reinstall) game.skills.addProvider(provider, at!);
-  expect(old!.effective(game.room.world)).toBe(false);
-  expect(skillAvailable(at!, old!)).toBe(false);
+  expect(old!.active(at!)).toBe(false);
   expect(game.room.decisions.submit(request.id, request.token, true)).toMatchObject({
     kind: 'rejected',
     reason: 'invalid',
@@ -310,7 +296,6 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
       on(window, {
         locked: true,
         id: 'paid',
-        retain: () => true,
         async effect(ctx, _event, self) {
           expect(await invoke(ctx, self, '发动后继续？')).toBe(true);
           expect(
@@ -324,7 +309,7 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
             ).kind,
           ).toBe('paid');
           remove(ctx);
-          expect(self.registered!()).toBe(false);
+          expect(self.active(ctx)).toBe(false);
           expect(
             (
               await pay(ctx, {
@@ -397,12 +382,12 @@ it('来源卸载立即移除查询/转换/主动入口，重新登记只产生�
       expect(game.book.handLimit(at, 'a')).toBe(4);
       expect(activeOffers(at, game.book, phase)).toEqual([]);
       expect(game.book.build(at, 'a', choice, 'use').ok).toBe(false);
-      expect(old.effective(at.world)).toBe(false);
-      expect(skillAvailable(at, old)).toBe(false);
+      expect(old.active(at)).toBe(false);
+      expect(old.active(at)).toBe(false);
       const removeNew = game.skills.addProvider(provider, at);
       remove(at);
-      expect(old.effective(at.world)).toBe(false);
-      expect(game.skills.binding(at.world, source.id)!.self.effective(at.world)).toBe(true);
+      expect(old.active(at)).toBe(false);
+      expect(game.skills.binding(at.world, source.id)!.self.active(at)).toBe(true);
       expect(game.book.handLimit(at, 'a')).toBe(6);
       removeNew(at);
     }),
@@ -563,14 +548,8 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     readonly name = source.name;
     readonly origin = source.origin;
     #owner = source.owner;
-    effective(world: WorldReader) {
-      return world.player(this.#owner).alive;
-    }
-    registered() {
-      return enabled && this.#owner === 'a';
-    }
-    available(ctx: Context) {
-      return ctx.world.player(this.#owner).alive;
+    active(ctx: Context) {
+      return enabled && this.#owner === 'a' && ctx.world.player(this.#owner).alive;
     }
   }
   class Definition implements SkillDefinition {
@@ -581,7 +560,6 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
       on(window, {
         locked: true,
         id: 'run',
-        retain: () => true,
         effect(ctx) {
           ctx.commit('probe.class', [], null);
         },
@@ -611,8 +589,8 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     enabled = false;
     await ctx.window(window, null);
     const handle = game.skills.binding(ctx.world, source.id)!.self;
-    expect(handle.effective(ctx.world)).toBe(false);
-    expect(skillAvailable(ctx, handle)).toBe(false);
+    expect(handle.active(ctx)).toBe(false);
+    expect(handle.active(ctx)).toBe(false);
   });
   expect(game.room.history.facts('probe.class')).toHaveLength(1);
   rebuilt(game);

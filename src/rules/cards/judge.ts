@@ -197,10 +197,7 @@ async function replaceJudgment(
     )
       return 'unavailable';
     if (
-      (skill &&
-        (!child.world.player(skill.owner).alive ||
-          !skill.effective(child.world) ||
-          child.world.zone(input.from).owner !== skill.owner)) ||
+      (skill && (!skill.active(child) || child.world.zone(input.from).owner !== skill.owner)) ||
       (legal && !child.query(() => legal(child)))
     )
       return 'unavailable';

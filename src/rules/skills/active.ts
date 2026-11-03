@@ -98,7 +98,7 @@ function selectActive(
     !binding ||
     !action ||
     binding.self.owner !== phase.owner ||
-    !binding.self.effective(ctx.world)
+    !binding.self.active(ctx)
   )
     return { ok: false, reason: 'Active skill is no longer available.' };
   const selection = availableSelection(ctx, { self: binding.self, phase, book }, action);
@@ -187,7 +187,7 @@ export function activeAvailable(ctx: Context, book: CardBook, phase: PhaseView):
 function* activeSelections(ctx: Context, book: CardBook, phase: PhaseView) {
   if (!open(ctx, phase)) return;
   for (const { self, definition } of book.skills.bindings(ctx.world)) {
-    if (self.owner !== phase.owner || !self.effective(ctx.world)) continue;
+    if (self.owner !== phase.owner || !self.active(ctx)) continue;
     for (const action of definition.active ?? []) {
       const model = availableSelection(ctx, { self, phase, book }, action);
       if (model) yield { self, definition, action, model };

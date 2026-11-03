@@ -21,13 +21,13 @@ export interface EquipmentDefinition {
 
 /** 忽略只属于指定目标的这个效果；嵌套效果、代答者及普通技能来源各自判断。 */
 export function equipmentEffectiveFor(
-  world: WorldReader,
+  ctx: Context,
   self: SkillHandle,
   effect: EffectRef,
   slot: EquipmentSlot,
 ): boolean {
   return (
-    self.effective(world) &&
+    self.active(ctx) &&
     !(
       self.origin?.kind === 'equipment' &&
       self.owner === effect.target &&
@@ -227,11 +227,13 @@ export function equipmentAbilities(definitions: readonly CardDefinition[]): Skil
       skill: definition.id,
       name: definition.name,
       origin: Object.freeze({ kind: 'equipment', id: card.id }),
-      effective: (current: WorldReader) =>
-        current.snapshot.zones.some(
+      active: (ctx: Context) =>
+        ctx.world.player(owner).alive &&
+        ctx.world.snapshot.zones.some(
           (zone) =>
             zone.kind === 'equipment' && zone.owner === owner && zone.cards.includes(card.id),
-        ) && !isSkillBlocked(current, owner, id),
+        ) &&
+        !isSkillBlocked(ctx.world, owner, id),
     });
     const binding = Object.freeze({ self, definition });
     byCard.set(card, binding);

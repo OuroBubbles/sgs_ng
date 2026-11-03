@@ -55,9 +55,7 @@ const blade = equipmentCard({
             timing: { kind: 'effect', ignoreDistance: true },
             prompt: `青龙偃月刀：可对 ${draft.effect.target} 再使用一张杀（忽略距离与阶段次数）`,
             available: (at) =>
-              self.effective(at.world) &&
-              !draft.broken &&
-              at.world.player(draft.effect.target).alive,
+              self.active(at) && !draft.broken && at.world.player(draft.effect.target).alive,
           });
           if (used.kind === 'used')
             ctx.commit('weapon.follow-up', [], {

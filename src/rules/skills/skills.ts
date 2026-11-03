@@ -20,24 +20,11 @@ export interface SkillHandle {
   readonly name: string;
   /** 显式授予的共享实例为 null；派生装备能力指向具体实体牌。 */
   readonly origin: SkillSource | null;
-  /** 只查询当前所有权与失效；历史后效不把已经离场的来源伪装成仍有效。 */
-  effective(world: WorldReader): boolean;
-  /** 执行侧登记资格。卸载或替换 Provider 后，旧引用不能借 retain 继续发动。 */
-  readonly registered?: () => boolean;
-  /** on 为本次结算绑定的可发动资格；不会被登记为查询、转换或新的主动技能。 */
-  readonly available?: (ctx: Context) => boolean;
-}
-
-/** 发动/支付的来源资格。历史资格只属于绑定它的结算和子流程。 */
-export function skillAvailable(ctx: Context, self: SkillHandle): boolean {
-  return ctx.query(() => {
-    const owner = ctx.world.snapshot.players.find((player) => player.id === self.owner);
-    return (
-      owner !== undefined &&
-      (self.registered?.() ?? true) &&
-      (self.available ? self.available(ctx) : owner.alive && self.effective(ctx.world))
-    );
-  });
+  /**
+   * 来源此刻能否发动、支付或提供修正：拥有者存活、仍持有且未失效（Provider 来源还须仍在登记中）。
+   * on 为本次结算绑定的来源改为本次结算及其子流程内的发动资格。
+   */
+  active(ctx: Context): boolean;
 }
 
 export interface SkillBinding {
@@ -357,7 +344,7 @@ export class SkillBook implements TriggerSource {
           skill,
           name: definition.name,
           origin: null,
-          effective: (current: WorldReader) => skillEffective(current, id),
+          active: (ctx: Context) => ctx.world.player(owner).alive && skillEffective(ctx.world, id),
         }),
         definition,
       });
@@ -366,9 +353,7 @@ export class SkillBook implements TriggerSource {
     });
     for (const [provider, registration] of this.#providers) {
       for (const { self, definition } of provider.collect(world, window)) {
-        const registered = () =>
-          this.#providers.get(provider) === registration && (self.registered?.() ?? true);
-        // 显式转发保留 class 方法的接收者；旧引用只属于这一次登记。
+        // 旧引用只属于这一次登记。
         bindings.push({
           definition: defineSkill(definition),
           self: Object.freeze({
@@ -377,13 +362,8 @@ export class SkillBook implements TriggerSource {
             skill: self.skill,
             name: self.name,
             origin: self.origin,
-            registered,
-            effective: (current: WorldReader) => registered() && self.effective(current),
-            ...(self.available === undefined
-              ? {}
-              : {
-                  available: (at: Context) => registered() && self.available!(at),
-                }),
+            active: (at: Context) =>
+              this.#providers.get(provider) === registration && self.active(at),
           }),
         });
       }
@@ -409,7 +389,7 @@ export class SkillBook implements TriggerSource {
       for (const { self, definition } of this.bindings(ctx.world)) {
         const modifiers = definition.modifiers?.filter((modifier) => modifier.query === query);
         if (!modifiers?.length) continue;
-        if (!ctx.world.player(self.owner).alive || !self.effective(ctx.world)) continue;
+        if (!self.active(ctx)) continue;
         for (const modifier of modifiers) {
           const contribution = modifier.contribution(ctx, input, self) as Value | undefined;
           if (contribution !== undefined) value = query.combine(value, contribution);

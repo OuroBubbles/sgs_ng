@@ -1,6 +1,5 @@
 import type { Context } from '../../core/runtime/room';
 import type { Timing, Trigger, TriggerOccurrence } from '../../core/runtime/event';
-import type { WorldReader } from '../../core/model/state';
 import { isGameOver } from '../game/end';
 import type { EffectHandle } from '../effects/effects';
 import type { SkillHandle } from './skills';
@@ -30,9 +29,7 @@ export interface TriggerSpec<T, V = true> {
   /** 覆盖默认排序（非锁定 choose，锁定 automatic）。 */
   readonly order?: 'automatic' | 'choose';
   readonly group?: string;
-  /** 已阵亡的拥有者仍可处理本次事件。 */
-  readonly allowDead?: boolean;
-  /** 已失去的来源仍可处理本次事件；不恢复所有权，只为本次结算提供发动资格。 */
+  /** 来源不再可用（失去、失效或拥有者阵亡）时仍可处理本次事件；不恢复所有权，只为本次结算提供发动资格。 */
   readonly retain?: Hook<T, boolean>;
   readonly ask?:
     | string
@@ -126,15 +123,15 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
 
   /** 独立效果：实例仍存在即有资格；以只读的来源视图调用同一套回调。 */
   function bindEffect(record: EffectHandle): Trigger<unknown> {
-    if (staged || spec.retain || spec.allowDead !== undefined)
-      throw new Error(`Effect trigger ${record.type}/${id} cannot ask, pay, retain or allowDead.`);
+    if (staged || spec.retain)
+      throw new Error(`Effect trigger ${record.type}/${id} cannot ask, pay or retain.`);
     const self: SkillHandle = Object.freeze({
       id: record.id,
       owner: record.owner ?? '',
       skill: record.type,
       name: record.type,
       origin: null,
-      effective: (world: WorldReader) => record.current(world) !== null,
+      active: (ctx: Context) => record.current(ctx.world) !== null,
     });
     return {
       ...common(self, 'automatic'),
@@ -151,10 +148,7 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
 
   function bindSkill(self: SkillHandle): Trigger<unknown> {
     const available = (ctx: Context, payload: T) =>
-      (self.registered?.() ?? true) &&
-      (spec.allowDead || ctx.world.player(self.owner).alive) &&
-      ((self.available ? self.available(ctx) : self.effective(ctx.world)) ||
-        (spec.retain?.(ctx, payload, self) ?? false));
+      self.active(ctx) || (spec.retain?.(ctx, payload, self) ?? false);
     return {
       ...common(self, locked ? 'automatic' : 'choose'),
       ...(times === undefined
@@ -171,9 +165,7 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
           skill: self.skill,
           name: self.name,
           origin: self.origin,
-          effective: (world: WorldReader) => self.effective(world),
-          ...(self.registered === undefined ? {} : { registered: () => self.registered!() }),
-          available: (c: Context) =>
+          active: (c: Context) =>
             active &&
             c.world === ctx.world &&
             c.cause.scopePath.includes(ctx.scope.id) &&

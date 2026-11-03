@@ -12,6 +12,7 @@ import {
   setState,
   Lifetime,
 } from '../../src/sdk';
+import type { Context } from '../../src/sdk';
 import '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed } from '../fixtures/room';
@@ -51,11 +52,11 @@ describe('技能实例与独立授予来源', () => {
       eligible: () => true,
       run: async (ctx) => {
         const previousHandle = book.binding(ctx.world, previous)!.self;
-        expect(previousHandle.effective(ctx.world)).toBe(true);
+        expect(previousHandle.active(ctx)).toBe(true);
         await book.revoke(ctx, 'b', 'test:skill', general);
-        expect(previousHandle.effective(ctx.world)).toBe(false);
+        expect(previousHandle.active(ctx)).toBe(false);
         await book.grant(ctx, { owner: 'b', skill: 'test:skill', source: general });
-        expect(previousHandle.effective(ctx.world)).toBe(false);
+        expect(previousHandle.active(ctx)).toBe(false);
       },
     });
     await game.run('window', (ctx) => ctx.window(window, null));
@@ -127,7 +128,7 @@ describe('技能实例与独立授予来源', () => {
         const handle = book.binding(ctx.world, id)!.self;
         expect(ctx.world.snapshot.skills).toHaveLength(1);
         expect(other.world.snapshot.skills).toEqual([]);
-        expect(handle.effective(other.world)).toBe(false);
+        expect(handle.active({ world: other.world } as Context)).toBe(false);
 
         // 两局刻意使用相同规则 ID，句柄必须查询实际传入的 World。
         await other.run('grant', (at) =>
@@ -135,22 +136,22 @@ describe('技能实例与独立授予来源', () => {
         );
         expect(other.world.snapshot.skills[0]!.id).toBe(id);
         const otherHandle = book.binding(other.world, id)!.self;
-        expect(handle.effective(other.world)).toBe(true);
+        expect(handle.active({ world: other.world } as Context)).toBe(true);
 
         await book.setEnabled(ctx, 'a', 'test:skill', general, false);
         expect(skillEffective(ctx.world, id)).toBe(true);
-        expect(handle.effective(ctx.world)).toBe(true);
+        expect(handle.active(ctx)).toBe(true);
         await book.setEnabled(ctx, 'a', 'test:skill', equipment, false);
         expect(skillEffective(ctx.world, id)).toBe(false);
-        expect(handle.effective(ctx.world)).toBe(false);
-        expect(otherHandle.effective(other.world)).toBe(true);
-        expect(otherHandle.effective(ctx.world)).toBe(false);
+        expect(handle.active(ctx)).toBe(false);
+        expect(otherHandle.active({ world: other.world } as Context)).toBe(true);
+        expect(otherHandle.active(ctx)).toBe(false);
         await ctx.window(window, null);
         expect(hits).toEqual([]);
 
         await book.setEnabled(ctx, 'a', 'test:skill', general, true);
         expect(skillEffective(ctx.world, id)).toBe(true);
-        expect(handle.effective(ctx.world)).toBe(true);
+        expect(handle.active(ctx)).toBe(true);
 
         await book.setEnabled(ctx, 'a', 'test:skill', equipment, true);
         await ctx.window(window, null);
@@ -203,7 +204,7 @@ describe('技能实例与独立授予来源', () => {
           on(window, {
             locked: true,
             id: 'legacy',
-            allowDead: true,
+            retain: () => true,
             effect: () => {
               hits.push('legacy');
             },

@@ -21,7 +21,7 @@ import type { Context, SkillHandle } from '../../../sdk';
 function retrialCards(ctx: Context, self: SkillHandle, judgment: Judgment): readonly string[] {
   if (
     !alive(ctx, self.owner) ||
-    !self.effective(ctx.world) ||
+    !self.active(ctx) ||
     !alive(ctx, judgment.player) ||
     isGameOver(ctx.world)
   )

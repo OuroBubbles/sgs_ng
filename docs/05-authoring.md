@@ -38,10 +38,10 @@ export default general({ id: 'scholar', name: '学士', kingdom: '群', hp: 3, s
 - `ask`：询问是否发动并宣告（skill.invoke）；可为字符串或 `(ctx, event, self, at) => string`，多次触发用 `nth(at)` 追加「第 i/n 次」。
 - `cost`：先由玩家完成选择（返回 null/false 视为不发动），再宣告；`declare` 返回随宣告同次提交的附加数据、状态变更或代价。
 - `keep`：宣告时的合法条件，与「未终局」一起由引擎检查。
-- `retain(ctx, event, self)`：已失去的来源仍可处理本次事件；`allowDead`：已阵亡拥有者仍可处理。
+- `retain(ctx, event, self)`：来源不再可用（失去、失效或拥有者阵亡）时仍可处理本次事件；资格为 `(self.active(ctx) ∨ retain) ∧ who ∧ when`。
 - `effect(ctx, event, self, value, at)`：宣告即生效，之后失去技能或条件改变不撤销；只有终局会截断 effect。效果内若文本要求再查（如奸雄要求材料仍在处理区），在 effect 里普通地判断。
 
-同一声明放进独立效果的 `create(self).triggers` 时，默认自动排序，不支持 `ask` / `cost` / `retain` / `allowDead`（效果不询问、不宣告）；资格为「效果实例仍存在」加 who/when，self 是该效果实例的只读视图（owner 为效果记录的 owner，skill 为效果类型）。spec 在 on 调用时读取固定，之后改写原对象不影响对局；回调按普通函数调用，不保留类实例的 `this`。
+同一声明放进独立效果的 `create(self).triggers` 时，默认自动排序，不支持 `ask` / `cost` / `retain`（效果不询问、不宣告）；资格为「效果实例仍存在」加 who/when，self 是该效果实例的只读视图（owner 为效果记录的 owner，skill 为效果类型）。spec 在 on 调用时读取固定，之后改写原对象不影响对局；回调按普通函数调用，不保留类实例的 `this`。
 
 ## 事件：时点、草案与历史同一身份
 
@@ -122,7 +122,7 @@ JointSelection 的 cards / targets 候选函数可直接返回稳定 ID 数组�
 
 需要在费用确定时同步修改待决草案，可使用 `PaymentIntent`。它的 `available` 是纯查询，`committed` 必须同步，先于支付后效；异步宣告属于代码故障。普通技能通常无需直接使用此入口，实际例子见 [伤害转移](../src/content/workshop/defense.ts)。
 
-“后续还需要什么条件”由技能文本决定。来源在发动前必须有效；已经宣告的效果不因为来源消失而统一回滚，也不应在每个 await 后机械添加 `self.effective(...)`。确实要求目标仍存活、当前阶段未结束或仍持有技能时，用动态候选及 `available` 表达，并由实际操作最终校验。区分草案、按发动时固定的来源与已经提交的结果。
+“后续还需要什么条件”由技能文本决定。来源在发动前必须有效；已经宣告的效果不因为来源消失而统一回滚，也不应在每个 await 后机械添加 `self.active(...)`。确实要求目标仍存活、当前阶段未结束或仍持有技能时，用动态候选及 `available` 表达，并由实际操作最终校验。区分草案、按发动时固定的来源与已经提交的结果。
 
 直接调用 `draw` / `recover` 即复用规则操作对受益者存活与终局的重查；技能只表达是否接受发动、支付是否成功、材料/目标选择和文本特有的继续条件。多目标后效仍逐个 await，每个目标在实际操作时独立校验。
 

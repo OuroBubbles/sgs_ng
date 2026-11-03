@@ -509,7 +509,7 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
           when: (ctx, draft, self) =>
             draft.input.to === self.owner &&
             draft.input.card !== undefined &&
-            equipmentEffectiveFor(ctx.world, self, draft.input.card, 'armor'),
+            equipmentEffectiveFor(ctx, self, draft.input.card, 'armor'),
           effect(_ctx, draft) {
             draft.setAmount(Math.min(1, draft.amount), 'cap');
           },

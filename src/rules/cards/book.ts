@@ -331,7 +331,7 @@ export class CardBook {
         };
     }
     for (const { self, definition } of this.skills.bindings(ctx.world)) {
-      if (self.owner !== actor || !self.effective(ctx.world)) continue;
+      if (self.owner !== actor || !self.active(ctx)) continue;
       const input: ViewAsInput = { self, book: this, purpose: operation };
       for (const recipe of definition.viewAs ?? []) {
         if (recipe.available && !recipe.available(ctx, input)) continue;
@@ -1240,7 +1240,7 @@ export class CardBook {
       };
     } else {
       const binding = this.skills.binding(ctx.world, choice.instance);
-      if (!binding || binding.self.owner !== actor || !binding.self.effective(ctx.world))
+      if (!binding || binding.self.owner !== actor || !binding.self.active(ctx))
         return invalid('View-as skill is no longer available.');
       const { self, definition } = binding;
       const recipe = definition.viewAs?.find((item) => item.id === choice.recipe);

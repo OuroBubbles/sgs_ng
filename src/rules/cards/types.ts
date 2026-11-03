@@ -110,7 +110,6 @@ export type ViewAs = Omit<ViewAsSpec, 'materials' | 'count'> &
       }
   );
 
-
 export type UseTiming =
   | { readonly kind: 'play'; readonly owner: string; readonly phase: Lifetime }
   | { readonly kind: 'effect'; readonly ignoreDistance?: boolean }

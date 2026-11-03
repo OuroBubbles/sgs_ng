@@ -167,7 +167,7 @@ it('无救援时先开放死亡效果，再埋葬剩余所属区域和技能；�
       on(Death.committed, {
         locked: true,
         id: 'gift',
-        allowDead: true,
+        retain: () => true,
         when: (_ctx, event, self) => event.player === self.owner,
         async effect(ctx, event) {
           expect(event.zonesBefore.find((zone) => zone.id === 'b:hand')?.cards).toEqual([

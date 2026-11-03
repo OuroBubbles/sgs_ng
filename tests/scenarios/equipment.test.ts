@@ -19,7 +19,14 @@ import {
   Cards,
   Cost,
 } from '../../src/sdk';
-import type { CardDefinition, CardOffer, CardChoice, UseIntent, SemanticCard } from '../../src/sdk';
+import type {
+  CardDefinition,
+  Context,
+  CardOffer,
+  CardChoice,
+  UseIntent,
+  SemanticCard,
+} from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { standardCards } from '../../src/content/standard/cards';
 import { card, cardGame, use } from '../fixtures/cards';
@@ -318,8 +325,9 @@ function lossDefinition(allowDead = false): CardDefinition {
         on(Cards.moved, {
           locked: true,
           id: 'lost',
-          allowDead,
-          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+          retain: (ctx, moved, self) =>
+            (allowDead || ctx.world.player(self.owner).alive) &&
+            equipmentLost(ctx.world, moved, self),
           when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
           effect(ctx, _event, self) {
             ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
@@ -563,7 +571,7 @@ it('重建和替换快照后，装备能力按当前实体与持有者派生', a
   const current = skills.bindings(restored.reader)[0]!;
   expect(current.definition.name).toBe('诸葛连弩');
   expect(current.definition.viewAs ?? []).toEqual([]);
-  expect(current.self.effective(restored.reader)).toBe(true);
+  expect(current.self.active({ world: restored.reader } as Context)).toBe(true);
 
   for (const [from, to] of [
     ['a', 'b'],
@@ -583,7 +591,7 @@ it('重建和替换快照后，装备能力按当前实体与持有者派生', a
     expect(skills.bindings(restored.reader)).toMatchObject([
       { self: { owner: to, origin: { kind: 'equipment', id: 'weapon' } } },
     ]);
-    expect(current.self.effective(restored.reader)).toBe(to === 'a');
+    expect(current.self.active({ world: restored.reader } as Context)).toBe(to === 'a');
   }
   expect(game.room.history.facts('skill.changed')).toHaveLength(0);
 });

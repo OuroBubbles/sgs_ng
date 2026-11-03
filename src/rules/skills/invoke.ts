@@ -1,6 +1,5 @@
 import type { Change, Zone } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
-import { skillAvailable } from './skills';
 import type { SkillHandle } from './skills';
 import { pay, payDiscard } from '../costs/pay';
 import type { UsageLimit } from '../costs/pay';
@@ -79,9 +78,7 @@ export function invoke(
 ): Promise<boolean> {
   return ctx.flow('skill.invoke', async (child) => {
     const live = () =>
-      child.query(
-        () => !isGameOver(child.world) && skillAvailable(child, self) && available(child),
-      );
+      child.query(() => !isGameOver(child.world) && self.active(child) && available(child));
     if (!(await askInvoke(child, self, prompt, live))) return false;
     const extra = (await declaration?.(child)) ?? {};
     return declare(child, self, {

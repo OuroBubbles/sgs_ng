@@ -112,7 +112,8 @@ export const relicJade = equipmentCard({
     description: '遗玉离开你的装备区后，你可以摸一张牌。不是装备时被弃置不会发动。',
     triggers: [
       on(Cards.moved, {
-        retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+        retain: (ctx, moved, self) =>
+          ctx.world.player(self.owner).alive && equipmentLost(ctx.world, moved, self),
         when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
         async effect(ctx, _event, self) {
           const accepted = await invoke(ctx, self, '是否发动【玉碎】摸一张牌？');

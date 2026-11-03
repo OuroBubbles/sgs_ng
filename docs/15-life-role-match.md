@@ -46,7 +46,7 @@ flowchart TD
 beforeDeath 只处理仍待决的死亡：已经防止、嵌套死亡处理、终局或濒死目标已获救便停止剩余候选。濒死死亡请求入口已有正体力时直接返回 rescued；规则直接死亡不使用这项豁免。已提交死亡后的事件与埋葬继续自己的流程，见 [52](52-life-boundaries.md)。
 
 1. 提交 alive=false；DeathEvent 保存死亡前角色、所属区域与技能快照。
-2. 开放 playerDied；拥有 `allowDead: true` 的死亡技能可读取快照并移动遗赠等牌。普通技能默认因拥有者死亡而失效。
+2. 开放 playerDied；以 retain 声明死亡后仍可处理的技能可读取快照并移动遗赠等牌。普通技能默认因拥有者死亡而失效。
 3. 重新读取当前所属区域，把余牌移到弃牌区，同时移除该角色剩余技能实例，一次提交后才开放 cardsMoved。
 4. 开放 playerBuried 和 deathFinished，后者提供 mode / after 顺序组。
 

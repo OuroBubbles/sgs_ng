@@ -4,20 +4,11 @@
 
 ## 当前所有权与本次后效分开
 
-以前 `on.retain` 能让离场装备成为候选，但 `invoke/pay` 仍只检查 `self.effective(world)`，因此可选离场后效无法正常宣告。普通显式授予的技能在最后来源移除后，也不再进入变更窗口的当前来源集合。
+以前 `on.retain` 能让离场装备成为候选，但 `invoke/pay` 仍只检查当前所有权，因此可选离场后效无法正常宣告。普通显式授予的技能在最后来源移除后，也不再进入变更窗口的当前来源集合。
 
-现在区分两项查询：
+现在只有一项来源资格：`self.active(ctx)`。普通来源为「拥有者存活、仍持有且未失效」（Provider 来源还须仍在登记中）；[on](../src/rules/skills/on.ts) 为正在执行的 `run` 绑定的来源改为「本次回调及其子流程内，`active ∨ retain` 仍成立」。它不把旧来源放回 World，也不让旧转换、查询修正或主动动作重新出现在目录中。作者直接继续调用 `invoke(ctx, self, ...)` 或 `pay(..., { skill: self })`。
 
-| 入口                        | 语义                                                                   |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `self.effective(world)`     | 当前来源是否仍拥有并有效；离场后保持 false                             |
-| `skillAvailable(ctx, self)` | 本次 Context 内是否可用该来源发动/支付；普通当前来源仍检查存活与有效性 |
-
-[on](../src/rules/skills/skills.ts) 为正在执行的 `run` 绑定一个来源引用，`available(ctx)` 只在这次回调及其子流程中有效。它不把旧来源放回 World，也不让旧转换、查询修正或主动动作重新出现在目录中。作者通常直接继续调用 `invoke(ctx, self, ...)` 或 `pay(..., { skill: self })`，需要显式检查时使用 `skillAvailable`。
-
-`retain` 仍是普通纯谓词：为本次事件中的历史来源提供资格，不代替 `when` 的事件条件，也不代替 `allowDead`。来源必须对应本局已知角色，自定义 available 不能省略这一点。核心在进入回调前重查 `when`；回调已经开始后，普通代码自行决定后续，支付不偷偷重新套用整个触发条件。需要支付前重新检查的文本条件继续写在 `PaymentSpec.legal` 或 `invoke` 的 available 参数中。
-
-来源失效、当前保留条件变化仍会阻止后续支付；已经完成的宣告和费用不回滚。`allowDead` 默认 false；明确为 true 的后效可以由死亡拥有者进行普通自愿宣告，但不会复活角色，也不绕过终局或材料/弃置规则。
+触发资格统一为 `(active ∨ retain) ∧ who ∧ when`。`retain` 是普通纯谓词，完整决定来源不可用时能否处理本次事件：不再隐含存活或登记检查，死亡来源的后效直接写进 retain（原 `allowDead` 已删除）。核心在进入回调前重查；回调开始后，支付前需要的文本条件继续写在 `PaymentSpec.legal` 或 `invoke` 的 available 参数中。已经完成的宣告和费用不回滚。
 
 ## 资格只属于当前执行
 
@@ -71,7 +62,7 @@ on(Skill.changed, {
 
 生命事件类型与窗口放在 [life-events.ts](../src/rules/combat/life-events.ts)，结算器在 [life.ts](../src/rules/combat/life.ts)。技能目录只依赖事件定义，不导入完整死亡执行器。
 
-`DeathEvent.skillsBefore/zonesBefore` 继续描述最初死亡时的快照。死亡后效可以改变牌或授予技能；`BurialEvent.burial.skillsBefore/zonesBefore` 另外记录真正埋葬前的内容，埋葬事实也保存该快照。后续窗口按实际移除的来源收集，不改写最初的死亡事件。已死亡但明确 allowDead 的旧来源可以自愿处理这次埋葬后效。
+`DeathEvent.skillsBefore/zonesBefore` 继续描述最初死亡时的快照。死亡后效可以改变牌或授予技能；`BurialEvent.burial.skillsBefore/zonesBefore` 另外记录真正埋葬前的内容，埋葬事实也保存该快照。后续窗口按实际移除的来源收集，不改写最初的死亡事件。retain 成立的已死亡旧来源可以自愿处理这次埋葬后效。
 
 ## 可运行内容与验证
 

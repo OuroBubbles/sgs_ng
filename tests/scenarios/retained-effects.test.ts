@@ -12,7 +12,6 @@ import {
   moveCards,
   on,
   pay,
-  skillAvailable,
   skillLost,
   withLifetime,
   activeOffers,
@@ -26,7 +25,7 @@ import {
   Lifetime,
   Skill,
 } from '../../src/sdk';
-import type { Context, SkillHandle, WorldReader, PhaseView } from '../../src/sdk';
+import type { Context, SkillHandle, PhaseView } from '../../src/sdk';
 import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
@@ -78,8 +77,7 @@ it('离场装备能使用普通 invoke 宣告并摸牌，当前能力目录仍�
   const armor = lostArmor(async (ctx, self) => {
     captured = self;
     capturedAt = ctx;
-    expect(self.effective(ctx.world)).toBe(false);
-    expect(skillAvailable(ctx, self)).toBe(true);
+    expect(self.active(ctx)).toBe(true);
     expect(game.skills.binding(ctx.world, self.id)).toBeUndefined();
     if (await invoke(ctx, self, '是否发动遗响？'))
       await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
@@ -99,14 +97,14 @@ it('离场装备能使用普通 invoke 宣告并摸牌，当前能力目录仍�
   );
   expect((await answer(game)).kind).toBe('invoke');
   await running;
-  expect(captured!.available!(capturedAt!)).toBe(false);
+  expect(captured!.active(capturedAt!)).toBe(false);
   expect(game.room.world.zone('a:hand').cards).toEqual(['reward']);
   expect(game.room.history.facts('skill.invoked')[0]?.data.detail).toMatchObject({
     skill: 'probe:retained-armor-ability',
     instance: captured!.id,
   });
   await game.room.run('closed', (ctx) => {
-    expect(skillAvailable(ctx, captured)).toBe(false);
+    expect(captured.active(ctx)).toBe(false);
   });
   rebuilt(game);
 });
@@ -115,8 +113,7 @@ it.each(['revoke', 'expiration'] as const)(
   '普通技能的 %s 快照可明确保留来源，旧实例不回到 World',
   async (kind) => {
     const respond = async (ctx: Context, self: SkillHandle) => {
-      expect(self.effective(ctx.world)).toBe(false);
-      expect(skillAvailable(ctx, self)).toBe(true);
+      expect(self.active(ctx)).toBe(true);
       if (await invoke(ctx, self, '是否发动遗响？'))
         ctx.commit('probe.retained', [], { instance: self.id });
     };
@@ -195,9 +192,9 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
   const foreign = cardGame();
   const armor = lostArmor(async (ctx, self) => {
     captured = self;
-    expect(skillAvailable(outer, self)).toBe(false);
+    expect(self.active(outer)).toBe(false);
     await foreign.room.run('foreign', (at) => {
-      expect(skillAvailable(at, self)).toBe(false);
+      expect(self.active(at)).toBe(false);
     });
     await ctx.flow('nested-cost', async (at) => {
       const paid = await pay(at, {
@@ -221,11 +218,10 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
       [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
       'loss',
     );
-    expect(skillAvailable(ctx, captured)).toBe(false);
+    expect(captured.active(ctx)).toBe(false);
     await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' });
-    expect(captured.effective(ctx.world)).toBe(true);
-    expect(skillAvailable(ctx, captured)).toBe(false);
-    expect(skillAvailable(ctx, game.skills.binding(ctx.world, captured.id)!.self)).toBe(true);
+    expect(captured.active(ctx)).toBe(false);
+    expect(game.skills.binding(ctx.world, captured.id)!.self.active(ctx)).toBe(true);
     expect(
       (
         await pay(ctx, {
@@ -242,7 +238,7 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
   rebuilt(game);
 });
 
-it.each([false, true])('死亡来源的普通 invoke 必须明确 allowDead，值为 %s', async (allowDead) => {
+it.each([false, true])('死亡来源的普通 invoke 必须明确 retain，值为 %s', async (allowDead) => {
   const legacy = defineSkill({
     id: 'probe:death',
     name: '遗言',
@@ -250,7 +246,7 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 allowDead，�
       on(Death.committed, {
         locked: true,
         id: 'legacy',
-        allowDead,
+        ...(allowDead ? { retain: () => true } : {}),
         when: (_ctx, event, self) => event.player === self.owner,
         async effect(ctx, _event, self) {
           if (await invoke(ctx, self, '是否留下遗言？'))
@@ -342,7 +338,6 @@ for (const [window, group] of [
           locked: true,
           id: 'legacy',
           group,
-          allowDead: true,
           retain: (ctx, event, self) =>
             event.burial.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
           when: (ctx, event, self) =>
@@ -350,7 +345,6 @@ for (const [window, group] of [
           async effect(ctx, event, self) {
             expect(event.skillsBefore).toHaveLength(0);
             expect(event.burial.skillsBefore).toHaveLength(1);
-            expect(self.effective(ctx.world)).toBe(false);
             if (await invoke(ctx, self, '是否留下遗言？'))
               ctx.commit('probe.buried', [], { instance: self.id });
           },
@@ -418,7 +412,7 @@ it('后效执行中被明确失效会停止后续支付，不回滚已经完成�
     expect(await invoke(ctx, self, '是否发动？')).toBe(true);
     await withLifetime(ctx, 'block-later-payment', async (at, lifetime) => {
       blockSkill(at, self, lifetime);
-      expect(skillAvailable(at, self)).toBe(false);
+      expect(self.active(at)).toBe(false);
       expect(
         (
           await pay(at, {
@@ -475,10 +469,10 @@ it.each(['abort', 'fault'] as const)(
     );
     if (exit === 'fault') await expect(running).rejects.toThrow('probe fault');
     else await running;
-    expect(captured!.available!(capturedAt!)).toBe(false);
+    expect(captured!.active(capturedAt!)).toBe(false);
     const foreign = cardGame();
     await foreign.room.run('foreign', (ctx) => {
-      expect(skillAvailable(ctx, captured)).toBe(false);
+      expect(captured.active(ctx)).toBe(false);
     });
   },
 );
@@ -517,8 +511,7 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
         skill: 'probe:bad',
         name: '错误资格',
         origin: null,
-        effective: () => false,
-        available(at) {
+        active(at) {
           at.commit(window.id, [], null);
           return true;
         },
@@ -546,7 +539,7 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
           retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
           when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
           async effect(ctx, _event, self, _value, occurrence) {
-            if (first) expect(skillAvailable(ctx, first)).toBe(false);
+            if (first) expect(first.active(ctx)).toBe(false);
             first ??= self;
             if (await invoke(ctx, self, `第${occurrence.index}次？`))
               ctx.commit('probe.occurrence', [], { index: occurrence.index });
@@ -718,7 +711,7 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
           retain: (ctx, event, self) => equipmentLost(ctx.world, event, self),
           when: (ctx, event, self) => equipmentLost(ctx.world, event, self),
           async effect(ctx, _event, self) {
-            expect(skillAvailable(ctx, self)).toBe(true);
+            expect(self.active(ctx)).toBe(true);
             expect(game.book.handLimit(ctx, 'a')).toBe(4);
             expect(activeOffers(ctx, game.book, phase)).toHaveLength(0);
             expect(
@@ -771,8 +764,8 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
     readonly name = '普通类';
     readonly origin = null;
     #owner = 'a';
-    effective(world: WorldReader) {
-      return world.player(this.#owner).alive;
+    active(ctx: Context) {
+      return ctx.world.player(this.#owner).alive;
     }
   }
   const definition = defineSkill({
@@ -783,7 +776,6 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
         locked: true,
         id: 'run',
         async effect(ctx, _event, self) {
-          expect(self.effective(ctx.world)).toBe(true);
           if (await invoke(ctx, self, '普通类来源？')) ctx.commit('probe.class', [], null);
         },
       }),
@@ -799,39 +791,6 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
   await answer(game);
   await running;
   expect(game.room.history.facts('probe.class')).toHaveLength(1);
-  rebuilt(game);
-});
-
-it('自定义 available 不能让本局不存在的角色发动或写入支付事实', async () => {
-  const game = cardGame();
-  const source: SkillHandle = {
-    id: 'unknown-owner',
-    owner: 'unknown',
-    skill: 'probe:unknown',
-    name: '未知来源',
-    origin: null,
-    effective: () => true,
-    available: () => true,
-  };
-  await expect(
-    game.room.run('unknown-owner', async (ctx) => {
-      expect(skillAvailable(ctx, source)).toBe(false);
-      expect(
-        (
-          await pay(ctx, {
-            skill: source,
-            cards: [],
-            to: 'discard',
-            reason: source.skill,
-          })
-        ).kind,
-      ).toBe('unavailable');
-      await invoke(ctx, source, '不应出现的询问');
-    }),
-  ).rejects.toThrow('Unknown player: unknown');
-  expect(game.room.decisions.pending).toEqual([]);
-  expect(game.room.history.facts('skill.invoked')).toHaveLength(0);
-  expect(game.room.history.facts('cost.paid')).toHaveLength(0);
   rebuilt(game);
 });
 

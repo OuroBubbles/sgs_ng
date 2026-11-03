@@ -29,7 +29,7 @@ export const eightDiagram = equipmentCard({
       on(Response.requested, {
         when: (ctx, request, self) =>
           request.actor === self.owner &&
-          equipmentEffectiveFor(ctx.world, self, request.to, 'armor') &&
+          equipmentEffectiveFor(ctx, self, request.to, 'armor') &&
           request.canProvide(ctx, jink),
         async effect(ctx, request, self) {
           const invoked = await invoke(
@@ -37,8 +37,7 @@ export const eightDiagram = equipmentCard({
             self,
             '是否发动【八卦阵】进行判定？',
             (at) =>
-              equipmentEffectiveFor(at.world, self, request.to, 'armor') &&
-              request.canProvide(at, jink),
+              equipmentEffectiveFor(at, self, request.to, 'armor') && request.canProvide(at, jink),
           );
           if (!invoked) return;
           const result = await judge(ctx, {
@@ -100,7 +99,7 @@ export const niohShield = equipmentCard({
           effect.state === 'ready' &&
           effect.card.name === 'standard:slash' &&
           effect.card.color === 'black' &&
-          equipmentEffectiveFor(ctx.world, self, effect, 'armor'),
+          equipmentEffectiveFor(ctx, self, effect, 'armor'),
         effect(ctx, { effect }, self) {
           effect.cancel(ctx, 'standard:nioh_shield');
           ctx.commit('equipment.blocked', [], {
