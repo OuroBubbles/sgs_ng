@@ -1,4 +1,4 @@
-import { cardActivities, general, skill, trigger, Phase } from '../../../sdk';
+import { cardActivities, general, skill, on, Phase } from '../../../sdk';
 import type { Context, PhaseView, SkillHandle } from '../../../sdk';
 
 /** 包括转换、供牌和改判中的真实打出；按阶段与实际角色查询。 */
@@ -25,7 +25,7 @@ export const keji = skill({
   description:
     '弃牌阶段开始前，若你在本回合的出牌阶段没有使用或打出过杀，你可以跳过此弃牌阶段。包括转换、供牌和改判中的真实打出；按阶段与实际角色查询。',
   triggers: [
-    trigger(Phase.before, {
+    on(Phase.before, {
       who: (phase) => phase.owner,
       when: (ctx, phase, self) => phase.kind === 'discard' && skippable(ctx, phase, self),
       ask: '是否发动【克己】跳过弃牌阶段？',

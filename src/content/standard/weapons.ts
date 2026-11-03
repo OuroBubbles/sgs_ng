@@ -42,13 +42,12 @@ const blade = equipmentCard({
     name: '青龙偃月刀',
     triggers: [
       on(Attack.defended, {
-        order: 'choose',
-        when: (ctx, { payload: draft, self }) =>
+        when: (ctx, draft, self) =>
           !draft.broken &&
           draft.effect.card.name === 'standard:slash' &&
           draft.effect.actor === self.owner &&
           ctx.world.player(draft.effect.target).alive,
-        async run(ctx, { payload: draft, self }) {
+        async effect(ctx, draft, self) {
           const used = await rulesOf(ctx).askUse(ctx, {
             actor: self.owner,
             names: ['standard:slash'],
@@ -83,14 +82,13 @@ const axe = equipmentCard({
     name: '贯石斧',
     triggers: [
       on(Attack.defended, {
-        order: 'choose',
-        when: (ctx, { payload: draft, self }) =>
+        when: (ctx, draft, self) =>
           !draft.broken &&
           draft.effect.actor === self.owner &&
           draft.effect.card.name === 'standard:slash' &&
           ctx.world.player(draft.effect.target).alive &&
           axeMaterials(ctx, self).length >= 2,
-        async run(ctx, { payload: draft, self }) {
+        async effect(ctx, draft, self) {
           const model = new JointSelection({
             cards: () =>
               axeMaterials(ctx, self).map((id) => ({
@@ -157,8 +155,7 @@ const kylinBow = equipmentCard({
     name: '麒麟弓',
     triggers: [
       on(Damage.causing, {
-        order: 'choose',
-        when: (ctx, { payload: draft, self }) =>
+        when: (ctx, draft, self) =>
           isDirectDamage(draft.input) &&
           draft.input.from === self.owner &&
           draft.input.card?.actor === self.owner &&
@@ -167,7 +164,7 @@ const kylinBow = equipmentCard({
           draft.amount > 0 &&
           ctx.world.player(draft.input.to).alive &&
           horses(ctx, self.owner, draft.input.to).length > 0,
-        async run(ctx, { payload: draft, self }) {
+        async effect(ctx, draft, self) {
           const target = draft.input.to;
           const model = new JointSelection({
             cards: () =>

@@ -18,10 +18,8 @@ export const allotment = {
     '准备阶段，你可以观看牌堆顶四张牌并分配。每名其他角色至多获得一张，且红牌只能交给受伤的其他角色；其余牌归自己。',
   triggers: [
     on(Phase.started, {
-      order: 'choose',
-      when: (_ctx, { payload: phase, self }) =>
-        phase.owner === self.owner && phase.kind === 'prepare',
-      async run(ctx, { self }) {
+      when: (_ctx, phase, self) => phase.owner === self.owner && phase.kind === 'prepare',
+      async effect(ctx, _event, self) {
         if (!(await invoke(ctx, self, '分筹：是否观看并分配牌堆顶四张牌？'))) return;
         await withPrivateTopCards(
           ctx,

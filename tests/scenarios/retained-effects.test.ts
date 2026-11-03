@@ -26,13 +26,7 @@ import {
   Lifetime,
   Skill,
 } from '../../src/sdk';
-import type {
-  Context,
-  SkillHandle,
-  SkillTriggerInput,
-  WorldReader,
-  PhaseView,
-} from '../../src/sdk';
+import type { Context, SkillHandle, WorldReader, PhaseView } from '../../src/sdk';
 import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
@@ -56,26 +50,16 @@ function rebuilt(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 }
 function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void>) {
-  class LostEffect {
-    id = 'lost';
-    #run = run;
-    #retained = true;
-
-    retain(
-      ctx: Context,
-      { payload: moved, self }: SkillTriggerInput<Parameters<typeof equipmentLost>[1]>,
-    ) {
-      return this.#retained && equipmentLost(ctx.world, moved, self);
-    }
-
-    when(ctx: Context, input: SkillTriggerInput<Parameters<typeof equipmentLost>[1]>) {
-      return this.retain(ctx, input);
-    }
-
-    run(ctx: Context, { self }: SkillTriggerInput<unknown>) {
-      return this.#run(ctx, self);
-    }
-  }
+  const retained = true;
+  const lost = {
+    id: 'lost',
+    locked: true,
+    retain: (ctx: Context, moved: Parameters<typeof equipmentLost>[1], self: SkillHandle) =>
+      retained && equipmentLost(ctx.world, moved, self),
+    when: (ctx: Context, moved: Parameters<typeof equipmentLost>[1], self: SkillHandle) =>
+      retained && equipmentLost(ctx.world, moved, self),
+    effect: (ctx: Context, _event: unknown, self: SkillHandle) => run(ctx, self),
+  };
   return equipmentCard({
     id: 'probe:retained-armor',
     label: '离场甲',
@@ -83,7 +67,7 @@ function lostArmor(run: (ctx: Context, self: SkillHandle) => void | Promise<void
     skill: defineSkill({
       id: 'probe:retained-armor-ability',
       name: '遗响',
-      triggers: [on(Cards.moved, new LostEffect())],
+      triggers: [on(Cards.moved, lost)],
     }),
   });
 }
@@ -141,18 +125,20 @@ it.each(['revoke', 'expiration'] as const)(
       name: '遗响',
       triggers: [
         on(Skill.changed, {
+          locked: true,
           id: 'lost',
-          retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
-          when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
-          run: (ctx, { self }) => respond(ctx, self),
+          retain: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+          when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+          effect: (ctx, _event, self) => respond(ctx, self),
         }),
         on(Lifetime.ended, {
+          locked: true,
           id: 'expired',
-          retain: (ctx, { payload: ended, self }) =>
+          retain: (ctx, ended, self) =>
             ended.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          when: (ctx, { payload: ended, self }) =>
+          when: (ctx, ended, self) =>
             ended.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          run: (ctx, { self }) => respond(ctx, self),
+          effect: (ctx, _event, self) => respond(ctx, self),
         }),
       ],
     });
@@ -186,9 +172,10 @@ it('retain 不自动保留所有离场效果；没有声明的旧技能候选不
     name: '不保留',
     triggers: [
       on(Skill.changed, {
+        locked: true,
         id: 'lost',
-        when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
-        run: (ctx) => {
+        when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+        effect: (ctx) => {
           ctx.commit('probe.unexpected', [], null);
         },
       }),
@@ -261,10 +248,11 @@ it.each([false, true])('死亡来源的普通 invoke 必须明确 allowDead，�
     name: '遗言',
     triggers: [
       on(Death.committed, {
+        locked: true,
         id: 'legacy',
         allowDead,
-        when: (_ctx, { payload: event, self }) => event.player === self.owner,
-        async run(ctx, { self }) {
+        when: (_ctx, event, self) => event.player === self.owner,
+        async effect(ctx, _event, self) {
           if (await invoke(ctx, self, '是否留下遗言？'))
             ctx.commit('probe.last-word', [], { owner: self.owner });
         },
@@ -291,10 +279,11 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
     name: '遗响',
     triggers: [
       on(Skill.changed, {
+        locked: true,
         id: 'lost',
-        retain: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
-        when: (ctx, { payload: change, self }) => skillLost(ctx.world, change.before, self),
-        run: (ctx) => {
+        retain: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+        when: (ctx, change, self) => skillLost(ctx.world, change.before, self),
+        effect: (ctx) => {
           ctx.commit('probe.retained', [], null);
         },
       }),
@@ -350,14 +339,15 @@ for (const [window, group] of [
       name: '遗言',
       triggers: [
         on(window, {
+          locked: true,
           id: 'legacy',
           group,
           allowDead: true,
-          retain: (ctx, { payload: event, self }) =>
+          retain: (ctx, event, self) =>
             event.burial.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          when: (ctx, { payload: event, self }) =>
+          when: (ctx, event, self) =>
             event.burial.skillsBefore.some((old) => skillLost(ctx.world, old, self)),
-          async run(ctx, { payload: event, self }) {
+          async effect(ctx, event, self) {
             expect(event.skillsBefore).toHaveLength(0);
             expect(event.burial.skillsBefore).toHaveLength(1);
             expect(self.effective(ctx.world)).toBe(false);
@@ -401,9 +391,10 @@ it('已开始后效不重新套用 when；普通支付只重查来源与调用�
     name: '起点',
     triggers: [
       on(window, {
+        locked: true,
         id: 'start',
         when: () => !started,
-        async run(ctx, { self }) {
+        async effect(ctx, _event, self) {
           started = true;
           if (await invoke(ctx, self, '是否继续已开始的后效？'))
             ctx.commit('probe.started', [], null);
@@ -499,12 +490,13 @@ it('retain 和新的 available 都是纯查询，不允许它们提交状态', a
     name: '错误来源',
     triggers: [
       on(Skill.changed, {
+        locked: true,
         id: 'lost',
         retain(ctx) {
           ctx.commit('probe.unexpected', [], null);
           return true;
         },
-        run: () => {},
+        effect: () => {},
       }),
     ],
   });
@@ -548,11 +540,12 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
       name: '双响',
       triggers: [
         on(Cards.moved, {
+          locked: true,
           id: 'lost',
           times: () => 2,
-          retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-          when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-          async run(ctx, { self, occurrence }) {
+          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+          when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+          async effect(ctx, _event, self, _value, occurrence) {
             if (first) expect(skillAvailable(ctx, first)).toBe(false);
             first ??= self;
             if (await invoke(ctx, self, `第${occurrence.index}次？`))
@@ -589,12 +582,11 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
     name: '旧来源',
     triggers: [
       on(window, {
+        locked: true,
         id: 'retained',
-        retain: (ctx, { payload: event, self }) =>
-          event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, { payload: event, self }) =>
-          event.before.some((old) => skillLost(ctx.world, old, self)),
-        async run(ctx, { self }) {
+        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
+        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
+        async effect(ctx, _event, self) {
           if (await invoke(ctx, self, '是否发动旧来源？')) ctx.commit('probe.custom', [], null);
         },
       }),
@@ -633,8 +625,9 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
       name: '快照错误',
       triggers: [
         on(window, {
+          locked: true,
           id: 'effect',
-          run: (ctx) => {
+          effect: (ctx) => {
             ctx.commit('probe.unexpected', [], null);
           },
         }),
@@ -669,12 +662,11 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
     name: '同一来源',
     triggers: [
       on(window, {
+        locked: true,
         id: 'lost',
-        retain: (ctx, { payload: event, self }) =>
-          event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, { payload: event, self }) =>
-          event.before.some((old) => skillLost(ctx.world, old, self)),
-        async run(ctx, { self }) {
+        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
+        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
+        async effect(ctx, _event, self) {
           await invoke(ctx, self, '只应询问一次');
         },
       }),
@@ -721,10 +713,11 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
       active: [{ id: 'active', label: '主动', available: () => true, run: () => {} }],
       triggers: [
         on(Cards.moved, {
+          locked: true,
           id: 'lost',
-          retain: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
-          when: (ctx, { payload: event, self }) => equipmentLost(ctx.world, event, self),
-          async run(ctx, { self }) {
+          retain: (ctx, event, self) => equipmentLost(ctx.world, event, self),
+          when: (ctx, event, self) => equipmentLost(ctx.world, event, self),
+          async effect(ctx, _event, self) {
             expect(skillAvailable(ctx, self)).toBe(true);
             expect(game.book.handLimit(ctx, 'a')).toBe(4);
             expect(activeOffers(ctx, game.book, phase)).toHaveLength(0);
@@ -787,8 +780,9 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
     name: '普通类',
     triggers: [
       on(window, {
+        locked: true,
         id: 'run',
-        async run(ctx, { self }) {
+        async effect(ctx, _event, self) {
           expect(self.effective(ctx.world)).toBe(true);
           if (await invoke(ctx, self, '普通类来源？')) ctx.commit('probe.class', [], null);
         },

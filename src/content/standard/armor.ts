@@ -27,12 +27,11 @@ export const eightDiagram = equipmentCard({
     name: '八卦阵',
     triggers: [
       on(Response.requested, {
-        order: 'choose',
-        when: (ctx, { payload: request, self }) =>
+        when: (ctx, request, self) =>
           request.actor === self.owner &&
           equipmentEffectiveFor(ctx.world, self, request.to, 'armor') &&
           request.canProvide(ctx, jink),
-        async run(ctx, { payload: request, self }) {
+        async effect(ctx, request, self) {
           const invoked = await invoke(
             ctx,
             self,
@@ -65,11 +64,12 @@ export const qinggangSword = equipmentCard({
     name: '青釭剑',
     triggers: [
       on(Target.specified, {
-        when: (_ctx, { payload: { effect }, self }) =>
+        locked: true,
+        when: (_ctx, { effect }, self) =>
           effect.actor === self.owner &&
           effect.card.name === 'standard:slash' &&
           effect.state === 'targeting',
-        run(ctx, { payload: { use, effect }, self }) {
+        effect(ctx, { use, effect }, self) {
           effect.ignoreEquipment(ctx, 'armor', 'standard:qinggang_sword');
           ctx.commit('equipment.ignored', [], {
             actor: self.owner,
@@ -94,13 +94,14 @@ export const niohShield = equipmentCard({
     name: '仁王盾',
     triggers: [
       on(Resolve.starting, {
-        when: (ctx, { payload: { effect }, self }) =>
+        locked: true,
+        when: (ctx, { effect }, self) =>
           effect.target === self.owner &&
           effect.state === 'ready' &&
           effect.card.name === 'standard:slash' &&
           effect.card.color === 'black' &&
           equipmentEffectiveFor(ctx.world, self, effect, 'armor'),
-        run(ctx, { payload: { effect }, self }) {
+        effect(ctx, { effect }, self) {
           effect.cancel(ctx, 'standard:nioh_shield');
           ctx.commit('equipment.blocked', [], {
             actor: self.owner,

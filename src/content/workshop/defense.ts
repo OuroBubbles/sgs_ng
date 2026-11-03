@@ -54,14 +54,13 @@ export const relay = {
     '你即将受到直接伤害时，可以弃置一张手牌，将当前伤害转移给一名其他角色。接收方重新结算防御；连环传播或已转移的伤害不能发动。',
   triggers: [
     on(Damage.inflicting, {
-      order: 'choose',
-      when: (ctx, { payload: draft, self }) =>
+      when: (ctx, draft, self) =>
         draft.input.to === self.owner &&
         isDirectDamage(draft.input) &&
         draft.pending &&
         draft.amount > 0 &&
         selection(ctx, draft, self).available(),
-      async run(ctx, { payload: draft, self }) {
+      async effect(ctx, draft, self) {
         const model = selection(ctx, draft, self);
         const answer = await ctx.ask(
           model.decision(self.owner, '代受：弃置一张手牌，选择伤害接收方', {

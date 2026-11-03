@@ -3,7 +3,7 @@ import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
 import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
-import type { Trigger, TriggerSource, Timing, TriggerOccurrence } from '../../core/runtime/event';
+import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import { defineState, setState } from '../state/state';
 import type { ViewAs } from '../cards/types';
@@ -116,107 +116,6 @@ interface DefinedBinding extends SkillBinding {
 
 // 只复用本入口完成规范化的声明，外部浅冻结对象不代表子声明已经固定。
 const definedSkills = new WeakSet<SkillDefinition>();
-
-/** 本次时点的载荷与技能来源；执行 Context 仍单独显式传递。 */
-export interface SkillTriggerInput<T> {
-  readonly payload: T;
-  readonly self: SkillHandle;
-}
-
-/** 候选已经展开后才有具体次数；times / retain 不依赖某一次 occurrence。 */
-export interface SkillTriggerOccurrenceInput<T> extends SkillTriggerInput<T> {
-  readonly occurrence: TriggerOccurrence;
-}
-
-/** 一个时点的处理函数；资格、有限次数和后效保留独立的普通回调。 */
-export interface SkillTriggerDefinition<T> {
-  /** 默认使用时点 ID；同一技能中重名的处理器须显式区分。 */
-  readonly id?: string;
-  readonly group?: string;
-  readonly order?: 'automatic' | 'choose';
-  readonly allowDead?: boolean;
-  /** 本窗口有限次数的快照；每次独立重查、选择与结算，不把多个发动藏在 run 循环中。 */
-  readonly times?: (ctx: Context, input: SkillTriggerInput<T>) => number;
-  /** 明确允许已离场来源处理本次事实；不恢复所有权，只为本次 run 与子流程提供发动资格。 */
-  readonly retain?: (ctx: Context, input: SkillTriggerInput<T>) => boolean;
-  readonly when?: (ctx: Context, input: SkillTriggerOccurrenceInput<T>) => boolean;
-  /** 可以直接返回规则操作；调用方等待完成，结果由技能自己的普通控制流消费。 */
-  readonly run: (ctx: Context, input: SkillTriggerOccurrenceInput<T>) => unknown;
-}
-
-export function on<T>(
-  window: Timing<T, unknown>,
-  definition: SkillTriggerDefinition<T>,
-): SkillTrigger {
-  const { id = window.id } = definition;
-  // 展开对象不会复制原型方法；固定入口时保留作者对象作为接收者。
-  const handler = Object.freeze({
-    id,
-    group: definition.group,
-    order: definition.order,
-    allowDead: definition.allowDead,
-    times: definition.times?.bind(definition),
-    retain: definition.retain?.bind(definition),
-    when: definition.when?.bind(definition),
-    run: definition.run.bind(definition),
-  });
-  if (!handler.id) throw new Error('Skill trigger requires an ID.');
-  return Object.freeze({
-    id: handler.id,
-    window,
-    bind(self: SkillHandle): Trigger<unknown> {
-      const available = (ctx: Context, payload: T) =>
-        syncQueryValue(self.registered?.() ?? true, `${self.skill}.registered`) &&
-        (handler.allowDead || ctx.world.player(self.owner).alive) &&
-        (syncQueryValue(
-          self.available ? self.available(ctx) : self.effective(ctx.world),
-          `${self.skill}.available`,
-        ) ||
-          syncQueryValue(
-            handler.retain?.(ctx, { payload, self }) ?? false,
-            `${self.skill}/${handler.id}.retain`,
-          ));
-      return {
-        id: JSON.stringify([self.id, handler.id]),
-        owner: self.owner,
-        ...(handler.group === undefined ? {} : { group: handler.group }),
-        ...(handler.order === undefined ? {} : { order: handler.order }),
-        ...(handler.times === undefined
-          ? {}
-          : {
-              times: (ctx: Context, payload: unknown) =>
-                handler.times!(ctx, { payload: payload as T, self }),
-            }),
-        eligible: (ctx, payload, occurrence) =>
-          available(ctx, payload as T) &&
-          (handler.when?.(ctx, { payload: payload as T, self, occurrence }) ?? true),
-        async run(ctx, payload, occurrence) {
-          let active = true;
-          const binding: SkillHandle = Object.freeze({
-            id: self.id,
-            owner: self.owner,
-            skill: self.skill,
-            name: self.name,
-            origin: self.origin,
-            effective: (world: WorldReader) =>
-              syncQueryValue(self.effective(world), `${self.skill}.effective`),
-            ...(self.registered === undefined ? {} : { registered: () => self.registered!() }),
-            available: (at: Context) =>
-              active &&
-              at.world === ctx.world &&
-              at.cause.scopePath.includes(ctx.scope.id) &&
-              available(at, payload as T),
-          });
-          try {
-            await handler.run(ctx, { payload: payload as T, self: binding, occurrence });
-          } finally {
-            active = false;
-          }
-        },
-      };
-    },
-  });
-}
 
 /** 只声明实际能力；固定方法入口并保留原接收者，不冻结作者对象。 */
 export function defineSkill(definition: SkillDefinition): DefinedSkill {

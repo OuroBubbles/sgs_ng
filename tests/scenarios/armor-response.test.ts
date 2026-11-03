@@ -452,10 +452,9 @@ it('同一窗口可选择技能顺序，供牌后其余候选失效；选择说�
     triggers: [
       on(Response.requested, {
         id: 'supply',
-        order: 'choose',
-        when: (ctx, { payload: r, self }) =>
-          r.actor === self.owner && r.canProvide(ctx, generated()),
-        async run(ctx, { payload: r }) {
+
+        when: (ctx, r, self) => r.actor === self.owner && r.canProvide(ctx, generated()),
+        async effect(ctx, r) {
           await r.provide(ctx, generated());
         },
       }),

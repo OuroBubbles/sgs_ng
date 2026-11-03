@@ -10,7 +10,7 @@ import {
   isGameOver,
   ownedCards,
   skill,
-  trigger,
+  on,
   Cards,
 } from '../../../sdk';
 
@@ -19,7 +19,7 @@ export const yingzi = skill({
   name: '英姿',
   description: '摸牌阶段，你可以多摸一张牌。',
   triggers: [
-    trigger(Cards.drawing, {
+    on(Cards.drawing, {
       who: (draft) => draft.input.player,
       when: (_ctx, draft) => draft.phase?.kind === 'draw',
       ask: '是否发动【英姿】多摸一张牌？',

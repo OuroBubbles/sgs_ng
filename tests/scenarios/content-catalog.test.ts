@@ -21,8 +21,6 @@ import type {
   GeneralDefinition,
   SkillDefinition,
   SkillTrigger,
-  SkillTriggerDefinition,
-  SkillTriggerInput,
   SkillHandle,
   SkillModifier,
   Context,
@@ -211,9 +209,10 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
           name: '研习',
           triggers: [
             on(window, {
+              locked: true,
               id: 'lose',
-              when: (_ctx, { payload: event, self }) => event.player === self.owner,
-              run: (ctx, { self }) =>
+              when: (_ctx, event, self) => event.player === self.owner,
+              effect: (ctx, _event, self) =>
                 loseHp(ctx, { player: self.owner, amount: 1, reason: self.skill }),
             }),
           ],
@@ -399,23 +398,15 @@ it('组合固定卡牌和静态技能声明，后续修改原对象不改变新�
       return originalUse;
     },
   } satisfies CardDefinition;
-  class TriggerDefinition implements SkillTriggerDefinition<null> {
-    id = 'lose';
-    #amount = 1;
-
-    times() {
-      return this.#amount;
-    }
-
-    when() {
-      return this.#amount > 0;
-    }
-
-    run(ctx: Context, { self }: SkillTriggerInput<null>) {
-      return loseHp(ctx, { player: self.owner, amount: this.#amount, reason: self.skill });
-    }
-  }
-  const originalTrigger = new TriggerDefinition();
+  const amount = 1;
+  const originalTrigger = {
+    id: 'lose',
+    locked: true,
+    times: () => amount,
+    when: () => amount > 0,
+    effect: (ctx: Context, _event: null, self: SkillHandle) =>
+      loseHp(ctx, { player: self.owner, amount, reason: self.skill }),
+  };
   class BoundTrigger implements SkillTrigger {
     id = 'lose';
     window = window;
@@ -500,7 +491,7 @@ it('组合固定卡牌和静态技能声明，后续修改原对象不改变新�
   });
   originalTrigger.times = () => 0;
   originalTrigger.when = () => false;
-  originalTrigger.run = () => {
+  originalTrigger.effect = () => {
     throw new Error('Changed trigger callback must not run.');
   };
   originalCard.id = 'changed-card';

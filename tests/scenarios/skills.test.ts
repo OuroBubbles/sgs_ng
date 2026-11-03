@@ -103,8 +103,9 @@ describe('技能实例与独立授予来源', () => {
         name: 'test',
         triggers: [
           on(window, {
+            locked: true,
             id: 'run',
-            run: (_ctx, { self }) => {
+            effect: (_ctx, _event, self) => {
               hits.push(self.id);
             },
           }),
@@ -145,8 +146,9 @@ describe('技能实例与独立授予来源', () => {
         name: 'new',
         triggers: [
           on(window, {
+            locked: true,
             id: 'hit',
-            run: () => {
+            effect: () => {
               hits.push('new');
             },
           }),
@@ -174,11 +176,14 @@ describe('技能实例与独立授予来源', () => {
     const window = testTiming<null>('test.skill');
     const hits: string[] = [];
     const trigger = on(window, {
-      run: (_ctx, { self }) => {
+      locked: true,
+      effect: (_ctx, _event, self) => {
         hits.push(self.id);
       },
     });
-    expect(() => on(window, { id: '', run: () => {} })).toThrow('Skill trigger requires an ID.');
+    expect(() => on(window, { locked: true, id: '', effect: () => {} })).toThrow(
+      'Trigger requires an ID.',
+    );
     expect(
       () => new SkillBook([{ id: 'duplicate', name: '重复', triggers: [trigger, trigger] }]),
     ).toThrow('[duplicate] Duplicate trigger ID: test.skill.');
@@ -262,15 +267,17 @@ describe('技能实例与独立授予来源', () => {
         name: 'test',
         triggers: [
           on(window, {
+            locked: true,
             id: 'ordinary',
-            run: () => {
+            effect: () => {
               hits.push('ordinary');
             },
           }),
           on(window, {
+            locked: true,
             id: 'legacy',
             allowDead: true,
-            run: () => {
+            effect: () => {
               hits.push('legacy');
             },
           }),
@@ -376,8 +383,9 @@ describe('显式生存期、状态与授予到期', () => {
         name: 'test',
         triggers: [
           on(window, {
+            locked: true,
             id: 'run',
-            run: () => {
+            effect: () => {
               hits.push('hit');
             },
           }),

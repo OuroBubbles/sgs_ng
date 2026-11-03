@@ -4,7 +4,7 @@ import type { DeepReadonly } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { syncQueryValue } from '../../core/runtime/query';
 import { labelTrigger, defineEvent, timing } from '../../core/runtime/event';
-import type { Trigger, TriggerSource, TriggerOccurrence, Timing } from '../../core/runtime/event';
+import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
 import type { QueryType } from '../skills/query';
 import { isGameOver } from '../game/end';
@@ -35,23 +35,6 @@ export interface EffectTrigger {
   readonly window: object;
   /** 纯同步绑定；候选收集、执行前重绑及显式入窗均检查这一约定。 */
   bind(self: EffectHandle): Trigger<unknown>;
-}
-
-/** 实例由 create(self) 的闭包保留；触发输入只携带本次窗口的数据。 */
-export interface EffectTriggerInput<Payload> {
-  readonly payload: Payload;
-}
-export interface EffectTriggerOccurrenceInput<Payload> extends EffectTriggerInput<Payload> {
-  readonly occurrence: TriggerOccurrence;
-}
-export interface EffectTriggerDefinition<Payload> {
-  /** 默认使用时点 ID；同一效果中重名的处理器须显式区分。 */
-  readonly id?: string;
-  readonly group?: string;
-  readonly order?: 'automatic' | 'choose';
-  readonly times?: (ctx: Context, input: EffectTriggerInput<Payload>) => number;
-  readonly when?: (ctx: Context, input: EffectTriggerOccurrenceInput<Payload>) => boolean;
-  readonly run: (ctx: Context, input: EffectTriggerOccurrenceInput<Payload>) => unknown;
 }
 
 export interface EffectModifier {
@@ -119,40 +102,6 @@ export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDe
   return fixed;
 }
 
-/** 只描述一个普通触发；身份、生存资格、行动序与有限次数仍走原有 Window。 */
-export function effectOn<Payload>(
-  window: Timing<Payload, unknown>,
-  input: EffectTriggerDefinition<Payload>,
-): EffectTrigger {
-  const { id = window.id } = input;
-  if (!id) throw new Error('Effect trigger requires an ID.');
-  const handler = Object.freeze({
-    id,
-    group: input.group,
-    order: input.order,
-    times: input.times?.bind(input),
-    when: input.when?.bind(input),
-    run: input.run.bind(input),
-  });
-  return Object.freeze({
-    id: handler.id,
-    window,
-    bind: (self: EffectHandle): Trigger<unknown> => ({
-      id: JSON.stringify([self.id, handler.id]),
-      owner: self.owner,
-      label: self.type,
-      ...(handler.group === undefined ? {} : { group: handler.group }),
-      ...(handler.order === undefined ? {} : { order: handler.order }),
-      ...(handler.times === undefined
-        ? {}
-        : { times: (ctx, value) => handler.times!(ctx, { payload: value as Payload }) }),
-      eligible: (ctx, value, occurrence) =>
-        self.current(ctx.world) !== null &&
-        (handler.when?.(ctx, { payload: value as Payload, occurrence }) ?? true),
-      run: (ctx, value, occurrence) => handler.run(ctx, { payload: value as Payload, occurrence }),
-    }),
-  });
-}
 export function effectModify<Input, Value>(
   query: QueryType<Input, Value>,
   contribution: (ctx: Context, input: Input) => Value | undefined,

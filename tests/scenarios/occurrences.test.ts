@@ -428,9 +428,10 @@ it('SDK 次数携带同一来源但独立身份，失去再获得技能不借新
       name: '重复',
       triggers: [
         on(window, {
+          locked: true,
           id: 'effect',
           times: () => 2,
-          async run(ctx, { self, occurrence: o }) {
+          async effect(ctx, _event, self, _value, o) {
             seen.push({ id: self.id, index: o.index });
             if (!replaced) {
               replaced = true;
@@ -481,10 +482,11 @@ it('SDK when 能区分各次身份；跳过一次不会删除本效果的全部�
       name: '逐次资格',
       triggers: [
         on(window, {
+          locked: true,
           id: 'point',
           times: () => 3,
-          when: (_ctx, { occurrence: o }) => o.index !== 2,
-          run(_ctx, { occurrence: o }) {
+          when: (_ctx, _event, _self, o) => o.index !== 2,
+          effect(_ctx, _event, _self, _value, o) {
             seen.push(o.index);
           },
         }),
@@ -504,9 +506,10 @@ it('拥有者在第一次中死亡，已经进入的普通代码可善后，剩�
     name: '离场次数',
     triggers: [
       on(window, {
+        locked: true,
         id: 'point',
         times: () => 3,
-        async run(ctx) {
+        async effect(ctx) {
           await kill(ctx, {
             player: 'a',
             killer: null,

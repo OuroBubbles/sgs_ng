@@ -325,11 +325,12 @@ function lossDefinition(allowDead = false): CardDefinition {
       name: '离场探针',
       triggers: [
         on(Cards.moved, {
+          locked: true,
           id: 'lost',
           allowDead,
-          retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-          when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-          run(ctx, { self }) {
+          retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+          when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+          effect(ctx, _event, self) {
             ctx.commit('probe:equipment-lost', [], { owner: self.owner, card: self.origin!.id });
           },
         }),

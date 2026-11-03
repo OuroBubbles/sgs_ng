@@ -504,12 +504,13 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
       name: '限伤',
       triggers: [
         on(Damage.inflicting, {
+          locked: true,
           id: 'cap',
-          when: (ctx, { payload: draft, self }) =>
+          when: (ctx, draft, self) =>
             draft.input.to === self.owner &&
             draft.input.card !== undefined &&
             equipmentEffectiveFor(ctx.world, self, draft.input.card, 'armor'),
-          run(_ctx, { payload: draft }) {
+          effect(_ctx, draft) {
             draft.setAmount(Math.min(1, draft.amount), 'cap');
           },
         }),

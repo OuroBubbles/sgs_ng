@@ -1,13 +1,4 @@
-import {
-  cardQueries,
-  draw,
-  general,
-  modify,
-  ownedCards,
-  skill,
-  trigger,
-  Cards,
-} from '../../../sdk';
+import { cardQueries, draw, general, modify, ownedCards, skill, on, Cards } from '../../../sdk';
 import type { Context, MoveResult } from '../../../sdk';
 
 export const qianxun = skill({
@@ -42,7 +33,7 @@ export const lianying = skill({
   description:
     '失去最后的手牌后，你可以摸一张牌。一批移出多张手牌只产生一次机会；重新获得手牌再失去时是新的机会。',
   triggers: [
-    trigger(Cards.moved, {
+    on(Cards.moved, {
       when: (ctx, moved, self) => emptiedHand(moved, self.owner) && emptyHanded(ctx, self.owner),
       ask: '是否发动【连营】摸一张牌？',
       keep: (ctx, _moved, self) => emptyHanded(ctx, self.owner),

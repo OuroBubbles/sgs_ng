@@ -1,5 +1,5 @@
 import {
-  effectOn,
+  on,
   effectModify,
   cardQueries,
   draw,
@@ -38,25 +38,25 @@ export const covenant = {
         ),
       ],
       triggers: [
-        effectOn(Damage.inflicting, {
-          when: (_ctx, { payload: hit }) =>
+        on(Damage.inflicting, {
+          when: (_ctx, hit) =>
             hit.input.to === self.data.target &&
             hit.amount > 0 &&
             !hit.prevented &&
             self.data.remaining > 0,
-          async run(ctx, { payload: hit }) {
+          async effect(ctx, hit) {
             hit.adjust(-1, 'covenant:promise');
             await self.update(ctx, { ...self.data, remaining: self.data.remaining - 1 });
           },
         }),
-        effectOn(Turn.ending, {
-          when: (_ctx, { payload: turn }) => turn.owner === self.data.target,
-          run: (ctx) => self.end(ctx, 'covenant:fulfilled'),
+        on(Turn.ending, {
+          when: (_ctx, turn) => turn.owner === self.data.target,
+          effect: (ctx) => self.end(ctx, 'covenant:fulfilled'),
         }),
-        effectOn(Death.finished, {
+        on(Death.finished, {
           group: 'after',
-          when: (_ctx, { payload: death }) => death.player === self.data.target,
-          run: (ctx) => self.end(ctx, 'covenant:target-died'),
+          when: (_ctx, death) => death.player === self.data.target,
+          effect: (ctx) => self.end(ctx, 'covenant:target-died'),
         }),
       ],
     };

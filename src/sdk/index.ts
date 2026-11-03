@@ -40,7 +40,6 @@ export type {
 } from '../core/decisions/selection';
 export {
   defineSkill,
-  on,
   SkillBook,
   skillEffective,
   skillAvailable,
@@ -51,9 +50,6 @@ export {
 export type {
   SkillDefinition,
   SkillTrigger,
-  SkillTriggerDefinition,
-  SkillTriggerInput,
-  SkillTriggerOccurrenceInput,
   SkillHandle,
   SkillBinding,
   SkillProvider,
@@ -62,6 +58,8 @@ export type {
   AiView,
   AiSeat,
 } from '../rules/skills/skills';
+export { on } from '../rules/skills/on';
+export type { TriggerSpec, TriggerHook } from '../rules/skills/on';
 export { defineQuery, modify } from '../rules/skills/query';
 export { genderOf, genderChange, setGender, differentGender } from '../rules/characters/gender';
 export type { Gender } from '../rules/characters/gender';
@@ -92,7 +90,6 @@ export {
   select,
   selection,
   askDiscard,
-  trigger,
   action,
   convert,
   skill,
@@ -103,7 +100,6 @@ export type {
   MoveFact,
   AskOptions,
   Picked,
-  TriggerSpec,
   ActionContext,
   ActionSpec,
   AuthoredGeneral,
@@ -119,7 +115,7 @@ export type {
 export { defineGeneral, GeneralBook, generalOf, generalChange } from '../rules/characters/general';
 export type { GeneralDefinition } from '../rules/characters/general';
 export { isResponseSatisfied } from '../rules/cards/response';
-export { EffectBook, defineEffect, effectOn, effectModify } from '../rules/effects/effects';
+export { EffectBook, defineEffect, effectModify } from '../rules/effects/effects';
 export type {
   EffectRecord,
   EffectHandle,
@@ -127,9 +123,6 @@ export type {
   EffectInput,
   EffectBehavior,
   EffectTrigger,
-  EffectTriggerInput,
-  EffectTriggerOccurrenceInput,
-  EffectTriggerDefinition,
   EffectModifier,
   PreparedEffect,
   EffectEnd,

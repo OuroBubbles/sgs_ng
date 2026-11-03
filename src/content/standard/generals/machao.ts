@@ -6,7 +6,7 @@ import {
   judge,
   modify,
   skill,
-  trigger,
+  on,
   Target,
 } from '../../../sdk';
 
@@ -27,7 +27,7 @@ export const tieqi = skill({
   description:
     '当你指定杀的目标后，可以判定。若结果为红色，该角色不能以闪响应这次杀，八卦阵和护驾供闪也不能绕过。',
   triggers: [
-    trigger(Target.specified, {
+    on(Target.specified, {
       who: ({ effect }) => effect.actor,
       when: (_ctx, { effect }) =>
         effect.card.name === 'standard:slash' && effect.state === 'targeting',

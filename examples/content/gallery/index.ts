@@ -13,11 +13,10 @@ const ink = {
   ],
   triggers: [
     on(Provision.finished, {
-      order: 'choose',
-      when: (ctx, { payload: event, self }) =>
+      when: (ctx, event, self) =>
         provisionBy(event, self.owner) &&
         ctx.world.player(self.owner).hp < ctx.world.player(self.owner).maxHp,
-      async run(ctx, { self }) {
+      async effect(ctx, _event, self) {
         if (await invoke(ctx, self, '是否发动【墨韵】回复1点体力？'))
           await recover(ctx, { from: self.owner, to: self.owner, amount: 1 });
       },

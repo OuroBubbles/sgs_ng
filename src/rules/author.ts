@@ -6,7 +6,7 @@
  * - 动词：obtain / takeCard / give / askDiscard / select，自带存活与终局 no-op。
  */
 import type { Context } from '../core/runtime/room';
-import type { TriggerOccurrence, Timing } from '../core/runtime/event';
+import type { TriggerOccurrence } from '../core/runtime/event';
 import { JointSelection } from '../core/decisions/selection';
 import type { JointChoice, JointSelectionSpec } from '../core/decisions/selection';
 import type { Decision } from '../core/decisions/hub';
@@ -18,10 +18,10 @@ import { ownedCards } from './cards/types';
 import type { ViewAs, ViewAsInput } from './cards/types';
 import type { PhysicalCardFace } from './cards/face';
 import { payDiscard, used } from './costs/pay';
-import { on, rulesOf } from './skills/skills';
-import type { SkillDefinition, SkillHandle, SkillTrigger } from './skills/skills';
+import { rulesOf } from './skills/skills';
+import type { SkillDefinition, SkillHandle } from './skills/skills';
 import type { ActiveInput, ActiveSkill } from './skills/active';
-import { declare, invoke } from './skills/invoke';
+import { declare } from './skills/invoke';
 import type { Declaration } from './skills/invoke';
 import type { GeneralDefinition } from './characters/general';
 import { genderOf } from './characters/gender';
@@ -235,91 +235,6 @@ export async function askDiscard(
 }
 
 // ───────────────────────── 触发技
-
-type Hook<T, R> = (ctx: Context, event: T, self: SkillHandle) => R;
-/**
- * 分段触发器：
- * - 非锁定技默认由玩家安排顺序（order: 'choose'）；
- * - ask：询问「是否发动」后宣告；cost：先做选择（返回 null 视为不发动），再宣告；
- * - declare：宣告附带的数据、变更或代价；keep：宣告时的合法条件（与「未终局」一同检查）；
- * - 宣告即生效：其后条件改变或失去技能不撤销，只在终局时截断 effect。
- */
-export interface TriggerSpec<T, V> {
-  readonly id?: string;
-  /** 事件的主体；仅当它是技能拥有者时触发。 */
-  readonly who?: (event: T) => string | null | undefined;
-  readonly when?: Hook<T, boolean>;
-  readonly times?: Hook<T, number>;
-  /** 锁定技：不询问、不宣告、自动排序。 */
-  readonly locked?: boolean;
-  readonly ask?:
-    | string
-    | ((ctx: Context, event: T, self: SkillHandle, at: TriggerOccurrence) => string);
-  readonly cost?: (
-    ctx: Context,
-    event: T,
-    self: SkillHandle,
-    at: TriggerOccurrence,
-  ) => Promise<V | null | undefined | false>;
-  readonly keep?: (ctx: Context, event: T, self: SkillHandle, value?: V) => boolean;
-  readonly declare?: (
-    ctx: Context,
-    event: T,
-    self: SkillHandle,
-    value: V,
-  ) => Declaration | Promise<Declaration>;
-  readonly effect?: (
-    ctx: Context,
-    event: T,
-    self: SkillHandle,
-    value: V,
-    at: TriggerOccurrence,
-  ) => unknown;
-}
-
-export function trigger<T, V = true>(
-  window: Timing<T, unknown>,
-  spec: TriggerSpec<T, V>,
-): SkillTrigger {
-  const { who, when, times, locked, ask, cost, keep, declare: extra, effect } = spec;
-  const staged = ask !== undefined || cost !== undefined;
-  return on(window, {
-    ...(spec.id === undefined ? {} : { id: spec.id }),
-    ...(locked ? {} : { order: 'choose' as const }),
-    ...(times ? { times: (ctx, { payload, self }) => times(ctx, payload, self) } : {}),
-    when: (ctx, { payload, self }) =>
-      (!who || who(payload) === self.owner) && (when?.(ctx, payload, self) ?? true),
-    async run(ctx, { payload, self, occurrence }) {
-      const going = (at: Context, value?: V) =>
-        !isGameOver(at.world) && (keep?.(at, payload, self, value) ?? true);
-      let value = true as V;
-      if (cost) {
-        const chosen = await cost(ctx, payload, self, occurrence);
-        if (chosen === null || chosen === undefined || chosen === false) return;
-        value = chosen;
-        const more = (await extra?.(ctx, payload, self, value)) ?? {};
-        const declared = await declare(ctx, self, {
-          ...more,
-          legal: (at) => going(at, value) && (more.legal?.(at) ?? true),
-        });
-        if (!declared) return;
-      } else if (ask !== undefined) {
-        const prompt = typeof ask === 'string' ? ask : ask(ctx, payload, self, occurrence);
-        const declared = await invoke(
-          ctx,
-          self,
-          prompt,
-          (at) => going(at),
-          extra && ((at) => extra(at, payload, self, value)),
-        );
-        if (!declared) return;
-      }
-      // 宣告即生效：其后失去技能、条件改变都不撤销，只有终局会截断。
-      if (staged && isGameOver(ctx.world)) return;
-      await effect?.(ctx, payload, self, value, occurrence);
-    },
-  });
-}
 
 // ───────────────────────── 主动技
 

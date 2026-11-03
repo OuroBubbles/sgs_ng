@@ -1,4 +1,4 @@
-import { cardDef, cardQueries, draw, general, modify, skill, trigger, Use } from '../../../sdk';
+import { cardDef, cardQueries, draw, general, modify, skill, on, Use } from '../../../sdk';
 
 /** 跟随实体/零材料虚拟牌；有材料的转换牌不发动标准集智。 */
 export const jizhi = skill({
@@ -6,7 +6,7 @@ export const jizhi = skill({
   name: '集智',
   description: '当你使用非转化的普通锦囊牌时，你可以摸一张牌。',
   triggers: [
-    trigger(Use.declared, {
+    on(Use.declared, {
       who: (use) => use.actor,
       when: (ctx, { card }) => {
         const def = cardDef(ctx, card.name);

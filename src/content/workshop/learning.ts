@@ -7,9 +7,8 @@ export const echo = {
   description: '受到一次伤害后，你可以摸一张牌。每次伤害一次，不按伤害点数重复。',
   triggers: [
     on(Damage.received, {
-      order: 'choose',
-      when: (_ctx, { payload: hit, self }) => hit.input.to === self.owner,
-      async run(ctx, { self }) {
+      when: (_ctx, hit, self) => hit.input.to === self.owner,
+      async effect(ctx, _event, self) {
         const accepted = await invoke(ctx, self, '是否发动【余响】摸一张牌？');
         if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
       },
@@ -24,12 +23,13 @@ export const insight = {
   description: '锁定技。受到伤害后，若你没有余响，获得余响（自下一次受到伤害起生效）。',
   triggers: [
     on(Damage.received, {
-      when: (ctx, { payload: hit, self }) =>
+      locked: true,
+      when: (ctx, hit, self) =>
         hit.input.to === self.owner &&
         !ctx.world.snapshot.skills.some(
           (skill) => skill.owner === self.owner && skill.skill === echo.id,
         ),
-      async run(ctx, { self }) {
+      async effect(ctx, _event, self) {
         const paid = await pay(ctx, {
           skill: self,
           reason: self.skill,

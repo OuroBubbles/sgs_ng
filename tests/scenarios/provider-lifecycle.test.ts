@@ -52,10 +52,11 @@ it.each([false, true])(
       name: source.name,
       triggers: [
         on(window, {
+          locked: true,
           id: 'repeat',
           times: () => 3,
           retain: () => retained,
-          run(ctx, { occurrence }) {
+          effect(ctx, _event, _self, _value, occurrence) {
             seen.push(occurrence.index);
             ctx.commit('probe.provider', [], occurrence);
             remove(ctx);
@@ -120,9 +121,10 @@ it('SkillBook 重新挂接不复活原窗口，旧 detach 不破坏新挂接的�
     name: source.name,
     triggers: [
       on(window, {
+        locked: true,
         id: 'repeat',
         times: () => 3,
-        run(_ctx, { occurrence }) {
+        effect(_ctx, _event, _self, _value, occurrence) {
           seen.push(occurrence.index);
           if (!replaced) {
             replaced = true;
@@ -157,9 +159,9 @@ it('顺序选择返回后重查 Provider 登记，旧选项被跳过且不影响
     triggers: [
       on(window, {
         id: 'choose',
-        order: 'choose',
+
         retain: () => true,
-        run() {
+        effect() {
           seen.push('A');
         },
       }),
@@ -210,8 +212,9 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
     modifiers: [modify(cardQueries.handLimitCorrection, () => 1)],
     triggers: [
       on(window, {
+        locked: true,
         id: 'late',
-        run() {
+        effect() {
           seen.push('B');
         },
       }),
@@ -222,8 +225,9 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
     name: source.name,
     triggers: [
       on(window, {
+        locked: true,
         id: 'install',
-        run(ctx) {
+        effect(ctx) {
           seen.push('A');
           if (!added) {
             added = true;
@@ -265,9 +269,10 @@ it.each([false, true])('等待 invoke 时卸载，重新登记为 %s 也不让�
     name: source.name,
     triggers: [
       on(window, {
+        locked: true,
         id: 'invoke',
         retain: () => true,
-        async run(ctx, { self }) {
+        async effect(ctx, _event, self) {
           at = ctx;
           old = self;
           accepted = await invoke(ctx, self, '是否发动派生技能？');
@@ -304,9 +309,10 @@ it('来源卸载不撤销已完成的宣告或费用；普通后续继续，新�
     name: source.name,
     triggers: [
       on(window, {
+        locked: true,
         id: 'paid',
         retain: () => true,
-        async run(ctx, { self }) {
+        async effect(ctx, _event, self) {
           expect(await invoke(ctx, self, '发动后继续？')).toBe(true);
           expect(
             (
@@ -574,9 +580,10 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     viewAs = [{ id: 'virtual', make: { name: 'standard:slash' } }];
     triggers = [
       on(window, {
+        locked: true,
         id: 'run',
         retain: () => true,
-        run(ctx) {
+        effect(ctx) {
           ctx.commit('probe.class', [], null);
         },
       }),
@@ -630,9 +637,10 @@ it('同一 Provider 对象重新登记不能复活旧候选，旧卸载函数也
     name: source.name,
     triggers: [
       on(window, {
+        locked: true,
         id: 'repeat',
         times: () => 3,
-        run(ctx, { occurrence }) {
+        effect(ctx, _event, _self, _value, occurrence) {
           seen.push(occurrence.index);
           if (!replaced) {
             replaced = true;
@@ -681,10 +689,11 @@ it.each(['registered', 'effective', 'available', 'retain'] as const)(
       name: source.name,
       triggers: [
         on(window, {
+          locked: true,
           id: 'sync-source',
           when: () => true,
           ...(kind === 'retain' ? { retain: invalid } : {}),
-          run() {
+          effect() {
             fired++;
           },
         }),

@@ -2,7 +2,7 @@ import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { card, cardGame } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { defineEffect, effectOn, draw } from '../../src/sdk';
+import { defineEffect, on, draw } from '../../src/sdk';
 import type { Context, EffectHandle, EffectBehavior, EffectRecord } from '../../src/sdk';
 
 interface Balance {
@@ -54,13 +54,11 @@ function setup(create: (self: EffectHandle<Balance>) => EffectBehavior) {
 }
 
 it('积筹在前组更新，兑现先结束效果，再按执行绑定快照实际摸牌', async () => {
-  expect(() => effectOn(redeem, { id: '', run: () => {} })).toThrow(
-    'Effect trigger requires an ID.',
-  );
+  expect(() => on(redeem, { id: '', effect: () => {} })).toThrow('Trigger requires an ID.');
   const game = setup((self) => ({
     triggers: [
-      effectOn(redeem, {
-        async run(ctx) {
+      on(redeem, {
+        async effect(ctx) {
           await self.end(ctx, 'redeemed');
           expect(self.current(ctx.world)).toBeNull();
           await draw(ctx, { player: 'b', count: self.data.count, reason: 'capacity:reward' });
@@ -102,9 +100,9 @@ it('绑定快照保持不变，显式当前值与结束结果用于按实际筹�
   const seen: number[] = [];
   const game = setup((self) => ({
     triggers: [
-      effectOn(redeem, {
+      on(redeem, {
         id: 'change-and-end',
-        async run(ctx) {
+        async effect(ctx) {
           const initial = self.current(ctx.world)!;
           seen.push(self.data.count);
           const updated = await self.update(ctx, { count: 12 });
@@ -134,9 +132,9 @@ it('嵌套同实例结算各保留本次绑定快照，内层结束不把外层�
   const seen: number[] = [];
   const game = setup((self) => ({
     triggers: [
-      effectOn(redeem, {
+      on(redeem, {
         id: 'outer',
-        async run(ctx: Context) {
+        async effect(ctx: Context) {
           await self.update(ctx, { count: 12 });
           expect(self.current(ctx.world)?.data.count).toBe(12);
           await ctx.window(nested, null);
@@ -144,9 +142,9 @@ it('嵌套同实例结算各保留本次绑定快照，内层结束不把外层�
           seen.push(self.data.count);
         },
       }),
-      effectOn(nested, {
+      on(nested, {
         id: 'inner',
-        async run(ctx) {
+        async effect(ctx) {
           const ended = await self.end(ctx, 'nested');
           expect(ended?.data.count).toBe(12);
           seen.push(self.data.count);

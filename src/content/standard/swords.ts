@@ -29,13 +29,12 @@ const doubleSwords = equipmentCard({
     name: '雌雄双股剑',
     triggers: [
       on(Target.specified, {
-        order: 'choose',
-        when: (ctx, { payload: { effect }, self }) =>
+        when: (ctx, { effect }, self) =>
           effect.actor === self.owner &&
           effect.state === 'targeting' &&
           effect.card.name === 'standard:slash' &&
           differentGender(ctx.world, self.owner, effect.target),
-        async run(ctx, { payload: { effect }, self }) {
+        async effect(ctx, { effect }, self) {
           const invoked = await invoke(
             ctx,
             self,
@@ -114,8 +113,7 @@ const iceSword = equipmentCard({
     name: '寒冰剑',
     triggers: [
       on(Damage.replacing, {
-        order: 'choose',
-        when: (ctx, { payload: draft, self }) =>
+        when: (ctx, draft, self) =>
           isDirectDamage(draft.input) &&
           draft.input.from === self.owner &&
           draft.input.card?.actor === self.owner &&
@@ -131,7 +129,7 @@ const iceSword = equipmentCard({
               reason: self.skill,
             }),
           ),
-        async run(ctx, { payload: draft, self }) {
+        async effect(ctx, draft, self) {
           const target = draft.input.to;
           const first = await chooseOwnedCard(ctx, {
             actor: self.owner,

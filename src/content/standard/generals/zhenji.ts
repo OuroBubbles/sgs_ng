@@ -7,7 +7,7 @@ import {
   judge,
   obtainJudgment,
   skill,
-  trigger,
+  on,
   Phase,
 } from '../../../sdk';
 
@@ -17,7 +17,7 @@ export const luoshen = skill({
   description:
     '准备阶段，你可以判定。若为黑色，你获得此判定牌，并可以继续判定，直到你停止或判定为非黑色。',
   triggers: [
-    trigger(Phase.started, {
+    on(Phase.started, {
       who: (phase) => phase.owner,
       when: (_ctx, phase) => phase.kind === 'prepare',
       ask: '是否发动【洛神】进行判定？',

@@ -5,7 +5,7 @@ import { covenant } from '../../examples/effects/covenant';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   defineEffect,
-  effectOn,
+  on,
   effectModify,
   defineQuery,
   withLifetime,
@@ -25,7 +25,6 @@ import type {
   EffectDefinition,
   EffectRecord,
   Lifetime,
-  EffectTriggerDefinition,
   EffectEnd,
   Trigger,
   TriggerOccurrence,
@@ -49,26 +48,13 @@ function create(
   const ended: string[] = [];
   const fired: string[] = [];
   let handle: EffectHandle<Data> | null = null;
-  class TickHandler implements EffectTriggerDefinition<null> {
-    #self: EffectHandle<Data>;
-    #limit = 1;
-
-    constructor(self: EffectHandle<Data>) {
-      this.#self = self;
-    }
-
-    times() {
-      return this.#limit;
-    }
-
-    when(ctx: Context) {
-      return this.#self.current(ctx.world) !== null;
-    }
-
-    run() {
-      fired.push(this.#self.id);
-    }
-  }
+  const tickHandler = (self: EffectHandle<Data>) => ({
+    times: () => 1,
+    when: (ctx: Context) => self.current(ctx.world) !== null,
+    effect: () => {
+      fired.push(self.id);
+    },
+  });
   class Definition implements EffectDefinition<Data> {
     id = 'probe:lasting';
     name = '持续效果';
@@ -84,7 +70,7 @@ function create(
       if (this.#options.behavior) return this.#options.behavior(self);
       return {
         modifiers: [effectModify(strength, () => self.data.amount)],
-        triggers: [effectOn(tick, new TickHandler(self))],
+        triggers: [on(tick, tickHandler(self))],
       };
     }
 
@@ -478,9 +464,9 @@ it('入场后更新数据，既有候选执行时读取最新值', async () => {
   const game = create({
     behavior: (self) => ({
       triggers: [
-        effectOn(tick, {
+        on(tick, {
           id: 'latest',
-          run() {
+          effect() {
             seen.push(self.data.amount);
           },
         }),
@@ -509,9 +495,9 @@ it('前组结束效果后，已收集的后组候选不再执行或收费', asyn
   const game = create({
     behavior: () => ({
       triggers: [
-        effectOn(tick, {
+        on(tick, {
           id: 'fee',
-          async run(ctx) {
+          async effect(ctx) {
             await pay(ctx, { actor: 'b', cards: [], to: 'discard', reason: 'effect:fee' });
             charged++;
           },
@@ -588,10 +574,10 @@ it('有限次数在入场时固定，逐次执行可读取更新数据，不从�
   const game = create({
     behavior: (self) => ({
       triggers: [
-        effectOn(tick, {
+        on(tick, {
           id: 'many',
           times: () => self.data.amount,
-          async run(ctx, { occurrence }) {
+          async effect(ctx, _event, _self, _value, occurrence) {
             seen.push(occurrence.index);
             if (occurrence.index === 1) await self.update(ctx, { amount: 7 });
           },
@@ -612,9 +598,9 @@ it('普通异步函数可以嵌套同类窗口，实例数据与每次事件身�
   const game = create({
     behavior: (self) => ({
       triggers: [
-        effectOn(tick, {
+        on(tick, {
           id: 'nested',
-          async run(ctx) {
+          async effect(ctx) {
             seen.push(self.data.amount);
             if (self.data.amount > 0) {
               await self.update(ctx, { amount: 0 });
@@ -760,9 +746,9 @@ it('普通工厂的分支移除触发后，已收集候选不再借旧回调执�
       triggers:
         self.data.amount > 0
           ? [
-              effectOn(tick, {
+              on(tick, {
                 id: 'conditional',
-                run() {
+                effect() {
                   fired++;
                 },
               }),
@@ -794,9 +780,9 @@ it('同一候选身份的工厂闭包按最新数据重绑，入场次数仍保�
       const amount = self.data.amount;
       return {
         triggers: [
-          effectOn(tick, {
+          on(tick, {
             id: 'closure',
-            run() {
+            effect() {
               seen.push(amount);
             },
           }),

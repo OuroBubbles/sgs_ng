@@ -248,10 +248,11 @@ it('角色预设技能在起手前授予，可由普通代码改写摸牌', asyn
     name: '准备',
     triggers: [
       on(Cards.drawing, {
+        locked: true,
         id: 'initial-hand',
-        when: (_ctx, { payload: draft, self }) =>
+        when: (_ctx, draft, self) =>
           draft.input.player === self.owner && draft.input.reason === 'match:initial-hand',
-        run: (_ctx, { payload: draft }) => draft.setCount(1, 'probe:setup'),
+        effect: (_ctx, draft) => draft.setCount(1, 'probe:setup'),
       }),
     ],
   });

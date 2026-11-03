@@ -1,13 +1,12 @@
 import {
   activeTarget,
   activeTurn,
-  effectOn,
+  on,
   general,
   isDirectDamage,
   readState,
   rulesOf,
   skill,
-  trigger,
   Cards,
   Damage,
 } from '../../../sdk';
@@ -28,8 +27,8 @@ export const luoyiAftereffect = {
     typeof (value as Partial<LuoyiData>).turn === 'string',
   create: (self) => ({
     triggers: [
-      effectOn(Damage.causing, {
-        when: (ctx, { payload: hit }) =>
+      on(Damage.causing, {
+        when: (ctx, hit) =>
           ctx.world.player(self.data.actor).alive &&
           readState(ctx.world, activeTurn, activeTarget)?.id === self.data.turn &&
           isDirectDamage(hit.input) &&
@@ -37,7 +36,7 @@ export const luoyiAftereffect = {
           hit.input.from === self.data.actor &&
           hit.input.card?.actor === self.data.actor &&
           ['standard:slash', 'standard:duel'].includes(hit.input.card?.card.name ?? ''),
-        run: (_ctx, { payload: hit }) => hit.adjust(1, 'standard:luoyi'),
+        effect: (_ctx, hit) => hit.adjust(1, 'standard:luoyi'),
       }),
     ],
   }),
@@ -49,7 +48,7 @@ export const luoyi = skill({
   description:
     '摸牌阶段，你可以少摸一张牌。若如此做，本回合你使用杀或决斗造成的伤害加 1。已发动的效果不因失去裸衣而消失。',
   triggers: [
-    trigger(Cards.drawing, {
+    on(Cards.drawing, {
       who: (draft) => draft.input.player,
       when: (_ctx, draft) => draft.phase?.kind === 'draw' && !!draft.phase.turn && draft.count > 0,
       ask: '是否发动【裸衣】少摸一张牌，本回合杀和决斗伤害加 1？',

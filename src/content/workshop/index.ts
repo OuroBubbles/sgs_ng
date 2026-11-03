@@ -91,10 +91,9 @@ export const hearing = {
   description: '当你使用锦囊牌时，你可以摸一张牌。',
   triggers: [
     on(Use.declared, {
-      order: 'choose',
-      when: (ctx, { payload: use, self }) =>
+      when: (ctx, use, self) =>
         use.actor === self.owner && rulesOf(ctx).definition(use.card.name).type === 'trick',
-      async run(ctx, { self }) {
+      async effect(ctx, _event, self) {
         const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
         if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
       },
@@ -113,10 +112,9 @@ export const relicJade = equipmentCard({
     description: '遗玉离开你的装备区后，你可以摸一张牌。不是装备时被弃置不会发动。',
     triggers: [
       on(Cards.moved, {
-        order: 'choose',
-        retain: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-        when: (ctx, { payload: moved, self }) => equipmentLost(ctx.world, moved, self),
-        async run(ctx, { self }) {
+        retain: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+        when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
+        async effect(ctx, _event, self) {
           const accepted = await invoke(ctx, self, '是否发动【玉碎】摸一张牌？');
           if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
