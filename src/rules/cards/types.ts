@@ -1,5 +1,5 @@
 import type { Card, WorldReader } from '../../core/model/state';
-import type { Decision, Validation } from '../../core/decisions/hub';
+import type { Validation } from '../../core/decisions/hub';
 import { normalizeChoiceCount } from '../../core/decisions/count';
 import type { ChoiceCount } from '../../core/decisions/count';
 import type { Context } from '../../core/runtime/room';
@@ -165,6 +165,9 @@ export interface UseIntent {
   /** 本次用牌明确禁止的反制牌名，不改变整种牌的定义。 */
   readonly prohibitedCounters?: readonly string[];
 }
+/** 声明了 use.victim 的牌：管线已校验 parameters.victim 为字符串。 */
+export const victimOf = (use: { readonly parameters?: unknown }): string =>
+  (use.parameters as { readonly victim: string } | undefined)?.victim as string;
 export interface UseRequest {
   readonly actor: string;
   readonly card: SemanticCard;
@@ -259,10 +262,6 @@ export interface CardUseInput {
 export interface CardTargetInput extends CardUseInput {
   readonly target: string;
 }
-export interface CardSelectionInput {
-  readonly intent: UseIntent;
-  readonly book: CardBook;
-}
 export interface CardFixedTargetsInput {
   readonly actor: string;
   readonly card: SemanticCard;
@@ -285,11 +284,8 @@ export interface UseRules {
   readonly usage?: { readonly key: string; readonly max: number };
   readonly canUse?: (ctx: Context, input: CardUseInput) => string | null;
   readonly target: (ctx: Context, input: CardTargetInput) => boolean;
-  /** 已知选择在同一草稿内完成；纯同步地把 cards/targets 转为真实目标与参数，管线再完整校验。 */
-  readonly selection?: (
-    ctx: Context,
-    input: CardSelectionInput,
-  ) => Decision<Pick<UseIntent, 'targets' | 'parameters'>>;
+  /** 附属目标（如借刀杀人的杀目标）：玩家最后选出的一名角色记入 parameters.victim，用 victimOf 读取。 */
+  readonly victim?: { readonly prompt: string };
   /** 宣告前的附属选择：返回已验证的普通参数；统一管线再做最终校验；取消不支付、不开放用牌窗口。 */
   readonly prepare?: (
     ctx: Context,

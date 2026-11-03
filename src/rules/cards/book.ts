@@ -36,7 +36,7 @@ import type {
   ViewAsInput,
   viewAs,
 } from './types';
-import { ownedCards, timingSnapshot, colorOfSuit, isResponseBlocked } from './types';
+import { ownedCards, victimOf, timingSnapshot, colorOfSuit, isResponseBlocked } from './types';
 import { physicalCardFace } from './face';
 import type { PhysicalCardFace } from './face';
 import { isGameOver } from '../game/end';
@@ -368,53 +368,64 @@ export class CardBook {
       const intent: UseIntent = { ...input, targets: [] };
       const built = this.#build(ctx, intent.actor, intent.choice, 'use');
       const rules = built.ok ? this.definition(built.value.name).use : undefined;
-      if (rules?.selection) {
-        const selection = rules.selection(ctx, { intent, book: this });
-        // 选择可由普通对象或原型方法实现；固定入口，不用展开对象丢失其声明。
-        const { available, describe, feedback, validate } = selection;
-        return {
-          player: selection.player,
-          kind: selection.kind,
-          prompt: selection.prompt,
-          optional: selection.optional,
-          ...(describe === undefined
-            ? { data: selection.data }
-            : { describe: () => ctx.query(() => describe.call(selection)) }),
-          ...(available === undefined
-            ? {}
-            : { available: () => ctx.query(() => available.call(selection)) }),
-          feedback: (raw) => ctx.query(() => feedback?.call(selection, raw)),
-          validate: (raw) =>
-            ctx.query(() => {
-              // 出牌草稿也直接调用 validate，不能依赖 DecisionHub 代查可用性。
-              if (available && !available.call(selection))
-                return invalid('Card selection is no longer available.');
-              const chosen = validate.call(selection, raw);
-              if (!chosen.ok) return chosen;
-              const legal = this.validateUse(ctx, { ...intent, ...chosen.value });
-              return legal.ok ? chosen : legal;
-            }),
-        };
-      }
-      const parse = (raw: unknown): Validation<Pick<UseIntent, 'targets' | 'parameters'>> => {
-        if (!raw || typeof raw !== 'object' || !('targets' in raw) || !isStringArray(raw.targets))
-          return invalid('Expected target IDs.');
-        return { ok: true, value: { targets: raw.targets } };
-      };
+      const victim = rules?.victim;
+      // 附属目标是最后选出的一名角色：记入 parameters.victim，不进入效果目标。
+      const split = (targets: readonly string[]): Pick<UseIntent, 'targets' | 'parameters'> =>
+        victim
+          ? { targets: targets.slice(0, -1), parameters: { victim: targets.at(-1) } }
+          : { targets };
+      const parse = (raw: unknown): Validation<readonly string[]> =>
+        !raw || typeof raw !== 'object' || !('targets' in raw) || !isStringArray(raw.targets)
+          ? invalid('Expected target IDs.')
+          : { ok: true, value: raw.targets };
+      const check = (targets: readonly string[]) =>
+        victim && targets.length < 2
+          ? invalid('Illegal target.')
+          : this.validateUse(ctx, { ...intent, ...split(targets) });
       return {
         player: intent.actor,
         kind: 'cards-targets',
-        prompt: '选择用牌目标',
+        prompt: victim?.prompt ?? '选择用牌目标',
         optional: true,
         feedback: (raw) => {
           const parsed = parse(raw);
-          return parsed.ok ? this.inspectUse(ctx, { ...intent, ...parsed.value }) : null;
+          if (!parsed.ok) return null;
+          if (!victim) return this.inspectUse(ctx, { ...intent, targets: parsed.value });
+          const targets = parsed.value;
+          const complete = (next: readonly string[]) => check(next).ok;
+          const reachable = (next: readonly string[]) =>
+            complete(next) ||
+            ctx.world.snapshot.players.some(
+              (player) =>
+                player.alive && !next.includes(player.id) && complete([...next, player.id]),
+            );
+          const done = check(targets);
+          const valid = !targets.length || reachable(targets);
+          return immutable({
+            model: 'use',
+            complete: done.ok,
+            reason: done.ok ? '' : done.reason,
+            prompt: victim.prompt,
+            targetCount: {
+              min: valid && !done.ok ? Math.max(2, targets.length + 1) : 2,
+              max: 'all',
+            },
+            fixedTargets: [],
+            targets: ctx.world.snapshot.players.map((player) => {
+              const selected = targets.includes(player.id);
+              return {
+                id: player.id,
+                selected,
+                selectable: selected || (player.alive && reachable([...targets, player.id])),
+              };
+            }),
+          });
         },
         validate: (raw) => {
           const parsed = parse(raw);
           if (!parsed.ok) return parsed;
-          const legal = this.validateUse(ctx, { ...intent, ...parsed.value });
-          return legal.ok ? parsed : legal;
+          const legal = check(parsed.value);
+          return legal.ok ? { ok: true, value: split(parsed.value) } : legal;
         },
       };
     });
@@ -485,6 +496,7 @@ export class CardBook {
       if (!rules) return invalid('This card cannot be actively used.');
       if (rules.timings && !rules.timings.includes(intent.timing.kind))
         return invalid('Card is unavailable at this timing.');
+      if (rules.victim && typeof victimOf(request) !== 'string') return invalid('Missing victim.');
       if (rules.fixedTargets) {
         if (intent.targets.length)
           return invalid('Fixed-target cards do not accept manual targets.');

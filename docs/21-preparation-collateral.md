@@ -6,7 +6,7 @@
 
 借刀选择持武器者 A 和受害者 B，但只有 A 是锦囊目标。B 是随后杀的指定目标，不单独产生一份借刀效果、无懈机会或借刀目标禁止检查。
 
-出牌阶段用 `book.useSelection` 解释玩家草稿。牌定义可提供纯同步的 `UseRules.selection`，复用普通 Decision / JointSelection，将有序选择转换为真正目标和附属参数：
+出牌阶段用 `book.useSelection` 解释玩家草稿。牌定义声明 `use.victim: { prompt }` 即表示需要一名附属目标：默认选择模型把最后选出的角色记入 `parameters.victim`，其余为真正目标，再走完整 `validateUse`；牌定义用 `victimOf(request | use)` 读取。不再有自定义 `UseRules.selection` 入口：
 
 ```text
 选择牌、持械者与出杀目标（同一草稿）
@@ -18,9 +18,9 @@
 
 ## 作者接口
 
-`UseIntent.parameters?: unknown` 允许规则调用者预填选项；输入在流程开始时复制。普通主动用牌回复仍是 choice / targets，不能直接透传附属参数；selection 把草稿映射为 `{ targets, parameters? }`。阶段句柄、actor 和 timing 留在主持流程，不进入选择回复。
+`UseIntent.parameters?: unknown` 允许规则调用者预填选项；输入在流程开始时复制。普通主动用牌回复仍是 choice / targets，不能直接透传附属参数；默认选择把草稿映射为 `{ targets, parameters: { victim } }`。阶段句柄、actor 和 timing 留在主持流程，不进入选择回复。
 
-selection 的工厂、反馈与验证必须同步、只读；返回的 Decision 可以使用普通对象、原型方法和私有字段。适配入口保留声明字段、原方法与接收者，动态可用性仍逐次读取；出牌草稿直接调用 validate 时也先检查 available，再映射选择并通过统一 `validateUse` 完整检查。执行和支付前仍再次重查。借刀的纯映射不需要挂起流程；规则代码直接调用 `book.use` 时必须提供完整 victim。
+部分反馈逐个候选向前探测一步（加入该角色后能否再补一名角色完成），只读；执行和支付前仍再次重查。声明了 victim 的牌，`validateUse` 要求 `parameters.victim` 为字符串。借刀的纯映射不需要挂起流程；规则代码直接调用 `book.use` 时必须提供完整 victim。
 
 需要在宣告前执行异步准备的其他牌，仍可使用：
 
@@ -55,4 +55,4 @@ prepare 应用于选择与参数整理。它是普通受管理流程，不是可
 - [浏览器场景](../tests/browser/client.spec.ts)：桌面和触屏从正常开局验证取消、交武器、完整出杀三条路径。日志区分用牌、实际出杀与武器获得。
 - [原生验证](../scripts/smoke-native.mjs) 检查借刀一次提交和武器转移。当前最终报告与平台界限见 [STATUS](STATUS.md)。
 
-selection 只转换选择，prepare 仍是普通受管理流程；两者都不是任意参数表单、事务或暂停调用栈存档。
+victim 只转换选择，prepare 仍是普通受管理流程；两者都不是任意参数表单、事务或暂停调用栈存档。

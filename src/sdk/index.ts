@@ -198,6 +198,7 @@ export type {
 } from '../rules/cards/book';
 export {
   ownedCards,
+  victimOf,
   viewAs,
   effectReference,
   isResponseBlocked,
@@ -236,7 +237,6 @@ export type {
   UseRules,
   CardUseInput,
   CardTargetInput,
-  CardSelectionInput,
   CardFixedTargetsInput,
   CardEffectInput,
   CardExecuteInput,

@@ -24,7 +24,7 @@ physical 选择必须是本人的手牌；viewAs 从当前有效技能实例的�
 
 ## 一次用牌
 
-卡牌 `use` 回调统一采用显式 `ctx` 与具名输入，按需解构：`canUse/prepare(ctx, { request, book })`、`target(ctx, { request, target, book })`、`selection(ctx, { intent, book })`、`fixedTargets(ctx, { actor, card, book })`、`canResolve/resolve(ctx, { effect, book })`、`execute(ctx, { use, book, resolveTargets })`。共享函数或类方法可标注 SDK 导出的对应 `Card*Input` 类型。目录仍是本局同一 CardBook，不存在隐式当前牌或当前目标。
+卡牌 `use` 回调统一采用显式 `ctx` 与具名输入，按需解构：`canUse/prepare(ctx, { request, book })`、`target(ctx, { request, target, book })`、`fixedTargets(ctx, { actor, card, book })`、`canResolve/resolve(ctx, { effect, book })`、`execute(ctx, { use, book, resolveTargets })`。共享函数或类方法可标注 SDK 导出的对应 `Card*Input` 类型。目录仍是本局同一 CardBook，不存在隐式当前牌或当前目标。
 
 `resolveTargets(ctx, resolver?)` 仍是整牌函数可调用一次的普通函数；局部 resolver 同样接收 `(ctx, { effect, book })`。整牌资源可以由普通闭包共享，查询必须同步，prepare 与执行后效可以等待。execute 的普通数据返回值保存在本次 UseSnapshot.outcome 中，undefined 按 null 处理；逐目标 resolver 的返回值被忽略。两者的返回值都不替代目标状态或中止语义。
 
@@ -42,7 +42,7 @@ physical 选择必须是本人的手牌；viewAs 从当前有效技能实例的�
   → 只清理本次处理区余牌
 ```
 
-玩家已知的附属选择通过纯同步 `UseRules.selection` 合并到出牌草稿；`book.useSelection` 将其映射为真实目标与参数，再复用完整校验。宣告前异步准备、附属参数和借刀的真实目标见 [21 · 准备与借刀](21-preparation-collateral.md)。
+附属目标通过 `use.victim` 声明，由默认选择模型合并到出牌草稿；`book.useSelection` 将其映射为真实目标与 `parameters.victim`，再复用完整校验。宣告前异步准备、附属参数和借刀的真实目标见 [21 · 准备与借刀](21-preparation-collateral.md)。
 
 UseId 来自本局稳定 FlowId，每个目标有独立 EffectId。初始目标按来源座次顺序执行。增删、转移和重复通过方法完成；添加目标不隐式重跑已经结算的目标。转移取消旧效果、创建新身份，并记录 fromEffectId；明确再次结算才调用 repeatTarget。
 
