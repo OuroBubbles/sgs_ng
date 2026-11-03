@@ -36,6 +36,8 @@ import { readState } from './state/state';
 import { activeTarget, activeTurn } from './turn/state';
 import type { PhaseView } from './turn/turn';
 import { Judgment } from './cards/judge';
+import { isDirectDamage } from './combat/damage';
+import type { DamageDraft } from './combat/damage';
 
 export type Areas = readonly Zone['kind'][];
 /** 手牌与装备区。 */
@@ -393,6 +395,19 @@ export function convert(
     make: { name: spec.as },
   };
 }
+
+// ───────────────────────── 伤害时点的共同前提
+
+/** 伤害由 actor 使用的某张指定牌直接造成且尚未防止（杀、决斗类加伤或替换效果的共同前提）。 */
+export const dealtWith = (draft: DamageDraft, actor: string, ...names: string[]) =>
+  isDirectDamage(draft.input) &&
+  !draft.prevented &&
+  draft.input.from === actor &&
+  draft.input.card?.actor === actor &&
+  names.includes(draft.input.card.card.name);
+/** 伤害仍将造成：未防止、数值为正且受伤角色存活；宣告与效果前重查用。 */
+export const landing = (ctx: Context, draft: DamageDraft) =>
+  !draft.prevented && draft.amount > 0 && ctx.world.player(draft.input.to).alive;
 
 // ───────────────────────── 技能与武将
 

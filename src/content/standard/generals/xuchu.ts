@@ -3,7 +3,7 @@ import {
   activeTurn,
   on,
   general,
-  isDirectDamage,
+  dealtWith,
   readState,
   rulesOf,
   skill,
@@ -24,11 +24,7 @@ export const luoyiAftereffect = defineEffect({
         when: (ctx, hit) =>
           ctx.world.player(self.data.actor).alive &&
           readState(ctx.world, activeTurn, activeTarget)?.id === self.data.turn &&
-          isDirectDamage(hit.input) &&
-          !hit.prevented &&
-          hit.input.from === self.data.actor &&
-          hit.input.card?.actor === self.data.actor &&
-          ['standard:slash', 'standard:duel'].includes(hit.input.card?.card.name ?? ''),
+          dealtWith(hit, self.data.actor, 'standard:slash', 'standard:duel'),
         effect: (_ctx, hit) => hit.adjust(1, 'standard:luoyi'),
       }),
     ],

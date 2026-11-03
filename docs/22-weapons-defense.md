@@ -51,6 +51,8 @@ equipment(
 );
 ```
 
+伤害时点的共同前提由作者层给出：`dealtWith(draft, actor, ...names)` 表示由该角色使用的指定牌直接造成且未防止（麒麟弓、寒冰剑、裸衣），`landing(ctx, draft)` 表示仍将造成伤害，用于宣告与效果前重查。
+
 CardBook 从权威装备位置派生角色绑定；没有模块级可变 book，也没有新增 World 中的授予副本。
 
 `SkillHandle.name` 是定义派生的显示名。技能发动的费用宣告携带可读 label，客户端不再把实现 ID 当成名称。贯石斧、麒麟弓的可选选择显示“不发动”；作者层 `select(..., { cancel })` 指定取消文字；`selection(ctx, …)` 的牌候选直接返回 ID，标签统一取印刷名。

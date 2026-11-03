@@ -4,7 +4,8 @@ import {
   draw,
   equipment,
   isGameOver,
-  isDirectDamage,
+  dealtWith,
+  landing,
   discardCards,
   on,
   ownedCards,
@@ -68,13 +69,8 @@ const iceSword = equipment(
   { weapon: 2 },
   on(Damage.replacing, {
     when: (ctx, draft, self) =>
-      isDirectDamage(draft.input) &&
-      draft.input.from === self.owner &&
-      draft.input.card?.actor === self.owner &&
-      draft.input.card.card.name === 'standard:slash' &&
-      !draft.prevented &&
-      draft.amount > 0 &&
-      ctx.world.player(draft.input.to).alive &&
+      dealtWith(draft, self.owner, 'standard:slash') &&
+      landing(ctx, draft) &&
       ownedCards(ctx.world, draft.input.to, ['hand', 'equipment']).some((card) =>
         rulesOf(ctx).canDiscard(ctx, {
           actor: self.owner,
@@ -97,9 +93,7 @@ const iceSword = equipment(
     },
     declare: (_ctx, draft, self, first) => ({
       legal: (at) =>
-        !draft.prevented &&
-        draft.amount > 0 &&
-        at.world.player(draft.input.to).alive &&
+        landing(at, draft) &&
         at.world.position(first.card) === first.from &&
         rulesOf(at).canDiscard(at, {
           actor: self.owner,
@@ -110,7 +104,7 @@ const iceSword = equipment(
     }),
     async effect(ctx, draft, self, first) {
       const target = draft.input.to;
-      if (draft.prevented || draft.amount < 1 || !ctx.world.player(target).alive) return;
+      if (!landing(ctx, draft)) return;
       draft.prevent(self.skill);
       ctx.commit(Weapon.damageReplaced, [], {
         actor: self.owner,

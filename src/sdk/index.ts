@@ -93,6 +93,8 @@ export {
   convert,
   skill,
   equipment,
+  dealtWith,
+  landing,
   general,
 } from '../rules/author';
 export type {

@@ -2,7 +2,8 @@ import {
   cardQueries,
   equipment,
   equipmentInSlot,
-  isDirectDamage,
+  dealtWith,
+  landing,
   modify,
   discardCards,
   on,
@@ -17,7 +18,7 @@ import {
   discardable,
   HE,
 } from '../../sdk';
-import type { CardDefinition, Context, SkillHandle } from '../../sdk';
+import type { CardDefinition, Context, DefenseDraft, SkillHandle } from '../../sdk';
 
 export const Weapon = defineEvent('weapon', {
   followUp: timing<
@@ -40,6 +41,16 @@ export const Weapon = defineEvent('weapon', {
   >(),
 });
 
+/** 青龙刀与贯石斧共同的时机：自己的杀被闪抵消、尚未被突破且目标存活。 */
+function slashDefended(ctx: Context, draft: DefenseDraft, self: SkillHandle): boolean {
+  return (
+    !draft.broken &&
+    draft.effect.card.name === 'standard:slash' &&
+    draft.effect.actor === self.owner &&
+    ctx.world.player(draft.effect.target).alive
+  );
+}
+
 function axeMaterials(ctx: Context, self: SkillHandle): readonly string[] {
   return discardable(ctx, self.owner, self.skill, HE).filter((id) => id !== self.origin?.id);
 }
@@ -49,11 +60,7 @@ const blade = equipment(
   '青龙偃月刀',
   { weapon: 3 },
   on(Attack.defended, {
-    when: (ctx, draft, self) =>
-      !draft.broken &&
-      draft.effect.card.name === 'standard:slash' &&
-      draft.effect.actor === self.owner &&
-      ctx.world.player(draft.effect.target).alive,
+    when: slashDefended,
     async effect(ctx, draft, self) {
       const used = await rulesOf(ctx).askUse(ctx, {
         actor: self.owner,
@@ -81,11 +88,7 @@ const axe = equipment(
   { weapon: 3 },
   on(Attack.defended, {
     when: (ctx, draft, self) =>
-      !draft.broken &&
-      draft.effect.actor === self.owner &&
-      draft.effect.card.name === 'standard:slash' &&
-      ctx.world.player(draft.effect.target).alive &&
-      axeMaterials(ctx, self).length >= 2,
+      slashDefended(ctx, draft, self) && axeMaterials(ctx, self).length >= 2,
     cost: (ctx, _draft, self) =>
       select(
         ctx,
@@ -128,13 +131,8 @@ const kylinBow = equipment(
   { weapon: 5 },
   on(Damage.causing, {
     when: (ctx, draft, self) =>
-      isDirectDamage(draft.input) &&
-      draft.input.from === self.owner &&
-      draft.input.card?.actor === self.owner &&
-      draft.input.card.card.name === 'standard:slash' &&
-      !draft.prevented &&
-      draft.amount > 0 &&
-      ctx.world.player(draft.input.to).alive &&
+      dealtWith(draft, self.owner, 'standard:slash') &&
+      landing(ctx, draft) &&
       horses(ctx, self.owner, draft.input.to).length > 0,
     cost: (ctx, draft, self) =>
       select(
@@ -150,10 +148,7 @@ const kylinBow = equipment(
     declare: (_ctx, draft, self, picked) => ({
       data: { card: picked.cards[0], target: draft.input.to },
       legal: (at) =>
-        !draft.prevented &&
-        draft.amount > 0 &&
-        at.world.player(draft.input.to).alive &&
-        horses(at, self.owner, draft.input.to).includes(picked.cards[0]!),
+        landing(at, draft) && horses(at, self.owner, draft.input.to).includes(picked.cards[0]!),
     }),
     async effect(ctx, draft, self, picked) {
       const [target, card] = [draft.input.to, picked.cards[0]!];
