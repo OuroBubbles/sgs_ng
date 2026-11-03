@@ -94,7 +94,7 @@ export const fankui = skill({
           ownedCards(ctx.world, source, areas(source, self)).length > 0
         );
       },
-      // 先选牌，确认即发动；宣告后效若已移走所选牌则不再追取。
+      // 先选牌，确认即发动；takeCard 只取仍在原位的所选牌。
       async cost(ctx, hit, self) {
         const source = hit.input.from!;
         const chosen = await chooseOwnedCard(ctx, {
@@ -107,8 +107,6 @@ export const fankui = skill({
         });
         return chosen.kind === 'chosen' ? chosen : null;
       },
-      keep: (ctx, hit, _self, chosen) =>
-        alive(ctx, hit.input.from!) && ctx.world.position(chosen!.card) === chosen!.from,
       effect: (ctx, hit, self, { card, from }) =>
         takeCard(ctx, {
           actor: self.owner,

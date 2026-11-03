@@ -336,13 +336,15 @@ function publicHistory(
           message += `，令其对 ${text(record(declaration.parameters).victim)} 使用杀`;
         break;
       }
-      case 'collateral.weapon-taken':
-        message = `${text(detail.actor)}因【借刀杀人】获得 ${text(detail.holder)} 的${strings(
-          detail.cards,
+      case 'collateral.weapon-taken': {
+        const taken = record(detail.declaration);
+        message = `${text(taken.actor)}因【借刀杀人】获得 ${text(taken.holder)} 的${strings(
+          taken.cards,
         )
           .map((id) => `【${printedCardView(match, id).name}】`)
           .join('、')}`;
         break;
+      }
       case 'skill.invoked': {
         const voice = skillVoice(text(detail.actor), text(detail.skill), fact.seq);
         if (voice) audio = { voice };

@@ -1,19 +1,13 @@
-import { JointSelection, equipmentInSlot, isGameOver, moveCards } from '../../sdk';
+import { JointSelection, defineEvent, equipmentInSlot, obtain, timing } from '../../sdk';
 import type { CardBook, CardDefinition, CardChoice, Context, UseRequest } from '../../sdk';
-import { defineEvent } from '../../sdk';
-import { timing } from '../../sdk';
 
 export const Collateral = defineEvent('collateral', {
   weaponTaken: timing<unknown>(),
 });
 
 function victimOf(input: unknown): string | null {
-  return input !== null &&
-    typeof input === 'object' &&
-    'victim' in input &&
-    typeof input.victim === 'string'
-    ? input.victim
-    : null;
+  const victim = (input as { victim?: unknown } | null | undefined)?.victim;
+  return typeof victim === 'string' ? victim : null;
 }
 
 /** 只探测结构上的杀目标；不要求此刻持有杀。实际用牌仍按所选牌面完整重查。 */
@@ -111,29 +105,12 @@ export const collateral: CardDefinition = {
           prompt: `借刀杀人：对 ${victim} 使用杀，否则将武器交给 ${effect.actor}`,
         });
 
-        if (
-          result.kind === 'used' ||
-          isGameOver(at.world) ||
-          !at.world.player(effect.actor).alive ||
-          !at.world.player(effect.target).alive
-        )
-          return;
+        if (result.kind === 'used' || !at.world.player(effect.target).alive) return;
         // 取结算此刻的武器；旧武器可能已经离场，新武器也可能来自更早的后效。
         const weapons = equipmentInSlot(at.world, book, effect.target, 'weapon');
-        if (!weapons.length) return;
-        const moves = weapons.map((id) => ({
-          cards: [id],
-          from: at.world.position(id),
-          to: `${effect.actor}:hand`,
-          place: 'bottom' as const,
-        }));
-        await moveCards(at, moves, 'standard:collateral');
-
-        at.commit(Collateral.weaponTaken, [], {
-          actor: effect.actor,
-          holder: effect.target,
-          victim,
-          cards: weapons,
+        await obtain(at, effect.actor, weapons, 'standard:collateral', {
+          kind: Collateral.weaponTaken,
+          data: { actor: effect.actor, holder: effect.target, victim, cards: weapons },
         });
       });
     },
