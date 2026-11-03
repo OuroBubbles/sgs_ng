@@ -9,22 +9,15 @@ import {
   skill,
   Cards,
   Damage,
+  defineEffect,
 } from '../../../sdk';
-import type { EffectDefinition } from '../../../sdk';
 
-interface LuoyiData {
-  readonly actor: string;
-  readonly turn: string;
-}
-/** 裸衣的本回合加伤：独立于技能存在，失去裸衣不会移除。 */
-export const luoyiAftereffect = {
+/** 裸衣的本回合加伤：独立于技能存在，失去裸衣不会移除；同一角色/回合只保留一份。 */
+export const luoyiAftereffect = defineEffect({
   id: 'standard:luoyi-effect',
   name: '裸衣',
-  accepts: (value): value is LuoyiData =>
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as Partial<LuoyiData>).actor === 'string' &&
-    typeof (value as Partial<LuoyiData>).turn === 'string',
+  data: { actor: '', turn: '' },
+  key: (data) => `${data.actor}/${data.turn}`,
   create: (self) => ({
     triggers: [
       on(Damage.causing, {
@@ -40,7 +33,7 @@ export const luoyiAftereffect = {
       }),
     ],
   }),
-} satisfies EffectDefinition<LuoyiData>;
+});
 
 export const luoyi = skill({
   id: 'standard:luoyi',
@@ -53,21 +46,15 @@ export const luoyi = skill({
       when: (_ctx, draft) => draft.phase?.kind === 'draw' && !!draft.phase.turn && draft.count > 0,
       ask: '是否发动【裸衣】少摸一张牌，本回合杀和决斗伤害加 1？',
       keep: (_ctx, draft) => draft.count > 0 && !draft.phase!.turn!.ended,
-      // 重复摸牌阶段可以再次少摸，但同一角色/回合只保留一份伤害加成。
       async declare(ctx, draft, self) {
         const turn = draft.phase!.turn!;
-        const effects = rulesOf(ctx).effects;
-        const existing = effects
-          .instances(ctx.world, luoyiAftereffect)
-          .find((entry) => entry.data.actor === self.owner && entry.data.turn === turn.id);
-        if (existing) return { data: { effect: existing } };
-        const prepared = await effects.prepare(ctx, luoyiAftereffect, {
+        const { record, changes } = await rulesOf(ctx).effects.prepare(ctx, luoyiAftereffect, {
           owner: self.owner,
           lifetime: turn.lifetime,
           origin: { actor: self.owner, skill: self.skill, instance: self.id },
           data: { actor: self.owner, turn: turn.id },
         });
-        return { data: { effect: prepared.record }, changes: [prepared.change] };
+        return { data: { effect: record }, changes };
       },
       effect: (_ctx, draft, self) => draft.setCount(Math.max(0, draft.count - 1), self.skill),
     }),

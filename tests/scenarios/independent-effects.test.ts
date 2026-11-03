@@ -121,7 +121,7 @@ it.each(['prepare', 'add', 'update'] as const)(
         const input = { owner: 'a', origin: data, data };
         if (mode === 'prepare') {
           const prepared = await game.book.effects.prepare(ctx, definition, input);
-          ctx.commit(testTiming('snapshot.prepared'), [prepared.change], prepared.record);
+          ctx.commit(testTiming('snapshot.prepared'), prepared.changes, prepared.record);
           record = prepared.record;
         } else record = await game.book.effects.add(ctx, definition, input);
         expect(record.origin).toBe(record.data);
@@ -330,7 +330,7 @@ it('实例声明可与费用同次提交，支付后效立即看到效果，未�
           to: 'discard',
           reason: 'probe:effect',
           legal: () => false,
-          changes: [prepared.change],
+          changes: prepared.changes,
         })
       ).kind,
     ).toBe('unavailable');
@@ -342,7 +342,7 @@ it('实例声明可与费用同次提交，支付后效立即看到效果，未�
           cards: [],
           to: 'discard',
           reason: 'probe:effect',
-          changes: [prepared.change],
+          changes: prepared.changes,
           declaration: { effect: prepared.record },
         })
       ).kind,

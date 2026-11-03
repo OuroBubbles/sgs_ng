@@ -47,8 +47,11 @@ export interface EffectBehavior {
 interface EffectDeclaration<Data> {
   readonly id: string;
   readonly name: string;
-  /** 新增、更新与读取存量数据都必须同步校验。 */
-  readonly accepts: (data: unknown) => data is Data;
+  /** 数据示例：新增、更新与读取存量数据都按其形状同步校验，除非另给 accepts。 */
+  readonly data?: Data;
+  readonly accepts?: (data: unknown) => data is Data;
+  /** 同键实例已存在时，prepare/add 复用它而不新增。 */
+  key?(data: DeepReadonly<Data>): string;
   /** 在纯收集/查询中以普通闭包绑定实例；条件和分支不需要配置模板。 */
   create(self: EffectHandle<Data>): EffectBehavior;
   /** 状态已结束、通用结束窗口已完成后的普通后续，不恢复效果资格。 */
@@ -63,8 +66,8 @@ export interface EffectInput<Data> {
 }
 export interface PreparedEffect<Data> {
   readonly record: EffectRecord<Data>;
-  /** 可与费用/宣告一起提交；调用方仍负责自己的最终资格检查。 */
-  readonly change: Extract<Change, { kind: 'setState' }>;
+  /** 可与费用/宣告一起提交；复用同键实例时为空。调用方仍负责自己的最终资格检查。 */
+  readonly changes: readonly Extract<Change, { kind: 'setState' }>[];
 }
 export interface EffectEnd<Data = unknown> {
   readonly before: EffectRecord<Data>;
@@ -80,11 +83,21 @@ export const Effect = defineEvent('effect', {
   removed: timing<unknown>(),
 });
 
+/** 与示例同形：同名字段的基本类型一致，嵌套对象逐层比较。 */
+function like(value: unknown, model: unknown): boolean {
+  if (model === null || typeof model !== 'object') return typeof value === typeof model;
+  if (value === null || typeof value !== 'object') return false;
+  if (Array.isArray(model)) return Array.isArray(value);
+  return Object.entries(model).every(([key, field]) => like(Reflect.get(value, key), field));
+}
+const accepts = (definition: EffectDefinition, data: unknown): boolean =>
+  definition.accepts ? definition.accepts(data) : like(data, definition.data);
+
 /** 校验后直接使用声明本身：不复制、不冻结、不绑定方法。 */
 export function defineEffect<Data>(definition: EffectDefinition<Data>): EffectDefinition<Data> {
-  const { id, name, accepts, create } = definition;
-  if (!id.trim() || !name.trim() || typeof accepts !== 'function' || typeof create !== 'function')
-    throw new Error('Effect requires an ID, name, data validator and ordinary behavior factory.');
+  const { id, name, data, create } = definition;
+  if (!id.trim() || !name.trim() || !(definition.accepts || data) || typeof create !== 'function')
+    throw new Error('Effect requires an ID, name, data shape and ordinary behavior factory.');
   return definition;
 }
 
@@ -148,7 +161,7 @@ export class EffectBook implements TriggerSource {
       )
     )
       throw new Error('Invalid stored effect record.');
-    if (!this.#definition(record.type).accepts(record.data))
+    if (!accepts(this.#definition(record.type), record.data))
       throw new Error(`Invalid effect data: ${record.type}`);
     return record;
   }
@@ -219,23 +232,29 @@ export class EffectBook implements TriggerSource {
         data: input.data,
       }),
     );
-    if (!ctx.query(() => registered.accepts(record.data)))
+    if (!ctx.query(() => accepts(registered, record.data)))
       throw new Error('Effect definition or data does not match the registered declaration.');
     if (record.owner !== null) ctx.world.player(record.owner);
     assertLifetime(ctx, lifetime);
+    const { key } = definition;
+    const same =
+      key && this.instances(ctx.world, definition).find((r) => key(r.data) === key(record.data));
+    if (same) return Object.freeze({ record: same, changes: [] });
     return Object.freeze({
       record,
-      change: immutable({
-        kind: 'setState' as const,
-        state: {
-          id: record.id,
-          key: stateKey,
-          owner: null,
-          source: definition.id,
-          scopeId: record.scopeId,
-          value: record,
-        },
-      }),
+      changes: [
+        immutable({
+          kind: 'setState' as const,
+          state: {
+            id: record.id,
+            key: stateKey,
+            owner: null,
+            source: definition.id,
+            scopeId: record.scopeId,
+            value: record,
+          },
+        }),
+      ],
     });
   }
 
@@ -253,7 +272,8 @@ export class EffectBook implements TriggerSource {
   ): Promise<EffectRecord<Data>> {
     return ctx.flow('effect.add', async (at) => {
       const prepared = this.#prepare(at, definition, input);
-      at.commit(Effect.added, [prepared.change], prepared.record);
+      if (!prepared.changes.length) return prepared.record;
+      at.commit(Effect.added, prepared.changes, prepared.record);
       await at.window(
         Effect.added,
         prepared.record,
@@ -270,7 +290,7 @@ export class EffectBook implements TriggerSource {
       if (entry?.key !== stateKey || isGameOver(at.world)) return null;
       const before = this.#record(at.world, entry);
       const after = at.query(() => immutable({ ...before, data })) as EffectRecord<Data>;
-      if (!at.query(() => this.#definition(before.type).accepts(after.data)))
+      if (!at.query(() => accepts(this.#definition(before.type), after.data)))
         throw new Error('Invalid updated effect data.');
       at.commit(Effect.changed, [{ kind: 'setState', state: { ...entry, value: after } }], {
         before,

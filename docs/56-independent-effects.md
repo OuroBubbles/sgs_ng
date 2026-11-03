@@ -23,7 +23,7 @@ EffectHandle.current(world) 返回当前挂接中的实例记录；实例结束�
 
 ## 定义和使用
 
-独立效果直接用普通对象声明 id、name、纯 accepts、普通 create 函数和可选 onEnd，使用 `satisfies EffectDefinition<Data>` 获得类型提示。createContent / EffectBook.register 固定声明并保留原接收者；需要主动提前规范化时仍可使用 defineEffect。
+独立效果用 `defineEffect({ id, name, data, key?, create, onEnd? })` 声明：`data` 是数据示例，新增、更新与读取存量记录都按其形状（同名字段同类型，嵌套对象逐层）校验；形状不足以表达约束时另给纯 `accepts`。给出 `key` 时，prepare / add 遇到同键的现存实例直接复用，prepare 的 `changes` 为空、add 不再提交，例如裸衣「同一角色/回合只保留一份」。
 
 create 取得类型化句柄，返回普通 triggers/modifiers 列表；作者可以用条件、循环和闭包构造行为，用与技能相同的 `on(Event.timing, spec)` / effectModify 连接现有时点和查询；回调为 `(ctx, event, self, …)`，效果中默认自动排序且不询问、不宣告，类型化 self 保留在 create 的闭包中。结束后效使用 `onEnd(ctx, { before, reason })`，before 保留声明的数据类型。自定义 bind 也必须同步；候选收集与执行前重绑都会在读取绑定结果前检查，不会把 Promise 当作无触发或无身份。
 
