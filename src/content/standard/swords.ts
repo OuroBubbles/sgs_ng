@@ -56,23 +56,13 @@ const doubleSwords = equipmentCard({
             ctx.world.player(target).alive &&
             ownedCards(ctx.world, target).includes(card)
           ) {
-            const from = ctx.world.position(card);
             const moved = await discardCards(ctx, {
               actor: target,
               owner: target,
               cards: [card],
               reason: self.skill,
             });
-            if (moved.kind === 'discarded') {
-              ctx.commit(Weapon.cardDiscarded, [], {
-                actor: self.owner,
-                name: self.name,
-                target,
-                card,
-                from,
-              });
-              return;
-            }
+            if (moved.kind === 'discarded') return;
           }
           await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
         },
@@ -172,13 +162,6 @@ const iceSword = equipmentCard({
             });
 
             if (moved.kind !== 'discarded') break;
-            ctx.commit(Weapon.cardDiscarded, [], {
-              actor: self.owner,
-              name: self.name,
-              target,
-              card,
-              from,
-            });
           }
         },
       }),

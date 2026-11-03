@@ -19,12 +19,6 @@ import {
 } from '../../sdk';
 import type { CardDefinition, Context, SkillHandle } from '../../sdk';
 
-interface WeaponDiscard {
-  readonly actor: string;
-  readonly name: string;
-  readonly target: string;
-  readonly card: string;
-}
 export const Weapon = defineEvent('weapon', {
   followUp: timing<
     unknown,
@@ -35,8 +29,6 @@ export const Weapon = defineEvent('weapon', {
       readonly use: string;
     }
   >(),
-  horseDiscarded: timing<unknown, WeaponDiscard>(),
-  cardDiscarded: timing<unknown, WeaponDiscard & { readonly from: string }>(),
   damageReplaced: timing<
     unknown,
     {
@@ -185,19 +177,12 @@ const kylinBow = equipmentCard({
           const [target, card] = [draft.input.to, picked.cards[0]!];
           if (!ctx.world.player(target).alive || !horses(ctx, self.owner, target).includes(card))
             return;
-          const discarded = await discardCards(ctx, {
+          await discardCards(ctx, {
             actor: self.owner,
             owner: target,
             cards: [card],
             reason: self.skill,
           });
-          if (discarded.kind === 'discarded')
-            ctx.commit(Weapon.horseDiscarded, [], {
-              actor: self.owner,
-              name: self.name,
-              target,
-              card,
-            });
         },
       }),
     ],

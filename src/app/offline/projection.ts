@@ -376,10 +376,21 @@ function publicHistory(
     (d) => `${d.actor}有无法弃置的手牌，本阶段需弃置 ${d.count} 张（原需 ${d.required} 张）`,
   );
   on(Weapon.followUp, (d) => `${d.actor}通过【${d.name}】追杀`);
-  on(
-    [Weapon.cardDiscarded, Weapon.horseDiscarded],
-    (d) => `${d.actor}以【${d.name}】弃置 ${d.target} 的${cardName(d.card)}`,
-  );
+  // 效果弃牌按来源（技能名或牌名）统一叙述，内容不另记日志事实。
+  const sourceName = (id: string) => {
+    try {
+      return match.skills.definition(id).name;
+    } catch {
+      // 装备技能以 `${牌}-ability` 为 ID，名称即牌名。
+      return match.book.definition(id.replace(/-ability$/, '')).label;
+    }
+  };
+  on(Discard.committed, ({ declaration: d }) => {
+    const cards = d.cards.map(cardName).join('');
+    return d.actor === d.owner
+      ? `${d.actor}因【${sourceName(d.reason)}】弃置${cards}`
+      : `${d.actor}以【${sourceName(d.reason)}】弃置 ${d.owner} 的${cards}`;
+  });
   on(Weapon.damageReplaced, (d) => `${d.actor}发动【${d.name}】防止对 ${d.target} 的伤害`);
   on(Equipment.ignored, (d) => `${d.actor}的【青釭剑】使此杀忽略目标防具`);
   on(Equipment.blocked, (d) => `${d.actor}的【仁王盾】抵消黑色杀`);
@@ -505,7 +516,6 @@ function publicHistory(
     CardEvent.takenDelayed,
     (d) => `${d.actor}移除了 ${d.target} 的【${label(d.card)}】，获得 ${d.cards.length} 张材料牌`,
   );
-  on(CardEvent.discardedDelayed, (d) => `${d.actor}移除了 ${d.target} 的【${label(d.card)}】`);
   on(Equipment.equipped, ({ declaration: d }) =>
     d.replaced.length
       ? `${d.owner}装备${cardName(d.card)}，替换${d.replaced.map(cardName).join('')}`
@@ -526,7 +536,6 @@ function publicHistory(
     ({ declaration: d }) =>
       `${d.actor}从 ${d.target} 获得${d.open ? cardName(d.card) : '一张手牌'}`,
   );
-  on(CardEvent.discardedByEffect, (d) => `${d.actor}弃置了 ${d.target} 的${cardName(d.card)}`);
   on(
     CardEvent.takenPublic,
     ({ declaration: d }) => `${d.actor}获得${d.cards.map(cardName).join('')}`,

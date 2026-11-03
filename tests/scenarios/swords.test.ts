@@ -23,6 +23,7 @@ import { standardCards } from '../../src/content/standard/cards';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { Weapon } from '../../src/content/standard/weapons';
+import { Discard } from '../../src/rules/cards/discard';
 
 type Game = ReturnType<typeof cardGame>;
 const strike: UseIntent = {
@@ -327,7 +328,7 @@ it.each([0, 1])('寒冰目标无牌不发动，只有一张则只弃一张：%s'
   }
   await running;
   expect(game.room.world.player('b').hp).toBe(count ? 4 : 3);
-  expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(count);
+  expect(game.room.history.facts(Discard.committed)).toHaveLength(count);
 });
 
 it('寒冰不发动则正常伤害，不触碰目标手牌', async () => {
@@ -411,7 +412,7 @@ it.each(['weapon', 'source', 'target'])(
     await chooseFirst(game);
     if (lost === 'weapon') await chooseFirst(game);
     await running;
-    expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(lost === 'weapon' ? 2 : 1);
+    expect(game.room.history.facts(Discard.committed)).toHaveLength(lost === 'weapon' ? 2 : 1);
     expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
   },
 );
@@ -462,7 +463,7 @@ it('寒冰发动支付后出现其他防止时不覆盖原因，也不继续弃�
   expect(game.room.history.facts(Damage.prevented)).toMatchObject([
     { data: { detail: { prevention: 'other' } } },
   ]);
-  expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(0);
+  expect(game.room.history.facts(Discard.committed)).toHaveLength(0);
 });
 
 it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已宣告弃牌', async () => {
@@ -507,7 +508,7 @@ it('寒冰首牌宣告后离区或受保护不追取，武器离场仍执行已�
     await chooseFirst(game);
     await running;
     expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-    expect(game.room.history.facts(Weapon.cardDiscarded)).toHaveLength(branch === 'weapon' ? 1 : 0);
+    expect(game.room.history.facts(Discard.committed)).toHaveLength(branch === 'weapon' ? 1 : 0);
     expect(game.room.history.facts(Damage.dealt)).toEqual([]);
     expect(game.room.history.facts(Damage.prevented)).toHaveLength(1);
     expect(game.room.world.player('b').hp).toBe(4);

@@ -29,28 +29,20 @@ async function takeOrDiscard(ctx: Context, effect: CardEffect, take: boolean): P
   const reason = effect.card.name;
   const chosen = await chooseOwnedCard(ctx, { actor, target, areas, reason, discard: !take });
   if (chosen.kind === 'unavailable') return;
-  if (chosen.kind === 'delayed') {
-    const moved = take
-      ? await moveDelayed(ctx, chosen.id, `${actor}:hand`)
-      : await discardCards(ctx, { actor, owner: target, cards: [chosen.id], reason });
+  const card = chosen.kind === 'delayed' ? chosen.id : chosen.card;
+  if (!take) await discardCards(ctx, { actor, owner: target, cards: [card], reason });
+  else if (chosen.kind !== 'delayed')
+    await takeCard(ctx, { actor, target, card, from: chosen.from, reason });
+  else {
+    const moved = await moveDelayed(ctx, chosen.id, `${actor}:hand`);
     if (moved.kind !== 'unavailable')
-      ctx.commit(take ? CardEvent.takenDelayed : CardEvent.discardedDelayed, [], {
+      ctx.commit(CardEvent.takenDelayed, [], {
         actor,
         target,
         card: chosen.card,
         cards: moved.cards,
       });
-    return;
   }
-  const { card, from } = chosen;
-  if (take) {
-    await takeCard(ctx, { actor, target, card, from, reason });
-    return;
-  }
-  const open = ctx.world.zone(from).kind !== 'hand';
-  const moved = await discardCards(ctx, { actor, owner: target, cards: [card], reason });
-  if (moved.kind === 'discarded')
-    ctx.commit(CardEvent.discardedByEffect, [], { actor, target, card, open, reason });
 }
 
 export const trickCards: readonly CardDefinition[] = [

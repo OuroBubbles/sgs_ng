@@ -105,8 +105,6 @@ export const CardEvent = defineEvent('card', {
     readonly reason: string;
   }>(),
   takenDelayed: timing<unknown, RemovedDelayed>(),
-  discardedDelayed: timing<unknown, RemovedDelayed>(),
-  discardedByEffect: timing<unknown, TakenCard>(),
 });
 
 export interface MoveDeclaration<D = unknown> {

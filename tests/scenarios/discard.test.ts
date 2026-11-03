@@ -24,7 +24,6 @@ import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { jieyin } from '../../src/content/standard/generals/sunshangxiang';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Discard } from '../../src/rules/cards/discard';
-import { Weapon } from '../../src/content/standard/weapons';
 import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;
@@ -492,7 +491,7 @@ it('寒冰剑目标没有可弃牌时不提供防伤替代；麒麟弓宣告后�
   await running;
   expect(bow.room.world.position('horse')).toBe('b:equipment');
   expect(bow.room.world.player('b').hp).toBe(3);
-  expect(bow.room.history.facts(Weapon.horseDiscarded)).toEqual([]);
+  expect(bow.room.history.facts(Discard.committed)).toEqual([]);
 });
 
 it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续，存活资格不被权限查询重复代判', async () => {
@@ -522,5 +521,5 @@ it('麒麟弓已完成选择与宣告后来源死亡，后续弃置仍可继续�
   expect(game.room.world.player('a').alive).toBe(false);
   expect(game.room.world.position('horse')).toBe('discard');
   expect(game.room.world.player('b').hp).toBe(3);
-  expect(game.room.history.facts(Weapon.horseDiscarded)).toHaveLength(1);
+  expect(game.room.history.facts(Discard.committed)).toHaveLength(1);
 });
