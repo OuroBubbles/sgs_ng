@@ -20,20 +20,12 @@
     "docs:check": "node scripts/check-doc-links.mjs",
     "audit:portraits": "node scripts/audit-portraits.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "platform:check": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 -Task check",
     "tauri": "tauri",
-    "desktop:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 -Task desktop",
-    "desktop:debug": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 -Task desktop-debug",
-    "desktop:verify": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-windows.ps1",
-    "desktop:package": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
-    "android:init": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 -Task android-init",
-    "android:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/android-package.ps1",
     "assets:fetch": "node scripts/fetch-spine.mjs",
     "server:build": "node scripts/build-server.mjs",
     "host:build": "node scripts/build-desktop-host.mjs",
     "server:start": "node .artifacts/server/main.mjs",
-    "online": "pnpm build && pnpm server:build && pnpm server:start",
-    "desktop:network": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-windows.ps1 -Network"
+    "online": "pnpm build && pnpm server:build && pnpm server:start"
   },
   "dependencies": {
     "@esotericsoftware/spine-pixi-v8": "4.2.120",
