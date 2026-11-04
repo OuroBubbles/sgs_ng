@@ -19,9 +19,10 @@
 | `pnpm lint`                        | 通过                   |
 | `pnpm format:check`                | 通过                   |
 | `pnpm docs:check`                  | 通过                   |
-| `pnpm test`                        | 82 文件 / 1418 项通过  |
+| `pnpm test`                        | 84 文件 / 1424 项通过  |
 | `pnpm build` + `CI=1 pnpm test:ui` | 桌面 / 触控 182 项通过 |
 | `pnpm smoke:bun`                   | 通过（Bun 1.4.4）      |
+| `pnpm build` 产物标记扫描          | 无主持端标记           |
 
 ## 未完成与下一步
 
