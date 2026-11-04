@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { expect, it } from 'vitest';
 
 /**
@@ -40,7 +40,7 @@ function webGraph(): Set<string> {
   const queue = [join(root, 'src/main.ts')];
   while (queue.length) {
     const file = queue.pop()!;
-    const name = relative(root, file);
+    const name = relative(root, file).split(sep).join('/');
     if (seen.has(name)) continue;
     seen.add(name);
     if (!/\.(ts|svelte)$/.test(file)) continue;
