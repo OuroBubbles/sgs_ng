@@ -71,36 +71,31 @@ export default ts.config(
     },
   },
   {
-    files: ['src/client/**/*.ts', 'src/client/**/*.svelte'],
+    // 网页端（P2 起）只含界面与素材：经 src/protocol 消费视图，规则只在主持端运行。
+    files: [
+      'src/main.ts',
+      'src/app/**/*.ts',
+      'src/app/**/*.svelte',
+      'src/client/**/*.ts',
+      'src/client/**/*.svelte',
+      'src/platform/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: [
-                '**/core/model/**',
-                '**/core/state/**',
-                '**/core/runtime/**',
-                '**/core/history/**',
-                '**/core/decisions/**',
-                '**/core/view/**',
-              ],
-              message: 'client 只消费 src/protocol 展示契约，不直连 core。',
+              regex: '^(\\.{1,2}/)+core(/|$)',
+              message: '网页端只消费 src/protocol 展示契约，不直连 core。',
             },
             {
-              group: ['**/rules/**', '**/content/**', '**/sdk/**'],
-              message: 'client 禁止导入规则或内容模块。',
+              regex: '^(\\.{1,2}/)+(rules|content|sdk)(/|$)|assets\\.json$',
+              message: '网页端禁止导入规则或内容；目录经主持端 /catalog 获取。',
             },
             {
-              group: [
-                '**/app/offline/**',
-                '**/offline/**',
-                '**/role-match*',
-                '**/app/network/room*',
-                '**/server/**',
-              ],
-              message: 'client 禁止导入 offline/host/server；联机只走 RemoteSession。',
+              regex: '^((\\.{1,2}/)+(host|server|offline)(/|$)|ws$|node:)',
+              message: '网页端禁止导入主持端；单机与联机都只走 RemoteSession。',
             },
           ],
         },
