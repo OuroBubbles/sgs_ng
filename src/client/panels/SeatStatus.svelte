@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SeatView } from '../../core/view/game';
+  import type { SeatView } from '../../protocol';
   import { roleImage } from '../presentation/skin';
   import Magatama from './Magatama.svelte';
 

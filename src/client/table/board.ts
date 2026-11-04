@@ -1,7 +1,7 @@
 // 渲染模块自行安装无动态求值适配，兼容原生生产 CSP，入口无需预载 Pixi。
 import 'pixi.js/unsafe-eval';
 import { Application, Container, Graphics, Matrix, Rectangle, Sprite, Texture } from 'pixi.js';
-import type { GameView } from '../../core/view/game';
+import type { GameView } from '../../protocol';
 import { layoutTable, photoLayout, type TableLayout } from './layout';
 import { PortraitTextures } from './portraits';
 import { seatFrame, skinImage } from '../presentation/skin';

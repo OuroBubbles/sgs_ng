@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LobbyView } from '../../app/network/protocol';
+  import type { LobbyView } from '../../protocol';
   import { skinImage } from '../presentation/skin';
 
   const {

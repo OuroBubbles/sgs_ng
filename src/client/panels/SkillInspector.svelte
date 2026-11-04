@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { SkillView } from '../../core/view/game';
+  import type { SkillView } from '../../protocol';
   const {
     name,
     skills,

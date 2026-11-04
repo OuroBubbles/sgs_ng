@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { CardView } from '../../core/view/table';
+  import type { CardView } from '../../protocol';
   import CardFace from './CardFace.svelte';
 
   const { card, onclose }: { card: CardView; onclose: () => void } = $props();

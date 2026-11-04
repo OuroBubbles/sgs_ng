@@ -1,12 +1,6 @@
-import type { GameView } from '../../core/view/game';
-import type { CardView } from '../../core/view/table';
+import type { GameView, CardView, RemoteAsset } from '../../protocol';
 
-export interface RemoteAsset {
-  /** 房间内稳定的资源 URI；各客户端替换为自己的 Blob URL。 */
-  readonly url: string;
-  readonly type: string;
-  readonly data: string;
-}
+export type { RemoteAsset };
 
 export function decodeAsset(type: string, data: string): Blob {
   return new Blob([Uint8Array.from(atob(data), (value) => value.charCodeAt(0))], { type });

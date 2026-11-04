@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SkillView, OfferView } from '../../core/view/game';
+  import type { SkillView, OfferView } from '../../protocol';
   import SkillButton from './SkillButton.svelte';
 
   const {

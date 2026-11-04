@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { CardChoiceGroupView, CandidateView } from '../../core/view/game';
-  import type { CardView } from '../../core/view/table';
+  import type { CardChoiceGroupView, CandidateView, CardView } from '../../protocol';
+
   import HandCard from './HandCard.svelte';
 
   const {

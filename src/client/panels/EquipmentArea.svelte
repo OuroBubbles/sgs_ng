@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { SeatView } from '../../core/view/game';
-  import type { CardView } from '../../core/view/table';
+  import type { SeatView, CardView } from '../../protocol';
+
   import { skinImage } from '../presentation/skin';
   import HandCard from './HandCard.svelte';
 

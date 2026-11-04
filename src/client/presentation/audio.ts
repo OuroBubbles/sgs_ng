@@ -1,4 +1,4 @@
-import type { GameView, LogView } from '../../core/view/game';
+import type { GameView, LogView } from '../../protocol';
 
 const effects = import.meta.glob<string>('../../assets/freekill/audio/system/*.mp3', {
   eager: true,

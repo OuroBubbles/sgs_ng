@@ -1,4 +1,4 @@
-import type { ChoicePreview, GameSelection } from '../../core/view/game';
+import type { ChoicePreview, GameSelection } from '../../protocol';
 
 /** 只补必选且唯一的下一目标；保留多目标的选择顺序，从不自动提交。 */
 export function selectForcedTargets(

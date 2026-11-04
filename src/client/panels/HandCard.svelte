@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { CardView, CardChoiceView } from '../../core/view/table';
+  import type { CardView, CardChoiceView } from '../../protocol';
   import CardFace from './CardFace.svelte';
   import { skinImage, suitImage } from '../presentation/skin';
 

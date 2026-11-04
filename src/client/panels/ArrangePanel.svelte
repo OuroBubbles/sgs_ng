@@ -1,7 +1,7 @@
 <script lang="ts">
+  import type { ArrangementDraft, DecisionView, CardView } from '../../protocol';
   import { onMount, untrack } from 'svelte';
-  import type { ArrangementDraft, DecisionView } from '../../core/view/game';
-  import type { CardView } from '../../core/view/table';
+
   import CardFace from './CardFace.svelte';
 
   const {

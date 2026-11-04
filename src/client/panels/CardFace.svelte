@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CardView } from '../../core/view/table';
+  import type { CardView } from '../../protocol';
   import { numberImage, suitImage } from '../presentation/skin';
   const {
     card,

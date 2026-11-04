@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import type { GameView } from '../../core/view/game';
+  import type { GameView } from '../../protocol';
   import type { TableLayout } from './layout';
 
   const {
