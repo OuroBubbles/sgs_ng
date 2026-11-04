@@ -77,13 +77,62 @@ export default ts.config(
         'error',
         {
           patterns: [
-            '**/core/model/**',
-            '**/core/state/**',
-            '**/core/runtime/**',
-            '**/core/history/**',
-            '**/core/decisions/**',
-            '**/rules/**',
-            '**/content/**',
+            {
+              group: [
+                '**/core/model/**',
+                '**/core/state/**',
+                '**/core/runtime/**',
+                '**/core/history/**',
+                '**/core/decisions/**',
+                '**/core/view/**',
+              ],
+              message: 'client 只消费 src/protocol 展示契约，不直连 core。',
+            },
+            {
+              group: ['**/rules/**', '**/content/**', '**/sdk/**'],
+              message: 'client 禁止导入规则或内容模块。',
+            },
+            {
+              group: [
+                '**/app/offline/**',
+                '**/offline/**',
+                '**/role-match*',
+                '**/app/network/room*',
+                '**/server/**',
+              ],
+              message: 'client 禁止导入 offline/host/server；联机只走 RemoteSession。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/protocol/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/rules/**',
+                '**/content/**',
+                '**/sdk/**',
+                '**/client/**',
+                '**/app/**',
+                '**/server/**',
+                '**/platform/**',
+                'svelte',
+                'pixi.js',
+                '@tauri-apps/*',
+              ],
+              message: 'protocol 仅为纯数据契约，不得依赖规则、内容或 UI。',
+            },
+            {
+              group: ['**/core/**'],
+              message: 'protocol 不得依赖 core 实现；视图类型以本目录为准。',
+            },
           ],
         },
       ],
