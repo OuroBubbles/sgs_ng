@@ -16,24 +16,27 @@
 
 ## 依赖方向
 
-箭头表示“左侧导入右侧”。`app` 装配对局与客户端，`server` 装配 Node 主持进程；登记技能定义时把内容注入运行实例，核心不反向 import 内容。`protocol` 为前后端共享的纯数据契约（P0）；client 不得导入 rules/content。
+箭头表示“左侧导入右侧”。前后端分离（P2）：**规则只在 Bun 主持端运行**。`host` 装配对局、投影、基础 AI 与会话，`server` 提供 HTTP / WebSocket；网页端（`main.ts`、`app`、`client`、`platform`）只含界面与素材，经 `protocol` 消费视图，单机与联机都走同一个 RemoteSession。核心不反向 import 内容。
 
 ```mermaid
 flowchart LR
-  N[server Node 入口] --> A
-  A[app 装配] --> C[content 内容]
-  A --> U[client 界面与表现]
-  A --> P[platform 系统接入]
-  A --> R[rules 规则标准库]
+  N[server Bun 入口] --> H[host 装配·投影·AI]
+  H --> C[content 内容]
+  H --> R[rules 规则标准库]
   C --> S[sdk 作者门面]
   S --> R
   R --> K[core 状态与运行机制]
-  A --> Proto[protocol 线协议与视图]
+  H --> Proto[protocol 线协议与视图]
+  W[app 网页装配] --> U[client 界面与表现]
+  W --> P[platform 系统接入]
+  W --> Proto
   U --> Proto
-  Proto -.兼容再导出.-> V[core/view]
+  W -. ws /game · GET /catalog .-> N
 ```
 
-`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合，不经过包元数据或依赖清单。未来扩展同样通过内容定义与目录注入；没有第二套包格式、加载器或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 定义可展示数据与线协议；`core/view` 现为兼容再导出。握手比较 `protocolHash`，`contentHash` 随 hello 记录。[本地主持侧](../src/host/solo.ts) 仍负责把规则状态投影成 GameView（P2 前仍可进浏览器）。
+`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合，不经过包元数据或依赖清单。未来扩展同样通过内容定义与目录注入；没有第二套包格式、加载器或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`，`contentHash` 随 hello 记录。
+
+网页端边界有三道检查：eslint 禁止网页端导入 core / rules / content / sdk / host / server / `assets.json`；[导入图测试](../tests/scenarios/web-boundary.test.ts) 从 `src/main.ts` 沿运行时导入走查；`pnpm build` 之后 [check-web-bundle](../scripts/check-web-bundle.mjs) 扫描 `dist` 脚本中的主持端标记（如 `CardBook`）。大厅需要的武将、牌组与技能说明由主持端 `GET /catalog`（[catalog](../src/host/catalog.ts)）提供。
 
 当前目录如下；不把尚未建立的接口或目录列为既有实现。
 
@@ -61,16 +64,15 @@ src/
   content/
     standard/        # 武将、卡牌、技能、文本与资源声明
     workshop/        # 演武内容，用于机制边界
-  protocol/          # 线协议与展示视图（纯数据；client 只依赖这里）
+  protocol/          # 线协议与展示视图（纯数据；网页端只依赖这里）
   client/
     table/           # Pixi 战场、卡牌、角色和指示
     panels/          # Svelte 面板、说明、菜单和选择器
     interaction/     # 选择草稿与输入
     presentation/    # 音频、帧序列与独立 Spine 演示；完整表现时序后置
   platform/          # 浏览器/WebView 前后台观测
-  app/               # 组装对局、客户端与本地/远端输入
-    offline/         # 本地装配、投影与托管
-    network/         # 席位绑定、远端适配；protocol 兼容再导出
+  app/               # 网页装配：App、RemoteSession、素材绑定
+  host/              # 主持端：对局装配、投影、基础 AI、单机会话、联机房间、目录
   server/            # HTTP / WebSocket 主持进程（Bun 直接运行源码）
 examples/content/    # 渡口、画阁等普通作者源码模块
 tests/
@@ -127,17 +129,19 @@ WorldReader.state(id) 按 ID 返回当前状态条目，缺失时为 undefined�
 
 规则负责“发生了什么”，表现负责“如何让人看清”。规则不等待 `animation.finished`，不调用 `setTimeout` 来模拟结算。
 
-当前界面由投影刷新驱动，AI 的展示延迟由 SoloSession 管理；完整的事实动画队列仍后置。将来加入表现时序时，必须支持跳过或禁用动画，并保证输入对应当前 Decision，不能让动画丢失阻塞规则。
+当前界面由投影刷新驱动，AI 的展示延迟由主持端 SoloSession 管理；预览与命令回执经协议异步到达，未到齐时 `.app-shell` 标 `aria-busy`，单机投影先于对应回执送出。完整的事实动画队列仍后置。将来加入表现时序时，必须支持跳过或禁用动画，并保证输入对应当前 Decision，不能让动画丢失阻塞规则。
 
 Pixi 与 DOM 共用一个逻辑战场坐标映射。静态边框与立绘由 Pixi 绘制，状态、区域牌与操作由 Svelte 承接，指示线使用独立 SVG。角色命中与键盘操作使用共享坐标的 DOM 按钮；不能让两个系统同时处理同一次点击。浮层捕获输入，战场暂停对应命中区域。
 
 ## 现有适配边界
 
-SoloSession 负责离线输入与基础 AI；NetworkRoom 持有连接与开局草稿，全部准备后才由普通工厂函数创建新的 RoleMatch。房间可连续开局，同时至多保留一局；结束后各人独立返回准备页，不把草稿放入 World。WebSocket 只传对应席位的投影、预览与回答，局号限定远端决策身份；两种会话共用选择解释，不复制合法性，普通技能仍在主持端执行。联机细节见下文“联机”。
+单机：浏览器以 `solo` hello（仅接受本机回环连接）向主持端开一局，一条连接即一局，断开即结束；[SoloSession](../src/host/solo.ts) 负责热坐交接、暂停与基础 AI。`pnpm dev` / `pnpm preview` 由 Vite 插件拉起并代理一个自有 Bun 主持端（`/game`、`/catalog`，默认端口 1423），`pnpm online` 的主持端同样接受本机单机。NetworkRoom 持有连接与开局草稿，全部准备后才由普通工厂函数创建新的 RoleMatch。房间可连续开局，同时至多保留一局；结束后各人独立返回准备页，不把草稿放入 World。WebSocket 只传对应席位的投影、预览与回答，局号限定远端决策身份；单机与联机共用选择解释，不复制合法性，普通技能仍在主持端执行。联机细节见下文“联机”。
 
 平台生命周期、文件加载和内容持久化留在装配与原生壳中，不渗入技能代码。未来端口按实际适配需要形成，不预建工厂或继承树。
 
 Windows 主持入口只提供状态、创建与关闭三个平台命令。[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程（`pnpm host:build` 的 Vite SSR 产物；同一入口在开发机已可 `bun src/server/desktop-host.ts <port>` 运行，随包改 Bun 留待 P8）；[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，规则仍全部为 TypeScript。原生壳退出关闭 stdin，主持端据此释放房间与监听；客户端只观察平台状态并使用既有 RemoteSession 加入，不持有第二份对局。
+
+桌面单机（P2 缺口）：`pnpm tauri dev` 的页面来自 Vite，单机经 Vite 拉起的 Bun 主持端可用；打包后的页面由 `tauri://` 提供，没有本机主持端，大厅提示无法读取内容目录，单机不可开局（联机加入与创建房间不受影响）。补齐需在启动时由原生壳拉起回环主持端（`127.0.0.1:0`），经平台命令把地址交给网页，并把该地址加入 CSP `connect-src`；与随包主持端改 Bun 一起在 P8 完成。
 
 ## 历史、录像和恢复
 
@@ -149,7 +153,7 @@ World 重建只恢复已记录的事实状态，不能恢复技能栈、监听�
 
 ## 联机
 
-`pnpm online` 构建页面后以 `pnpm server`（`bun src/server/main.ts`）从 TypeScript 源码直接起主持端并监听 `127.0.0.1:1422`，不打包、不产出 server 构建物；[bunfig.toml](../bunfig.toml) 预加载 [source-hashes](../scripts/source-hashes.mjs) 按当前源码计算握手哈希（Vite/vitest 侧为构建期 define）。`SGS_SEED`、`SGS_ROOM`（完整 [RoomSetup](../src/host/setup.ts) JSON）、`SGS_HOST`、`SGS_PORT` 与 `SGS_PRACTICE=1` 控制房间。Windows 桌面程序可在开局页直接创建房间：[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程，[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，配置只经 stdin 首行传入，stdin EOF 回收主持端。
+`pnpm online` 构建页面后以 `pnpm server`（`bun src/server/main.ts`）从 TypeScript 源码直接起主持端并监听 `127.0.0.1:1422`，不打包、不产出 server 构建物；[bunfig.toml](../bunfig.toml) 预加载 [source-hashes](../scripts/source-hashes.mjs) 按当前源码计算握手哈希（Vite/vitest 侧为构建期 define）。`SGS_SEED`、`SGS_ROOM`（完整 [RoomSetup](../src/protocol/wire.ts) JSON）、`SGS_HOST`、`SGS_PORT` 与 `SGS_PRACTICE=1` 控制房间；`SGS_DEV_HOST_PORT`（默认 1423）与 `SGS_BUN` 控制 Vite 拉起的开发主持端。Windows 桌面程序可在开局页直接创建房间：[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程，[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，配置只经 stdin 首行传入，stdin EOF 回收主持端。
 
 - [NetworkRoom](../src/host/room.ts) 持有连接与准备草稿，同时至多一局 RoleMatch；全部玩家准备才开局，第 N 局种子为 `((房间种子 - 1 + N - 1) % 4294967295) + 1`。
 - [协议](../src/protocol/wire.ts) 只传对应席位的 GameView、选择与预览，不发送 World、牌堆、他人私有决策、原始历史或闭包；远端 Decision ID 以局号限定，旧局回复被拒绝。
