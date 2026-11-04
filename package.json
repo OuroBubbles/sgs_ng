@@ -23,7 +23,8 @@
     "server:build": "node scripts/build-server.mjs",
     "host:build": "node scripts/build-desktop-host.mjs",
     "server:start": "node .artifacts/server/main.mjs",
-    "online": "pnpm build && pnpm server:build && pnpm server:start"
+    "online": "pnpm build && pnpm server:build && pnpm server:start",
+    "smoke:bun": "bash scripts/smoke-bun-host.sh"
   },
   "dependencies": {
     "@esotericsoftware/spine-pixi-v8": "4.2.120",

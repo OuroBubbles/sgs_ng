@@ -16,7 +16,7 @@
 
 ## 依赖方向
 
-箭头表示“左侧导入右侧”。`app` 装配对局与客户端，`server` 装配 Node 主持进程；登记技能定义时把内容注入运行实例，核心不反向 import 内容。
+箭头表示“左侧导入右侧”。`app` 装配对局与客户端，`server` 装配 Node 主持进程；登记技能定义时把内容注入运行实例，核心不反向 import 内容。`protocol` 为前后端共享的纯数据契约（P0）；client 不得导入 rules/content。
 
 ```mermaid
 flowchart LR
@@ -28,11 +28,12 @@ flowchart LR
   C --> S[sdk 作者门面]
   S --> R
   R --> K[core 状态与运行机制]
-  A --> V[core/view 只读契约]
-  U --> V
+  A --> Proto[protocol 线协议与视图]
+  U --> Proto
+  Proto -.兼容再导出.-> V[core/view]
 ```
 
-`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合，不经过包元数据或依赖清单。未来扩展同样通过内容定义与目录注入；没有第二套包格式、加载器或编译器。对局不读取分发版本，也不将它们写入 World。`core/view` 定义可展示的数据和输入值，不导出 World 写入器；[本地主持侧](../src/app/offline/session.ts) 负责把规则状态投影成 GameView。
+`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合，不经过包元数据或依赖清单。未来扩展同样通过内容定义与目录注入；没有第二套包格式、加载器或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 定义可展示数据与线协议；`core/view` 现为兼容再导出。握手比较 `protocolHash`，`contentHash` 随 hello 记录。[本地主持侧](../src/app/offline/session.ts) 仍负责把规则状态投影成 GameView（P2 前仍可进浏览器）。
 
 当前目录如下；不把尚未建立的接口或目录列为既有实现。
 
@@ -44,7 +45,7 @@ src/
     runtime/         # Flow、时点（defineEvent / timing）、作用域、调度和随机源
     decisions/       # 选择会话、候选与回复验证
     history/         # 顺序事实、作用域查询、轨迹
-    view/            # 视角数据与客户端输入契约
+    view/            # 兼容再导出 → protocol
   rules/
     turn/            # 回合、阶段、跳过与插入
     cards/           # 使用、响应、目标、判定、牌移动
@@ -60,6 +61,7 @@ src/
   content/
     standard/        # 武将、卡牌、技能、文本与资源声明
     workshop/        # 演武内容，用于机制边界
+  protocol/          # 线协议与展示视图（纯数据；client 只依赖这里）
   client/
     table/           # Pixi 战场、卡牌、角色和指示
     panels/          # Svelte 面板、说明、菜单和选择器
@@ -68,8 +70,8 @@ src/
   platform/          # 浏览器/WebView 前后台观测
   app/               # 组装对局、客户端与本地/远端输入
     offline/         # 本地装配、投影与托管
-    network/         # 席位绑定、数据协议、远端展示适配
-  server/            # Node HTTP / WebSocket 主持进程
+    network/         # 席位绑定、远端适配；protocol 兼容再导出
+  server/            # Node HTTP / WebSocket 主持进程（P1 迁 Bun）
 examples/content/    # 渡口、画阁等普通作者源码模块
 tests/
   scenarios/         # 跨模块的真实机制反例
