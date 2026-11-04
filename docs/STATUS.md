@@ -13,18 +13,18 @@
 
 ## 验证
 
-| 检查                               | 结果         |
-| ---------------------------------- | ------------ |
-| `pnpm typecheck`                   | （本轮填写） |
-| `pnpm lint`                        | （本轮填写） |
-| `pnpm format:check`                | （本轮填写） |
-| `pnpm docs:check`                  | （本轮填写） |
-| `pnpm test`                        | （本轮填写） |
-| `pnpm build` + `CI=1 pnpm test:ui` | （本轮填写） |
-| `pnpm smoke:bun`                   | （本轮填写） |
+| 检查                               | 结果                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm typecheck`                   | 0 错误                                                                  |
+| `pnpm lint`                        | 通过                                                                    |
+| `pnpm format:check`                | 通过                                                                    |
+| `pnpm docs:check`                  | 通过                                                                    |
+| `pnpm test`                        | 82 文件 / 1418 项通过                                                   |
+| `pnpm build` + `CI=1 pnpm test:ui` | 桌面 / 触控 182 项通过                                                  |
+| `pnpm smoke:bun`                   | BLOCKED：`import.meta.glob` 非 Bun API（P1 改目录扫描前无法源码起宿主） |
 
 ## 未完成与下一步
 
-1. **P1**：Bun 宿主迁移（`bun run` 源码入口，旁路 server esbuild→node）。
+1. **P1**：Bun 宿主迁移（`bun run` 源码入口，旁路 server esbuild→node）；先去掉内容侧对 Vite `import.meta.glob` 的运行时依赖。
 2. **P2**：宿主独占内核；LocalSession 图退出浏览器。
 3. Windows 桌面需在装有 Rust + MSVC 的机器上用 `pnpm tauri build` 重新构建与实机验证。
