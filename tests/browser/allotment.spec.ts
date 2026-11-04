@@ -2,6 +2,10 @@ import { type Page } from '@playwright/test';
 import { test, expect } from './settled';
 import config from '../../src-tauri/tauri.conf.json' with { type: 'json' };
 
+// 本文件用路由改写文档以套用桌面 CSP；Chromium 把改写后的文档视为非本机地址，
+// 会以本地网络访问检查拦截它到同源本机主持端的 ws。仅对本文件关闭该检查。
+test.use({ launchOptions: { args: ['--disable-features=LocalNetworkAccessChecks'] } });
+
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
   const found: string[] = [];
