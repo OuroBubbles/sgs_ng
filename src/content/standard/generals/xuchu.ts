@@ -52,6 +52,7 @@ export const luoyi = skill(
     },
     effect: (_ctx, draft, self) => draft.setCount(Math.max(0, draft.count - 1), self.skill),
   }),
+  { effects: [luoyiAftereffect] },
 );
 
 export default general('standard:xuchu', '许褚', '魏', 4, [luoyi]);

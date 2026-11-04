@@ -41,6 +41,7 @@ export interface ContentDefinition {
   readonly cards?: readonly CardDefinition[];
   /** 不属于任何武将的技能；武将引用的技能对象会自动登记。 */
   readonly skills?: readonly SkillDefinition[];
+  /** 不由任何技能引用的独立效果；技能 `effects` 引用的效果会自动登记。 */
   readonly effects?: readonly EffectDefinition[];
   readonly generals?: readonly (GeneralDefinition & {
     readonly abilities?: readonly SkillDefinition[];
@@ -80,9 +81,6 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
   const generals = Object.freeze(
     definitions.flatMap((entry) => entry.generals ?? []).map(defineGeneral),
   );
-  const effects = Object.freeze(
-    definitions.flatMap((entry) => entry.effects ?? []).map(defineEffect),
-  );
   const decks = Object.freeze(
     definitions
       .flatMap((entry) => entry.decks ?? [])
@@ -104,6 +102,14 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
         ]),
       ),
     ].map(defineSkill),
+  );
+  // 显式列出的独立效果原样登记（重复即报错）；技能 effects 引用的同一对象只补登一次。
+  const listed = definitions.flatMap((entry) => entry.effects ?? []);
+  const effects = Object.freeze(
+    [
+      ...listed,
+      ...new Set(skills.flatMap((skill) => skill.effects ?? []).filter((e) => !listed.includes(e))),
+    ].map(defineEffect),
   );
   // 与规则定义一样，先固定公开字段，再校验与建索引；不重复读取作者 getter。
   const cardEntries = immutable(

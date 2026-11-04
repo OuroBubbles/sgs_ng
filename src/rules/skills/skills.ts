@@ -10,6 +10,7 @@ import { viewAs } from '../cards/types';
 import type { QueryType, SkillModifier } from './query';
 import type { ActiveSkill } from './active';
 import { EffectBook } from '../effects/effects';
+import type { EffectDefinition } from '../effects/effects';
 import type { CardBook } from '../cards/book';
 import { Death } from '../combat/life-events';
 import type { PaymentReceipt } from '../costs/pay';
@@ -61,6 +62,8 @@ export interface SkillDefinition {
   readonly active?: readonly ActiveSkill[];
   /** 与技能同处一处的 AI 提示；规则从不读取。 */
   readonly ai?: SkillAi;
+  /** 技能创建的独立效果；内容装配按引用自动登记，与武将的技能同理。 */
+  readonly effects?: readonly EffectDefinition[];
 }
 
 /** AI 只看到观察者视角的简化局面；提示函数必须是纯函数。 */
