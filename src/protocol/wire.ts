@@ -67,11 +67,10 @@ export interface ClientCommandMessage {
   readonly command: ClientCommand;
 }
 
-/** 握手：protocol 强制相等；content 记入房间/回放，客户端不强求持有同内容代码。 */
+/** 握手：双方的 protocol 必须相等；内容只在主持端，客户端不持有内容代码。 */
 export interface BuildHello {
   readonly kind: 'hello';
   readonly protocol: string;
-  readonly content: string;
 }
 
 /** 房间创建草稿；人数由阵容长度确定，不保存另一份可矛盾的席位数。 */
@@ -132,6 +131,8 @@ export interface ContentSummary {
 
 /** GET /catalog 的响应。 */
 export interface HostCatalog {
+  /** 主持端启动时发现的内容的 contentHash（与 hello 相同）。 */
+  readonly content: string;
   readonly seats: readonly string[];
   readonly standard: ContentSummary;
   readonly practice: ContentSummary;
@@ -169,7 +170,8 @@ export type CommandResult =
 
 export type ServerMessage =
   | { readonly kind: 'pulse' }
-  | (BuildHello & { readonly assets: readonly RemoteAsset[] })
+  /** content 为主持端已装内容的 contentHash，供记录与提示，不参与入座核对。 */
+  | (BuildHello & { readonly content: string; readonly assets: readonly RemoteAsset[] })
   | { readonly kind: 'seat'; readonly seat: string; readonly key: string }
   /** lobby 为 null 表示单机连接：没有房间，只有这一局。 */
   | { readonly kind: 'view'; readonly lobby: LobbyView | null; readonly view: GameView | null }

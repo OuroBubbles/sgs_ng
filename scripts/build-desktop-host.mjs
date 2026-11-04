@@ -2,7 +2,8 @@ import { build } from 'vite';
 import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
-import { protocolHash, contentHash } from './network-build.mjs';
+import { protocolHash } from './network-build.mjs';
+import { prelinkContent } from './prelink-content.mjs';
 
 if (process.platform !== 'win32' || process.arch !== 'x64' || !process.version.startsWith('v24.'))
   throw new Error('Desktop host delivery requires the project Windows x64 Node.js 24 runtime.');
@@ -12,8 +13,8 @@ await build({
   configFile: false,
   define: {
     __SGS_PROTOCOL_HASH__: JSON.stringify(protocolHash()),
-    __SGS_CONTENT_HASH__: JSON.stringify(contentHash()),
   },
+  plugins: [prelinkContent()],
   ssr: { noExternal: ['ws'] },
   build: {
     ssr: 'src/server/desktop-host.ts',

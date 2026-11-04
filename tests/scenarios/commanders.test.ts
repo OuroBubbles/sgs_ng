@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
-import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
+import { standardGeneralSkills, standardGenerals } from '../fixtures/standard';
 import { standardCards } from '../../src/content/standard/cards';
 import { RoleMatch } from '../../src/host/role-match';
 import { createRoleMatch } from '../../src/host/content';

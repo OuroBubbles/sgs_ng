@@ -1,9 +1,8 @@
 import { expect, it } from 'vitest';
-import { readFile, readdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createContent } from '../../src/sdk';
-import standard from '../../src/content/standard';
+import { standard } from '../fixtures/standard';
 import assets from '../../src/content/standard/assets.json';
 import { createRoleMatch, defaultContent } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';
@@ -73,23 +72,13 @@ it('公开武将图随当前武将投影，身份和手牌权限不变，图像�
   );
 });
 
-it('二十五将立绘与目录一一对应，标准包媒体按清单原字节放在 public/standard', async () => {
-  expect(Object.keys(defaultContent.generalViews).sort()).toEqual(
-    defaultContent.generals.map((entry) => entry.id).sort(),
-  );
-  expect(assets.portraits).toHaveLength(25);
+it('导入的标准包媒体保持清单原字节，按约定成为对应武将的立绘', async () => {
+  // assets.json 只记录来源与原字节；是否存在、归谁由主持端扫描 public/standard 决定。
   for (const entry of assets.portraits)
     expect(defaultContent.generalViews[entry.id]?.portrait).toBe(`/standard/${entry.file}`);
-  const listed = [...assets.resources, ...assets.portraits];
-  for (const entry of listed) {
+  for (const entry of [...assets.resources, ...assets.portraits]) {
     const data = await readFile(`public/standard/${entry.file}`);
     expect(data.byteLength).toBe(entry.bytes);
     expect(createHash('sha256').update(data).digest('hex')).toBe(entry.sha256);
   }
-  const files = (await readdir('public/standard', { recursive: true, withFileTypes: true }))
-    .filter((entry) => entry.isFile())
-    .map((entry) =>
-      relative('public/standard', join(entry.parentPath, entry.name)).replaceAll('\\', '/'),
-    );
-  expect(files.sort()).toEqual([...listed.map((entry) => entry.file), 'SOURCE-LICENSE.txt'].sort());
 });

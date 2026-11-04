@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
 import {
   judge,
@@ -30,7 +30,7 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import { createRoleMatch } from '../../src/host/content';
 import { generalGame } from '../fixtures/generals';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Lifetime } from '../../src/sdk';
 import { Skill } from '../../src/sdk';

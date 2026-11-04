@@ -9,7 +9,7 @@ import {
   settled,
 } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import {
   recover,
@@ -31,7 +31,7 @@ import {
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Phase } from '../../src/sdk';
 import { Skill } from '../../src/sdk';

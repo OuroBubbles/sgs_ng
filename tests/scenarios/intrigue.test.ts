@@ -9,7 +9,7 @@ import {
   settled,
 } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import { RoleMatch } from '../../src/host/role-match';
 import { projectMatch } from '../../src/host/projection';
@@ -42,7 +42,7 @@ import {
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Fanjian } from '../../src/content/standard/generals/zhouyu';
 import { Skill } from '../../src/sdk';

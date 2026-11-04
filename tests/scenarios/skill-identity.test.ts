@@ -10,7 +10,7 @@ import {
   Skill,
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, chooseAndActivate as activate } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

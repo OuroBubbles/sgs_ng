@@ -51,6 +51,30 @@ export interface ContentDefinition {
   readonly generalViews?: readonly GeneralPresentation[];
 }
 
+/**
+ * 内容包描述：`src/content/<包>/package.ts` 的默认导出。主持端启动时发现包目录，
+ * 并把 `generals/*.ts`（默认导出武将）与 `skills/*.ts`（默认导出技能）并入本包，无需登记。
+ */
+export interface PackDefinition extends ContentDefinition {
+  /** 只在机制演武中启用（依赖其他包的练习内容）。 */
+  readonly practice?: boolean;
+  /**
+   * generals/ 下文件名（不含扩展名）的固定先后，决定大厅列表与按种子抽将；
+   * 未列出的文件按文件名追加。省略时全部按文件名排列。
+   */
+  readonly order?: readonly string[];
+}
+
+/** 加载器交给包描述的环境：包 ID（目录名）与本包公开媒体（`public/<包>/`）的 URL 解析。 */
+export interface PackSetup {
+  readonly id: string;
+  /** 文件存在时返回稳定 URL `/<包>/<file>`，否则 undefined。 */
+  readonly media: (file: string) => string | undefined;
+}
+
+/** package.ts 可直接导出描述，或导出接收 PackSetup 的函数（需要按媒体是否存在组装展示时）。 */
+export type PackModule = PackDefinition | ((setup: PackSetup) => PackDefinition);
+
 export interface ContentCatalog {
   readonly cards: readonly CardDefinition[];
   readonly generals: readonly GeneralDefinition[];

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { loseHp, runPhase } from '../../src/sdk';
 import type { CardChoice } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';

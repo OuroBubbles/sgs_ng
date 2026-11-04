@@ -14,7 +14,7 @@ import {
   Resolve,
 } from '../../src/sdk';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';

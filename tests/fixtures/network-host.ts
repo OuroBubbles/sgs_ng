@@ -1,7 +1,7 @@
 ﻿import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createContent } from '../../src/content/catalog';
-import standard from '../../src/content/standard';
+import { standard } from './standard';
 import harbor from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
 import { createRoomOptions } from '../../src/host/setup';

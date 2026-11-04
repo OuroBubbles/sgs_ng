@@ -1,5 +1,4 @@
 import { expect, it } from 'vitest';
-import { readdirSync } from 'node:fs';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -7,7 +6,7 @@ import { longdan } from '../../src/content/standard/generals/zhaoyun';
 import { paoxiao } from '../../src/content/standard/generals/zhangfei';
 import { qixi } from '../../src/content/standard/generals/ganning';
 import { xiaoji } from '../../src/content/standard/generals/sunshangxiang';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import {
   runPhase,
   defineSkill,
@@ -219,11 +218,7 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
 });
 
-it('标准武将保持原包顺序：登记表顺序决定大厅列表与按种子抽将，目录内武将文件全部登记', () => {
-  const files = readdirSync(new URL('../../src/content/standard/generals/', import.meta.url))
-    .filter((name) => name.endsWith('.ts') && name !== 'index.ts')
-    .map((name) => `standard:${name.slice(0, -3)}`);
-  expect(standardGenerals.map((general) => general.id).sort()).toEqual(files.sort());
+it('标准武将保持原包顺序：package.ts 的 order 决定大厅列表与按种子抽将', () => {
   expect(standardGenerals.map((general) => general.id.replace('standard:', ''))).toEqual([
     'guanyu',
     'huanggai',

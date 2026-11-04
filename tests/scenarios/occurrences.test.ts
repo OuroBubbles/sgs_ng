@@ -15,7 +15,7 @@ import type { WorldSeed } from '../../src/core/model/state';
 import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose, answer, cancel } from '../fixtures/room';
 import { card, cardGame, grant, settled, die } from '../fixtures/cards';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Draw } from '../../src/rules/cards/draw';

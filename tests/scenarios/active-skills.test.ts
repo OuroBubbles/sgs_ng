@@ -4,7 +4,7 @@ import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { kurou } from '../../src/content/standard/generals/huanggai';
 import { jieyin, xiaoji } from '../../src/content/standard/generals/sunshangxiang';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGenerals, standardGeneralSkills } from '../fixtures/standard';
 import { RoleMatch } from '../../src/host/role-match';
 import { createRoleMatch } from '../../src/host/content';
 import { World } from '../../src/core/state/world';

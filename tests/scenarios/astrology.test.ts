@@ -19,7 +19,7 @@ import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
 import type { ChoiceItem } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest, room, answer } from '../fixtures/room';
-import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGenerals, standardGeneralSkills } from '../fixtures/standard';
 import { standardCards } from '../../src/content/standard/cards';
 import { RoleMatch } from '../../src/host/role-match';
 import { SoloSession } from '../../src/host/solo';

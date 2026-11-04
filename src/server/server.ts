@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import { NetworkRoom, type NetworkRoomOptions } from '../host/room';
 import { openSolo } from '../host/solo';
 import { hostCatalog } from '../host/catalog';
+import { contentHash } from '../host/content';
 import type { ClientMessage, RemoteAsset, ServerMessage } from '../protocol';
 import { protocolHash, buildMismatch, helloPayload } from '../protocol/build';
 
@@ -113,7 +114,9 @@ export function createGameServer(
     }
     // 未核对的连接不占席位、不接收投影，也不能因断开而中止别人的对局。
     const timeout = setTimeout(() => reject('构建核对超时，请更新客户端后重新加入。'), 10_000);
-    socket.send(JSON.stringify(helloPayload({ assets: options.assets ?? [] })));
+    socket.send(
+      JSON.stringify(helloPayload({ content: contentHash, assets: options.assets ?? [] })),
+    );
     socket.on('error', () => socket.close());
     socket.on('close', () => {
       clearInterval(heartbeat);

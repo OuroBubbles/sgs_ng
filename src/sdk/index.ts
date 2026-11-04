@@ -328,6 +328,9 @@ export { createContent } from '../content/catalog';
 export type {
   ContentDefinition,
   ContentCatalog,
+  PackDefinition,
+  PackModule,
+  PackSetup,
   CardPresentation,
   GeneralPresentation,
   DeckDefinition,

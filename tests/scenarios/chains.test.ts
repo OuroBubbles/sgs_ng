@@ -26,7 +26,7 @@ import {
 import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
 import { card, cardGame, settled, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';

@@ -13,7 +13,7 @@ import {
   Use,
   Cards,
 } from '../../sdk';
-import type { Card, CardDefinition, ContentDefinition, SkillDefinition } from '../../sdk';
+import type { Card, CardDefinition, PackDefinition, SkillDefinition } from '../../sdk';
 import { relay, ward } from './defense';
 import { vermilion, createFaceDeck } from './faces';
 import { insight, echo } from './learning';
@@ -123,7 +123,9 @@ export const relicJade = equipmentCard({
   },
 });
 
+/** 机制演武包：依赖标准包的牌与技能，只在演武中启用。 */
 export default {
+  practice: true,
   cards: [prepare, relicJade, bind, ember, ward],
   skills: [hearing, relay, vermilion, insight, echo, allotment],
   generals: [
@@ -284,4 +286,4 @@ export default {
       },
     },
   ],
-} satisfies ContentDefinition;
+} satisfies PackDefinition;

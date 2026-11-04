@@ -10,7 +10,7 @@ import { decideBasic } from '../../src/host/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
 import { RoleMatch } from '../../src/host/role-match';
-import standard from '../../src/content/standard';
+import { standard } from '../fixtures/standard';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 
 it('普通源码直接组合无命名空间的定义，保留时点身份、本局目录和真实技能结算', async () => {

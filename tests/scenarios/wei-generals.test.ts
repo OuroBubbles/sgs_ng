@@ -5,7 +5,7 @@ import { nextRequest, room, answer } from '../fixtures/room';
 import { ganglie } from '../../src/content/standard/generals/xiahoudun';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import {
   damage,
   judge,
@@ -26,7 +26,7 @@ import {
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';

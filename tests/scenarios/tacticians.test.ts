@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import { RoleMatch } from '../../src/host/role-match';
 import { projectMatch } from '../../src/host/projection';
@@ -24,7 +24,7 @@ import {
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
-import { standardGenerals } from '../../src/content/standard/generals';
+import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';

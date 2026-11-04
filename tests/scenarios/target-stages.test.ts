@@ -21,7 +21,7 @@ import type {
   UseIntent,
   UsePlanView,
 } from '../../src/sdk';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';

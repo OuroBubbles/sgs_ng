@@ -1,12 +1,16 @@
 import { createContent } from '../content/catalog';
 import type { ContentCatalog, ContentDefinition } from '../content/catalog';
-import standard from '../content/standard';
-import workshop from '../content/workshop';
+import { contentTree } from './content-tree';
+import { loadContent } from './load-content';
 import { RoleMatch } from './role-match';
 
-export const defaultContent = createContent(standard);
-/** 机制演武也是普通源码组合；开关只选择内容，不安装或解析扩展包。 */
-export const practiceContent = createContent(standard, workshop);
+/** 主持端启动时发现的内容包（标准包在前）；新增武将/技能文件后重启主持端即生效。 */
+export const { packs, hash: contentHash } = await loadContent(await contentTree());
+export const defaultContent = createContent(
+  ...packs.filter((pack) => !pack.practice).map((pack) => pack.definition),
+);
+/** 机制演武在常规包之外再启用 practice 包；开关只选择内容。 */
+export const practiceContent = createContent(...packs.map((pack) => pack.definition));
 export const seatNames = ['甲席', '乙席', '丙席', '丁席', '戊席', '己席', '庚席', '辛席'];
 
 /** 指定阵容时由其长度决定席位；练习局也可只指定人数，不保存另一份可矛盾的数量。 */

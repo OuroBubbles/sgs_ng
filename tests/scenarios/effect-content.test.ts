@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { Room } from '../../src/core/runtime/room';
 import { cardSeed } from '../fixtures/cards';
-import standard from '../../src/content/standard';
+import { standard } from '../fixtures/standard';
 import { covenant } from '../../examples/effects/covenant';
 import { createContent, EffectBook } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';

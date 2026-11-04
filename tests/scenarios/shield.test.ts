@@ -15,7 +15,7 @@ import {
 } from '../../src/sdk';
 import type { Context, DamageDraft } from '../../src/sdk';
 import { card, cardGame, settled } from '../fixtures/cards';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;

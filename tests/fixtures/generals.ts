@@ -1,4 +1,4 @@
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from './standard';
 import { cardGame } from './cards';
 
 /** 标准武将场景：目录装配全部标准武将技能，a 默认空手；技能需另行 grant。 */

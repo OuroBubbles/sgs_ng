@@ -40,23 +40,12 @@ export function protocolHash(root = projectRoot) {
   return hashFiles(root, files);
 }
 
-/**
- * 内容树哈希：已启用内容源码（脚手架；未完全接入回放头/大厅提示）。
- * 记入 hello，客户端不强求持有同内容代码。
- */
-export function contentHash(root = projectRoot) {
-  const files = [];
-  collectFiles(root, 'src/content', files);
-  return hashFiles(root, files);
-}
-
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
   console.log(
     JSON.stringify(
       {
         protocolHash: protocolHash(),
-        contentHash: contentHash(),
       },
       null,
       2,

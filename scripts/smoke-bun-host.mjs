@@ -3,7 +3,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { WebSocket } from 'ws';
-import { protocolHash, contentHash } from './network-build.mjs';
+import { protocolHash } from './network-build.mjs';
 
 const pinned = JSON.parse(readFileSync('package.json', 'utf8')).engines.bun;
 let version;
@@ -19,7 +19,6 @@ if (version !== pinned) {
 }
 
 const protocol = protocolHash();
-const content = contentHash();
 const host = spawn('bun', ['src/server/main.ts'], {
   env: { ...process.env, SGS_HOST: '127.0.0.1', SGS_PORT: '0' },
   stdio: ['ignore', 'pipe', 'inherit'],
@@ -46,6 +45,7 @@ const catalog = await fetch(`http://127.0.0.1:${port}/catalog`)
   .then((response) => response.json())
   .catch(fail);
 if (!catalog.standard?.generals?.length) fail('catalog without generals');
+if (!/^[0-9a-f]{64}$/.test(catalog.content ?? '')) fail(`catalog content ${catalog.content}`);
 /** 完成一次握手，返回第一个满足 done 的服务端消息。 */
 const handshake = (extra, done) =>
   new Promise((resolve, reject) => {
@@ -55,8 +55,9 @@ const handshake = (extra, done) =>
       const message = JSON.parse(String(data));
       if (message.kind === 'hello') {
         if (message.protocol !== protocol) reject(new Error(`protocol ${message.protocol}`));
-        else if (message.content !== content) reject(new Error(`content ${message.content}`));
-        else socket.send(JSON.stringify({ kind: 'hello', protocol, content, ...extra }));
+        else if (message.content !== catalog.content)
+          reject(new Error(`content ${message.content}`));
+        else socket.send(JSON.stringify({ kind: 'hello', protocol, ...extra }));
       } else if (message.kind === 'error') reject(new Error(message.message));
       else if (done(message)) {
         socket.close();
@@ -79,6 +80,6 @@ clearTimeout(timer);
 host.removeAllListeners('exit');
 host.kill();
 console.log(
-  `smoke-bun-host: PASS — Bun ${version}, catalog ${catalog.standard.generals.length} generals, seat ${seat}, solo ${solo.view.players.length} seats`,
+  `smoke-bun-host: PASS — Bun ${version}, catalog ${catalog.standard.generals.length} generals (content ${catalog.content.slice(0, 12)}), seat ${seat}, solo ${solo.view.players.length} seats`,
 );
 process.exit(0);

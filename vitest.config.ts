@@ -1,10 +1,9 @@
 import { defineConfig } from 'vitest/config';
-import { protocolHash, contentHash } from './scripts/network-build.mjs';
+import { protocolHash } from './scripts/network-build.mjs';
 
 export default defineConfig({
   define: {
     __SGS_PROTOCOL_HASH__: JSON.stringify(protocolHash()),
-    __SGS_CONTENT_HASH__: JSON.stringify(contentHash()),
   },
   test: {
     include: ['src/**/*.test.ts', 'tests/scenarios/**/*.test.ts'],

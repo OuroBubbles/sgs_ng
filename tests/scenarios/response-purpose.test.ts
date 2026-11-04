@@ -12,7 +12,7 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { UseTiming } from '../../src/sdk';
-import { standardGeneralSkills } from '../../src/content/standard/generals';
+import { standardGeneralSkills } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';
 import { Skill } from '../../src/sdk';

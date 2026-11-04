@@ -1,6 +1,5 @@
 import type { CardKind } from '../../protocol';
-import type { CardPresentation } from '../catalog';
-import { standardCardMedia } from './media';
+import type { CardPresentation, PackSetup } from '../catalog';
 
 const descriptions: Readonly<
   Record<string, { readonly kind: CardKind; readonly description: string }>
@@ -146,11 +145,42 @@ const descriptions: Readonly<
   },
 };
 
-export const standardCardViews: readonly CardPresentation[] = Object.entries(descriptions).map(
-  ([id, view]) => ({
+/** 卡面、图标与用牌语音按 public/standard 中实际存在的文件取 URL；不参与合法性或结算。 */
+function cardMedia(
+  media: PackSetup['media'],
+  id: string,
+): Pick<CardPresentation, 'icon' | 'image' | 'voices'> {
+  const name = id.slice('standard:'.length);
+  const horse = ['chitu', 'dayuan', 'zixing', 'jueying', 'dilu', 'zhuahuangfeidian'].includes(name);
+  const mark = media('marks/' + name + '.png');
+  const icon = media('icons/' + (horse ? 'horse' : name) + '.png') ?? mark;
+  const equipment = horse
+    ? 'horse'
+    : ['eight_diagram', 'nioh_shield'].includes(name)
+      ? 'armor'
+      : icon && !mark
+        ? 'weapon'
+        : null;
+  const voices = Object.fromEntries(
+    ['male', 'female'].flatMap((gender) => {
+      const voice =
+        media('audio/card/' + gender + '/' + name + '.mp3') ??
+        (equipment ? media('audio/card/common/' + equipment + '.mp3') : undefined);
+      return voice ? [[gender, voice]] : [];
+    }),
+  );
+  const image = media('cards/' + name + '.png');
+  return {
+    ...(icon ? { icon } : {}),
+    ...(image ? { image } : {}),
+    ...(Object.keys(voices).length ? { voices } : {}),
+  };
+}
+
+export const standardCardViews = (media: PackSetup['media']): readonly CardPresentation[] =>
+  Object.entries(descriptions).map(([id, view]) => ({
     id,
     kind: view.kind,
     description: view.description,
-    ...standardCardMedia(id),
-  }),
-);
+    ...cardMedia(media, id),
+  }));

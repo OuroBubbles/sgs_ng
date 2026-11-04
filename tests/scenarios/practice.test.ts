@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
 import { createRoleMatch } from '../../src/host/content';
-import { standardCardViews } from '../../src/content/standard/presentation';
+import { standard } from '../fixtures/standard';
 import { standardCards } from '../../src/content/standard/cards';
 
 it(
   '练习牌组包含所有已实现定义与显示说明，各种牌均能通过确定性初始化到达起手',
   async () => {
-    expect(standardCardViews.map((view) => view.id).sort()).toEqual(
+    expect(standard.cardViews!.map((view) => view.id).sort()).toEqual(
       standardCards.map((card) => card.id).sort(),
     );
     const fixtures: Record<string, { seed: number; first: string; hand: readonly string[] }> = {};
@@ -180,7 +180,7 @@ it(
       )
         break;
     }
-    expect(Object.keys(fixtures).sort()).toEqual(standardCardViews.map((view) => view.id).sort());
+    expect(Object.keys(fixtures).sort()).toEqual(standard.cardViews!.map((view) => view.id).sort());
     if (logging) console.info(JSON.stringify({ cards: fixtures, cases }));
   },
   process.env.SGS_FIXTURE_LOG === '1' ? 120_000 : 5_000,

@@ -1,5 +1,5 @@
 import { createContent } from '../../src/content/catalog';
-import standard from '../../src/content/standard';
+import { standard } from '../fixtures/standard';
 import harbor from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -17,9 +17,9 @@ import type { NetworkRoomOptions, RoomPlayer } from '../../src/host/room';
 import type { LobbyView, ServerMessage } from '../../src/protocol/wire';
 import { finishGame } from '../../src/rules/game/end';
 import { WebSocketServer } from 'ws';
-import { protocolHash, contentHash, buildMismatch } from '../../src/protocol/build';
+import { protocolHash, buildMismatch } from '../../src/protocol/build';
 import { readFile } from 'node:fs/promises';
-import { defaultContent, practiceContent } from '../../src/host/content';
+import { contentHash, defaultContent, practiceContent } from '../../src/host/content';
 import { Match } from '../../src/host/role-match';
 import { Game } from '../../src/sdk';
 

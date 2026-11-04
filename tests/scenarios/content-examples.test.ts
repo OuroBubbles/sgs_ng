@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import definition from '../../examples/content/study';
 import harbor, { Provision, tideDrawBonus } from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
-import standard from '../../src/content/standard';
+import { standard } from '../fixtures/standard';
 import { createContent, damage, Cards, Cost } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
 import { card, cardGame } from '../fixtures/cards';
