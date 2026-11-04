@@ -4,7 +4,7 @@
 
 ## 一将一文件
 
-标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件；`order` 数组固定标准武将的大厅与按种子抽将顺序，新武将不在其中时排在末尾。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
+标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 按标准顺序显式静态导入各武将（Bun 宿主、Vite 与 vitest 行为一致）；新增武将时新建文件并在末尾追加导入与登记，登记顺序即大厅与按种子抽将顺序（P3 改为宿主目录扫描）。立绘、技能与阵亡语音按原字节放在 [public/standard/](../public/standard/)，以稳定 URL `/standard/<file>` 提供，并登记到 [assets.json](../src/content/standard/assets.json)（存在性的唯一依据）。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
 ```ts
 import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';

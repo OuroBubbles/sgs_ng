@@ -71,7 +71,7 @@ src/
   app/               # 组装对局、客户端与本地/远端输入
     offline/         # 本地装配、投影与托管
     network/         # 席位绑定、远端适配；protocol 兼容再导出
-  server/            # Node HTTP / WebSocket 主持进程（P1 迁 Bun）
+  server/            # HTTP / WebSocket 主持进程（Bun 直接运行源码）
 examples/content/    # 渡口、画阁等普通作者源码模块
 tests/
   scenarios/         # 跨模块的真实机制反例
@@ -137,7 +137,7 @@ LocalSession 负责离线输入与基础 AI；NetworkRoom 持有连接与开局�
 
 平台生命周期、文件加载和内容持久化留在装配与原生壳中，不渗入技能代码。未来端口按实际适配需要形成，不预建工厂或继承树。
 
-Windows 主持入口只提供状态、创建与关闭三个平台命令。[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程；[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，规则仍全部为 TypeScript。原生壳退出关闭 stdin，主持端据此释放房间与监听；客户端只观察平台状态并使用既有 RemoteSession 加入，不持有第二份对局。
+Windows 主持入口只提供状态、创建与关闭三个平台命令。[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程（`pnpm host:build` 的 Vite SSR 产物；同一入口在开发机已可 `bun src/server/desktop-host.ts <port>` 运行，随包改 Bun 留待 P8）；[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，规则仍全部为 TypeScript。原生壳退出关闭 stdin，主持端据此释放房间与监听；客户端只观察平台状态并使用既有 RemoteSession 加入，不持有第二份对局。
 
 ## 历史、录像和恢复
 
@@ -149,11 +149,11 @@ World 重建只恢复已记录的事实状态，不能恢复技能栈、监听�
 
 ## 联机
 
-`pnpm online` 构建页面与 Node 主持端并监听 `127.0.0.1:1422`；`SGS_SEED`、`SGS_ROOM`（完整 [RoomSetup](../src/app/network/setup.ts) JSON）、`SGS_HOST`、`SGS_PORT` 与 `SGS_PRACTICE=1` 控制房间。Windows 桌面程序可在开局页直接创建房间：[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程，[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，配置只经 stdin 首行传入，stdin EOF 回收主持端。
+`pnpm online` 构建页面后以 `pnpm server`（`bun src/server/main.ts`）从 TypeScript 源码直接起主持端并监听 `127.0.0.1:1422`，不打包、不产出 server 构建物；[bunfig.toml](../bunfig.toml) 预加载 [source-hashes](../scripts/source-hashes.mjs) 按当前源码计算握手哈希（Vite/vitest 侧为构建期 define）。`SGS_SEED`、`SGS_ROOM`（完整 [RoomSetup](../src/app/network/setup.ts) JSON）、`SGS_HOST`、`SGS_PORT` 与 `SGS_PRACTICE=1` 控制房间。Windows 桌面程序可在开局页直接创建房间：[原生壳](../src-tauri/src/desktop_host.rs) 拥有随包 Node 子进程，[入口](../src/server/desktop-host.ts) 装配同一个 NetworkRoom，配置只经 stdin 首行传入，stdin EOF 回收主持端。
 
 - [NetworkRoom](../src/app/network/room.ts) 持有连接与准备草稿，同时至多一局 RoleMatch；全部玩家准备才开局，第 N 局种子为 `((房间种子 - 1 + N - 1) % 4294967295) + 1`。
 - [协议](../src/app/network/protocol.ts) 只传对应席位的 GameView、选择与预览，不发送 World、牌堆、他人私有决策、原始历史或闭包；远端 Decision ID 以局号限定，旧局回复被拒绝。
-- 入席前双方比对 [networkBuild](../scripts/network-build.mjs) 摘要（源码、资源、锁文件与构建入口的 SHA-256），不一致即拒绝。修改源码后双方都要重新构建。
+- 入席前双方比对 [protocolHash](../scripts/network-build.mjs)（`src/protocol` 的 SHA-256），不一致即拒绝；`contentHash`（`src/content`）随 hello 记录但不强求相等。内容携带的媒体为稳定 URL（`/standard/...`，来自 `public/`），任何同版本客户端构建都能解析。
 - 短暂断线保留席位凭据、原对局与挂起请求，重连回到同一席位；不重放、不重发旧答案。主持进程退出后原结算栈结束，不能凭展示数据恢复。
 
 ## 结算契约总则
