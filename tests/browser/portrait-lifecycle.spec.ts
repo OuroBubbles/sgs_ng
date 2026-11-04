@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './settled';
 
 test('立绘牌桌反复进入和关闭独立 Spine 渲染器后仍可重绘与选择', async ({ page }) => {
   const errors: string[] = [];

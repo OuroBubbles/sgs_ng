@@ -32,6 +32,7 @@
   let humans = $state(initial.humans);
   let creating = $state(false);
   $effect(() => {
+    if (!decks.length || !generals.length) return;
     if (!decks.some((deck) => deck.id === preset)) preset = decks[0]!.id;
     const next = lineup.map((id, i) =>
       generals.some((general) => general.id === id) ? id : generals[i % generals.length]!.id,

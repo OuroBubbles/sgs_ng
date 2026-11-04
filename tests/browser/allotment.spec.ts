@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './settled';
 import config from '../../src-tauri/tauri.conf.json' with { type: 'json' };
 
 const errors = new WeakMap<Page, string[]>();

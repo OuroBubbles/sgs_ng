@@ -117,6 +117,9 @@ export class RemoteSession {
     { readonly round: number; readonly resolve: (result: CommandResult) => void }
   >();
   readonly #previews = new Map<string, CommandResult | null>();
+  #inFlight = 0;
+  #settled = true;
+  readonly #settleListeners = new Set<(settled: boolean) => void>();
   #sequence = 0;
   #view = waitingView(null);
   #latest = this.#view;
@@ -333,6 +336,7 @@ export class RemoteSession {
     this.#state = 'closed';
     this.#settlePending();
     this.#listeners.clear();
+    this.#settleListeners.clear();
     this.#socket?.close();
     this.#socket = null;
     this.#releaseAssets();
@@ -361,9 +365,12 @@ export class RemoteSession {
     if (this.solo) this.#send({ kind: 'confirm-seat', key });
   }
   #send(command: ClientCommand): void {
-    this.#request(command).catch((error: unknown) => {
-      if (this.#socket) this.#lose(this.#socket, String(error));
-    });
+    this.#track(1);
+    this.#request(command)
+      .catch((error: unknown) => {
+        if (this.#socket) this.#lose(this.#socket, String(error));
+      })
+      .finally(() => this.#track(-1));
   }
 
   inspect(
@@ -402,8 +409,35 @@ export class RemoteSession {
   }
   async #reply(command: ClientCommand): Promise<ReplyResult> {
     if (this.#paused && command.kind !== 'delegate') return closedReply('请先恢复显示。');
-    const result = await this.#request(command);
-    return 'kind' in result ? result : closedReply('主持端返回了错误的响应。');
+    this.#track(1);
+    try {
+      const result = await this.#request(command);
+      return 'kind' in result ? result : closedReply('主持端返回了错误的响应。');
+    } finally {
+      this.#track(-1);
+    }
+  }
+  /**
+   * 预览与命令回执是否全部到达。二者经协议异步返回；界面据此标注忙碌，
+   * 自动化与辅助技术可等待结果而非读到中间态。通知延后一拍，可从派生值中安全发起。
+   */
+  get settled(): boolean {
+    return this.#settled;
+  }
+  watchSettled(listener: (settled: boolean) => void): () => void {
+    this.#settleListeners.add(listener);
+    return () => {
+      this.#settleListeners.delete(listener);
+    };
+  }
+  #track(delta: number): void {
+    this.#inFlight += delta;
+    queueMicrotask(() => {
+      const settled = this.#inFlight === 0;
+      if (settled === this.#settled || this.#disposed) return;
+      this.#settled = settled;
+      for (const listener of this.#settleListeners) listener(settled);
+    });
   }
   #preview(command: ClientCommand): CommandResult | null {
     const key = JSON.stringify(command);
@@ -411,6 +445,7 @@ export class RemoteSession {
       this.#previews.set(key, null);
       const generation = this.#generation;
       const socket = this.#socket;
+      this.#track(1);
       this.#request(command)
         .then((result) => {
           // 迟到响应不覆盖新决策或不同状态的预览。
@@ -420,7 +455,9 @@ export class RemoteSession {
         })
         .catch((error: unknown) => {
           if (this.#socket === socket && socket) this.#lose(socket, String(error));
-        });
+        })
+        // 先发布结果再报告到齐，界面不会在结果渲染前标为空闲。
+        .finally(() => this.#track(-1));
     }
     return this.#previews.get(key) ?? null;
   }

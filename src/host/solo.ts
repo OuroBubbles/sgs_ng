@@ -323,52 +323,59 @@ export function openSolo(
     });
   }
   let closed = false;
-  let queued = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = () => {
+    clearTimeout(timer);
+    timer = undefined;
+    if (!closed) send({ kind: 'view', lobby: null, view: session.view });
+  };
   // 一次结算可能连续刷新多次；同一轮事件循环只发送最后一份投影。
   session.subscribe(() => {
-    if (queued) return;
-    queued = true;
-    setTimeout(() => {
-      queued = false;
-      if (!closed) send({ kind: 'view', lobby: null, view: session.view });
-    }, 0);
+    timer ??= setTimeout(flush, 0);
   });
   session.start();
   const accepted = { kind: 'accepted' } as const;
   return {
     command(_round, command) {
-      if (closed) return closedReply('对局已结束。');
-      switch (command.kind) {
-        case 'inspect':
-          return session.inspect(command.id, command.token, command.selection);
-        case 'inspect-answer':
-          return session.inspectAnswer(command.id, command.token, command.value);
-        case 'reply':
-          return session.reply(command.id, command.token, command.selection);
-        case 'answer':
-          return session.answer(command.id, command.token, command.value);
-        case 'cancel':
-          return session.cancel(command.id, command.token);
-        case 'delegate':
-          return session.setDelegated(command.enabled);
-        case 'pause':
-          if (command.enabled) session.hide();
-          else session.resume();
-          return accepted;
-        case 'confirm-seat':
-          session.confirmSeat(command.key);
-          return accepted;
-        case 'ready':
-        case 'choose-general':
-        case 'prepare':
-        case 'leave':
-        case 'end-round':
-          return closedReply('单机对局没有房间操作。');
-      }
+      const result = handle(command);
+      // 命令造成的新投影先于其回执送出：客户端收到回执时已看到结果。
+      if (timer !== undefined) flush();
+      return result;
     },
     disconnect() {
       closed = true;
+      clearTimeout(timer);
       session.dispose();
     },
   };
+  function handle(command: ClientCommand): CommandResult {
+    if (closed) return closedReply('对局已结束。');
+    switch (command.kind) {
+      case 'inspect':
+        return session.inspect(command.id, command.token, command.selection);
+      case 'inspect-answer':
+        return session.inspectAnswer(command.id, command.token, command.value);
+      case 'reply':
+        return session.reply(command.id, command.token, command.selection);
+      case 'answer':
+        return session.answer(command.id, command.token, command.value);
+      case 'cancel':
+        return session.cancel(command.id, command.token);
+      case 'delegate':
+        return session.setDelegated(command.enabled);
+      case 'pause':
+        if (command.enabled) session.hide();
+        else session.resume();
+        return accepted;
+      case 'confirm-seat':
+        session.confirmSeat(command.key);
+        return accepted;
+      case 'ready':
+      case 'choose-general':
+      case 'prepare':
+      case 'leave':
+      case 'end-round':
+        return closedReply('单机对局没有房间操作。');
+    }
+  }
 }

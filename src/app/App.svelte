@@ -1,12 +1,18 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { CardView } from '../core/view/table';
-  import type { GameSelection } from '../core/view/game';
-  import type { ReplyResult } from '../core/decisions/hub';
-  import { SoloSession } from '../host/solo';
-  import { RemoteSession, rememberedRoom, type RememberedRoom } from './session';
-  import { defaultRoomSetup, type LobbyView, type RoomSetup } from '../protocol';
-  import { createRoleMatch, defaultContent, practiceContent, seatNames } from '../host/content';
+  import { RemoteSession, rememberedRoom, waitingView, type RememberedRoom } from './session';
+  import {
+    defaultRoomSetup,
+    emptyPreview,
+    type CardView,
+    type ContentSummary,
+    type GameSelection,
+    type HostCatalog,
+    type LobbyView,
+    type ReplyResult,
+    type RoomSetup,
+    type SoloSetup,
+  } from '../protocol';
   import type { BattleBoard } from '../client/table/board';
   import type { TableLayout, TableRegion } from '../client/table/layout';
   import { cardPoolCenter } from '../client/table/layout';
@@ -41,9 +47,12 @@
 
   type LobbyPage = 'home' | 'solo' | 'network' | 'content';
   const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
-  const initialSession = new SoloSession(createRoleMatch(), { human: '甲席' });
-  let session = $state.raw<SoloSession | RemoteSession>(initialSession);
-  const online = $derived(session instanceof RemoteSession);
+  // 大厅阶段没有会话；单机与联机都是经 /game 协议连接主持端的同一种会话。
+  let session = $state.raw<RemoteSession | null>(null);
+  const online = $derived(session?.online ?? false);
+  const manualSession = $derived(Boolean(session?.solo && !session.solo.lineup));
+  let catalog = $state.raw<HostCatalog | null>(null);
+  const noContent: ContentSummary = { cards: 0, decks: [], generals: [] };
   let remoteLobby = $state.raw<LobbyView | null>(null);
   let savedRoom = $state.raw<RememberedRoom | null>(null);
   let remoteState = $state<RemoteSession['connectionState'] | null>(null);
@@ -57,7 +66,7 @@
   let lastRoomSetup = $state.raw<RoomSetup>(defaultRoomSetup);
   let lastRoomPort = $state(1422);
   let lobbyPage = $state<LobbyPage>('home');
-  let view = $state.raw(initialSession.view);
+  let view = $state.raw(waitingView());
   const tableOpen = $derived(view.status !== 'idle' && view.players.length > 0);
   let selection = $state<GameSelection>(empty());
   let autoTargetEnabled = $state(true);
@@ -65,35 +74,40 @@
   let seed = $state(42);
   let deckPreset = $state('standard:identity');
   let enablePractice = $state(false);
-  const selectedContent = $derived(enablePractice ? practiceContent : defaultContent);
+  const selectedContent = $derived(
+    catalog ? (enablePractice ? catalog.practice : catalog.standard) : noContent,
+  );
+  const seatNames = $derived(catalog?.seats ?? []);
   const generals = $derived(selectedContent.generals);
-  const implementedCardCount = $derived(selectedContent.cards.length);
+  const portraitOf = (id: string) => generals.find((item) => item.id === id)?.portrait;
+  const implementedCardCount = $derived(selectedContent.cards);
   let manualPractice = $state(false);
   let practiceOptionsOpen = $state(false);
   let general = $state('standard:guanyu');
   const selectedGeneral = $derived(generals.find((item) => item.id === general));
-  // 大厅复用实际内容装配的技能说明；不启动对局，也不另维护一份技能文案。
-  const lobbySkills = $derived(selectedContent.createBooks().skills);
-  const selectedGeneralSkills = $derived(
-    selectedGeneral?.skills.map((id) => lobbySkills.definition(id)) ?? [],
-  );
+  // 技能说明随主持端目录送达，取自实际内容装配；客户端不另维护一份技能文案。
+  const selectedGeneralSkills = $derived(selectedGeneral?.skills ?? []);
   let failedPortrait = $state<string | null>(null);
   let aiGeneral = $state('preset');
   // 预览与开局共享同一份阵容草稿，不在表现层另外推算一套席位。
   const localLineup = $derived(
     Array.from({ length: playerCount }, (_, i) =>
-      i === 0 ? general : aiGeneral === 'preset' ? generals[i % generals.length]!.id : aiGeneral,
+      i === 0
+        ? general
+        : aiGeneral === 'preset'
+          ? (generals[i % generals.length]?.id ?? '')
+          : aiGeneral,
     ),
   );
   const lobbySeats = $derived(
-    localLineup.map((id, i) => ({
+    localLineup.slice(0, seatNames.length).map((id, i) => ({
       seat: seatNames[i]!,
       name: manualPractice
         ? '自由演练'
         : (generals.find((item) => item.id === id)?.name ?? '待选将'),
       portrait: manualPractice
         ? skinImage('ui/photo/unknown.jpg')
-        : (selectedContent.generalViews[id]?.portrait ?? skinImage('ui/photo/unknown.jpg')),
+        : (portraitOf(id) ?? skinImage('ui/photo/unknown.jpg')),
       controller: manualPractice ? '手动' : i === 0 ? '你' : 'AI',
     })),
   );
@@ -118,6 +132,8 @@
   let audio = $state.raw<GameAudio | null>(null);
   let visible = $state(true);
   let unsubscribe = () => {};
+  /** 主持端预览全部到达；未到达时界面标注 aria-busy。 */
+  let settled = $state(true);
   let decisionKey = '';
   const phases = [
     ['prepare', '准备'],
@@ -127,11 +143,13 @@
     ['discard', '弃牌'],
     ['finish', '结束'],
   ];
-  const preview = $derived(session.inspect(view.decision?.id, view.decision?.token, selection));
+  /** 选择预览只来自主持端；结果到达前为空预览。 */
+  const inspect = (draft: GameSelection) =>
+    session?.inspect(view.decision?.id, view.decision?.token, draft) ?? emptyPreview();
+  const preview = $derived(inspect(selection));
   const targetOptions = $derived(
     preview.targetCount.max === 1
-      ? session.inspect(view.decision?.id, view.decision?.token, { ...selection, targets: [] })
-          .targets
+      ? inspect({ ...selection, targets: [] }).targets
       : preview.targets,
   );
   const offers = $derived(view.decision && 'offers' in view.decision ? view.decision.offers : []);
@@ -139,7 +157,7 @@
   const cardOptions = $derived(
     (selectedOffer?.kind === 'active' && selectedOffer.count.max === 1) ||
       (view.decision?.kind === 'cards-targets' && view.decision.cardCount.max === 1)
-      ? session.inspect(view.decision?.id, view.decision?.token, { ...selection, cards: [] }).cards
+      ? inspect({ ...selection, cards: [] }).cards
       : preview.cards,
   );
   const ownedCardGroups = $derived(
@@ -147,9 +165,7 @@
   );
   $effect(() => {
     if (!autoTargetEnabled || !view.decision) return;
-    const next = selectForcedTargets(selection, (draft) =>
-      session.inspect(view.decision?.id, view.decision?.token, draft),
-    );
+    const next = selectForcedTargets(selection, inspect);
     if (next !== selection) selection = next;
   });
   const fixedTargets = $derived(
@@ -197,6 +213,7 @@
     return '公开记录随结算更新 · 右键或长按查看牌面';
   });
   $effect(() => {
+    if (!catalog) return;
     if (!selectedContent.decks.some((deck) => deck.id === deckPreset))
       deckPreset = 'standard:identity';
     if (!generals.some((item) => item.id === general)) general = 'standard:guanyu';
@@ -228,15 +245,38 @@
 
   function subscribe() {
     unsubscribe();
-    unsubscribe = session.subscribe((next) => {
+    const current = session;
+    settled = true;
+    if (!current) {
+      unsubscribe = () => {};
+      remoteLobby = null;
+      remoteState = null;
+      remoteEpoch = 0;
+      remoteBaseline = 0;
+      remoteRetryable = false;
+      decisionKey = '';
+      view = waitingView();
+      return;
+    }
+    const unwatch = current.watchSettled((next) => {
+      if (session === current) settled = next;
+    });
+    const unlisten = current.subscribe((next) => {
+      // 单机在开局前失败（装配失败、主持端未运行）时回到大厅并提示，而非停在空桌。
+      if (current.solo && next.error && !next.players.length) {
+        queueMicrotask(() => {
+          if (session === current) useSession(null, next.error);
+        });
+        return;
+      }
       const previousRound = remoteLobby?.round;
       const previousEditing = remoteLobby?.editing;
       const previousEpoch = remoteEpoch;
-      remoteLobby = session instanceof RemoteSession ? session.lobby : null;
-      remoteState = session instanceof RemoteSession ? session.connectionState : null;
-      remoteEpoch = session instanceof RemoteSession ? session.epoch : 0;
-      remoteBaseline = session instanceof RemoteSession ? session.actionBaseline : 0;
-      remoteRetryable = session instanceof RemoteSession && session.reconnectable;
+      remoteLobby = current.lobby;
+      remoteState = current.connectionState;
+      remoteEpoch = current.epoch;
+      remoteBaseline = current.actionBaseline;
+      remoteRetryable = current.reconnectable;
       const scopeChanged =
         previousRound !== remoteLobby?.round || previousEditing !== remoteLobby?.editing;
       if (previousRound !== remoteLobby?.round) audio?.reset();
@@ -263,6 +303,10 @@
       decisionKey = key;
       view = next;
     });
+    unsubscribe = () => {
+      unwatch();
+      unlisten();
+    };
   }
   onMount(() => {
     let mounted = true;
@@ -279,6 +323,23 @@
       });
     const playback = new GameAudio();
     audio = playback;
+    // 主持端可能与页面同时启动；短暂重试后再提示。
+    (async () => {
+      for (let attempt = 0; mounted && attempt < 20; attempt++) {
+        try {
+          const response = await fetch('/catalog');
+          if (response.ok) {
+            const next = (await response.json()) as HostCatalog;
+            if (mounted) catalog = next;
+            return;
+          }
+        } catch {
+          /* 主持端尚未就绪。 */
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      if (mounted) notice = '无法读取本机主持端的内容目录；请用 pnpm dev 或 pnpm online 启动。';
+    })().catch(() => {});
     savedRoom = rememberedRoom();
     if (
       new URL(location.href).searchParams.has('online') &&
@@ -291,15 +352,14 @@
       visible = active;
       if (!active) {
         inspectedCard = null;
-        session.hide();
+        session?.hide();
       }
     });
     return () => {
       mounted = false;
       offHosting();
       unsubscribe();
-      if (session instanceof RemoteSession) session.dispose(false);
-      else session.dispose();
+      session?.dispose(false);
       offVisibility();
       playback.destroy();
     };
@@ -348,13 +408,13 @@
     region
       ? `left:${region.left}px;top:${region.top + (fitContent ? region.height / 2 : 0)}px;width:${region.width}px;${fitContent ? 'max-height' : 'height'}:${region.height}px`
       : 'visibility:hidden';
-  function useSession(next: SoloSession | RemoteSession) {
+  function useSession(next: RemoteSession | null, message = '') {
     audio?.reset();
-    session.dispose();
+    session?.dispose();
     session = next;
     subscribe();
     selection = empty();
-    notice = '';
+    notice = message;
   }
   /** 回到开局页只结束会话；本地配置仍是草稿，等实际开局时再校验。 */
   async function returnToLobby() {
@@ -367,7 +427,7 @@
       }
     }
     const wasOnline = online;
-    useSession(new SoloSession(createRoleMatch(), { human: '甲席' }));
+    useSession(null);
     savedRoom = rememberedRoom();
     lobbyPage = 'solo';
     if (wasOnline) history.replaceState(null, '', location.pathname);
@@ -399,23 +459,15 @@
       notice = '牌局种子需为 1 至 4294967295 的整数';
       return;
     }
-    let next: SoloSession;
-    try {
-      next = new SoloSession(
-        createRoleMatch({
-          seed,
-          preset: deckPreset,
-          content: selectedContent,
-          ...(manualPractice ? { count: playerCount } : { lineup: localLineup }),
-        }),
-        manualPractice ? {} : { human: '甲席' },
-      );
-    } catch (error) {
-      notice = `内容装配失败：${error instanceof Error ? error.message : String(error)}`;
-      return;
-    }
-    useSession(next);
-    next.start();
+    if (!catalog) return;
+    // 只发送普通开局草稿；本机主持端装配内容并开局，失败时经协议报回。
+    const solo: SoloSetup = {
+      seed,
+      preset: deckPreset,
+      ...(enablePractice ? { practice: true } : {}),
+      ...(manualPractice ? { count: playerCount } : { lineup: localLineup }),
+    };
+    useSession(new RemoteSession(location.href, { solo }));
   }
   async function chooseLobbyGeneral(id: string) {
     general = id;
@@ -486,7 +538,7 @@
     const previous = selection.targets;
     let next = { ...selection, targets: [] as string[] };
     for (const id of previous) {
-      const feedback = session.inspect(decision.id, decision.token, next);
+      const feedback = inspect(next);
       if (feedback.targets.some((target) => target.id === id && target.selectable))
         next = { ...next, targets: [...next.targets, id] };
     }
@@ -525,9 +577,9 @@
   }
   async function reply(value?: unknown) {
     const decision = view.decision;
-    if (!decision) return;
-    const key = decisionKey;
     const current = session;
+    if (!decision || !current) return;
+    const key = decisionKey;
     const epoch = remoteEpoch;
     const result = await (value === undefined
       ? current.reply(decision.id, decision.token, selection)
@@ -542,8 +594,8 @@
   }
   async function cancel() {
     const decision = view.decision;
-    if (!decision) return;
     const current = session;
+    if (!decision || !current) return;
     const key = decisionKey;
     const epoch = remoteEpoch;
     const result = await current.cancel(decision.id, decision.token);
@@ -566,7 +618,7 @@
   }
   async function roomReply(action: (remote: RemoteSession) => Promise<ReplyResult>) {
     const current = session;
-    if (!(current instanceof RemoteSession)) return;
+    if (!current?.online) return;
     const round = current.lobby?.round;
     notice = '';
     const result = await action(current);
@@ -574,8 +626,8 @@
       notice = result.message;
   }
   async function toggleDelegation() {
-    if (!view.control) return;
     const current = session;
+    if (!view.control || !current) return;
     const round = remoteLobby?.round;
     const result = await current.setDelegated(!view.control.delegated);
     if (session === current && remoteLobby?.round === round && result.kind === 'rejected')
@@ -627,7 +679,12 @@
 
 <svelte:window onkeydown={keydown} />
 
-<div class="app-shell" class:motion-off={!animations} class:setup={view.status === 'idle'}>
+<div
+  class="app-shell"
+  class:motion-off={!animations}
+  class:setup={view.status === 'idle'}
+  aria-busy={!settled}
+>
   <header class="app-header">
     <a
       href="/"
@@ -659,9 +716,9 @@
       <span class="room-tag"
         >{online
           ? `联机 · ${remoteLobby?.seat ?? '连接中'}`
-          : session.human
-            ? '单机 · 基础 AI'
-            : '手动演练'}</span
+          : manualSession
+            ? '手动演练'
+            : '单机 · 基础 AI'}</span
       >{#if online}<button
           class="subtle-button"
           data-back-action={view.status === 'idle' ? '' : undefined}
@@ -678,6 +735,7 @@
   {#if view.status === 'idle'}
     <LobbyShell
       page={online ? 'room' : lobbyPage}
+      ready={catalog !== null}
       summary={implementedCardCount + ' 种牌 · ' + generals.length + ' 名武将'}
       {matchSummary}
       seats={lobbySeats}
@@ -714,8 +772,7 @@
                 <img
                   src={(manualPractice || failedPortrait === general
                     ? undefined
-                    : selectedContent.generalViews[general]?.portrait) ??
-                    skinImage('ui/photo/unknown.jpg')}
+                    : portraitOf(general)) ?? skinImage('ui/photo/unknown.jpg')}
                   alt=""
                   onerror={() => {
                     failedPortrait = general;
@@ -893,7 +950,7 @@
               name: item.name,
               kingdom: item.kingdom,
               maxHp: item.maxHp,
-              portrait: selectedContent.generalViews[item.id]?.portrait,
+              portrait: item.portrait,
             }))}
             selected={general}
             onselect={chooseLobbyGeneral}
@@ -1012,10 +1069,10 @@
               {#if remoteRetryable}<button
                   class="confirm-button"
                   onclick={() => {
-                    if (session instanceof RemoteSession) session.reconnect();
+                    session?.reconnect();
                   }}>重连原席位 →</button
                 >{/if}
-              {#if session instanceof RemoteSession && session.connected}
+              {#if online && session?.connected}
                 <button
                   class="confirm-button"
                   disabled={remoteLobby?.phase !== 'finished'}
@@ -1037,7 +1094,7 @@
                     >{player.name} · {player.role} {player.alive ? '' : '· 阵亡'}</span
                   >{/each}
               </div>
-              {#if session instanceof RemoteSession && session.connected}
+              {#if online && session?.connected}
                 <button
                   class="confirm-button"
                   disabled={remoteLobby?.phase !== 'finished'}
@@ -1251,13 +1308,12 @@
               logOpen = !logOpen;
             }}>记录</button
           ><button
-            aria-label={online ? '隐藏联机手牌' : session.human ? '暂停对局' : '隐藏手牌'}
+            aria-label={online ? '隐藏联机手牌' : manualSession ? '隐藏手牌' : '暂停对局'}
             data-back-action={view.status === 'running' && !view.paused && !logOpen
               ? ''
               : undefined}
             disabled={!view.viewer || view.status !== 'running'}
-            onclick={() => session.hide()}
-            >{online ? '藏牌' : session.human ? '暂停' : '藏牌'}</button
+            onclick={() => session?.hide()}>{online || manualSession ? '藏牌' : '暂停'}</button
           >
         </nav>
       </div>
@@ -1294,7 +1350,7 @@
     </aside>
   </main>
   <footer class="app-footer">
-    <span>{online ? '联机运行 · 主持端结算' : '本地运行 · 无需网络'}</span><span
+    <span>{online ? '联机运行 · 主持端结算' : '单机运行 · 本机主持端结算'}</span><span
       class="footer-center">SGS_NG ／ 自由落子</span
     >
     <div>
@@ -1334,10 +1390,13 @@
       cards={view.pools.flatMap((pool) => pool.cards)}
       onpreview={(choice) =>
         view.decision
-          ? session.inspectAnswer(view.decision.id, view.decision.token, choice)
+          ? (session?.inspectAnswer(view.decision.id, view.decision.token, choice) ?? {
+              valid: false,
+              reason: '当前不可操作',
+            })
           : { valid: false, reason: '选择已结束' }}
       onconfirm={(choice) => reply(choice)}
-      onpause={() => session.hide()}
+      onpause={() => session?.hide()}
       oncancel={cancel}
       privateContent={hasPrivatePool}
     />
@@ -1347,14 +1406,14 @@
     onexit={returnToLobby}
     {online}
     delegated={view.control?.delegated ?? false}
-    onresume={() => session.resume()}
+    onresume={() => session?.resume()}
   />{/if}
 {#if view.handoff}{#key view.handoff.key}<SeatCurtain
       name={view.handoff.name}
       turn={view.handoff.turn}
       extra={view.handoff.extra}
       onconfirm={() => {
-        if (view.handoff) session.confirmSeat(view.handoff.key);
+        if (view.handoff) session?.confirmSeat(view.handoff.key);
       }}
     />{/key}{/if}
 {#if labOpen}<SpinePanel

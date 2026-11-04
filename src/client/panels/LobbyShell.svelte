@@ -6,6 +6,7 @@
   type LobbyPage = 'home' | 'solo' | 'network' | 'content';
   const {
     page,
+    ready,
     summary,
     matchSummary,
     seats,
@@ -18,6 +19,8 @@
     children,
   }: {
     page: LobbyPage | 'room';
+    /** 主持端大厅目录已到达。 */
+    ready: boolean;
     summary: string;
     matchSummary: string;
     seats: readonly {
@@ -76,7 +79,7 @@
   class:launch={page === 'home'}
   class:waiting={page === 'room'}
   aria-label={page === 'home' ? '启动界面' : '游戏大厅'}
-  data-content-ready="true"
+  data-content-ready={ready}
 >
   <div class="lobby-frame">
     <div class="lobby-masthead">
@@ -90,7 +93,11 @@
         <span class="lobby-edition">联机房间 <span>／</span> 准备入席</span>
       {/if}
       <span class="lobby-state" role="status"
-        ><i class="ready"></i>{page === 'room' ? '等待同伴' : '离线可用 · 内容就绪'}</span
+        ><i class="ready"></i>{page === 'room'
+          ? '等待同伴'
+          : ready
+            ? '本机主持端 · 内容就绪'
+            : '正在连接本机主持端…'}</span
       >
     </div>
 
@@ -229,7 +236,7 @@
 
     <div class="lobby-bottomline">
       <span>{page === 'room' ? '对局内容由主持端提供' : summary}</span>
-      <span>{page === 'room' ? '联机对局 · 准备入席' : '本地内容 · 离线可用'}</span>
+      <span>{page === 'room' ? '联机对局 · 准备入席' : '本机主持端 · 规则只在主持端运行'}</span>
     </div>
   </div>
 </section>
