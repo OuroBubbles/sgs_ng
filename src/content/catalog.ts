@@ -74,7 +74,7 @@ function distinct(entries: readonly { readonly id: string }[], kind: string): vo
   }
 }
 
-/** 唯一的普通源码装配；固定声明与方法入口，保留 Window / Query 的对象身份。 */
+/** 唯一的普通源码装配：展平全部定义并校验重复；技能、事件与查询按引用使用。 */
 export function createContent(...definitions: readonly ContentDefinition[]): ContentCatalog {
   const cards = Object.freeze(definitions.flatMap((entry) => entry.cards ?? []).map(defineCard));
   const generals = Object.freeze(
