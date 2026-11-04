@@ -114,10 +114,10 @@ test('标准立绘实际绘制到原席位，确认与目标区域仍按参考�
 });
 
 test('坏立绘回退默认图、坏卡面回退文字，解码失败不阻塞本人选择', async ({ page }, info) => {
-  await page.route('**/assets/guanyu-*.jpg', (route) =>
+  await page.route('**/standard/portraits/guanyu.jpg', (route) =>
     route.fulfill({ status: 200, contentType: 'image/jpeg', body: 'invalid image' }),
   );
-  await page.route('**/assets/slash-*.png', (route) =>
+  await page.route('**/standard/cards/slash.png', (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: 'invalid card image' }),
   );
   await page

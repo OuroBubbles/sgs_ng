@@ -4,7 +4,7 @@ import { standardGenerals } from './generals';
 import { createStandardDeck } from './deck';
 import { mechanicsDeck } from './practice-deck';
 import { standardCardViews } from './presentation';
-import { standardGeneralViews } from './portraits';
+import { standardGeneralViews } from './media';
 import { luoyiAftereffect } from './generals/xuchu';
 
 export default {

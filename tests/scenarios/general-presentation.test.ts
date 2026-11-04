@@ -1,9 +1,10 @@
 import { expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { createContent } from '../../src/sdk';
 import standard from '../../src/content/standard';
-import provenance from '../../src/content/standard/portraits/provenance.json';
+import assets from '../../src/content/standard/assets.json';
 import { createOfflineMatch, defaultContent } from '../../src/app/offline/practice';
 import { projectMatch } from '../../src/app/offline/projection';
 import { observeAgent } from '../../src/app/offline/agent-observation';
@@ -72,15 +73,23 @@ it('公开武将图随当前武将投影，身份和手牌权限不变，图像�
   );
 });
 
-it('二十五将立绘与目录一一对应，私有参考图保留原始字节和可核对的来源', async () => {
+it('二十五将立绘与目录一一对应，标准包媒体按清单原字节放在 public/standard', async () => {
   expect(Object.keys(defaultContent.generalViews).sort()).toEqual(
     defaultContent.generals.map((entry) => entry.id).sort(),
   );
-  expect(provenance.images).toHaveLength(25);
-  for (const entry of provenance.images) {
-    const data = await readFile(`src/content/standard/portraits/${entry.file}`);
+  expect(assets.portraits).toHaveLength(25);
+  for (const entry of assets.portraits)
+    expect(defaultContent.generalViews[entry.id]?.portrait).toBe(`/standard/${entry.file}`);
+  const listed = [...assets.resources, ...assets.portraits];
+  for (const entry of listed) {
+    const data = await readFile(`public/standard/${entry.file}`);
     expect(data.byteLength).toBe(entry.bytes);
     expect(createHash('sha256').update(data).digest('hex')).toBe(entry.sha256);
-    expect(defaultContent.generalViews[entry.id]).toBeDefined();
   }
+  const files = (await readdir('public/standard', { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) =>
+      relative('public/standard', join(entry.parentPath, entry.name)).replaceAll('\\', '/'),
+    );
+  expect(files.sort()).toEqual([...listed.map((entry) => entry.file), 'SOURCE-LICENSE.txt'].sort());
 });

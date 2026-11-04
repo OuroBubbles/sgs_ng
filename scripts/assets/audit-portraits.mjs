@@ -1,29 +1,26 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../../', import.meta.url);
 const read = (path) => readFile(new URL(path, root));
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const manifest = JSON.parse(await read('src/content/standard/portraits/provenance.json'));
-const emitted = await readdir(new URL('dist/assets/', root));
+const manifest = JSON.parse(await read('src/content/standard/assets.json'));
 const images = [];
-for (const image of manifest.images) {
+for (const image of manifest.portraits) {
   // 素材清单中的来源相对工作区；参考项目与本项目同级。
   const original = await read(`../${image.source}`);
-  const copied = await read(`src/content/standard/portraits/${image.file}`);
+  const copied = await read(`public/standard/${image.file}`);
   assert.equal(original.length, image.bytes);
   assert.equal(copied.length, image.bytes);
   assert.equal(hash(original), image.sha256);
   assert.equal(hash(copied), image.sha256);
-  const prefix = `${image.file.slice(0, -4)}-`;
-  const outputs = emitted.filter((name) => name.startsWith(prefix) && name.endsWith('.jpg'));
-  assert.equal(outputs.length, 1, `Expected one emitted portrait: ${image.id}`);
-  assert.equal(hash(await read(`dist/assets/${outputs[0]}`)), image.sha256);
+  // public/standard 原样复制到 dist，URL 稳定为 /standard/<file>。
+  assert.equal(hash(await read(`dist/standard/${image.file}`)), image.sha256);
   images.push({
     ...image,
-    emitted: `dist/assets/${outputs[0]}`,
+    emitted: `dist/standard/${image.file}`,
     originalAndEmittedBytesMatch: true,
   });
 }
