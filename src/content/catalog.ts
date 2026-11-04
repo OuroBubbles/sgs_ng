@@ -1,5 +1,5 @@
 import type { Card } from '../core/model/state';
-import type { CardKind } from '../core/view/table';
+import type { CardKind } from '../protocol';
 import { immutable } from '../core/model/value';
 import { CardBook, defineCard } from '../rules/cards/book';
 import type { CardDefinition, CardPolicy } from '../rules/cards/types';

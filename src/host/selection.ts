@@ -1,7 +1,7 @@
 import type { DecisionRequest } from '../core/decisions/hub';
 import { immutable } from '../core/model/value';
-import type { GameSelection, ChoicePreview } from '../core/view/game';
-import { emptyPreview } from '../core/view/game';
+import type { GameSelection, ChoicePreview } from '../protocol';
+import { emptyPreview } from '../protocol';
 import { record, candidates } from './projection';
 import type { RoleMatch } from './role-match';
 

@@ -1,7 +1,7 @@
 import type { DecisionRequest } from '../core/decisions/hub';
 import { immutable } from '../core/model/value';
 import { projectMatch } from './projection';
-import { emptyPreview } from '../core/view/game';
+import { emptyPreview } from '../protocol';
 import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
 import { AgentDriver } from './agent-driver';

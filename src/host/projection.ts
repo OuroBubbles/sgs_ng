@@ -11,8 +11,8 @@ import type {
   CandidateView,
   PoolView,
   CardChoiceGroupView,
-} from '../core/view/game';
-import type { CardView, CardChoiceView } from '../core/view/table';
+} from '../protocol';
+import type { CardView, CardChoiceView } from '../protocol';
 import { immutable, isStringArray } from '../core/model/value';
 import { activePhase, activeTurn, activeTarget } from '../rules/turn/turn';
 import { readState } from '../rules/state/state';

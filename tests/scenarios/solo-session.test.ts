@@ -5,7 +5,7 @@ import { standardCards } from '../../src/content/standard/cards';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { moveCards, finishGame, Use } from '../../src/sdk';
 import '../../src/sdk';
-import type { GameSelection, GameView } from '../../src/core/view/game';
+import type { GameSelection, GameView } from '../../src/protocol';
 import { card } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

@@ -1,4 +1,4 @@
-import type { CardKind } from '../../core/view/table';
+import type { CardKind } from '../../protocol';
 import type { CardPresentation } from '../catalog';
 import { standardCardMedia } from './media';
 
