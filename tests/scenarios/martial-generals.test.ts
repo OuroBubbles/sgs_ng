@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { readdirSync } from 'node:fs';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -218,7 +219,11 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
 });
 
-it('标准武将保持原包顺序：glob 文件名顺序不影响大厅列表与按种子抽将', () => {
+it('标准武将保持原包顺序：登记表顺序决定大厅列表与按种子抽将，目录内武将文件全部登记', () => {
+  const files = readdirSync(new URL('../../src/content/standard/generals/', import.meta.url))
+    .filter((name) => name.endsWith('.ts') && name !== 'index.ts')
+    .map((name) => `standard:${name.slice(0, -3)}`);
+  expect(standardGenerals.map((general) => general.id).sort()).toEqual(files.sort());
   expect(standardGenerals.map((general) => general.id.replace('standard:', ''))).toEqual([
     'guanyu',
     'huanggai',
