@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 // 固定官方仓库提交；资源与运行时都属于 Spine 4.2。
 const commit = 'e7dc1435fa4a0083ab431f1b28e083c14a1f5c68';
 const root = `https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/${commit}`;
-const directory = new URL('../public/spine/', import.meta.url);
+const directory = new URL('../../public/spine/', import.meta.url);
 const assets = [
   ['spineboy-pro.skel', 'examples/spineboy/export/spineboy-pro.skel'],
   ['spineboy.atlas', 'examples/spineboy/export/spineboy.atlas'],

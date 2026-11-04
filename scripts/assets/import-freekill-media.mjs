@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// node scripts/import-freekill-media.mjs ../freekill
+// node scripts/assets/import-freekill-media.mjs ../freekill
 // 参考目录只读；运行程序只依赖复制到本项目的资源。
-const project = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const project = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const source = resolve(process.argv[2] ?? resolve(project, '../freekill'));
 const target = resolve(project, 'src/assets/freekill');
 const entries = [];

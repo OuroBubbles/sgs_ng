@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const root = new URL('../', import.meta.url);
+const root = new URL('../../', import.meta.url);
 const read = (path) => readFile(new URL(path, root));
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const manifest = JSON.parse(await read('src/content/standard/portraits/provenance.json'));
