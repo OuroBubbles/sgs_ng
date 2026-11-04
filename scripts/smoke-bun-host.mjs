@@ -1,4 +1,4 @@
-// 宿主冒烟：用 Bun 直接跑 src/server/main.ts（源码，不打包），连一次 /game 完成 hello 并入座。
+// 宿主冒烟：用 Bun 直接跑 src/server/main.ts（源码，不打包）：读 /catalog，/game 联机入座，再开一局单机。
 // Bun 缺失或版本不符 engines.bun、未监听、哈希不符或握手失败均以非零退出。
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -42,23 +42,43 @@ const port = await new Promise((resolve) =>
     if (found) resolve(found[1]);
   }),
 );
-const seat = await new Promise((resolve, reject) => {
-  const socket = new WebSocket(`ws://127.0.0.1:${port}/game`);
-  socket.on('error', reject);
-  socket.on('message', (data) => {
-    const message = JSON.parse(String(data));
-    if (message.kind === 'hello') {
-      if (message.protocol !== protocol) reject(new Error(`protocol ${message.protocol}`));
-      else if (message.content !== content) reject(new Error(`content ${message.content}`));
-      else socket.send(JSON.stringify({ kind: 'hello', protocol, content, build: protocol }));
-    } else if (message.kind === 'seat') {
-      socket.close();
-      resolve(message.seat);
-    } else if (message.kind === 'error') reject(new Error(message.message));
-  });
-}).catch(fail);
+const catalog = await fetch(`http://127.0.0.1:${port}/catalog`)
+  .then((response) => response.json())
+  .catch(fail);
+if (!catalog.standard?.generals?.length) fail('catalog without generals');
+/** 完成一次握手，返回第一个满足 done 的服务端消息。 */
+const handshake = (extra, done) =>
+  new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/game`);
+    socket.on('error', reject);
+    socket.on('message', (data) => {
+      const message = JSON.parse(String(data));
+      if (message.kind === 'hello') {
+        if (message.protocol !== protocol) reject(new Error(`protocol ${message.protocol}`));
+        else if (message.content !== content) reject(new Error(`content ${message.content}`));
+        else socket.send(JSON.stringify({ kind: 'hello', protocol, content, ...extra }));
+      } else if (message.kind === 'error') reject(new Error(message.message));
+      else if (done(message)) {
+        socket.close();
+        resolve(message);
+      }
+    });
+  }).catch(fail);
+const { seat } = await handshake({}, (message) => message.kind === 'seat');
+const solo = await handshake(
+  {
+    solo: {
+      seed: 7,
+      preset: 'standard:identity',
+      lineup: catalog.standard.generals.slice(0, 2).map((general) => general.id),
+    },
+  },
+  (message) => message.kind === 'view' && message.lobby === null && message.view.players.length,
+);
 clearTimeout(timer);
 host.removeAllListeners('exit');
 host.kill();
-console.log(`smoke-bun-host: PASS — Bun ${version}, hello ok, seat ${seat}`);
+console.log(
+  `smoke-bun-host: PASS — Bun ${version}, catalog ${catalog.standard.generals.length} generals, seat ${seat}, solo ${solo.view.players.length} seats`,
+);
 process.exit(0);

@@ -157,6 +157,8 @@ export class NetworkRoom {
   #command(seat: string, command: ClientCommand): CommandResult {
     const game = this.#game;
     if (command.kind === 'leave') return closedReply('连接已关闭。');
+    if (command.kind === 'pause' || command.kind === 'confirm-seat')
+      return closedReply('联机房间不支持暂停或热坐交接。');
     if (command.kind === 'end-round') {
       if (!game || game.settled || this.#humans.every((id) => this.#clients.get(id)?.send))
         return closedReply('只有本局有人断线时才可结束。');

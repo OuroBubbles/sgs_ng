@@ -229,7 +229,6 @@ test('两个独立牌桌入席、托管交接、远端预览、藏牌和断线�
           kind: 'hello',
           protocol: 'different-content',
           content: 'x',
-          build: 'different-content',
         }),
       ),
     );

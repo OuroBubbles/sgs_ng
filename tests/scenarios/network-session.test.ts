@@ -9,11 +9,12 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { inspectSelection } from '../../src/host/selection';
-import { createRoomOptions, defaultRoomSetup, type RoomSetup } from '../../src/host/setup';
+import { createRoomOptions } from '../../src/host/setup';
+import { defaultRoomSetup, type RoomSetup } from '../../src/protocol';
 import type { RoleMatch } from '../../src/host/role-match';
 import { NetworkRoom } from '../../src/host/room';
 import type { NetworkRoomOptions, RoomPlayer } from '../../src/host/room';
-import type { ServerMessage } from '../../src/protocol/wire';
+import type { LobbyView, ServerMessage } from '../../src/protocol/wire';
 import { finishGame } from '../../src/rules/game/end';
 import { WebSocketServer } from 'ws';
 import { protocolHash, contentHash, buildMismatch } from '../../src/protocol/build';
@@ -81,10 +82,10 @@ it('创建草稿和选项后续修改不改变房间目录、种子或实际建�
     throw new Error('Changed factory must not run.');
   };
 
-  type Frame = Extract<ServerMessage, { kind: 'view' }>;
+  type Frame = Extract<ServerMessage, { kind: 'view' }> & { readonly lobby: LobbyView };
   let view: Frame | undefined;
   const a = room.join((frame) => {
-    if (frame.kind === 'view') view = frame;
+    if (frame.kind === 'view') view = frame as Frame;
   })!;
   const b = room.join(() => {})!;
   await vi.waitFor(() => expect(view?.lobby.seed).toBe(17));
@@ -301,12 +302,9 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
   const { clients, port, start } = await connect();
   const match = await start();
   for (const first of [
-    {
-      kind: 'hello',
-      protocol: 'different-rules-with-the-same-version',
-      content: 'x',
-      build: 'different-rules-with-the-same-version',
-    },
+    { kind: 'hello', protocol: 'different-rules-with-the-same-version', content: 'x' },
+    // 旧客户端只发 build 字段；该别名已删除，不再被当作协议哈希。
+    { kind: 'hello', content: 'x', build: protocolHash },
     { sequence: 1, round: 1, command: { kind: 'ready', enabled: true } },
     null,
   ]) {
@@ -324,7 +322,6 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
         kind: 'hello',
         protocol: protocolHash,
         content: contentHash,
-        build: protocolHash,
         assets: [],
       },
       { kind: 'error', message: first === null ? '消息格式错误。' : buildMismatch },
@@ -336,7 +333,7 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
 
 it('客户端拒绝不同构建和旧主持端的视图，在读取手牌或建立席位前结束连接', async () => {
   for (const greeting of [
-    { kind: 'hello', protocol: 'other-content', content: 'x', build: 'other-content' },
+    { kind: 'hello', protocol: 'other-content', content: 'x' },
     { kind: 'view', lobby: { seat: '甲席' }, view: { hand: ['old-private-card'] } },
   ]) {
     const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
@@ -447,7 +444,7 @@ it.each([
       expect(client.view.hand).toEqual([]);
       expect(client.view.decision).toBeNull();
     }
-    for (const client of clients.slice(0, -1)) client.start();
+    await Promise.all(clients.slice(0, -1).map((client) => client.setReady(true)));
     await vi.waitFor(() => {
       expect(
         clients.every(
@@ -807,15 +804,15 @@ it('房间草稿在规则实例外；跨局号、重复内核决策 ID 与旧连
     0,
   );
   cleanup.push(() => room.dispose());
-  type Frame = Extract<ServerMessage, { kind: 'view' }>;
+  type Frame = Extract<ServerMessage, { kind: 'view' }> & { readonly lobby: LobbyView };
   let aView: Frame | undefined;
   let bView: Frame | undefined;
   const sendA = (frame: ServerMessage) => {
-    if (frame.kind === 'view') aView = frame;
+    if (frame.kind === 'view') aView = frame as Frame;
   };
   let a = room.join(sendA)!;
   const sendB = (frame: ServerMessage) => {
-    if (frame.kind === 'view') bView = frame;
+    if (frame.kind === 'view') bView = frame as Frame;
   };
   const oldB = room.join(sendB)!;
   await vi.waitFor(() => expect(aView?.view).toBeNull());

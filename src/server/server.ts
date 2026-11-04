@@ -5,10 +5,18 @@ import { resolve, extname, sep } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { NetworkRoom, type NetworkRoomOptions } from '../host/room';
-import type { ClientMessage, RemoteAsset } from '../protocol';
+import { openSolo } from '../host/solo';
+import { hostCatalog } from '../host/catalog';
+import type { ClientMessage, RemoteAsset, ServerMessage } from '../protocol';
 import { protocolHash, buildMismatch, helloPayload } from '../protocol/build';
 
-/** 一个 HTTP / WebSocket 入口；房间跨局保留，规则实例由房间工厂按局创建。 */
+const loopback = (address: string | undefined) =>
+  address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+
+/**
+ * 一个 HTTP / WebSocket 入口：静态页面、GET /catalog 大厅目录、/game 协议。
+ * 房间跨局保留，规则实例由房间工厂按局创建；本机连接也可在同一协议上开单机局。
+ */
 export function createGameServer(
   setup: NetworkRoomOptions,
   options: {
@@ -33,6 +41,15 @@ export function createGameServer(
   };
   const server = createServer((request, response) => {
     const serve = async () => {
+      if (request.method === 'GET' && request.url === '/catalog') {
+        const body = JSON.stringify(hostCatalog());
+        response.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        });
+        response.end(body);
+        return;
+      }
       if (!root || request.method !== 'GET') {
         response.writeHead(404).end();
         return;
@@ -68,8 +85,12 @@ export function createGameServer(
     maxPayload: 64 * 1024,
     perMessageDeflate: false,
   });
-  sockets.on('connection', (socket) => {
-    let joined: ReturnType<NetworkRoom['join']> = null;
+  sockets.on('connection', (socket, request) => {
+    const local = loopback(request.socket.remoteAddress);
+    let joined: Pick<
+      NonNullable<ReturnType<NetworkRoom['join']>>,
+      'command' | 'disconnect'
+    > | null = null;
     let alive = true;
     socket.on('pong', () => {
       alive = true;
@@ -114,15 +135,29 @@ export function createGameServer(
           if (
             !('kind' in message) ||
             message.kind !== 'hello' ||
-            (message.protocol ?? message.build) !== protocolHash
+            message.protocol !== protocolHash
           ) {
             reject(buildMismatch);
             return;
           }
-          joined = room.join((message) => {
+          const send = (message: ServerMessage) => {
             if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
-          }, message.resume);
-          if (!joined) {
+          };
+          if (message.solo) {
+            if (!local) {
+              reject('单机对局只接受本机连接。');
+              return;
+            }
+            try {
+              joined = openSolo(message.solo, send, options.aiDelayMs);
+            } catch (error) {
+              reject(error instanceof Error ? error.message : String(error));
+            }
+            return;
+          }
+          const seat = room.join(send, message.resume);
+          joined = seat;
+          if (!seat) {
             if (message.resume) {
               socket.send(
                 JSON.stringify({
@@ -133,7 +168,7 @@ export function createGameServer(
               );
               socket.close(1008);
             } else reject('房间已满或已经开局。');
-          } else socket.send(JSON.stringify({ kind: 'seat', seat: joined.seat, key: joined.key }));
+          } else socket.send(JSON.stringify({ kind: 'seat', seat: seat.seat, key: seat.key }));
           return;
         }
         if ('kind' in message) throw new Error('Unexpected hello.');

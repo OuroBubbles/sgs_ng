@@ -5,9 +5,8 @@
   import type { ReplyResult } from '../core/decisions/hub';
   import { SoloSession } from '../host/solo';
   import { RemoteSession, rememberedRoom, type RememberedRoom } from './session';
-  import type { LobbyView } from '../protocol';
+  import { defaultRoomSetup, type LobbyView, type RoomSetup } from '../protocol';
   import { createRoleMatch, defaultContent, practiceContent, seatNames } from '../host/content';
-  import { defaultRoomSetup, type RoomSetup } from '../host/setup';
   import type { BattleBoard } from '../client/table/board';
   import type { TableLayout, TableRegion } from '../client/table/layout';
   import { cardPoolCenter } from '../client/table/layout';
@@ -376,7 +375,7 @@
   function connectOnline(address: string, resume?: string) {
     let next: RemoteSession;
     try {
-      next = new RemoteSession(address, resume);
+      next = new RemoteSession(address, resume ? { resume } : {});
     } catch (error) {
       notice = error instanceof Error ? error.message : String(error);
       return;
@@ -416,7 +415,7 @@
       return;
     }
     useSession(next);
-    session.start();
+    next.start();
   }
   async function chooseLobbyGeneral(id: string) {
     general = id;

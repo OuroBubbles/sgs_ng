@@ -7,6 +7,7 @@ import type {
   LobbyView,
   ReplyResult,
   ServerMessage,
+  SoloSetup,
 } from '../protocol';
 import { closedReply, emptyPreview } from '../protocol';
 import { protocolHash, buildMismatch, helloPayload } from '../protocol/build';
@@ -73,10 +74,10 @@ function forget(key: string): void {
   }
 }
 
-/** 尚未创建规则实例的房间没有 GameView；用空展示承接连接与准备页。 */
-function waitingView(lobby: LobbyView | null): GameView {
+/** 尚未创建规则实例的房间没有 GameView；用空展示承接大厅、连接与准备页。 */
+export function waitingView(lobby: LobbyView | null = null): GameView {
   return {
-    deckName: lobby?.deckName ?? '联机房间',
+    deckName: lobby?.deckName ?? '',
     revision: 0,
     status: 'idle',
     viewer: lobby?.seat ?? null,
@@ -101,8 +102,13 @@ function waitingView(lobby: LobbyView | null): GameView {
   };
 }
 
-/** 远端展示适配。预览缓存只保存主持端结果，绝不在客户端重算规则。 */
+/**
+ * 客户端唯一的会话：经 /game 协议连接主持端。联机时入座房间；单机时本机主持端为这条连接
+ * 开一局（solo），断开即结束。预览缓存只保存主持端结果，绝不在客户端重算规则。
+ */
 export class RemoteSession {
+  /** 单机开局草稿；null 表示联机房间。 */
+  readonly solo: SoloSetup | null;
   readonly #address: string;
   #socket: WebSocket | null = null;
   readonly #listeners = new Set<(view: GameView) => void>();
@@ -128,9 +134,13 @@ export class RemoteSession {
   #stopConnection = () => {};
   readonly #assets = new Map<string, string>();
 
-  constructor(address: string, resume?: string) {
+  constructor(
+    address: string,
+    options: { readonly resume?: string; readonly solo?: SoloSetup } = {},
+  ) {
     this.#address = socketAddress(address);
-    this.#key = resume ?? null;
+    this.#key = options.resume ?? null;
+    this.solo = options.solo ?? null;
     this.#open();
   }
   #open(): void {
@@ -163,7 +173,7 @@ export class RemoteSession {
         if (message.code === 'resume-expired' || message.code === 'replaced') this.#key = null;
         this.#lose(socket, message.message, true);
       } else if (!this.#verified) {
-        if (message.kind !== 'hello' || (message.protocol ?? message.build) !== protocolHash) {
+        if (message.kind !== 'hello' || message.protocol !== protocolHash) {
           this.#lose(socket, buildMismatch, true);
           return;
         }
@@ -179,40 +189,53 @@ export class RemoteSession {
           return;
         }
         this.#verified = true;
-        socket.send(JSON.stringify(helloPayload(this.#key ? { resume: this.#key } : {})));
+        socket.send(
+          JSON.stringify(
+            helloPayload(this.solo ? { solo: this.solo } : this.#key ? { resume: this.#key } : {}),
+          ),
+        );
       } else if (message.kind === 'hello') this.#lose(socket, '主持端重复发送构建核对。', true);
       else if (message.kind === 'seat') {
         this.#key = message.key;
         remember({ address: this.#address, seat: message.seat, key: message.key });
       } else if (message.kind === 'view') {
-        if (!this.#key) {
+        const lobby = message.lobby;
+        if (this.solo ? lobby !== null : !this.#key || !lobby) {
           this.#lose(socket, '主持端未分配席位。', true);
           return;
         }
-        if (this.#lobby && message.lobby.round < this.#lobby.round) return;
-        if (message.lobby.round !== this.#lobby?.round) this.#settlePending(message.lobby.round);
+        if (lobby) {
+          if (this.#lobby && lobby.round < this.#lobby.round) return;
+          if (lobby.round !== this.#lobby?.round) this.#settlePending(lobby.round);
+          this.#lobby = {
+            ...lobby,
+            lineup: lobby.lineup.map((player) => ({
+              ...player,
+              ...(player.portrait
+                ? { portrait: this.#assets.get(player.portrait) ?? player.portrait }
+                : {}),
+            })),
+          };
+        }
         this.#latest = message.view
           ? bindRoomAssets(message.view, this.#assets)
-          : waitingView(message.lobby);
-        this.#lobby = {
-          ...message.lobby,
-          lineup: message.lobby.lineup.map((player) => ({
-            ...player,
-            ...(player.portrait
-              ? { portrait: this.#assets.get(player.portrait) ?? player.portrait }
-              : {}),
-          })),
-        };
+          : waitingView(lobby);
         if (firstView) {
           firstView = false;
-          this.#epoch++;
-          this.#baselineRound = message.lobby.round;
-          this.#baselineActions = Math.max(0, ...this.#latest.actions.map((action) => action.seq));
           clearTimeout(timeout);
+          // 单机连接即新局，无需跳过既有动画或音频；联机首帧可能是重连后的中局。
+          if (lobby) {
+            this.#epoch++;
+            this.#baselineRound = lobby.round;
+            this.#baselineActions = Math.max(
+              0,
+              ...this.#latest.actions.map((action) => action.seq),
+            );
+          }
         }
         this.#state = 'connected';
         this.#connectionError = '';
-        const generation = `${message.lobby.round}:${this.#latest.revision}:${this.#latest.decision?.id}:${this.#latest.decision?.token}`;
+        const generation = `${lobby?.round ?? 0}:${this.#latest.revision}:${this.#latest.decision?.id}:${this.#latest.decision?.token}`;
         if (generation !== this.#generation) {
           this.#generation = generation;
           this.#previews.clear();
@@ -229,13 +252,22 @@ export class RemoteSession {
     });
     socket.addEventListener('close', () => {
       stop();
-      this.#lose(socket, '与主持端的连接已断开，可重连回到原席位。');
+      this.#lose(
+        socket,
+        this.solo
+          ? '与本机主持端的连接已断开，本局结束。'
+          : '与主持端的连接已断开，可重连回到原席位。',
+      );
     });
     socket.addEventListener('error', () => this.#lose(socket, '无法连接主持端。'));
     this.#publish();
   }
+  /** 联机席位；单机没有房间席位。 */
   get human(): string | null {
     return this.#lobby?.seat ?? null;
+  }
+  get online(): boolean {
+    return !this.solo;
   }
   get lobby(): LobbyView | null {
     return this.#lobby;
@@ -252,7 +284,7 @@ export class RemoteSession {
     return this.#epoch;
   }
   get actionBaseline(): number {
-    return this.#lobby?.round === this.#baselineRound ? this.#baselineActions : 0;
+    return this.#lobby && this.#lobby.round === this.#baselineRound ? this.#baselineActions : 0;
   }
   get reconnectable(): boolean {
     return !this.#disposed && this.#state === 'disconnected' && this.#key !== null;
@@ -270,11 +302,6 @@ export class RemoteSession {
       this.#listeners.delete(listener);
     };
   }
-  start(): void {
-    this.setReady(true).catch((error: unknown) => {
-      if (this.#socket) this.#lose(this.#socket, String(error));
-    });
-  }
   async setReady(enabled: boolean): Promise<ReplyResult> {
     return this.#reply({ kind: 'ready', enabled });
   }
@@ -290,7 +317,7 @@ export class RemoteSession {
   /** 显式离开结束活跃局；页面刷新/进程退出只断开，仍可凭原席位返回。 */
   dispose(leaving = true): void {
     if (this.#disposed) return;
-    if (leaving) {
+    if (leaving && !this.solo) {
       if (this.connected && this.#lobby)
         this.#socket!.send(
           JSON.stringify({
@@ -314,16 +341,29 @@ export class RemoteSession {
     for (const url of this.#assets.values()) URL.revokeObjectURL(url);
     this.#assets.clear();
   }
+  /** 单机交给主持端暂停 AI（手动演练则撤销席位查看）；联机只在本地藏牌，对局继续。 */
   hide(): void {
-    this.#paused = true;
-    this.#publish();
+    if (this.solo) this.#send({ kind: 'pause', enabled: true });
+    else {
+      this.#paused = true;
+      this.#publish();
+    }
   }
   resume(): void {
-    this.#paused = false;
-    this.#publish();
+    if (this.solo) this.#send({ kind: 'pause', enabled: false });
+    else {
+      this.#paused = false;
+      this.#publish();
+    }
   }
-  confirmSeat(): void {
-    /* 远端席位由连接分配，无热坐交接。 */
+  /** 手动演练的热坐交接；联机席位由连接分配，主持端会拒绝。 */
+  confirmSeat(key: string): void {
+    if (this.solo) this.#send({ kind: 'confirm-seat', key });
+  }
+  #send(command: ClientCommand): void {
+    this.#request(command).catch((error: unknown) => {
+      if (this.#socket) this.#lose(this.#socket, String(error));
+    });
   }
 
   inspect(
@@ -385,10 +425,10 @@ export class RemoteSession {
     return this.#previews.get(key) ?? null;
   }
   #request(command: ClientCommand): Promise<CommandResult> {
-    if (!this.connected || !this.#lobby)
+    if (!this.connected || (!this.#lobby && !this.solo))
       return Promise.resolve(closedReply('尚未连接或连接已关闭。'));
     const sequence = ++this.#sequence;
-    const round = this.#lobby.round;
+    const round = this.#lobby?.round ?? 0;
     return new Promise((resolve) => {
       this.#pending.set(sequence, { round, resolve });
       // Svelte 草稿可能为 Proxy；JSON 是实际传输边界。

@@ -55,7 +55,11 @@ export type ClientCommand =
       readonly token: number;
       readonly value: unknown;
     }
-  | { readonly kind: 'cancel'; readonly id: string; readonly token: number };
+  | { readonly kind: 'cancel'; readonly id: string; readonly token: number }
+  /** 仅单机：暂停（AI 停步并藏牌）或恢复。 */
+  | { readonly kind: 'pause'; readonly enabled: boolean }
+  /** 仅单机手动演练：确认热坐交接，钥匙来自 GameView.handoff。 */
+  | { readonly kind: 'confirm-seat'; readonly key: string };
 
 export interface ClientCommandMessage {
   readonly sequence: number;
@@ -63,19 +67,75 @@ export interface ClientCommandMessage {
   readonly command: ClientCommand;
 }
 
-/**
- * 握手：protocol 强制相等；content 记入房间/回放，客户端不强求持有同内容代码。
- * `build` 保留为 protocol 别名，兼容旧字段阅读；新代码应读 `protocol`。
- */
+/** 握手：protocol 强制相等；content 记入房间/回放，客户端不强求持有同内容代码。 */
 export interface BuildHello {
   readonly kind: 'hello';
   readonly protocol: string;
   readonly content: string;
-  /** @deprecated 与 protocol 相同；过渡期双写。 */
-  readonly build: string;
 }
 
-export type ClientMessage = (BuildHello & { readonly resume?: string }) | ClientCommandMessage;
+/** 房间创建草稿；人数由阵容长度确定，不保存另一份可矛盾的席位数。 */
+export interface RoomSetup {
+  readonly practice?: boolean;
+  readonly seed: number;
+  readonly preset: string;
+  readonly lineup: readonly string[];
+  readonly humans: number;
+}
+
+export const defaultRoomSetup: RoomSetup = {
+  seed: 42,
+  preset: 'standard:identity',
+  lineup: ['standard:guanyu', 'standard:caocao', 'standard:zhangfei', 'standard:zhaoyun'],
+  humans: 2,
+};
+
+/**
+ * 单机开局草稿：本机主持端据此装配一局，连接即对局、断开即结束。
+ * 给出阵容时甲席由你执掌、其余为基础 AI；只给人数时为手动多席演练（热坐交接）。
+ */
+export type SoloSetup = {
+  readonly practice?: boolean;
+  readonly seed: number;
+  readonly preset: string;
+} & (
+  | { readonly lineup: readonly string[]; readonly count?: never }
+  | { readonly count: number; readonly lineup?: never }
+);
+
+/** 客户端握手：resume 回到联机席位；solo 请主持端开一局单机。两者互斥。 */
+export type ClientHello = BuildHello & {
+  readonly resume?: string;
+  readonly solo?: SoloSetup;
+};
+
+export type ClientMessage = ClientHello | ClientCommandMessage;
+
+/** 大厅展示目录：主持端从内容装配摘出的普通数据；客户端不持有内容模块。 */
+export interface ContentSummary {
+  readonly cards: number;
+  readonly decks: readonly { readonly id: string; readonly label: string }[];
+  readonly generals: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly kingdom: string;
+    readonly maxHp: number;
+    readonly portrait?: string;
+    readonly skills: readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly lord: boolean;
+      readonly description: string;
+    }[];
+  }[];
+}
+
+/** GET /catalog 的响应。 */
+export interface HostCatalog {
+  readonly seats: readonly string[];
+  readonly standard: ContentSummary;
+  readonly practice: ContentSummary;
+}
 
 export interface LobbyView {
   readonly seat: string;
@@ -111,7 +171,8 @@ export type ServerMessage =
   | { readonly kind: 'pulse' }
   | (BuildHello & { readonly assets: readonly RemoteAsset[] })
   | { readonly kind: 'seat'; readonly seat: string; readonly key: string }
-  | { readonly kind: 'view'; readonly lobby: LobbyView; readonly view: GameView | null }
+  /** lobby 为 null 表示单机连接：没有房间，只有这一局。 */
+  | { readonly kind: 'view'; readonly lobby: LobbyView | null; readonly view: GameView | null }
   | {
       readonly kind: 'response';
       readonly sequence: number;

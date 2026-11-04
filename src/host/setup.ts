@@ -2,22 +2,7 @@ import { createRoleMatch, seatNames, defaultContent, practiceContent } from './c
 import { roleRoster } from '../rules/game/roles';
 import type { NetworkRoomOptions } from './room';
 import type { ContentCatalog } from '../content/catalog';
-
-/** 创建前的普通数据草稿；人数由阵容长度确定，不保存另一份可矛盾的席位数。 */
-export interface RoomSetup {
-  readonly practice?: boolean;
-  readonly seed: number;
-  readonly preset: string;
-  readonly lineup: readonly string[];
-  readonly humans: number;
-}
-
-export const defaultRoomSetup: RoomSetup = {
-  seed: 42,
-  preset: 'standard:identity',
-  lineup: ['standard:guanyu', 'standard:caocao', 'standard:zhangfei', 'standard:zhaoyun'],
-  humans: 2,
-};
+import type { RoomSetup } from '../protocol';
 
 /** 桌面和开发主持端共用装配；身份配置、武将与牌组仍由原有对局装配验证。 */
 export function createRoomOptions(

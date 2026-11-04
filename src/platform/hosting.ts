@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { RoomSetup } from '../host/setup';
+import type { RoomSetup } from '../protocol';
 
 export interface HostedRoom {
   readonly port: number;

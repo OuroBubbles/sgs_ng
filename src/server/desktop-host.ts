@@ -1,7 +1,8 @@
 import { networkInterfaces } from 'node:os';
 import { createInterface } from 'node:readline';
 import { createGameServer } from './server';
-import { createRoomOptions, type RoomSetup } from '../host/setup';
+import { createRoomOptions } from '../host/setup';
+import type { RoomSetup } from '../protocol';
 
 // stdout 只承载一次原生就绪通知，其余日志走 stderr。
 console.log = (...values: unknown[]) => console.error(...values);

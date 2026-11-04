@@ -23,9 +23,14 @@ export type {
   ClientCommand,
   ClientCommandMessage,
   BuildHello,
+  ClientHello,
   ClientMessage,
+  RoomSetup,
+  SoloSetup,
+  ContentSummary,
+  HostCatalog,
   LobbyView,
   CommandResult,
   ServerMessage,
 } from './wire';
-export { closedReply } from './wire';
+export { closedReply, defaultRoomSetup } from './wire';
