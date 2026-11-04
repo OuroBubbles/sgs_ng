@@ -2,8 +2,8 @@ import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { damage } from '../../src/sdk';
 import { insight, echo } from '../../src/content/workshop/learning';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -81,7 +81,7 @@ it('后续伤害自然收集已有余响，不重复学习或复制同一时点�
 it.each([4, 17])(
   '问道客与标准技能组成四人真实身份局，基础 AI 至胜负，seed=%s',
   async (seed) => {
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed,
       preset: 'workshop:defense',
       lineup: ['workshop:inquirer', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],

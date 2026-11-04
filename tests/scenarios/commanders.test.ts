@@ -4,10 +4,10 @@ import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills, standardGenerals } from '../../src/content/standard/generals';
 import { standardCards } from '../../src/content/standard/cards';
-import { RoleMatch } from '../../src/app/offline/role-match';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { projectMatch } from '../../src/app/offline/projection';
-import { observeAgent } from '../../src/app/offline/agent-observation';
+import { RoleMatch } from '../../src/host/role-match';
+import { createRoleMatch } from '../../src/host/content';
+import { projectMatch } from '../../src/host/projection';
+import { observeAgent } from '../../src/host/agent-observation';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   kingdomOf,
@@ -67,7 +67,7 @@ async function factions(
 
 it('曹操、张辽初始化当前势力，身份模式只为主公授予主公技；非主公仍能查看说明', async () => {
   for (const general of standardGenerals.slice(11, 13)) {
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed: 42,
       preset: 'standard:identity',
       lineup: Array(6).fill(general.id),
@@ -91,7 +91,7 @@ it('曹操、张辽初始化当前势力，身份模式只为主公授予主公�
   }
 });
 it('势力可独立变更为自定义值或无势力，投影/AI/重放读取当前状态', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 42,
     preset: 'standard:identity',
     lineup: ['standard:caocao', 'standard:zhaoyun'],
@@ -697,7 +697,7 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
 
 it('含曹操、张辽的八人局，基础 AI 通过正式委托、替代摸牌和取得材料走到胜负', async () => {
   const lineup = [11, 12, 8, 9, 10, 0, 2, 5].map((index) => standardGenerals[index]!.id);
-  const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+  const match = createRoleMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 6000 });
 
   expect(

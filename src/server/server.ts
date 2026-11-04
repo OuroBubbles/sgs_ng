@@ -4,9 +4,9 @@ import { stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
-import { NetworkRoom, type NetworkRoomOptions } from '../app/network/room';
+import { NetworkRoom, type NetworkRoomOptions } from '../host/room';
 import type { ClientMessage, RemoteAsset } from '../protocol';
-import { protocolHash, buildMismatch, helloPayload } from '../app/network/build';
+import { protocolHash, buildMismatch, helloPayload } from '../protocol/build';
 
 /** 一个 HTTP / WebSocket 入口；房间跨局保留，规则实例由房间工厂按局创建。 */
 export function createGameServer(

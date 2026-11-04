@@ -3,9 +3,9 @@ import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { RoleMatch } from '../../src/app/offline/role-match';
-import { projectMatch } from '../../src/app/offline/projection';
+import { createRoleMatch } from '../../src/host/content';
+import { RoleMatch } from '../../src/host/role-match';
+import { projectMatch } from '../../src/host/projection';
 import { standardCards } from '../../src/content/standard/cards';
 import {
   useDeclarations,
@@ -502,7 +502,7 @@ it.each(['mixed', 'all-liuli'])(
       kind === 'mixed'
         ? [18, 19, 20, 20, 15, 13, 9, 14].map((i) => standardGenerals[i]!.id)
         : Array<string>(4).fill('standard:daqiao');
-    const match = createOfflineMatch({ seed: 14, preset: 'standard:identity', lineup });
+    const match = createRoleMatch({ seed: 14, preset: 'standard:identity', lineup });
     await playMatch(match, { steps: 9000 });
   },
   60000,

@@ -28,8 +28,8 @@ import { card, cardGame, settled, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
 import { Attack } from '../../src/sdk';
 import { Cost } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -548,7 +548,7 @@ it('传播保留原牌材料关联，曹操仍可奸雄取得处理区材料且�
 
 it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连环伤害并清理材料', async () => {
   const content = practiceContent;
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 4,
     preset: 'workshop:chains',
     lineup: ['standard:guanyu', 'standard:guanyu'],
@@ -595,7 +595,7 @@ it.each([4, 17])(
   '连环演练四人局由基础 AI 经真实选择至胜负，seed=%s',
   async (seed) => {
     const content = practiceContent;
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed,
       preset: 'workshop:chains',
       lineup: ['standard:guanyu', 'standard:huanggai', 'standard:guojia', 'standard:caocao'],

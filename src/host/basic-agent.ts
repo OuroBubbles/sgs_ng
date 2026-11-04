@@ -1,4 +1,4 @@
-import type { DecisionRequest } from '../../core/decisions/hub';
+import type { DecisionRequest } from '../core/decisions/hub';
 import type { AgentCard, AgentObservation } from './agent-observation';
 
 export type AgentAnswer =

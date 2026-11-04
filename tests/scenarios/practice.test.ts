@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
 import { standardCardViews } from '../../src/content/standard/presentation';
 import { standardCards } from '../../src/content/standard/cards';
 
@@ -23,7 +23,7 @@ it(
       }
     > = {};
     for (let seed = 1; seed <= (logging ? 8192 : 32); seed++) {
-      const game = createOfflineMatch({ count: 4, seed, preset: 'standard:mechanics' });
+      const game = createRoleMatch({ count: 4, seed, preset: 'standard:mechanics' });
       await game.prepare();
       const first = game.progress!.next;
       const hand = [

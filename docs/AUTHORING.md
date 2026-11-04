@@ -75,7 +75,7 @@ export const Provision = defineEvent('provision', {
 
 用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果放在 `ContentDefinition.effects`（裸衣的 `luoyiAftereffect` 在[标准入口](../src/content/standard/index.ts)声明）。
 
-用 [createOfflineMatch](../src/app/offline/practice.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
+用 [createRoleMatch](../src/host/content.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 
 [研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留 `ContentDefinition` / `createContent` 这一组合接口。
 

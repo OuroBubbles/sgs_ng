@@ -21,7 +21,7 @@ import {
   Response,
 } from '../../src/sdk';
 import type { Context, Timing, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
-import { RoleMatch } from '../../src/app/offline/role-match';
+import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { guicai } from '../../src/content/standard/generals/simayi';
 import { hujia } from '../../src/content/standard/generals/caocao';

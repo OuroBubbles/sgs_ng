@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
 import { judge } from '../../src/sdk';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { projectMatch } from '../../src/app/offline/projection';
+import { observeAgent } from '../../src/host/agent-observation';
+import { projectMatch } from '../../src/host/projection';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
 import { playMatch } from '../fixtures/match';
@@ -13,7 +13,7 @@ import { CardEvent } from '../../src/sdk';
 const content = practiceContent;
 
 it('自然种子 2 的牌面演练：本人牌面红桃、他人印刷黑桃，真实黑桃材料以武圣使用', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 2,
     preset: 'workshop:faces',
     lineup: ['workshop:vermilion_guest', 'standard:guanyu'],
@@ -83,7 +83,7 @@ it('自然种子 2 的牌面演练：本人牌面红桃、他人印刷黑桃，�
 });
 
 it('映绯真实判定：黑桃在绯衣客判定为红桃，另一角色判定仍是黑桃', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 2,
     preset: 'workshop:faces',
     lineup: ['workshop:vermilion_guest', 'standard:guanyu'],
@@ -112,7 +112,7 @@ it('映绯真实判定：黑桃在绯衣客判定为红桃，另一角色判定�
 
 it('四人牌面演练通过基础 AI 正式决策至胜负，seed=2', async () => {
   const seed = 2;
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed,
     preset: 'workshop:faces',
     lineup: ['workshop:vermilion_guest', 'standard:guanyu', 'standard:simayi', 'standard:guojia'],

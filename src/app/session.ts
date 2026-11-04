@@ -7,10 +7,10 @@ import type {
   LobbyView,
   ReplyResult,
   ServerMessage,
-} from '../../protocol';
-import { closedReply, emptyPreview } from '../../protocol';
-import { protocolHash, buildMismatch, helloPayload } from './build';
-import { bindRoomAssets, decodeAsset } from './content';
+} from '../protocol';
+import { closedReply, emptyPreview } from '../protocol';
+import { protocolHash, buildMismatch, helloPayload } from '../protocol/build';
+import { bindRoomAssets, decodeAsset } from './assets';
 
 /** 地址只决定主持端位置；客户端保留自己的页面，协议仍固定为 /game。 */
 function socketAddress(address: string): string {

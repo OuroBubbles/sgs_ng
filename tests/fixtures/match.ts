@@ -1,8 +1,8 @@
 import { expect } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import type { RoleMatch } from '../../src/app/offline/role-match';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
+import type { RoleMatch } from '../../src/host/role-match';
+import { observeAgent } from '../../src/host/agent-observation';
+import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { activePhase, activeTarget, activeTurn, readState, useDeclarations } from '../../src/sdk';

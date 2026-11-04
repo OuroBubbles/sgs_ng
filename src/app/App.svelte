@@ -3,16 +3,11 @@
   import type { CardView } from '../core/view/table';
   import type { GameSelection } from '../core/view/game';
   import type { ReplyResult } from '../core/decisions/hub';
-  import { LocalSession } from './offline/session';
-  import { RemoteSession, rememberedRoom, type RememberedRoom } from './network/session';
-  import type { LobbyView } from './network/protocol';
-  import {
-    createOfflineMatch,
-    defaultContent,
-    practiceContent,
-    seatNames,
-  } from './offline/practice';
-  import { defaultRoomSetup, type RoomSetup } from './network/setup';
+  import { SoloSession } from '../host/solo';
+  import { RemoteSession, rememberedRoom, type RememberedRoom } from './session';
+  import type { LobbyView } from '../protocol';
+  import { createRoleMatch, defaultContent, practiceContent, seatNames } from '../host/content';
+  import { defaultRoomSetup, type RoomSetup } from '../host/setup';
   import type { BattleBoard } from '../client/table/board';
   import type { TableLayout, TableRegion } from '../client/table/layout';
   import { cardPoolCenter } from '../client/table/layout';
@@ -47,8 +42,8 @@
 
   type LobbyPage = 'home' | 'solo' | 'network' | 'content';
   const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
-  const initialSession = new LocalSession(createOfflineMatch(), { human: '甲席' });
-  let session = $state.raw<LocalSession | RemoteSession>(initialSession);
+  const initialSession = new SoloSession(createRoleMatch(), { human: '甲席' });
+  let session = $state.raw<SoloSession | RemoteSession>(initialSession);
   const online = $derived(session instanceof RemoteSession);
   let remoteLobby = $state.raw<LobbyView | null>(null);
   let savedRoom = $state.raw<RememberedRoom | null>(null);
@@ -354,7 +349,7 @@
     region
       ? `left:${region.left}px;top:${region.top + (fitContent ? region.height / 2 : 0)}px;width:${region.width}px;${fitContent ? 'max-height' : 'height'}:${region.height}px`
       : 'visibility:hidden';
-  function useSession(next: LocalSession | RemoteSession) {
+  function useSession(next: SoloSession | RemoteSession) {
     audio?.reset();
     session.dispose();
     session = next;
@@ -373,7 +368,7 @@
       }
     }
     const wasOnline = online;
-    useSession(new LocalSession(createOfflineMatch(), { human: '甲席' }));
+    useSession(new SoloSession(createRoleMatch(), { human: '甲席' }));
     savedRoom = rememberedRoom();
     lobbyPage = 'solo';
     if (wasOnline) history.replaceState(null, '', location.pathname);
@@ -405,10 +400,10 @@
       notice = '牌局种子需为 1 至 4294967295 的整数';
       return;
     }
-    let next: LocalSession;
+    let next: SoloSession;
     try {
-      next = new LocalSession(
-        createOfflineMatch({
+      next = new SoloSession(
+        createRoleMatch({
           seed,
           preset: deckPreset,
           content: selectedContent,

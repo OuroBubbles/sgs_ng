@@ -1,12 +1,7 @@
-import {
-  createOfflineMatch,
-  seatNames,
-  defaultContent,
-  practiceContent,
-} from '../offline/practice';
-import { roleRoster } from '../../rules/game/roles';
+import { createRoleMatch, seatNames, defaultContent, practiceContent } from './content';
+import { roleRoster } from '../rules/game/roles';
 import type { NetworkRoomOptions } from './room';
-import type { ContentCatalog } from '../../content/catalog';
+import type { ContentCatalog } from '../content/catalog';
 
 /** 创建前的普通数据草稿；人数由阵容长度确定，不保存另一份可矛盾的席位数。 */
 export interface RoomSetup {
@@ -52,7 +47,7 @@ export function createRoomOptions(
       return { id, name, ...(portrait ? { portrait } : {}) };
     }),
     createMatch: (players, seed) =>
-      createOfflineMatch({
+      createRoleMatch({
         seed,
         preset,
         lineup: players.map((player) => player.general),

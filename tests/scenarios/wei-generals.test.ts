@@ -25,7 +25,7 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
 import { standardGenerals } from '../../src/content/standard/generals';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
@@ -675,6 +675,6 @@ it('含三名新魏将的八人局，由基础 AI 经公开决策走到真实身
   const lineup = [...standardGenerals.slice(6, 9), ...standardGenerals.slice(0, 5)].map(
     (general) => general.id,
   );
-  const match = createOfflineMatch({ seed: 42, preset: 'standard:identity', lineup });
+  const match = createRoleMatch({ seed: 42, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 4000 });
 }, 60_000);

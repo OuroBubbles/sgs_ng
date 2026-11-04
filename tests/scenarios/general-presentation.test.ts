@@ -5,9 +5,9 @@ import { createHash } from 'node:crypto';
 import { createContent } from '../../src/sdk';
 import standard from '../../src/content/standard';
 import assets from '../../src/content/standard/assets.json';
-import { createOfflineMatch, defaultContent } from '../../src/app/offline/practice';
-import { projectMatch } from '../../src/app/offline/projection';
-import { observeAgent } from '../../src/app/offline/agent-observation';
+import { createRoleMatch, defaultContent } from '../../src/host/content';
+import { projectMatch } from '../../src/host/projection';
+import { observeAgent } from '../../src/host/agent-observation';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 const general = {
@@ -45,7 +45,7 @@ it('公开武将图随当前武将投影，身份和手牌权限不变，图像�
   });
   views[0]!.portrait = 'changed';
   expect(Object.isFrozen(content.generalViews[general.id])).toBe(true);
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 1,
     preset: 'standard:identity',
     lineup: [general.id, 'standard:guanyu'],

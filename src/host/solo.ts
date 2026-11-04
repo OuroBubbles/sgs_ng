@@ -1,13 +1,13 @@
-import type { DecisionRequest, ReplyResult } from '../../core/decisions/hub';
-import { immutable } from '../../core/model/value';
-import type { GameView, GameSelection, ChoicePreview } from '../../core/view/game';
+import type { DecisionRequest, ReplyResult } from '../core/decisions/hub';
+import { immutable } from '../core/model/value';
+import type { GameView, GameSelection, ChoicePreview } from '../core/view/game';
 import { projectMatch } from './projection';
-import { emptyPreview } from '../../core/view/game';
+import { emptyPreview } from '../core/view/game';
 import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
 import { AgentDriver } from './agent-driver';
 
-export interface LocalSessionOptions {
+export interface SoloSessionOptions {
   /** 固定人类席位；省略时保留内容作者的手动多席演练。 */
   readonly human?: string;
   /** 展示侧节奏，不进入规则时间或随机源。 */
@@ -15,7 +15,7 @@ export interface LocalSessionOptions {
 }
 
 /** 本地主持侧。私有权威状态留在这里；组件只接收投影并提交当前选择。 */
-export class LocalSession {
+export class SoloSession {
   #viewer: string | null = null;
   #listeners = new Set<(view: GameView) => void>();
   #unsubscribe: () => void;
@@ -29,7 +29,7 @@ export class LocalSession {
   readonly human: string | null;
   constructor(
     private readonly match: RoleMatch,
-    options: LocalSessionOptions = {},
+    options: SoloSessionOptions = {},
   ) {
     this.human = options.human ?? null;
     if (this.human && !match.initial.players.some((player) => player.id === this.human))

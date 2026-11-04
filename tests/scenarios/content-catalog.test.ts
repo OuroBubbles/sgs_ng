@@ -3,17 +3,13 @@ import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import { defineSkill, rulesOf, on, moveCards, loseHp, createContent } from '../../src/sdk';
 import type { SkillDefinition } from '../../src/sdk';
-import {
-  createOfflineMatch,
-  defaultContent,
-  practiceContent,
-} from '../../src/app/offline/practice';
-import { cardView } from '../../src/app/offline/projection';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
+import { createRoleMatch, defaultContent, practiceContent } from '../../src/host/content';
+import { cardView } from '../../src/host/projection';
+import { observeAgent } from '../../src/host/agent-observation';
+import { decideBasic } from '../../src/host/basic-agent';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
-import { RoleMatch } from '../../src/app/offline/role-match';
+import { RoleMatch } from '../../src/host/role-match';
 import standard from '../../src/content/standard';
 import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 
@@ -135,7 +131,7 @@ it('组合拒绝重复定义和失效引用，另一局已经创建的目录保�
 
 it('普通定义与预装配目录共用牌组和效果装配，单机入口无需预先组合目录', async () => {
   for (const content of [standard, createContent(standard)]) {
-    const offline = createOfflineMatch({
+    const offline = createRoleMatch({
       seed: 1,
       content,
       lineup: ['standard:guanyu', 'standard:caocao'],
@@ -214,7 +210,7 @@ it('实体牌按固定快照验证，重复实体与未知牌组明确失败', (
 
 for (const branch of ['draw', 'recover'] as const) {
   it(`演武源码经实际目录完成闻策与整备 ${branch} 分支，使用普通选择并清理材料`, async () => {
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed: 1,
       preset: 'workshop:showcase',
       lineup: ['workshop:guest', 'standard:guanyu'],
@@ -283,7 +279,7 @@ for (const branch of ['draw', 'recover'] as const) {
 }
 
 it('混合内容的闻策也能响应标准锦囊，工厂未捕获另一套规则目录', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 1,
     preset: 'workshop:showcase',
     lineup: ['workshop:guest', 'standard:guanyu'],
@@ -313,7 +309,7 @@ it('混合内容的闻策也能响应标准锦囊，工厂未捕获另一套规�
 });
 
 it('演武源码与基础 AI 共用标准动作/具名选项，真实完成整局，无必选卡死', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 42,
     preset: 'workshop:showcase',
     lineup: ['workshop:guest', 'standard:guanyu', 'workshop:guest', 'standard:zhaoyun'],

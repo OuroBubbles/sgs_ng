@@ -1,12 +1,12 @@
-import type { DecisionRequest } from '../../core/decisions/hub';
-import { immutable } from '../../core/model/value';
-import { projectMatch } from '../offline/projection';
-import { emptyPreview } from '../../core/view/game';
-import { inspectSelection, selectionInput } from '../offline/selection';
-import type { RoleMatch } from '../offline/role-match';
-import { AgentDriver } from '../offline/agent-driver';
-import { closedReply } from './protocol';
-import type { ClientCommand, CommandResult, LobbyView, ServerMessage } from './protocol';
+import type { DecisionRequest } from '../core/decisions/hub';
+import { immutable } from '../core/model/value';
+import { projectMatch } from './projection';
+import { emptyPreview } from '../core/view/game';
+import { inspectSelection, selectionInput } from './selection';
+import type { RoleMatch } from './role-match';
+import { AgentDriver } from './agent-driver';
+import { closedReply } from '../protocol';
+import type { ClientCommand, CommandResult, LobbyView, ServerMessage } from '../protocol';
 
 export interface RoomPlayer {
   readonly id: string;

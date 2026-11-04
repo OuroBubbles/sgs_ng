@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { createGameServer } from './server';
-import { createRoomOptions, defaultRoomSetup, type RoomSetup } from '../app/network/setup';
+import { createRoomOptions, defaultRoomSetup, type RoomSetup } from '../host/setup';
 
 const host = process.env.SGS_HOST ?? '127.0.0.1';
 const port = Number(process.env.SGS_PORT ?? 1422);

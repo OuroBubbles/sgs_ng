@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { HostingState } from '../../platform/hosting';
-  import type { RoomSetup } from '../../app/network/setup';
+  import type { RoomSetup } from '../../host/setup';
 
   const {
     hosting,

@@ -1,10 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { Match, RoleMatch } from '../../src/app/offline/role-match';
-import { LocalSession } from '../../src/app/offline/session';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
+import { Match, RoleMatch } from '../../src/host/role-match';
+import { SoloSession } from '../../src/host/solo';
+import { createRoleMatch } from '../../src/host/content';
+import { observeAgent } from '../../src/host/agent-observation';
+import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { standardCards } from '../../src/content/standard/cards';
 import { chooseOwnedCard, moveCards, Use } from '../../src/sdk';
@@ -48,7 +48,7 @@ function fixture() {
   });
   return match;
 }
-const waitPlay = async (session: LocalSession) =>
+const waitPlay = async (session: SoloSession) =>
   vi.waitFor(() => {
     expect(session.view.decision?.kind).toBe('play-action');
     return session.view.decision!;
@@ -56,7 +56,7 @@ const waitPlay = async (session: LocalSession) =>
 
 it('本人托管后拒绝旧输入，收回和暂停立即撤销未执行的 AI，交接不改变规则事实', async () => {
   const match = fixture();
-  const session = new LocalSession(match, { human: 'a', aiDelayMs: 100 });
+  const session = new SoloSession(match, { human: 'a', aiDelayMs: 100 });
   try {
     session.start();
     const request = await waitPlay(session);
@@ -102,7 +102,7 @@ it('本人托管遇到未支持的必选请求时交还原决策，作者可以�
       });
     },
   });
-  const session = new LocalSession(match, { human: 'a', aiDelayMs: 10 });
+  const session = new SoloSession(match, { human: 'a', aiDelayMs: 10 });
   try {
     session.start();
     await vi.waitFor(() => expect(session.view.decision?.kind).toBe('unsupported'));
@@ -301,7 +301,7 @@ it('观察只含本人手牌与公开身份，交换其他席位的私有牌和�
 
 it('默认单人控制固定视角；AI 自动出闪，私有响应不投影，不接受人类代答', async () => {
   const match = fixture();
-  const session = new LocalSession(match, { human: 'a', aiDelayMs: 30 });
+  const session = new SoloSession(match, { human: 'a', aiDelayMs: 30 });
   const views: string[] = [];
   let observeResponse: (request: (typeof match.room.decisions.pending)[number]) => void = () => {};
   const aiReady = new Promise<(typeof match.room.decisions.pending)[number]>((resolve) => {
@@ -345,7 +345,7 @@ it('默认单人控制固定视角；AI 自动出闪，私有响应不投影，�
 
 it('暂停冻结 AI 请求并隐藏手牌；继续只回答一次，关闭会取消定时任务', async () => {
   const match = fixture();
-  const session = new LocalSession(match, { human: 'a', aiDelayMs: 100 });
+  const session = new SoloSession(match, { human: 'a', aiDelayMs: 100 });
   try {
     session.start();
     const request = await waitPlay(session);
@@ -377,7 +377,7 @@ it('暂停冻结 AI 请求并隐藏手牌；继续只回答一次，关闭会取
 
 it('请求令牌在等待时失效，AI 重新读取请求而不提交旧草稿', async () => {
   const match = fixture();
-  const session = new LocalSession(match, { human: 'a', aiDelayMs: 200 });
+  const session = new SoloSession(match, { human: 'a', aiDelayMs: 200 });
   try {
     session.start();
     const request = await waitPlay(session);
@@ -464,7 +464,7 @@ for (const [count, seed, preset] of [
   [2, 255, 'standard:mechanics'],
 ] as const) {
   it(`${count} 席 ${preset} 种子 ${seed}：基础 AI 使用真实规则完成整局，无非法回复或必选卡死`, async () => {
-    const match = createOfflineMatch({ count, seed, preset });
+    const match = createRoleMatch({ count, seed, preset });
     await playMatch(match, { steps: Infinity, decisions: 1800 });
   }, 60_000);
 }

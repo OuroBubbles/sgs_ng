@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { Match, RoleMatch } from '../../src/app/offline/role-match';
-import { LocalSession } from '../../src/app/offline/session';
+import { Match, RoleMatch } from '../../src/host/role-match';
+import { SoloSession } from '../../src/host/solo';
 import { standardCards } from '../../src/content/standard/cards';
 import {
   activePhase,
@@ -483,7 +483,7 @@ it('同一玩家的额外回合也强制热座确认，投影和日志明确标�
     phase.turn!.end(ctx, 'probe');
     if (count === 2) await stop(ctx);
   });
-  const session = new LocalSession(game);
+  const session = new SoloSession(game);
   session.start();
   try {
     const ready = await nextRequest(game.room);

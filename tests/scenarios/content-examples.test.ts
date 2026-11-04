@@ -4,7 +4,7 @@ import harbor, { Provision, tideDrawBonus } from '../../examples/content/harbor'
 import gallery from '../../examples/content/gallery';
 import standard from '../../src/content/standard';
 import { createContent, damage, Cards, Cost } from '../../src/sdk';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -67,7 +67,7 @@ it('真实备航和潮声经跨模块查询多摸一张，完成窗口触发墨�
   expect(gallery.skills[0]!.triggers[0]!.window).toBe(Provision.finished);
   expect(gallery.skills[0]!.modifiers[0]!.query).toBe(tideDrawBonus);
   const content = createContent(standard, harbor, gallery);
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 2,
     preset: 'harbor:crossing',
     lineup: ['gallery:guest', 'standard:guanyu'],

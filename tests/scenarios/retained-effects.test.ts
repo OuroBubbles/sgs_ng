@@ -30,8 +30,8 @@ import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, settled } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
 import { Cost } from '../../src/sdk';
 import { PlayerEvent } from '../../src/rules/combat/life';
 
@@ -791,7 +791,7 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
 
 it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否发动为 %s', async (accept) => {
   const content = practiceContent;
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 10,
     preset: 'workshop:relics',
     lineup: ['workshop:guest', 'standard:guanyu'],

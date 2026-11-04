@@ -1,7 +1,7 @@
 import { afterAll, expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createOfflineMatch, defaultContent } from '../../src/app/offline/practice';
+import { createRoleMatch, defaultContent } from '../../src/host/content';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { generalOf, genderOf, kingdomOf, roleOf } from '../../src/sdk';
 import type { GameResult } from '../../src/sdk';
@@ -66,7 +66,7 @@ it('标准二十五将统一初始化：目录字段、主公技能与体力奖�
     if (['standard:sunquan', 'standard:lvmeng', 'standard:luxun'].includes(general.id))
       expect(general.kingdom).toBe('吴');
 
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed: seeds[general.id] ?? 42,
       preset: 'standard:identity',
       lineup: Array<string>(6).fill(general.id),
@@ -108,7 +108,7 @@ for (const [index, general] of generals.entries()) {
     // 每名武将轮流位于甲席，并通过不同偏移与其他武将组合；不重排起手或注入状态。
     const lineup = [0, 7, 13, 19].map((offset) => generals[(index + offset) % generals.length]!.id);
     const seed = 42 + index * 17;
-    const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
+    const match = createRoleMatch({ seed, preset: 'standard:identity', lineup });
     const decisions = await playMatch(match, { steps: 12_000, decisions: 2400 });
 
     expect(generalOf(match.room.world, '甲席')).toBe(general.id);

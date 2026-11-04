@@ -1,6 +1,6 @@
-import type { WorldReader } from '../../core/model/state';
-import type { HistoryReader } from '../../core/history/journal';
-import type { DecisionRequest } from '../../core/decisions/hub';
+import type { WorldReader } from '../core/model/state';
+import type { HistoryReader } from '../core/history/journal';
+import type { DecisionRequest } from '../core/decisions/hub';
 import type {
   GameView,
   DecisionView,
@@ -11,49 +11,49 @@ import type {
   CandidateView,
   PoolView,
   CardChoiceGroupView,
-} from '../../core/view/game';
-import type { CardView, CardChoiceView } from '../../core/view/table';
-import { immutable, isStringArray } from '../../core/model/value';
-import { activePhase, activeTurn, activeTarget } from '../../rules/turn/turn';
-import { readState } from '../../rules/state/state';
+} from '../core/view/game';
+import type { CardView, CardChoiceView } from '../core/view/table';
+import { immutable, isStringArray } from '../core/model/value';
+import { activePhase, activeTurn, activeTarget } from '../rules/turn/turn';
+import { readState } from '../rules/state/state';
 import { knownRole } from './knowledge';
-import { roleOf } from '../../rules/game/roles';
-import { genderOf } from '../../rules/characters/gender';
-import { kingdomOf } from '../../rules/characters/kingdom';
-import { generalOf } from '../../rules/characters/general';
+import { roleOf } from '../rules/game/roles';
+import { genderOf } from '../rules/characters/gender';
+import { kingdomOf } from '../rules/characters/kingdom';
+import { generalOf } from '../rules/characters/general';
 import type { RoleMatch } from './role-match';
-import { delayedCards } from '../../rules/cards/delayed';
-import { skillEffective } from '../../rules/skills/skills';
-import { privateCardPools } from '../../rules/cards/private-pool';
-import { useDeclarations } from '../../rules/cards/plan';
-import { isChained } from '../../rules/combat/chain';
-import { shieldOf } from '../../rules/combat/shield';
-import { CardEvent } from '../../rules/cards/move';
-import { Cards } from '../../rules/cards/move';
-import { isFact } from '../../core/history/journal';
-import type { Fact } from '../../core/history/journal';
-import type { Timing } from '../../core/runtime/event';
-import type { Card } from '../../core/model/state';
-import { victimOf } from '../../rules/cards/types';
-import type { UseSnapshot } from '../../rules/cards/types';
-import { Skill } from '../../rules/skills/skills';
-import { Discard } from '../../rules/cards/discard';
-import { Equipment } from '../../rules/cards/equipment';
-import { Draw } from '../../rules/cards/draw';
-import { Damage } from '../../rules/combat/damage';
-import { Shield } from '../../rules/combat/shield';
-import { Chain } from '../../rules/combat/chain';
-import { Hp } from '../../rules/combat/recover';
-import { PlayerEvent } from '../../rules/combat/life';
-import { Turn, Phase } from '../../rules/turn/turn';
-import { Game } from '../../rules/game/end';
-import { Delayed } from '../../rules/cards/delayed';
-import { Judgment } from '../../rules/cards/judge';
-import { Use } from '../../rules/cards/book';
-import { Counter } from '../../rules/cards/counter';
-import { Collateral } from '../../content/standard/collateral';
-import { Weapon } from '../../content/standard/weapons';
-import { Fanjian } from '../../content/standard/generals/zhouyu';
+import { delayedCards } from '../rules/cards/delayed';
+import { skillEffective } from '../rules/skills/skills';
+import { privateCardPools } from '../rules/cards/private-pool';
+import { useDeclarations } from '../rules/cards/plan';
+import { isChained } from '../rules/combat/chain';
+import { shieldOf } from '../rules/combat/shield';
+import { CardEvent } from '../rules/cards/move';
+import { Cards } from '../rules/cards/move';
+import { isFact } from '../core/history/journal';
+import type { Fact } from '../core/history/journal';
+import type { Timing } from '../core/runtime/event';
+import type { Card } from '../core/model/state';
+import { victimOf } from '../rules/cards/types';
+import type { UseSnapshot } from '../rules/cards/types';
+import { Skill } from '../rules/skills/skills';
+import { Discard } from '../rules/cards/discard';
+import { Equipment } from '../rules/cards/equipment';
+import { Draw } from '../rules/cards/draw';
+import { Damage } from '../rules/combat/damage';
+import { Shield } from '../rules/combat/shield';
+import { Chain } from '../rules/combat/chain';
+import { Hp } from '../rules/combat/recover';
+import { PlayerEvent } from '../rules/combat/life';
+import { Turn, Phase } from '../rules/turn/turn';
+import { Game } from '../rules/game/end';
+import { Delayed } from '../rules/cards/delayed';
+import { Judgment } from '../rules/cards/judge';
+import { Use } from '../rules/cards/book';
+import { Counter } from '../rules/cards/counter';
+import { Collateral } from '../content/standard/collateral';
+import { Weapon } from '../content/standard/weapons';
+import { Fanjian } from '../content/standard/generals/zhouyu';
 
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};

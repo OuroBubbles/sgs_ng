@@ -1,4 +1,4 @@
-import type { GameView, CardView, RemoteAsset } from '../../protocol';
+import type { GameView, CardView, RemoteAsset } from '../protocol';
 
 export type { RemoteAsset };
 

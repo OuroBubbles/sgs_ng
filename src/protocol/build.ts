@@ -1,4 +1,4 @@
-import type { RemoteAsset } from '../../protocol';
+import type { RemoteAsset } from './wire';
 
 declare const __SGS_PROTOCOL_HASH__: string;
 declare const __SGS_CONTENT_HASH__: string;

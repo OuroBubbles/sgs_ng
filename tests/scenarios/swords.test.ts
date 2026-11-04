@@ -18,7 +18,7 @@ import type { DamageDraft, Gender, UseIntent } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { RoleMatch } from '../../src/app/offline/role-match';
+import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';

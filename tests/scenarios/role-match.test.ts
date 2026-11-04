@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { RoleMatch } from '../../src/app/offline/role-match';
+import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {

@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { createStandardDeck } from '../../src/content/standard/deck';
 import { standardCards } from '../../src/content/standard/cards';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
 import { genderOf } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
@@ -101,8 +101,8 @@ it('标准 + EX 数量配比固定，各花色 27 张，EX 的四张额外牌面
 });
 
 it('默认开局使用标准牌表，机制牌组明确独立，性别预设随初始事实提交', async () => {
-  const normal = createOfflineMatch();
-  const mechanics = createOfflineMatch({ count: 4, seed: 42, preset: 'standard:mechanics' });
+  const normal = createRoleMatch();
+  const mechanics = createRoleMatch({ count: 4, seed: 42, preset: 'standard:mechanics' });
   expect(normal.initial.cards).toHaveLength(108);
   expect(normal.deckName).toBe('标准＋EX（108 张）');
   expect(mechanics.initial.cards).toHaveLength(288);
@@ -115,8 +115,8 @@ it('默认开局使用标准牌表，机制牌组明确独立，性别预设随�
 });
 
 it('标准牌表初始化可复现，洗牌/发牌后实体位置守恒', async () => {
-  const a = createOfflineMatch({ count: 8, seed: 2026 });
-  const b = createOfflineMatch({ count: 8, seed: 2026 });
+  const a = createRoleMatch({ count: 8, seed: 2026 });
+  const b = createRoleMatch({ count: 8, seed: 2026 });
   await a.prepare();
   await b.prepare();
   expect(a.room.world.snapshot).toEqual(b.room.world.snapshot);

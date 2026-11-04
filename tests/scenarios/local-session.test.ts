@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { LocalSession } from '../../src/app/offline/session';
-import { Match, RoleMatch } from '../../src/app/offline/role-match';
+import { SoloSession } from '../../src/host/solo';
+import { Match, RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../../src/content/standard/cards';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { moveCards, finishGame, Use } from '../../src/sdk';
@@ -9,7 +9,7 @@ import type { GameSelection, GameView } from '../../src/core/view/game';
 import { card } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
 import type { Context } from '../../src/sdk';
 import type { Validation } from '../../src/core/decisions/hub';
 import { Game } from '../../src/sdk';
@@ -20,8 +20,8 @@ const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });
 it('本地预览与回复把规则故障留在主持侧，返回不可操作结果并保留原始错误', async () => {
   for (const fault of ['throw', 'async'] as const) {
     for (const entry of ['inspect', 'inspectAnswer', 'reply', 'answer'] as const) {
-      const match = createOfflineMatch({ count: 2, seed: 42 });
-      const session = new LocalSession(match, { human: '甲席' });
+      const match = createRoleMatch({ count: 2, seed: 42 });
+      const session = new SoloSession(match, { human: '甲席' });
       let at: Context;
       let lateError = '';
       const validate =
@@ -127,12 +127,12 @@ function game(options: { wounded?: boolean; response?: boolean } = {}) {
         ctx.commit(testTiming('wounded'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);
     },
   });
-  const session = new LocalSession(match);
+  const session = new SoloSession(match);
   session.start();
   return { match, session };
 }
 async function waitView(
-  session: LocalSession,
+  session: SoloSession,
   check: (view: GameView) => boolean,
 ): Promise<GameView> {
   return vi.waitFor(() => {
@@ -140,7 +140,7 @@ async function waitView(
     return session.view;
   });
 }
-async function enter(session: LocalSession) {
+async function enter(session: SoloSession) {
   const hidden = await waitView(session, (view) => Boolean(view.handoff));
   session.confirmSeat(hidden.handoff!.key);
   return waitView(session, (view) => Boolean(view.decision));

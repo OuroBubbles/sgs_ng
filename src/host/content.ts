@@ -1,7 +1,7 @@
-import { createContent } from '../../content/catalog';
-import type { ContentCatalog, ContentDefinition } from '../../content/catalog';
-import standard from '../../content/standard';
-import workshop from '../../content/workshop';
+import { createContent } from '../content/catalog';
+import type { ContentCatalog, ContentDefinition } from '../content/catalog';
+import standard from '../content/standard';
+import workshop from '../content/workshop';
 import { RoleMatch } from './role-match';
 
 export const defaultContent = createContent(standard);
@@ -10,7 +10,7 @@ export const practiceContent = createContent(standard, workshop);
 export const seatNames = ['甲席', '乙席', '丙席', '丁席', '戊席', '己席', '庚席', '辛席'];
 
 /** 指定阵容时由其长度决定席位；练习局也可只指定人数，不保存另一份可矛盾的数量。 */
-export type OfflineMatchOptions = {
+export type RoleMatchSetup = {
   readonly seed?: number;
   readonly preset?: string;
   readonly content?: ContentDefinition | ContentCatalog;
@@ -20,7 +20,7 @@ export type OfflineMatchOptions = {
 );
 
 /** 默认规则直接从源码装配；普通配置按需填写，无位置占位或分发参与。 */
-export function createOfflineMatch(options: OfflineMatchOptions = {}): RoleMatch {
+export function createRoleMatch(options: RoleMatchSetup = {}): RoleMatch {
   const { seed = 42, preset = 'standard:identity', content = defaultContent, lineup } = options;
   const count = lineup?.length ?? options.count ?? 4;
   return new RoleMatch({

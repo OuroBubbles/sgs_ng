@@ -21,12 +21,12 @@ import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest, room, answer } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
 import { standardCards } from '../../src/content/standard/cards';
-import { RoleMatch } from '../../src/app/offline/role-match';
-import { LocalSession } from '../../src/app/offline/session';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { projectMatch } from '../../src/app/offline/projection';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { decideBasic } from '../../src/app/offline/basic-agent';
+import { RoleMatch } from '../../src/host/role-match';
+import { SoloSession } from '../../src/host/solo';
+import { createRoleMatch } from '../../src/host/content';
+import { projectMatch } from '../../src/host/projection';
+import { observeAgent } from '../../src/host/agent-observation';
+import { decideBasic } from '../../src/host/basic-agent';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
@@ -206,7 +206,7 @@ it('实时候选刷新使旧 token 和旧集合失效，必选不可取消，一
 
 it.each([2, 4, 8])('诸葛亮初始化与观星数量按 %s 人局存活人数计算，上限五张', async (count) => {
   expect(standardGenerals).toHaveLength(25);
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 19,
     preset: 'standard:identity',
     lineup: Array<string>(count).fill('standard:zhugeliang'),
@@ -445,7 +445,7 @@ it('主持侧专用预览经过授权；暂停藏牌和请求，恢复同一排�
       'test:restore',
     ),
   );
-  const session = new LocalSession(match, { human: 'a' });
+  const session = new SoloSession(match, { human: 'a' });
   const running = prepare(match);
   await answer(match, true);
   const request = await nextRequest(match.room);
@@ -592,7 +592,7 @@ it('混合八人标准对局的观星由基础 AI 经正式选择完成，最终
     'diaochan',
     'lvbu',
   ].map((id) => `standard:${id}`);
-  const match = createOfflineMatch({ seed: 27, preset: 'standard:identity', lineup: roster });
+  const match = createRoleMatch({ seed: 27, preset: 'standard:identity', lineup: roster });
   await playMatch(match, { steps: 24000 });
 
   expect(match.room.history.facts(Cards.arranged).length).toBeGreaterThan(0);

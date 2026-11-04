@@ -5,10 +5,10 @@ import { allotment } from '../../src/content/workshop/allotment';
 import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
-import { projectMatch } from '../../src/app/offline/projection';
-import { observeAgent } from '../../src/app/offline/agent-observation';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
+import { projectMatch } from '../../src/host/projection';
+import { observeAgent } from '../../src/host/agent-observation';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -185,7 +185,7 @@ it.each([4, 17])(
   '筹策客真实四席身份局由基础 AI 经同一合法分配模型至胜负，seed=%s',
   async (seed) => {
     const content = practiceContent;
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed,
       preset: 'standard:identity',
       lineup: ['workshop:quartermaster', 'standard:guojia', 'standard:simayi', 'standard:guanyu'],

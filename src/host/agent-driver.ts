@@ -1,4 +1,4 @@
-import type { DecisionRequest } from '../../core/decisions/hub';
+import type { DecisionRequest } from '../core/decisions/hub';
 import type { RoleMatch } from './role-match';
 import { observeAgent } from './agent-observation';
 import { decideBasic } from './basic-agent';

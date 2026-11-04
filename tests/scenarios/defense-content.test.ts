@@ -1,11 +1,11 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { practiceContent } from '../../src/app/offline/practice';
+import { createRoleMatch } from '../../src/host/content';
+import { practiceContent } from '../../src/host/content';
 import { shieldOf } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { observeAgent } from '../../src/app/offline/agent-observation';
-import { projectMatch } from '../../src/app/offline/projection';
+import { observeAgent } from '../../src/host/agent-observation';
+import { projectMatch } from '../../src/host/projection';
 import { nextRequest } from '../fixtures/room';
 import { Damage } from '../../src/sdk';
 import { Shield } from '../../src/sdk';
@@ -14,7 +14,7 @@ import { Skill } from '../../src/sdk';
 const content = practiceContent;
 
 it('种子 4 自然起手凝障/缚阵/引焰，真实用牌后护盾吸收传播，公开投影一致', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 4,
     preset: 'workshop:defense',
     lineup: ['standard:guanyu', 'standard:guanyu'],
@@ -64,7 +64,7 @@ it('种子 4 自然起手凝障/缚阵/引焰，真实用牌后护盾吸收传�
 });
 
 it.each([false, true])('演武代受真实选择、支付、材料关联与善后：accept=%s', async (accept) => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 4,
     preset: 'workshop:defense',
     lineup: ['standard:guanyu', 'workshop:guardian'],
@@ -120,7 +120,7 @@ it.each([false, true])('演武代受真实选择、支付、材料关联与善�
 it.each([4, 17])(
   '护盾/转移演练四人局由基础 AI 真实决策至胜负，seed=%s',
   async (seed) => {
-    const match = createOfflineMatch({
+    const match = createRoleMatch({
       seed,
       preset: 'workshop:defense',
       lineup: ['workshop:guardian', 'workshop:guardian', 'standard:guojia', 'standard:caocao'],

@@ -1,16 +1,16 @@
-import type { Card, Player } from '../../core/model/state';
-import { immutable } from '../../core/model/value';
-import type { Role } from '../../rules/game/roles';
+import type { Card, Player } from '../core/model/state';
+import { immutable } from '../core/model/value';
+import type { Role } from '../rules/game/roles';
 import type { RoleMatch } from './role-match';
 import { knownRole } from './knowledge';
-import { genderOf } from '../../rules/characters/gender';
-import type { Gender } from '../../rules/characters/gender';
-import { privateCardPools } from '../../rules/cards/private-pool';
-import { kingdomOf } from '../../rules/characters/kingdom';
-import { isChained } from '../../rules/combat/chain';
-import { shieldOf } from '../../rules/combat/shield';
-import type { CardColor } from '../../rules/cards/types';
-import type { SkillAi } from '../../rules/skills/skills';
+import { genderOf } from '../rules/characters/gender';
+import type { Gender } from '../rules/characters/gender';
+import { privateCardPools } from '../rules/cards/private-pool';
+import { kingdomOf } from '../rules/characters/kingdom';
+import { isChained } from '../rules/combat/chain';
+import { shieldOf } from '../rules/combat/shield';
+import type { CardColor } from '../rules/cards/types';
+import type { SkillAi } from '../rules/skills/skills';
 
 export interface AgentCard extends Card {
   readonly color: CardColor;

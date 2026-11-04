@@ -5,8 +5,8 @@ import { nextRequest } from '../fixtures/room';
 import { kurou } from '../../src/content/standard/generals/huanggai';
 import { jieyin, xiaoji } from '../../src/content/standard/generals/sunshangxiang';
 import { standardGenerals, standardGeneralSkills } from '../../src/content/standard/generals';
-import { RoleMatch } from '../../src/app/offline/role-match';
-import { createOfflineMatch } from '../../src/app/offline/practice';
+import { RoleMatch } from '../../src/host/role-match';
+import { createRoleMatch } from '../../src/host/content';
 import { World } from '../../src/core/state/world';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
@@ -568,7 +568,7 @@ it('枭姬不会把装备区内部重排当作失去，首轮摸牌后失去技�
 });
 
 it('武将初始化的体力、性别、技能来源和选将事实可重建；拒绝隐式覆盖与缺失目录', async () => {
-  const match = createOfflineMatch({
+  const match = createRoleMatch({
     seed: 42,
     preset: 'standard:identity',
     lineup: ['standard:sunshangxiang', 'standard:huanggai'],
@@ -604,7 +604,7 @@ it('武将初始化的体力、性别、技能来源和选将事实可重建；�
       }),
   ).toThrow(/cannot override/);
   expect(() =>
-    createOfflineMatch({
+    createRoleMatch({
       seed: 42,
       preset: 'standard:identity',
       lineup: ['unknown', 'standard:guanyu'],

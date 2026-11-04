@@ -4,7 +4,7 @@ import { createContent } from '../../src/content/catalog';
 import standard from '../../src/content/standard';
 import harbor from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
-import { createRoomOptions } from '../../src/app/network/setup';
+import { createRoomOptions } from '../../src/host/setup';
 import { createGameServer } from '../../src/server/server';
 
 // 真实普通源码和二进制资源，只在主持端组合；客户端仍是原来的构建产物。

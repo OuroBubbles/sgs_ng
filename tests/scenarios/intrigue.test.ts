@@ -10,9 +10,9 @@ import {
 } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../../src/content/standard/generals';
-import { createOfflineMatch } from '../../src/app/offline/practice';
-import { RoleMatch } from '../../src/app/offline/role-match';
-import { projectMatch } from '../../src/app/offline/projection';
+import { createRoleMatch } from '../../src/host/content';
+import { RoleMatch } from '../../src/host/role-match';
+import { projectMatch } from '../../src/host/projection';
 import { standardCards } from '../../src/content/standard/cards';
 import {
   chooseOne,
@@ -883,7 +883,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
 it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
   const seed = 27;
   const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
-  const match = createOfflineMatch({ seed, preset: 'standard:identity', lineup });
+  const match = createRoleMatch({ seed, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 12000 });
 
   const invoked = match.room.history
