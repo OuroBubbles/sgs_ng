@@ -4,7 +4,7 @@
 
 ## 一将一文件
 
-标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 按标准顺序显式静态导入各武将（Bun 宿主、Vite 与 vitest 行为一致）；新增武将时新建文件并在末尾追加导入与登记，登记顺序即大厅与按种子抽将顺序（P3 改为宿主目录扫描）。立绘、技能与阵亡语音按原字节放在 [public/standard/](../public/standard/)，以稳定 URL `/standard/<file>` 提供，并登记到 [assets.json](../src/content/standard/assets.json)（存在性的唯一依据）。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
+标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`，不需要任何登记表：主持端启动时扫描内容包（见下节）。立绘、技能与阵亡语音按原字节放在 [public/standard/](../public/standard/)，以稳定 URL `/standard/<file>` 提供，按文件名约定归属武将；[assets.json](../src/content/standard/assets.json) 只记录导入素材的来源与原字节。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
 ```ts
 import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';
@@ -27,6 +27,14 @@ export default general('scholar', '学士', '群', 3, [study]);
 `skill(id, name, description, ...parts)` 是作者层写法：每个部件按形状归类——`on(...)` 为触发、`modify(...)` 为查询修正、带 `run` 的为主动技、带 `make` 的为转换，带 `lord` / `ai` 的对象为选项。内核仍是 `defineSkill({ id, name, description, triggers, ... })` 对象形，需要 getter 或自定义结构时直接使用。
 
 技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。
+
+## 添加武将
+
+1. 在包的 `generals/` 下新建 `<名>.ts`，`export default general('<包>:<名>', ...)`——ID 必须等于“包目录名:文件名”。不属于任何武将的技能可放 `skills/<名>.ts`（ID 同样为 `<包>:<名>`）。
+2. 素材可选，按约定放在 `public/<包>/`：`portraits/<名>.jpg|png|webp`、`audio/death/<名>.mp3`、`audio/skill/<技能名><n>.mp3`。
+3. 重启主持端（`pnpm dev` 会自动重启）。不改其它文件、不重新构建网页；只有改界面时才需要 `pnpm build`。
+
+内容包是 `src/content/` 下含 `package.ts` 的目录（目录名以 `.disabled` 结尾则跳过），由 [load-content](../src/host/load-content.ts) 发现：`package.ts` 默认导出包定义（牌、牌组、`practice` 等；可写成接收 `{ id, media }` 的函数）。顺序确定：标准包先行，其余按目录名；包内武将先按 `order`（标准包保留原包顺序，影响大厅与按种子抽将），其余按文件名追加。重复 ID、ID 与文件名不符、默认导出不是 `general`/`skill`、`order` 指向不存在的文件、约定目录里找不到对应武将的立绘或阵亡语音，都会让主持端启动失败并指出文件。各包源码的 SHA-256 即 `contentHash`，随 hello 与 `/catalog` 发出。
 
 ## 触发技：唯一的 on
 
@@ -73,7 +81,7 @@ export const Provision = defineEvent('provision', {
 
 ## 组合与运行
 
-用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果放在 `ContentDefinition.effects`（裸衣的 `luoyiAftereffect` 在[标准入口](../src/content/standard/index.ts)声明）。
+用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果由创建它的技能在 `skill(..., { effects: [...] })` 中引用即自动登记（裸衣的 `luoyiAftereffect` 见 [xuchu.ts](../src/content/standard/generals/xuchu.ts)）；不属于任何技能的效果才写进 `ContentDefinition.effects`。
 
 用 [createRoleMatch](../src/host/content.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 

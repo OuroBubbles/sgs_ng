@@ -34,7 +34,7 @@ flowchart LR
   W -. ws /game · GET /catalog .-> N
 ```
 
-`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合，不经过包元数据或依赖清单。未来扩展同样通过内容定义与目录注入；没有第二套包格式、加载器或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`，`contentHash` 随 hello 记录。
+`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合。主持端启动时由 [load-content](../src/host/load-content.ts) 扫描 `src/content/<包>/package.ts` 与包内 `generals/*.ts`、`skills/*.ts`（Bun 直接 import 源码；桌面 Node 产物由 [prelink-content](../scripts/prelink-content.mjs) 预链接同一棵树），校验后按确定顺序组合；没有登记表、安装、依赖清单或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`；主持端把扫描到的内容源码哈希 `contentHash` 随 hello 与 `/catalog` 发出。
 
 网页端边界有三道检查：eslint 禁止网页端导入 core / rules / content / sdk / host / server / `assets.json`；[导入图测试](../tests/scenarios/web-boundary.test.ts) 从 `src/main.ts` 沿运行时导入走查；`pnpm build` 之后 [check-web-bundle](../scripts/check-web-bundle.mjs) 扫描 `dist` 脚本中的主持端标记（如 `CardBook`）。大厅需要的武将、牌组与技能说明由主持端 `GET /catalog`（[catalog](../src/host/catalog.ts)）提供。
 
@@ -157,7 +157,7 @@ World 重建只恢复已记录的事实状态，不能恢复技能栈、监听�
 
 - [NetworkRoom](../src/host/room.ts) 持有连接与准备草稿，同时至多一局 RoleMatch；全部玩家准备才开局，第 N 局种子为 `((房间种子 - 1 + N - 1) % 4294967295) + 1`。
 - [协议](../src/protocol/wire.ts) 只传对应席位的 GameView、选择与预览，不发送 World、牌堆、他人私有决策、原始历史或闭包；远端 Decision ID 以局号限定，旧局回复被拒绝。
-- 入席前双方比对 [protocolHash](../scripts/network-build.mjs)（`src/protocol` 的 SHA-256），不一致即拒绝；`contentHash`（`src/content`）随 hello 记录但不强求相等。内容携带的媒体为稳定 URL（`/standard/...`，来自 `public/`），任何同版本客户端构建都能解析。
+- 入席前双方比对 [protocolHash](../scripts/network-build.mjs)（`src/protocol` 的 SHA-256），不一致即拒绝；`contentHash`（主持端已加载各包源码的 SHA-256，运行时计算）只由主持端发出，客户端不持有内容。内容携带的媒体为稳定 URL（`/standard/...`，来自 `public/`），任何同版本客户端构建都能解析。
 - 短暂断线保留席位凭据、原对局与挂起请求，重连回到同一席位；不重放、不重发旧答案。主持进程退出后原结算栈结束，不能凭展示数据恢复。
 
 ## 结算契约总则
