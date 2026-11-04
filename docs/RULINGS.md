@@ -1,45 +1,12 @@
-# 53 · 标准规则与验收入口
+# 标准规则裁定
 
-本页集中说明标准目录、条件清单与活动归属。具体规则以项目源码和人工条件清单为准；当前验证及平台覆盖只查 [STATUS](STATUS.md)，产品范围见[路线](11-offline-roadmap.md)。
+本页记录标准＋EX 内容在本项目中的规则裁定，以及锁定每条裁定的场景测试。实现以 [武将](../src/content/standard/generals/)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts) 为准；技能文本只写在内容源码里，不在别处复制。
 
-## 先固定来源，再判断行为
+FreeKill / noname 只作为本地参考分别查阅，不把不同项目、不同模式的文本拼成一套规则；它们也不代表上游最新版本。覆盖的证据是行为测试本身：通用机制证明与具体声明证明分开保留（武圣不能借龙胆的额度场景，无中生有不能借决斗的反制记录）。
 
-```sh
-pnpm audit:standard
-```
+## 武将与技能
 
-[审阅工具](../scripts/audit-standard.mjs) 只读取当前项目与本地 freekill/noname，通过 TypeScript AST 和 Lua 字面文本生成 `.artifacts/validation/standard-semantics-inventory.json`。报告包含当前 25 名武将的技能装配、40 个技能和 32 种牌的项目说明、两份参考说明、源码位置以及输入文件 SHA-256。报告随显式执行刷新，以实际输入哈希定位来源。
-
-工具不执行参考代码，不自动导入它们的架构，也不判断文本等价或技能分支已经通过。报告明确标记 static-reference-inventory 与 behaviorVerified=false；常规构建、测试不读取参考项目。坐骑只解析本目录明确的 horse 工厂调用，不尝试解释任意作者函数。
-
-规则依据优先读取项目实际定义与说明；参考分别记录，不能把不同项目、不同模式的文本拼成一套规则。当前目录见 [武将/技能装配](../src/content/standard/generals/sunshangxiang.ts)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts)。本地参考入口为 [FreeKill 标准文本](../../freekill/packages/standard/i18n/zh_CN.lua)、[牌文本](../../freekill/packages/standard_cards/i18n/zh_CN.lua)、[noname 标准文本](../../noname/resources/app/character/standard/translate.js) 与 [牌包](../../noname/resources/app/card/standard.js)。它们不代表上游最新版本。
-
-## 行为清单与检查
-
-[技能清单](../scripts/standard-behavior-review.mjs)与[牌清单](../scripts/standard-card-review.mjs)逐条绑定项目规则文本、条件说明、测试文件和完整测试名称。先人工核对实现与实际断言，再登记；检查器不按技能名推算覆盖率。当前对象、条件及通过数量由报告和 STATUS 维护。
-
-通用机制证明与具体声明证明分别保留：武圣不能借龙胆的额度场景，无中生有不能借决斗的反制记录。直接声明的边界可从[标准配方](../tests/scenarios/standard-authoring-baseline.test.ts)、[标准触发](../tests/scenarios/standard-trigger-baseline.test.ts)和[标准牌](../tests/scenarios/standard-card-baseline.test.ts)场景追到实际材料、响应、来源与后效。
-
-```sh
-pnpm check
-
-# 局部审阅：先生成完整、通过的测试报告，再检查已登记条件。
-pnpm test
-pnpm audit:standard:behavior
-
-# 要求整个标准目录登记完整。
-pnpm audit:standard:behavior --complete
-```
-
-[检查器](../scripts/audit-standard-behavior.mjs)核对规则文本一致、具名断言唯一且通过，以及当前源码与引用测试没有晚于报告开始时间。修改规则文本要重新审阅条件；合并或改名被引用的测试时同步更新清单。缺失、歧义、失败、过期或文本不符均失败，不沿用旧绿色结果。报告记录输入、两份人工清单及测试报告的哈希。
-
-普通模式明确列出待审对象；`--complete` 还要求全部目录登记，`pnpm check` 使用这一严格模式。常规检查只读自有代码，不依赖参考项目或上次的静态目录报告。
-
-`catalogueComplete` 只表示有限条件清单登记完整，不证明未列出的分支、任意内容组合、其他社区版本或完整产品验收。`fullOfflineVerified` 不由此自动成立；客户端、资源和平台仍按路线单独验证。
-
-## 武将目录：基线与行为证据入口
-
-下表登记现有目录的完整 25 将/40 技能。专项链接用于继续逐条阅读断言，不能仅凭文件存在或一局完成就关闭整项审计。共同的重新授予、计次、失效、死亡、嵌套边界还需结合 [身份审计](42-skill-identity-audit.md)、[有限次数](38-window-occurrences.md) 与相关机制场景。
+下表是标准 25 将 / 40 技能在本项目的裁定，右列是锁定该行为的场景测试。重新授予、计次、失效、死亡与嵌套等共同边界另见 [skill-identity](../tests/scenarios/skill-identity.test.ts) 与 [occurrences](../tests/scenarios/occurrences.test.ts)。
 
 | 武将   | 技能与项目采用的基线                                                                    | 专项证据入口                                                                                                                                                       |
 | ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -69,9 +36,9 @@ pnpm audit:standard:behavior --complete
 | 貂蝉   | 离间：每阶段一次，手牌/装备费用，后选男性对先选男性使用不可无懈决斗；闭月：结束阶段摸一 | [谋略](../tests/scenarios/intrigue.test.ts)、[身份](../tests/scenarios/skill-identity.test.ts)                                                                     |
 | 诸葛亮 | 观星：存活数至多五，牌顶/底各自有序；空城：空手禁止杀/决斗选为目标                      | [观星](../tests/scenarios/astrology.test.ts)、[准备顺序](../tests/scenarios/occurrences.test.ts)                                                                   |
 
-## 牌目录：每种定义的核对入口
+## 牌
 
-实体表仍为标准＋EX 108 张，32 种定义；实体多重集的本地参考核对见 [23](23-swords-standard-deck.md)。下表没有把三个同类坐骑合成一个已实现定义，也不把机制练习牌组当标准实体表。
+实体表为标准＋EX 108 张、32 种定义（[deck.ts](../src/content/standard/deck.ts)）。同类坐骑分别列出；机制练习牌组不是标准实体表。
 
 | 牌         | 需核对的具体语义                                          | 专项证据入口                                                                                                      |
 | ---------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -111,14 +78,14 @@ pnpm audit:standard:behavior --complete
 ## 项目采用的规则语义
 
 - 仁德以出牌阶段累计。FreeKill 使用 `_rende_cards-phase`，noname 说明使用“回合”措辞；本项目按 [仁德实现](../src/content/standard/generals/liubei.ts) 的明确阶段生存期与原子交牌累计处理，不从文本相似推断嵌套行为相同。
-- 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的独立效果处理，详见 [42](42-skill-identity-audit.md)。
+- 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的独立效果处理。
 - 方天选择“材料包含全部非空手牌”，和 FreeKill 当前代码一致；不能仅按 noname“最后手牌”短句推断多材料或零材料分支。
-- 天妒的公共判定结束机会先于洛神的本次判定后续；最终牌若已被取得，后者不抢回，详见 [29](29-wei-judgment-effects.md) 与谋士专项。判定最终快照与当前牌面分开，见 [50](50-card-faces.md)。
-- 抵消杀时使用闪，万箭齐发要求打出闪；用途、禁令、完成时点、转换和委托材料交接见 [55](55-response-purpose.md)。参考为 [FreeKill 的 SlashOffsetFunc](../../freekill/lua/core/util.lua)、[万箭齐发](../../freekill/packages/standard_cards/pkg/skills/archery_attack.lua)与本地 noname 的 chooseToUse；用途区别不只是事实名称。
-- 铁骑的具名响应禁令、混合请求过滤和唯一供牌窗口收束见 [54](54-named-response-blocks.md)。复杂替代额度仍需按具体规则验证，不把标准分支推广到所有内容。
-- 身份胜负选择死亡后效/埋葬完成后判胜，未终局才执行击杀奖惩；这属于已声明的项目基线，见 [15](15-life-role-match.md)，不宣称逐时点复制两个参考实现。
+- 天妒的公共判定结束机会先于洛神的本次判定后续；最终牌若已被取得，后者不抢回。判定最终快照与当前牌面分开。
+- 抵消杀时使用闪，万箭齐发要求打出闪；用途、禁令、完成时点、转换和委托材料交接见 [response-purpose 场景](../tests/scenarios/response-purpose.test.ts)。参考为 FreeKill 的 `SlashOffsetFunc`、`archery_attack.lua` 与 noname 的 `chooseToUse`；用途区别不只是事实名称。
+- 铁骑的具名响应禁令、混合请求过滤和唯一供牌窗口收束见 [named-response-blocks 场景](../tests/scenarios/named-response-blocks.test.ts)。复杂替代额度仍需按具体规则验证，不把标准分支推广到所有内容。
+- 身份胜负选择死亡后效/埋葬完成后判胜，未终局才执行击杀奖惩；这属于已声明的项目基线，不宣称逐时点复制两个参考实现。
 
-待决资格分别见[判定](58-judgment-pending-windows.md)、[反制](60-counter-pending-windows.md)、[目标](61-target-pending-windows.md)及[内层效果关联](62-counter-effect-eligibility.md)。检查发生在候选与结果封口边界，不让普通异步函数在任意位置自动中断；独立持续效果见 [56](56-independent-effects.md)。
+待决资格分别由 [判定](../tests/scenarios/judgment-boundaries.test.ts)、[反制](../tests/scenarios/counter-boundaries.test.ts)、[目标](../tests/scenarios/target-window-boundaries.test.ts) 与 [内层效果](../tests/scenarios/counter-effect-eligibility.test.ts) 场景锁定。检查发生在候选与结果封口边界，不让普通异步函数在任意位置自动中断。
 
 ## 活动的领域归属
 
@@ -134,4 +101,4 @@ pnpm audit:standard:behavior --complete
 
 克己只选择实际 turnId 等于本回合、实际 phase 为本人 play、实际使用/打出者为本人的杀；真正嵌套在本回合内的出牌阶段仍计入，嵌套其他回合则不计入。普通响应和鬼才改判的打出都保留真实主体。
 
-[活动归属场景](../tests/scenarios/activity-periods.test.ts)覆盖内外回合与阶段恢复、普通响应、鬼才改判、独立阶段与根用牌、普通命名 Flow、关闭边界、窄因果查询及纯事实历史。具体通过结果见 STATUS。
+[活动归属场景](../tests/scenarios/activity-periods.test.ts)覆盖内外回合与阶段恢复、普通响应、鬼才改判、独立阶段与根用牌、普通命名 Flow、关闭边界、窄因果查询及纯事实历史。

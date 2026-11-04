@@ -7,6 +7,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const docs = await readdir(resolve(root, 'docs'), { recursive: true });
 const files = [
   'README.md',
+  'AGENTS.md',
   ...docs.filter((file) => file.endsWith('.md')).map((file) => `docs/${file}`),
 ];
 const failures = [];

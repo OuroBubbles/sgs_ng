@@ -1,10 +1,10 @@
-# 05 · 内容开发入口
+# 内容作者指南
 
-本文使用当前 [SDK](../src/sdk/index.ts)。系统能力与未验收边界以 [STATUS](STATUS.md) 为准；流程、时点和故障的完整契约见 [04](04-resolution.md)。
+本文使用当前 [SDK](../src/sdk/index.ts)。流程、时点和故障的完整契约见 [ARCHITECTURE](ARCHITECTURE.md)，标准规则裁定见 [RULINGS](RULINGS.md)。
 
 ## 一将一文件
 
-标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件，不再改任何登记列表。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
+标准武将位于 [src/content/standard/generals/](../src/content/standard/generals/)，每个文件导出该武将的技能并 `export default general(...)`。[generals/index.ts](../src/content/standard/generals/index.ts) 用 `import.meta.glob` 收集同目录全部默认导出，新增武将只需新建文件；`order` 数组固定标准武将的大厅与按种子抽将顺序，新武将不在其中时排在末尾。`general(id, name, kingdom, hp, skills, { gender? })` 按武将牌面顺序书写（与 FreeKill 的 `General:new(ext, name, kingdom, hp)` 同序），直接接收技能对象；createContent 从武将的 `abilities` 自动登记技能，同一技能对象被多处引用时只登记一次。`ContentDefinition.skills` 仍可列出不属于任何武将的技能（例如机制演武）。
 
 ```ts
 import { draw, general, skill, on, useDeclared, cardDef } from '../../../sdk';
@@ -77,9 +77,9 @@ export const Provision = defineEvent('provision', {
 
 用 [createOfflineMatch](../src/app/offline/practice.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 
-[研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留[内容组合接口](39-source-packages.md)。
+[研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留 `ContentDefinition` / `createContent` 这一组合接口。
 
-底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 可省略局部 id（默认取时点 ID）；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，见 [装备与查询](18-equipment-queries.md#小而可组合的纯查询)；卡牌 use 回调见 [语义牌与用牌](13-card-use.md#一次用牌)。
+底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 可省略局部 id（默认取时点 ID）；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，具名查询见 [queries.ts](../src/rules/cards/queries.ts)；卡牌 use 回调见 [types.ts](../src/rules/cards/types.ts)。
 
 ## ctx、self 与普通函数
 
@@ -130,7 +130,7 @@ JointSelection 的 cards / targets 候选函数可直接返回稳定 ID 数组�
 
 局内计数和标记用 `defineState` / `readState` / `setState`，不要放在共享定义或模块级可变变量中。`stateChange` 可与费用组成同一提交。`UsageLimit` 的 source 由规则选择：按技能定义计数可防止同阶段重新授予重置，按实例计数则区分每次获得。
 
-阶段、回合等使用有身份的 `Lifetime`，嵌套阶段和额外回合各自独立。普通 Flow 不自动变成回合生存期。独立效果使用自己的到期条件，失去创建它的技能不代表效果一律消失；具体契约见 [独立效果](56-independent-effects.md)。
+阶段、回合等使用有身份的 `Lifetime`，嵌套阶段和额外回合各自独立。普通 Flow 不自动变成回合生存期。独立效果使用自己的到期条件，失去创建它的技能不代表效果一律消失；写法见 [裸衣](../src/content/standard/generals/xuchu.ts) 与 [独立效果场景](../tests/scenarios/independent-effects.test.ts)。
 
 World、事实和接纳后的决策值在类型与运行时均只读；需要本地修改数组时先复制。领域草案通过其公开方法修改，封口后不能继续改写。`ctx.query` 与所有合法性查询不能写状态、取随机数或 await；违规异步规则查询立即冻结本局。
 
@@ -142,8 +142,8 @@ World、事实和接纳后的决策值在类型与运行时均只读；需要本
 
 ## 扩展与验证的边界
 
-普通文件可以导出函数、事件（defineEvent）和 Query，由相对 import 共享同一实例；资源使用静态 import 或调用者提供的 URL。见 [跨文件协作](39-source-packages.md#跨模块代码共享) 与 [资源](39-source-packages.md#资源与所有权)。不在挂起技能中途热换定义，也不引入签名或沙箱体系。
+普通文件可以导出函数、事件（defineEvent）和 Query，由相对 import 共享同一实例；资源使用静态 import 或调用者提供的 URL。例子见 [渡口](../examples/content/harbor/index.ts)。不在挂起技能中途热换定义，也不引入签名或沙箱体系。
 
 当前客户端支持已登记的选择形态。自定义 `ctx.ask` 类型能在规则层运行，不代表 UI 和基础 AI 已自动具备该交互；不支持的必选决策会中止基础 AI 对局。先复用现有选择模型，确有新交互需求时再补完整执行、投影和客户端路径。
 
-改动后先运行 `pnpm typecheck`、`pnpm lint` 与对应领域场景；交付前运行 `pnpm check`，界面改动另跑 `pnpm test:ui`。检查领域结果、取消/失效与嵌套路径，不为每个实现细节追加测试。轨迹从 `ctx.history` 的事实和原因链读取，随机数使用 `ctx.randomInt`；不依赖真实时间、动画或 `Math.random` 决定规则。
+改动后先运行 `pnpm typecheck`、`pnpm lint` 与对应领域场景；交付前运行 `pnpm check`（typecheck、lint、format:check、test），界面改动另跑 `pnpm test:ui`。检查领域结果、取消/失效与嵌套路径，不为每个实现细节追加测试。轨迹从 `ctx.history` 的事实和原因链读取，随机数使用 `ctx.randomInt`；不依赖真实时间、动画或 `Math.random` 决定规则。
