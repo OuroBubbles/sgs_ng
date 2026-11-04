@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative as nativeRelative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+
+const relative = (from: string, to: string) => nativeRelative(from, to).split(sep).join('/');
 
 // 样式与 Pixi 的 CSP 适配只以裸 import 生效；没有任何符号引用它们，类型检查、
 // lint 与逻辑测试都不会因删除而失败，只有浏览器里布局才会坏掉。
