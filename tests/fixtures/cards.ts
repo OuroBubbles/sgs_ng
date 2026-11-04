@@ -48,7 +48,7 @@ export async function chooseAndActivate(
 export function card(id: string, name: string, suit: Card['suit'] = 'spade', rank = 7): Card {
   return { id, name: `standard:${name}`, suit, rank };
 }
-export const defaultHand = [
+const defaultHand = [
   card('slash1', 'slash'),
   card('slash2', 'slash'),
   card('peach', 'peach', 'heart', 3),

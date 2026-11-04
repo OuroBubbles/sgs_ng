@@ -8,7 +8,7 @@ export interface GameResult {
   readonly winners: readonly string[];
   readonly reason: string;
 }
-export const gameResult = defineState<GameResult | null>(
+const gameResult = defineState<GameResult | null>(
   'core:game-result',
   null,
   (value): value is GameResult | null =>
@@ -20,7 +20,7 @@ export const gameResult = defineState<GameResult | null>(
       'reason' in value &&
       typeof value.reason === 'string'),
 );
-export const gameTarget = Object.freeze({ owner: null, source: 'game', lifetime: null });
+const gameTarget = Object.freeze({ owner: null, source: 'game', lifetime: null });
 export const Game = defineEvent('game', {
   finished: timing<GameResult>(),
 });

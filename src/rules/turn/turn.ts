@@ -27,7 +27,7 @@ import { defineEvent, timing } from '../../core/runtime/event';
 import { Cards } from '../cards/move';
 import { Discard } from '../cards/discard';
 
-export { activeTurn, activeTarget, validTurnOrigin } from './state';
+export { activeTurn, activeTarget } from './state';
 export type { TurnOrigin } from './state';
 
 export const phaseKinds = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'] as const;

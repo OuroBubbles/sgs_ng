@@ -58,11 +58,11 @@ import { Fanjian } from '../../content/standard/generals/zhouyu';
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 }
-export function strings(value: unknown): readonly string[] {
+function strings(value: unknown): readonly string[] {
   return isStringArray(value) ? value : [];
 }
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
-export const roleNames: Readonly<Record<string, string>> = {
+const roleNames: Readonly<Record<string, string>> = {
   lord: '主公',
   loyalist: '忠臣',
   rebel: '反贼',
@@ -136,7 +136,7 @@ function printedCardView(match: RoleMatch, id: string): CardView {
   return face(match, id, match.room.world.card(id));
 }
 
-export function decisionView(match: RoleMatch, request: DecisionRequest): DecisionView {
+function decisionView(match: RoleMatch, request: DecisionRequest): DecisionView {
   const base = {
     id: request.id,
     token: request.token,
