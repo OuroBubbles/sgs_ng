@@ -1,0 +1,2 @@
+# 宿主以 Bun 直接运行 TypeScript 源码（不打包）；类型由 tsc/svelte-check 检查。
+preload = ["./scripts/source-hashes.mjs"]

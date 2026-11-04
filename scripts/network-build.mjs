@@ -50,29 +50,6 @@ export function contentHash(root = projectRoot) {
   return hashFiles(root, files);
 }
 
-/**
- * 历史全量构建摘要（src+public+配置）。保留给需要整树指纹的工具；
- * 握手强制相等已改为 protocolHash。
- */
-export function networkBuild(root = projectRoot) {
-  const files = [];
-  collectFiles(root, 'src', files);
-  collectFiles(root, 'public', files);
-  files.push(
-    'index.html',
-    'package.json',
-    'pnpm-lock.yaml',
-    'pnpm-workspace.yaml',
-    'tsconfig.json',
-    'svelte.config.js',
-    'vite.config.ts',
-    'scripts/network-build.mjs',
-    'scripts/build-server.mjs',
-    'scripts/build-desktop-host.mjs',
-  );
-  return hashFiles(root, files);
-}
-
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
   console.log(
@@ -80,7 +57,6 @@ if (isMain) {
       {
         protocolHash: protocolHash(),
         contentHash: contentHash(),
-        networkBuild: networkBuild(),
       },
       null,
       2,

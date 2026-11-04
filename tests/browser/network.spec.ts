@@ -14,8 +14,9 @@ declare global {
 
 let host: ChildProcess;
 let url = '';
-async function startHost(extra: Record<string, string>, entry = '.artifacts/server/main.mjs') {
-  const child = spawn(process.execPath, [entry], {
+// 宿主与真实部署相同：Bun 直接运行 TypeScript 源码；Playwright 自身仍在 Node。
+async function startHost(extra: Record<string, string>, entry = 'src/server/main.ts') {
+  const child = spawn('bun', [entry], {
     cwd: process.cwd(),
     env: { ...process.env, SGS_HOST: '127.0.0.1', SGS_PORT: '0', ...extra },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -48,7 +49,7 @@ test('主持端普通源码组合画阁技能与二进制立绘，客户端使�
   page,
   browser,
 }, info) => {
-  const author = await startHost({}, '.artifacts/network-fixture/main.mjs');
+  const author = await startHost({}, 'tests/fixtures/network-host.ts');
   const context = await browser.newContext({
     viewport: page.viewportSize(),
     isMobile: info.project.use.isMobile ?? false,
