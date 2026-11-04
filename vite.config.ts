@@ -1,12 +1,15 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tauriConfig from './src-tauri/tauri.conf.json' with { type: 'json' };
-import { networkBuild } from './scripts/network-build.mjs';
+import { protocolHash, contentHash } from './scripts/network-build.mjs';
 
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  define: { __SGS_NETWORK_BUILD__: JSON.stringify(networkBuild()) },
+  define: {
+    __SGS_PROTOCOL_HASH__: JSON.stringify(protocolHash()),
+    __SGS_CONTENT_HASH__: JSON.stringify(contentHash()),
+  },
   plugins: [svelte()],
   clearScreen: false,
   preview: { headers: { 'Content-Security-Policy': tauriConfig.app.security.csp } },

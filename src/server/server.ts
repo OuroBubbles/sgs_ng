@@ -5,9 +5,8 @@ import { resolve, extname, sep } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { NetworkRoom, type NetworkRoomOptions } from '../app/network/room';
-import type { ClientMessage } from '../app/network/protocol';
-import { networkBuild, buildMismatch } from '../app/network/build';
-import type { RemoteAsset } from '../app/network/content';
+import type { ClientMessage, RemoteAsset } from '../protocol';
+import { protocolHash, buildMismatch, helloPayload } from '../app/network/build';
 
 /** 一个 HTTP / WebSocket 入口；房间跨局保留，规则实例由房间工厂按局创建。 */
 export function createGameServer(
@@ -93,9 +92,7 @@ export function createGameServer(
     }
     // 未核对的连接不占席位、不接收投影，也不能因断开而中止别人的对局。
     const timeout = setTimeout(() => reject('构建核对超时，请更新客户端后重新加入。'), 10_000);
-    socket.send(
-      JSON.stringify({ kind: 'hello', build: networkBuild, assets: options.assets ?? [] }),
-    );
+    socket.send(JSON.stringify(helloPayload({ assets: options.assets ?? [] })));
     socket.on('error', () => socket.close());
     socket.on('close', () => {
       clearInterval(heartbeat);
@@ -114,7 +111,11 @@ export function createGameServer(
         const message = JSON.parse(bytes.toString('utf8')) as ClientMessage;
         if (!joined) {
           clearTimeout(timeout);
-          if (!('kind' in message) || message.kind !== 'hello' || message.build !== networkBuild) {
+          if (
+            !('kind' in message) ||
+            message.kind !== 'hello' ||
+            (message.protocol ?? message.build) !== protocolHash
+          ) {
             reject(buildMismatch);
             return;
           }

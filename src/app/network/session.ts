@@ -1,10 +1,16 @@
-import type { ReplyResult } from '../../core/decisions/hub';
-import type { ChoicePreview, GameSelection, GameView } from '../../core/view/game';
-import { emptyPreview } from '../../core/view/game';
-import { closedReply } from './protocol';
-import { networkBuild, buildMismatch } from './build';
+import type {
+  ChoicePreview,
+  ClientCommand,
+  CommandResult,
+  GameSelection,
+  GameView,
+  LobbyView,
+  ReplyResult,
+  ServerMessage,
+} from '../../protocol';
+import { closedReply, emptyPreview } from '../../protocol';
+import { protocolHash, buildMismatch, helloPayload } from './build';
 import { bindRoomAssets, decodeAsset } from './content';
-import type { ClientCommand, CommandResult, LobbyView, ServerMessage } from './protocol';
 
 /** 地址只决定主持端位置；客户端保留自己的页面，协议仍固定为 /game。 */
 function socketAddress(address: string): string {
@@ -157,7 +163,7 @@ export class RemoteSession {
         if (message.code === 'resume-expired' || message.code === 'replaced') this.#key = null;
         this.#lose(socket, message.message, true);
       } else if (!this.#verified) {
-        if (message.kind !== 'hello' || message.build !== networkBuild) {
+        if (message.kind !== 'hello' || (message.protocol ?? message.build) !== protocolHash) {
           this.#lose(socket, buildMismatch, true);
           return;
         }
@@ -173,13 +179,7 @@ export class RemoteSession {
           return;
         }
         this.#verified = true;
-        socket.send(
-          JSON.stringify({
-            kind: 'hello',
-            build: networkBuild,
-            ...(this.#key ? { resume: this.#key } : {}),
-          }),
-        );
+        socket.send(JSON.stringify(helloPayload(this.#key ? { resume: this.#key } : {})));
       } else if (message.kind === 'hello') this.#lose(socket, '主持端重复发送构建核对。', true);
       else if (message.kind === 'seat') {
         this.#key = message.key;

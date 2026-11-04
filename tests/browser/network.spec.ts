@@ -223,7 +223,14 @@ test('两个独立牌桌入席、托管交接、远端预览、藏牌和断线�
   try {
     const incompatible = new WebSocketServer({ host: '127.0.0.1', port: 0 });
     incompatible.on('connection', (socket) =>
-      socket.send(JSON.stringify({ kind: 'hello', build: 'different-content' })),
+      socket.send(
+        JSON.stringify({
+          kind: 'hello',
+          protocol: 'different-content',
+          content: 'x',
+          build: 'different-content',
+        }),
+      ),
     );
     try {
       await new Promise<void>((resolve) => incompatible.once('listening', resolve));

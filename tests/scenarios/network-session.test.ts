@@ -16,7 +16,7 @@ import type { NetworkRoomOptions, RoomPlayer } from '../../src/app/network/room'
 import type { ServerMessage } from '../../src/app/network/protocol';
 import { finishGame } from '../../src/rules/game/end';
 import { WebSocketServer } from 'ws';
-import { networkBuild, buildMismatch } from '../../src/app/network/build';
+import { protocolHash, contentHash, buildMismatch } from '../../src/app/network/build';
 import { readFile } from 'node:fs/promises';
 import { defaultContent, practiceContent } from '../../src/app/offline/practice';
 import { Match } from '../../src/app/offline/role-match';
@@ -301,7 +301,12 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
   const { clients, port, start } = await connect();
   const match = await start();
   for (const first of [
-    { kind: 'hello', build: 'different-rules-with-the-same-version' },
+    {
+      kind: 'hello',
+      protocol: 'different-rules-with-the-same-version',
+      content: 'x',
+      build: 'different-rules-with-the-same-version',
+    },
     { sequence: 1, round: 1, command: { kind: 'ready', enabled: true } },
     null,
   ]) {
@@ -315,7 +320,13 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
     });
     await vi.waitFor(() => expect(socket.readyState).toBe(WebSocket.CLOSED));
     expect(frames).toEqual([
-      { kind: 'hello', build: networkBuild, assets: [] },
+      {
+        kind: 'hello',
+        protocol: protocolHash,
+        content: contentHash,
+        build: protocolHash,
+        assets: [],
+      },
       { kind: 'error', message: first === null ? '消息格式错误。' : buildMismatch },
     ]);
     expect(match.room.status).toBe('running');
@@ -325,7 +336,7 @@ it('构建不同或省略核对的连接不入席、不接收视图，也不影�
 
 it('客户端拒绝不同构建和旧主持端的视图，在读取手牌或建立席位前结束连接', async () => {
   for (const greeting of [
-    { kind: 'hello', build: 'other-content' },
+    { kind: 'hello', protocol: 'other-content', content: 'x', build: 'other-content' },
     { kind: 'view', lobby: { seat: '甲席' }, view: { hand: ['old-private-card'] } },
   ]) {
     const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });

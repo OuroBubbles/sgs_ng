@@ -1,5 +1,5 @@
 import { build } from 'vite';
-import { networkBuild } from './network-build.mjs';
+import { protocolHash, contentHash } from './network-build.mjs';
 import { resolve, sep } from 'node:path';
 
 const artifactRoot = resolve('.artifacts');
@@ -10,7 +10,10 @@ if (!output.startsWith(artifactRoot + sep))
 // 常规 Vite SSR 构建：开发者可指定普通入口，测试使用同一构建方式。
 await build({
   configFile: false,
-  define: { __SGS_NETWORK_BUILD__: JSON.stringify(networkBuild()) },
+  define: {
+    __SGS_PROTOCOL_HASH__: JSON.stringify(protocolHash()),
+    __SGS_CONTENT_HASH__: JSON.stringify(contentHash()),
+  },
   build: {
     ssr: process.argv[2] ?? 'src/server/main.ts',
     target: 'node24',
