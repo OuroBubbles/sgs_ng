@@ -1,7 +1,7 @@
 import { buildCard, cardOffers, hasCardOffers, parseCardChoice } from './card';
 import { cardDef } from '../skills/skills';
 import { rulesOf } from '../skills/skills';
-import { immutable } from '../../core/model/value';
+import { equal, immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { pay } from '../costs/pay';
 import { isGameOver } from '../game/end';
@@ -103,7 +103,7 @@ export function withCardSupply<T>(
             live(latest) &&
             current.ok &&
             names.includes(current.value.name) &&
-            JSON.stringify(current.value) === JSON.stringify(card)
+            equal(current.value, card)
           );
         },
         factKind: CardEvent.responded,
