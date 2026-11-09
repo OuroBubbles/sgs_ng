@@ -103,8 +103,6 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
     .flatMap((file) => /^([^/]+)\/package\.ts$/.exec(file)?.[1] ?? [])
     .filter((id) => !id.endsWith('.disabled'))
     .sort(packOrder);
-  const generalSource = new Map<string, string>();
-  const cardSource = new Map<string, string>();
   const skillSource = new Map<string, { skill: SkillDefinition; file: string }>();
   const claimSkill = (skill: SkillDefinition, file: string) => {
     const known = skillSource.get(skill.id);
@@ -126,6 +124,9 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
     if (!record(descriptor))
       fail(descriptorFile, 'default export must be a pack definition object.');
     const { practice = false, order = [], ...definition } = descriptor as PackDefinition;
+    for (const key of ['generals', 'cards', 'skills'])
+      if (key in definition)
+        fail(descriptorFile, `${key} are not listed here: each lives in its own ${key}/<name>.ts.`);
     const scan = (folder: string) =>
       tree.files.filter(
         (file) =>
@@ -158,48 +159,30 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
         fail(file, `ID must be "${expected}" (file name inside pack "${id}"), got "${value.id}".`);
       return value;
     };
-    const scanned: { general: General; file: string }[] = [];
+    // ID 即「包:文件名」，跨文件不会重名；只有被多处引用的技能对象需要核对是同一个。
+    const generals: General[] = [];
     for (const stem of ordered) {
       const file = `${id}/generals/${stem}.ts`;
-      scanned.push({ general: await owned(file, isGeneral, 'general(...)'), file });
+      const general = await owned(file, isGeneral, 'general(...)');
+      for (const skill of general.abilities ?? []) claimSkill(skill, file);
+      generals.push(general);
     }
-    const looseSkills: SkillDefinition[] = [];
+    const skills: SkillDefinition[] = [];
     for (const file of scan('skills')) {
       const skill = await owned(file, isSkill, 'skill(...)');
       claimSkill(skill, file);
-      looseSkills.push(skill);
+      skills.push(skill);
     }
-    const generals = [
-      ...(definition.generals ?? []).map((general) => ({ general, file: descriptorFile })),
-      ...scanned,
-    ];
-    for (const { general, file } of generals) {
-      const known = generalSource.get(general.id);
-      if (known) fail(file, `general ${general.id} is also defined in ${where(known)}.`);
-      generalSource.set(general.id, file);
-      for (const skill of general.abilities ?? []) claimSkill(skill, file);
-    }
-    const cards: { card: AuthoredCard; file: string }[] = [
-      ...(definition.cards ?? []).map((card) => ({ card, file: descriptorFile })),
-    ];
+    const cards: AuthoredCard[] = [];
     for (const file of scan('cards'))
-      cards.push({
-        card: await owned(file, isCard, 'card(...), equipment(...) or delayedCard(...)'),
-        file,
-      });
-    for (const { card, file } of cards) {
-      const known = cardSource.get(card.id);
-      if (known) fail(file, `card ${card.id} is also defined in ${where(known)}.`);
-      cardSource.set(card.id, file);
-    }
-    for (const skill of definition.skills ?? []) claimSkill(skill, descriptorFile);
+      cards.push(await owned(file, isCard, 'card(...), equipment(...) or delayedCard(...)'));
 
     // 展示按约定从 public/<包>/ 取：武将 portraits/<名>.(jpg|png|webp)、audio/death/<名>.mp3、
     // audio/skill/<技能名><n>.mp3；牌 cards/<名>.png、icons/<名>.png（或 marks/<名>.png）、
     // audio/card/<male|female>/<名>.mp3，装备缺省时用 icons/<栏位>.png 与 audio/card/common/<栏位>.mp3
     // （两种坐骑栏位都记作 horse）。约定目录里没有对应武将或牌的文件多半是拼错，启动即报。
-    const names = new Set(generals.map(({ general }) => localId(general.id)));
-    const cardNames = new Set(cards.map(({ card }) => localId(card.id)));
+    const names = new Set(generals.map((general) => localId(general.id)));
+    const cardNames = new Set(cards.map((card) => localId(card.id)));
     for (const file of mediaFiles) {
       if (
         (file.startsWith('portraits/') || file.startsWith('audio/death/')) &&
@@ -210,7 +193,7 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
         fail(`${id}/${file}`, `no card "${id}:${stemOf(file)}" in pack "${id}".`);
     }
     const explicitCards = new Set((definition.cardViews ?? []).map((view) => view.id));
-    const derivedCards = cards.flatMap(({ card }): CardPresentation[] => {
+    const derivedCards = cards.flatMap((card): CardPresentation[] => {
       if (explicitCards.has(card.id)) return [];
       const name = localId(card.id);
       const slot = card.equipment?.slot.replace(/^(offensive|defensive)-horse$/, 'horse');
@@ -236,7 +219,7 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
       return Object.keys(view).length ? [{ id: card.id, ...view }] : [];
     });
     const explicit = new Set((definition.generalViews ?? []).map((view) => view.id));
-    const derived = generals.flatMap(({ general }): GeneralPresentation[] => {
+    const derived = generals.flatMap((general): GeneralPresentation[] => {
       if (explicit.has(general.id)) return [];
       const name = localId(general.id);
       const portrait = portraitTypes
@@ -267,9 +250,9 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
       practice: practice === true,
       definition: {
         ...definition,
-        generals: generals.map(({ general }) => general),
-        cards: cards.map(({ card }) => card),
-        skills: [...(definition.skills ?? []), ...looseSkills],
+        generals,
+        cards,
+        skills,
         generalViews: [...(definition.generalViews ?? []), ...derived],
         cardViews: [...(definition.cardViews ?? []), ...derivedCards],
       },

@@ -148,12 +148,12 @@ it('目录名带 .disabled 的包不加载，也不计入内容哈希', async ()
 
 it.each([
   [
-    '重复武将 ID',
+    '在 package.ts 里登记武将',
     {
-      'sample/package.ts': `import beta from './generals/beta';\nexport default { generals: [{ ...beta }] };\n`,
+      'sample/package.ts': `import beta from './generals/beta';\nexport default { generals: [beta] };\n`,
       'sample/generals/beta.ts': general('beta'),
     },
-    /sample\/generals\/beta\.ts: general sample:beta is also defined in .*sample\/package\.ts/,
+    /sample\/package\.ts: generals are not listed here: each lives in its own generals\/<name>\.ts/,
   ],
   [
     'ID 与文件名不符',
@@ -206,12 +206,12 @@ it.each([
     /sample\/cards\/omen\.ts: default export must be card/,
   ],
   [
-    '重复牌 ID',
+    '在 package.ts 里登记牌',
     {
-      'sample/package.ts': `import omen from './cards/omen';\nexport default { cards: [{ ...omen }] };\n`,
+      'sample/package.ts': `import omen from './cards/omen';\nexport default { cards: [omen] };\n`,
       'sample/cards/omen.ts': cardFile('omen'),
     },
-    /sample\/cards\/omen\.ts: card sample:omen is also defined in .*sample\/package\.ts/,
+    /sample\/package\.ts: cards are not listed here: each lives in its own cards\/<name>\.ts/,
   ],
   [
     '同 ID 的不同技能',

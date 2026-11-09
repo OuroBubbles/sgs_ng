@@ -82,7 +82,8 @@ export interface ContentDefinition {
  * 并把 `generals/*.ts`（默认导出武将）、`cards/*.ts`（默认导出牌）与 `skills/*.ts`（默认导出技能）
  * 并入本包，无需登记；展示资源按约定从 `public/<包>/` 取得。
  */
-export interface PackDefinition extends ContentDefinition {
+export interface PackDefinition
+  extends Pick<ContentDefinition, 'decks' | 'cardViews' | 'generalViews'> {
   /** 只在机制演武中启用（依赖其他包的练习内容）。 */
   readonly practice?: boolean;
   /**
