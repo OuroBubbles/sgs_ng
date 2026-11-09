@@ -12,7 +12,7 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
+import { observeAgent } from '../../src/host/ai/seat';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
@@ -185,7 +185,7 @@ it('发动后失去技能不撤回已宣告的分配', async () => {
 });
 
 it.each([4, 17])(
-  '筹策客真实四席身份局由基础 AI 经同一合法分配模型至胜负，seed=%s',
+  '筹策客真实四席身份局由托管 AI 经同一合法分配模型至胜负，seed=%s',
   async (seed) => {
     const content = practiceContent;
     const match = createRoleMatch({

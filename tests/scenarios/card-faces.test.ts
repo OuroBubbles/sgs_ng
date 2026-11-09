@@ -34,8 +34,7 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
 import { cardView, projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { observeAgent } from '../../src/host/ai/seat';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
@@ -470,45 +469,6 @@ it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色�
   expect(game.room.world.card('gift').suit).toBe('spade');
   expect(game.room.history.facts(Damage.dealt)).toHaveLength(0);
   settled(game);
-});
-
-it('基础 AI 改判使用接收者的判定候选面，不把自己黑色手牌误认为能破坏对方红判定', async () => {
-  const match = new RoleMatch({
-    id: 'filtered-retrial',
-    seed: 2,
-    players: [
-      { id: 'a', skills: ['standard:guicai'] },
-      { id: 'b', skills: [vermilion.id] },
-    ],
-    roles: ['lord', 'rebel'],
-    deck: Array.from({ length: 24 }, (_, i) => card(`r${i}`, 'slash')),
-    content: {
-      cards: standardCards,
-      skills: [vermilion, guicai],
-    },
-  });
-  await match.prepare();
-  const running = match.room.run('judge', (ctx) =>
-    judge(ctx, {
-      player: 'b',
-      reason: 'standard:indulgence',
-      match: (_at, face) => face.suit === 'heart',
-    }),
-  );
-  const request = await nextRequest(match.room);
-  expect(observeAgent(match, 'a').hand.every((card) => card.suit === 'spade')).toBe(true);
-  const answer = decideBasic(observeAgent(match, 'a'), request, (input) =>
-    match.room.decisions.preview(request.id, input),
-  );
-  expect(answer).toEqual({ kind: 'cancel' });
-  expect(match.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
-  expect(await running).toMatchObject({
-    value: { matched: true, card: { suit: 'heart' } },
-  });
-  expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
-    match.room.world.snapshot,
-  );
-  match.room.abort('complete');
 });
 
 it('角色选牌按区域投影：暗手牌无牌面，公开装备使用不透明选项和正常花色点数，本人手牌保留过滤', async () => {

@@ -590,7 +590,7 @@ it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连�
 });
 
 it.each([4, 17])(
-  '连环演练四人局由基础 AI 经真实选择至胜负，seed=%s',
+  '连环演练四人局由托管 AI 经真实选择至胜负，seed=%s',
   async (seed) => {
     const content = practiceContent;
     const match = createRoleMatch({

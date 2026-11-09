@@ -123,7 +123,7 @@ test('红牌不能给未受伤角色，暂停隐藏私有分配，恢复重新�
   await expect(page.getByTestId('hand-cards').locator('button')).toHaveCount(10);
 });
 
-test('非主控筹策客由基础 AI 自行分配，固定甲席且不展示其他角色的私有面板', async ({
+test('非主控筹策客由托管 AI 自行分配，固定甲席且不展示其他角色的私有面板', async ({
   page,
 }, info) => {
   await start(page, true);

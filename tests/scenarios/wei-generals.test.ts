@@ -655,7 +655,7 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
   },
 );
 
-it('含三名新魏将的八人局，由基础 AI 经公开决策走到真实身份胜负', async () => {
+it('含三名新魏将的八人局，由托管 AI 经公开决策走到真实身份胜负', async () => {
   const lineup = [...standardGenerals.slice(6, 9), ...standardGenerals.slice(0, 5)].map(
     (general) => general.id,
   );

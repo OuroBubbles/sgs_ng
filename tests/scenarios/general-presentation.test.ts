@@ -6,7 +6,7 @@ import { standard } from '../fixtures/standard';
 import assets from '../../src/content/standard/assets.json';
 import { createRoleMatch, defaultContent } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
+import { observeAgent } from '../../src/host/ai/seat';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 const general = {

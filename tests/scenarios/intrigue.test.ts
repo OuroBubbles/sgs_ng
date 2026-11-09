@@ -873,7 +873,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
   expect(game.room.history.facts(CardEvent.used)).toHaveLength(3);
   settled(game);
 });
-it('三名新将混合八人局以基础 AI 正式决策推进至胜负，seed=27', async () => {
+it('三名新将混合八人局以托管 AI 正式决策推进至胜负，seed=27', async () => {
   const seed = 27;
   const lineup = [21, 22, 23, 21, 22, 23, 15, 13].map((i) => standardGenerals[i]!.id);
   const match = createRoleMatch({ seed, preset: 'standard:identity', lineup });

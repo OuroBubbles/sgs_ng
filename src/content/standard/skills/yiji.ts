@@ -60,5 +60,4 @@ export default skill(
         },
       ),
   }),
-  { ai: { targets: 'ally' } },
 );

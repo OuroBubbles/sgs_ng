@@ -13,5 +13,4 @@ export default skill(
     effect: (ctx, { self, cards }) =>
       draw(ctx, { player: self.owner, count: cards.length, reason: self.skill }),
   }),
-  { ai: { value: ({ hand, cost }) => (hand.some((card) => cost(card.id) <= 4) ? 14 : -1) } },
 );

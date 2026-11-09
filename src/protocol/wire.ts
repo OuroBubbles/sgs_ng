@@ -91,7 +91,7 @@ export const defaultRoomSetup: RoomSetup = {
 
 /**
  * 单机开局草稿：本机主持端据此装配一局，连接即对局、断开即结束。
- * 给出阵容时甲席由你执掌、其余为基础 AI；只给人数时为手动多席演练（热坐交接）。
+ * 给出阵容时甲席由你执掌、其余为托管 AI；只给人数时为手动多席演练（热坐交接）。
  */
 export type SoloSetup = {
   readonly practice?: boolean;

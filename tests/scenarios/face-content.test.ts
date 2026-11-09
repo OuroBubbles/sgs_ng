@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
 import { judge, useCard } from '../../src/sdk';
-import { observeAgent } from '../../src/host/agent-observation';
+import { observeAgent } from '../../src/host/ai/seat';
 import { projectMatch } from '../../src/host/projection';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
@@ -110,7 +110,7 @@ it('映绯真实判定：黑桃在绯衣客判定为红桃，另一角色判定�
   match.room.abort('test complete');
 });
 
-it('四人牌面演练通过基础 AI 正式决策至胜负，seed=2', async () => {
+it('四人牌面演练通过托管 AI 正式决策至胜负，seed=2', async () => {
   const seed = 2;
   const match = createRoleMatch({
     seed,

@@ -29,7 +29,7 @@ import study from '../skills/study';
 export default general('<包>:scholar', '学士', '群', 3, [study]);
 ```
 
-`skill(id, name, description, ...parts)` 是唯一的技能写法：每个部件按形状归类——`on(...)` 为触发、`modify(...)` 为查询修正、`action(...)` 为主动技、`convert(...)` 或带 `make` 的对象为转换、`defineMark(...)` 为本技能使用的标记（带 `skill` 时即持续效果，见“持续效果”），带 `lord` / `ai` 的对象为选项。内核里的 `SkillDefinition` 是它的产物，不再作为第二种写法导出。
+`skill(id, name, description, ...parts)` 是唯一的技能写法：每个部件按形状归类——`on(...)` 为触发、`modify(...)` 为查询修正、`action(...)` 为主动技、`convert(...)` 或带 `make` 的对象为转换、`defineMark(...)` 为本技能使用的标记（带 `skill` 时即持续效果，见“持续效果”），带 `lord` 的对象为选项（主公技）。内核里的 `SkillDefinition` 是它的产物，不再作为第二种写法导出。
 
 技能与牌的回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper）；回调只收到 `ctx` 与具名输入，没有目录参数。
 
@@ -133,9 +133,9 @@ use: async (ctx, { self, intent }) => {
 },
 ```
 
-## AI 提示与技能同处
+## 作者不写 AI
 
-技能可声明 `ai: { value?: (view) => number, targets?: 'ally' | 'enemy' }`。基础 AI 只通过 `observation.skills(id)` 读取提示：`value` 给出主动技能的发动意愿（不大于 0 不发动），`targets: 'ally'` 让选目标偏向友方。view 只含观察者视角的 `self / players / hand / cards / hostility / cost`，提示必须是纯函数。基础 AI 本身不再按技能 ID 分支。
+技能、武将与牌都没有 AI 字段、提示、权重或优先级。托管 AI（[src/host/ai](../src/host/ai/think.ts)）是独立系统：它按本席所知重新洗配看不见的牌与身份，在同一规则的副本里把每个候选（出牌、发动、选项、选目标）推演下去，用一个只认内核语义的局面估值（体力、手牌、装备、护甲、判定区、连环、额外回合、终局）比较结果。新写的武将或技能放进包里即可被合理使用，[零 AI 代码的放入测试](../tests/scenarios/ai-drop-in.test.ts) 验证这一点。若 AI 用得不好，应改进 AI 的通用推演或估值，而不是给某个技能写提示。
 
 ## 组合与运行
 
@@ -236,6 +236,6 @@ World、事实和接纳后的决策值在类型与运行时均只读；需要本
 
 普通文件可以导出函数、事件（defineEvent）和 Query，由相对 import 共享同一实例；资源使用静态 import 或调用者提供的 URL。例子见 [渡口](../examples/content/harbor/index.ts)。不在挂起技能中途热换定义，也不引入签名或沙箱体系。
 
-当前客户端支持已登记的选择形态。自定义 `ctx.ask` 类型能在规则层运行，不代表 UI 和基础 AI 已自动具备该交互；不支持的必选决策会中止基础 AI 对局。先复用现有选择模型，确有新交互需求时再补完整执行、投影和客户端路径。
+当前客户端支持已登记的选择形态。自定义 `ctx.ask` 类型能在规则层运行，不代表 UI 和托管 AI 已自动具备该交互；不支持的必选决策会中止托管 AI 对局。先复用现有选择模型，确有新交互需求时再补完整执行、投影和客户端路径。
 
 改动后先运行 `pnpm typecheck`、`pnpm lint` 与对应领域场景；交付前运行 `pnpm check`（typecheck、lint、format:check、test），界面改动另跑 `pnpm test:ui`。检查领域结果、取消/失效与嵌套路径，不为每个实现细节追加测试。轨迹从 `ctx.history` 的事实和原因链读取，随机数使用 `ctx.randomInt`；不依赖真实时间、动画或 `Math.random` 决定规则。

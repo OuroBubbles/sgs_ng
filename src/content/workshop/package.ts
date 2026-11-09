@@ -12,7 +12,7 @@ export default {
     {
       id: 'workshop:faces',
       label: '牌面演练（40 张）',
-      // 全黑桃便于观察印刷牌与当前牌面差别；配比仍能完成真实基础 AI 对局。
+      // 全黑桃便于观察印刷牌与当前牌面差别；配比仍能完成真实托管 AI 对局。
       create: deckOf(
         'face-card',
         [

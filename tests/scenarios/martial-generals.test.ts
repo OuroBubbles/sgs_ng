@@ -266,7 +266,7 @@ it('首六武将完整初始化，主公奖励叠加目录体力，空武将引�
   match.room.abort('done');
 });
 
-it('六名真实武将全部由基础 AI 经正式决策走到身份胜负', async () => {
+it('六名真实武将全部由托管 AI 经正式决策走到身份胜负', async () => {
   const match = createRoleMatch({
     seed: 42,
     preset: 'standard:identity',

@@ -4,7 +4,7 @@ import { projectMatch } from './projection';
 import { emptyPreview } from '../protocol';
 import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
-import { AgentDriver } from './agent-driver';
+import { AgentDriver } from './ai/driver';
 import { closedReply } from '../protocol';
 import type { ClientCommand, CommandResult, LobbyView, ServerMessage } from '../protocol';
 

@@ -78,13 +78,4 @@ export default skill(
         await damage(ctx, { from: self.owner, to: target!, amount: 1, nature: 'normal' });
     },
   }),
-  {
-    ai: {
-      value: ({ hand, players, cost, hostility }) =>
-        hand.some((card) => cost(card.id) <= 5) &&
-        players.some((p) => p.alive && hostility(p.id) > 0)
-          ? 12
-          : -1,
-    },
-  },
 );

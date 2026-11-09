@@ -16,7 +16,7 @@
 
 ## 依赖方向
 
-箭头表示“左侧导入右侧”。前后端分离（P2）：**规则只在 Bun 主持端运行**。`host` 装配对局、投影、基础 AI 与会话，`server` 提供 HTTP / WebSocket；网页端（`main.ts`、`app`、`client`、`platform`）只含界面与素材，经 `protocol` 消费视图，单机与联机都走同一个 RemoteSession。核心不反向 import 内容。
+箭头表示“左侧导入右侧”。前后端分离（P2）：**规则只在 Bun 主持端运行**。`host` 装配对局、投影、托管 AI 与会话，`server` 提供 HTTP / WebSocket；网页端（`main.ts`、`app`、`client`、`platform`）只含界面与素材，经 `protocol` 消费视图，单机与联机都走同一个 RemoteSession。核心不反向 import 内容。
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ src/
     presentation/    # 音频、帧序列与独立 Spine 演示；完整表现时序后置
   platform/          # 浏览器/WebView 前后台观测
   app/               # 网页装配：App、RemoteSession、素材绑定
-  host/              # 主持端：对局装配、投影、基础 AI、单机会话、联机房间、目录
+  host/              # 主持端：对局装配、投影、托管 AI（ai/）、单机会话、联机房间、目录
   server/            # HTTP / WebSocket 主持进程（Bun 直接运行源码）
 examples/content/    # 渡口、画阁等普通作者源码模块
 tests/
@@ -133,7 +133,7 @@ Pixi 与 DOM 共用一个逻辑战场坐标映射。静态边框与立绘由 Pix
 
 ## 现有适配边界
 
-单机：浏览器以 `solo` hello（仅接受本机回环连接）向主持端开一局，一条连接即一局，断开即结束；[SoloSession](../src/host/solo.ts) 负责热坐交接、暂停与基础 AI。`pnpm dev` / `pnpm preview` 由 Vite 插件拉起并代理一个自有 Bun 主持端（`/game`、`/catalog`，默认端口 1423），`pnpm online` 的主持端同样接受本机单机。NetworkRoom 持有连接与开局草稿，全部准备后才由普通工厂函数创建新的 RoleMatch。房间可连续开局，同时至多保留一局；结束后各人独立返回准备页，不把草稿放入 World。WebSocket 只传对应席位的投影、预览与回答，局号限定远端决策身份；单机与联机共用选择解释，不复制合法性，普通技能仍在主持端执行。联机细节见下文“联机”。
+单机：浏览器以 `solo` hello（仅接受本机回环连接）向主持端开一局，一条连接即一局，断开即结束；[SoloSession](../src/host/solo.ts) 负责热坐交接、暂停与托管 AI。`pnpm dev` / `pnpm preview` 由 Vite 插件拉起并代理一个自有 Bun 主持端（`/game`、`/catalog`，默认端口 1423），`pnpm online` 的主持端同样接受本机单机。NetworkRoom 持有连接与开局草稿，全部准备后才由普通工厂函数创建新的 RoleMatch。房间可连续开局，同时至多保留一局；结束后各人独立返回准备页，不把草稿放入 World。WebSocket 只传对应席位的投影、预览与回答，局号限定远端决策身份；单机与联机共用选择解释，不复制合法性，普通技能仍在主持端执行。联机细节见下文“联机”。
 
 平台生命周期、文件加载和内容持久化留在装配与原生壳中，不渗入技能代码。未来端口按实际适配需要形成，不预建工厂或继承树。
 

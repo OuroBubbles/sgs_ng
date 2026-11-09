@@ -17,7 +17,7 @@ const server = createGameServer(
 );
 const boundPort = await server.listen(port, host);
 console.log(
-  `${setup.humans}人联机：http://${host}:${boundPort}/?online=1（${setup.lineup.length - setup.humans} 席基础 AI）`,
+  `${setup.humans}人联机：http://${host}:${boundPort}/?online=1（${setup.lineup.length - setup.humans} 席托管 AI）`,
 );
 const stop = () => {
   server.close().catch((error: unknown) => {

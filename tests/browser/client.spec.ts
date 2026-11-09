@@ -590,7 +590,7 @@ async function reachOwnSkill(
   throw new Error(`Skill not reached: ${wanted}`);
 }
 
-test('默认固定甲席与基础 AI；暂停藏牌、后台等待及继续不切换席位', async ({ page }, info) => {
+test('默认固定甲席与托管 AI；暂停藏牌、后台等待及继续不切换席位', async ({ page }, info) => {
   await expect(page.getByRole('checkbox', { name: '手动演练（内容调试）' })).not.toBeChecked();
   await page
     .getByRole('combobox', { name: '牌组', exact: true })
@@ -968,7 +968,7 @@ test('曹操奸雄从真实伤害取得材料，供牌未发生时护驾说明�
     fullPage: true,
   });
 });
-test('曹操主公请求护驾，由基础 AI 的魏角色实际供闪', async ({ page }, info) => {
+test('曹操主公请求护驾，由托管 AI 的魏角色实际供闪', async ({ page }, info) => {
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:caocao');
@@ -1278,7 +1278,7 @@ test('黄月英使用普通锦囊触发集智，在牌效果前实际摸牌', as
     fullPage: true,
   });
 });
-test('吕布无双杀令基础 AI 实际连续使用两张闪', async ({ page }, info) => {
+test('吕布无双杀令托管 AI 实际连续使用两张闪', async ({ page }, info) => {
   await page.getByRole('combobox', { name: '你的武将', exact: true }).selectOption('standard:lvbu');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
   await page.getByRole('spinbutton').fill('2');
@@ -2689,7 +2689,7 @@ for (const invoke of [false, true]) {
   });
 }
 
-test('本人可托管并收回，暂停冻结托管，继续后基础 AI 完成整局', async ({ page }, info) => {
+test('本人可托管并收回，暂停冻结托管，继续后托管 AI 完成整局', async ({ page }, info) => {
   test.setTimeout(120_000);
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
   await page.getByRole('spinbutton').fill('27');
@@ -2701,7 +2701,7 @@ test('本人可托管并收回，暂停冻结托管，继续后基础 AI 完成�
     'true',
   );
   await expect(page.locator('.decision-actions button')).toHaveCount(0);
-  await expect(page.getByTestId('decision-hint')).toHaveText('基础 AI 正在代你操作…');
+  await expect(page.getByTestId('decision-hint')).toHaveText('托管 AI 正在代你操作…');
   await page.getByRole('button', { name: '收回操作', exact: true }).click();
   await expect(page.getByRole('button', { name: 'AI 托管', exact: true })).toHaveAttribute(
     'aria-pressed',

@@ -5,8 +5,7 @@ import gallery from '../../examples/content/gallery';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createGameServer } from '../../src/server/server';
 import { RemoteSession } from '../../src/app/session';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { decide } from '../../src/host/ai/think';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { inspectSelection } from '../../src/host/selection';
 import { createRoomOptions } from '../../src/host/setup';
@@ -671,9 +670,7 @@ it('两个真实 WebSocket 客户端绑定不同席位，复用预览并完整�
       previewed = true;
     }
     // 测试操作者通过真实网络回答；正式客户端不会取得这里的主持端观察。
-    const answer = decideBasic(observeAgent(match, request.player), request, (value) =>
-      match.room.decisions.preview(request.id, value),
-    );
+    const answer = await decide(match, request);
     if (answer.kind === 'unsupported') throw new Error(answer.reason);
     const reply = await (answer.kind === 'cancel'
       ? client.cancel(decision.id, decision.token)

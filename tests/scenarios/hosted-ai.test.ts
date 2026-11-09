@@ -3,8 +3,8 @@ import { setImmediate } from 'node:timers/promises';
 import { Match, RoleMatch } from '../../src/host/role-match';
 import { SoloSession } from '../../src/host/solo';
 import { createRoleMatch } from '../../src/host/content';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { observeAgent } from '../../src/host/ai/seat';
+import { decide } from '../../src/host/ai/think';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { standardCards } from '../fixtures/standard';
 import { chooseOwnedCard, moveCards, Use, askUse, useCard } from '../../src/sdk';
@@ -157,9 +157,7 @@ async function drive<T>(match: RoleMatch, flow: Promise<FlowResult<T>>) {
       await setImmediate();
       const request = match.room.decisions.pending[0];
       if (!request) continue;
-      const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
+      const answer = await decide(match, request);
       if (answer.kind === 'unsupported') throw new Error(answer.reason);
       expect(
         answer.kind === 'cancel'
@@ -393,14 +391,12 @@ it('请求令牌在等待时失效，AI 重新读取请求而不提交旧草稿'
   }
 });
 
-it('基础 AI 区分取牌用途与技能发动：突袭后续取牌可完成，寒冰仅在可选发动时保留伤害', async () => {
+it('托管 AI 完成必选与可选的选牌：突袭、反馈都取到对方暗手牌且不读取其牌面', async () => {
   const match = fixture();
   await match.prepare();
   for (const [reason, optional] of [
     ['standard:tuxi', false],
     ['standard:fankui', true],
-    ['standard:ice_sword-ability', true],
-    ['standard:ice_sword-ability', false],
   ] as const) {
     const running = match.room.run('choose', (ctx) =>
       chooseOwnedCard(ctx, {
@@ -414,23 +410,13 @@ it('基础 AI 区分取牌用途与技能发动：突袭后续取牌可完成，
     const request = await nextRequest(match.room);
     expect(request.data).toMatchObject({ purpose: 'owned-card', reason });
     expect(JSON.stringify(request.data)).not.toContain('secret-b');
-    const answer = decideBasic(observeAgent(match, 'a'), request, (input) =>
-      match.room.decisions.preview(request.id, input),
-    );
-    const decline = reason === 'standard:ice_sword-ability' && optional;
-    if (decline) {
-      expect(answer).toEqual({ kind: 'cancel' });
-      expect(match.room.decisions.cancel(request.id, request.token)).toEqual({ kind: 'accepted' });
-    } else {
-      expect(answer.kind).toBe('submit');
-      if (answer.kind !== 'submit') throw Error('Real owned-card choice must complete.');
-      expect(match.room.decisions.submit(request.id, request.token, answer.value)).toEqual({
-        kind: 'accepted',
-      });
-    }
-    expect(await running).toMatchObject({
-      value: decline ? { kind: 'unavailable' } : { kind: 'chosen', card: 'secret-b' },
+    const answer = await decide(match, request);
+    expect(answer.kind).toBe('submit');
+    if (answer.kind !== 'submit') throw Error('Real owned-card choice must complete.');
+    expect(match.room.decisions.submit(request.id, request.token, answer.value)).toEqual({
+      kind: 'accepted',
     });
+    expect(await running).toMatchObject({ value: { kind: 'chosen', card: 'secret-b' } });
   }
   match.room.abort('done');
 });
@@ -448,12 +434,8 @@ it('未知必选决策明确返回不支持；可选扩展决策允许放弃', a
     prompt: '自定义',
     optional: false,
   };
-  expect(decideBasic(observeAgent(match, 'b'), request, () => null)).toMatchObject({
-    kind: 'unsupported',
-  });
-  expect(decideBasic(observeAgent(match, 'b'), { ...request, optional: true }, () => null)).toEqual(
-    { kind: 'cancel' },
-  );
+  expect(await decide(match, request)).toMatchObject({ kind: 'unsupported' });
+  expect(await decide(match, { ...request, optional: true })).toEqual({ kind: 'cancel' });
   match.room.abort('done');
 });
 
@@ -464,8 +446,79 @@ for (const [count, seed, preset] of [
   [8, 42, 'standard:identity'],
   [2, 255, 'standard:mechanics'],
 ] as const) {
-  it(`${count} 席 ${preset} 种子 ${seed}：基础 AI 使用真实规则完成整局，无非法回复或必选卡死`, async () => {
+  it(`${count} 席 ${preset} 种子 ${seed}：托管 AI 使用真实规则完成整局，无非法回复或必选卡死`, async () => {
     const match = createRoleMatch({ count, seed, preset });
     await playMatch(match, { steps: Infinity, decisions: 1800 });
   }, 60_000);
 }
+
+it('想象只取决于本席所知：交换他人暗牌与未知身份，出牌决策完全相同', async () => {
+  const answers = [];
+  for (const swapped of [false, true]) {
+    const hands: Record<string, string[]> = {
+      a: ['a-slash', 'a-duel', 'a-peach'],
+      b: ['b-1', 'b-2'],
+      c: swapped ? ['d-1', 'd-2'] : ['c-1', 'c-2'],
+      d: swapped ? ['c-1', 'c-2'] : ['d-1', 'd-2'],
+    };
+    const match = new RoleMatch({
+      id: 'imagined-knowledge',
+      seed: 7,
+      content: { cards: standardCards },
+      players: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
+      roles: swapped
+        ? ['lord', 'renegade', 'rebel', 'loyalist']
+        : ['lord', 'rebel', 'loyalist', 'renegade'],
+      deck: [
+        card('a-slash', 'slash'),
+        card('a-duel', 'duel'),
+        card('a-peach', 'peach', 'heart'),
+        card('b-1', 'jink'),
+        card('b-2', 'slash'),
+        card('c-1', 'peach', 'heart'),
+        card('c-2', 'nullification'),
+        card('d-1', 'jink'),
+        card('d-2', 'dismantlement'),
+        ...Array.from({ length: 16 }, (_, i) => card(`draw-${i}`, i % 2 ? 'slash' : 'jink')),
+      ],
+    });
+    match.room.on(Match.prepared, {
+      id: 'fixture',
+      owner: null,
+      eligible: () => true,
+      async run(ctx) {
+        const owner = (id: string) =>
+          Object.entries(hands).find(([, cards]) => cards.includes(id))?.[0];
+        await moveCards(
+          ctx,
+          ctx.world.snapshot.cards.map((item) => ({
+            cards: [item.id],
+            from: ctx.world.position(item.id),
+            to: owner(item.id) ? `${owner(item.id)}:hand` : 'draw',
+            place: 'bottom' as const,
+          })),
+          'fixture',
+        );
+      },
+    });
+    const running = match.start();
+    try {
+      for (;;) {
+        const request = await nextRequest(match.room);
+        if (request.player === 'a' && request.kind === 'play-action') {
+          answers.push(await decide(match, request));
+          break;
+        }
+        const answer = await decide(match, request);
+        if (answer.kind === 'submit')
+          match.room.decisions.submit(request.id, request.token, answer.value);
+        else match.room.decisions.cancel(request.id, request.token);
+      }
+    } finally {
+      match.room.abort('done');
+      await running;
+    }
+  }
+  expect(answers[0]!.kind).toBe('submit');
+  expect(answers[0]).toEqual(answers[1]);
+});

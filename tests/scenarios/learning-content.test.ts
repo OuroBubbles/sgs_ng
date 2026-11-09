@@ -80,7 +80,7 @@ it('后续伤害自然收集已有余响，不重复学习或复制同一时点�
 });
 
 it.each([4, 17])(
-  '问道客与标准技能组成四人真实身份局，基础 AI 至胜负，seed=%s',
+  '问道客与标准技能组成四人真实身份局，托管 AI 至胜负，seed=%s',
   async (seed) => {
     const match = createRoleMatch({
       seed,

@@ -1,8 +1,7 @@
 import { expect } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import type { RoleMatch } from '../../src/host/role-match';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { decide } from '../../src/host/ai/think';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { activePhase, activeTurn } from '../../src/rules/turn/turn';
@@ -28,9 +27,7 @@ export async function playMatch(
 
       // 场景在回答前检查分配投影等中间状态，不再复制整套 AI 驱动与善后。
       beforeAnswer?.(request);
-      const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
+      const answer = await decide(match, request);
       if (answer.kind === 'unsupported') throw new Error(`${request.prompt}: ${answer.reason}`);
       const accepted =
         answer.kind === 'cancel'

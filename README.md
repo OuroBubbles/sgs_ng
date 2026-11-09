@@ -2,7 +2,7 @@
 
 从零设计的三国杀项目：个人开发、AI 辅助迭代，用简洁、可组合的规则语义承载复杂技能。
 
-内容直接用普通 TypeScript 定义，以 `ContentDefinition` / `createContent(...)` 组合；不需要包清单、版本登记或专用编译器。现有标准＋EX（26 将、108 张牌）、身份模式、固定本人席位＋基础 AI、机制演武，以及浏览器 / Windows 桌面的局域网联机。
+内容直接用普通 TypeScript 定义，以 `ContentDefinition` / `createContent(...)` 组合；不需要包清单、版本登记或专用编译器。现有标准＋EX（26 将、108 张牌）、身份模式、固定本人席位＋托管 AI、机制演武，以及浏览器 / Windows 桌面的局域网联机。
 
 技术栈：TypeScript + PixiJS 8（含官方 Spine runtime）+ Svelte 5 + Tauri 2；主持端为 Bun 直接运行 TypeScript 源码（不打包）；Vite、pnpm、Vitest、Playwright、ESLint、Prettier。
 
@@ -15,7 +15,7 @@ pnpm install --frozen-lockfile
 pnpm dev            # http://127.0.0.1:1420（同时拉起本机 Bun 主持端）
 ```
 
-启动页选择“单机演武”开局；规则只在主持端运行，页面经 ws 与它对话。默认控制甲席，其余角色由基础 AI 行动；“手动演练”供内容调试。按 1–9 选牌、Enter 确认、Esc 清除草稿。
+启动页选择“单机演武”开局；规则只在主持端运行，页面经 ws 与它对话。默认控制甲席，其余角色由托管 AI 行动；“手动演练”供内容调试。按 1–9 选牌、Enter 确认、Esc 清除草稿。
 
 联机：`pnpm online` 构建页面后用 `pnpm server`（即 `bun src/server/main.ts`，源码直接运行）监听 `127.0.0.1:1422`；改了宿主源码只需重启，页面改动才需重新 `pnpm build`。环境变量见 [ARCHITECTURE](docs/ARCHITECTURE.md#联机)。Windows 桌面程序也可在开局页直接创建或加入房间。
 

@@ -19,21 +19,4 @@ export default skill(
       await recover(ctx, { from: self.owner, to: self.owner, amount: 1 });
     },
   }),
-  {
-    ai: {
-      targets: 'ally',
-      value: ({ self, players, hostility }) =>
-        self.hp < self.maxHp &&
-        players.some(
-          (p) =>
-            p.alive &&
-            p.id !== self.id &&
-            p.hp < p.maxHp &&
-            ['male', 'dual'].includes(p.gender) &&
-            hostility(p.id) < 0,
-        )
-          ? 40
-          : -1,
-    },
-  },
 );

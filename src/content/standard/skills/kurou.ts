@@ -11,5 +11,4 @@ export default skill(
       await draw(ctx, { player: self.owner, count: 2, reason: self.skill });
     },
   }),
-  { ai: { value: ({ self, hand }) => (self.hp > 2 && hand.length < 6 ? 15 : -1) } },
 );

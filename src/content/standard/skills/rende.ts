@@ -23,14 +23,4 @@ export default skill(
         await recover(ctx, { from: self.owner, to: self.owner, amount: 1 });
     },
   }),
-  {
-    ai: {
-      value: ({ self, hand, players, hostility }) =>
-        self.hp < self.maxHp &&
-        hand.length >= Math.max(2, self.hp + 1) &&
-        players.some((p) => p.id !== self.id && p.alive && hostility(p.id) < 0)
-          ? 18
-          : -1,
-    },
-  },
 );

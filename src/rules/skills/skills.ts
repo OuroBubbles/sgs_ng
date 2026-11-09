@@ -63,35 +63,8 @@ export interface SkillDefinition {
   readonly viewAs?: readonly ViewAs[];
   readonly modifiers?: readonly SkillModifier[];
   readonly active?: readonly ActiveSkill[];
-  /** 与技能同处一处的 AI 提示；规则从不读取。 */
-  readonly ai?: SkillAi;
   /** 技能用到的标记；带 skill 的标记（持续效果）随技能自动登记。 */
   readonly marks?: readonly Mark<unknown>[];
-}
-
-/** AI 只看到观察者视角的简化局面；提示函数必须是纯函数。 */
-export interface AiSeat {
-  readonly id: string;
-  readonly alive: boolean;
-  readonly hp: number;
-  readonly maxHp: number;
-  readonly gender: string;
-}
-export interface AiView {
-  readonly self: AiSeat;
-  readonly players: readonly AiSeat[];
-  readonly hand: readonly { readonly id: string }[];
-  readonly cards: readonly { readonly id: string }[];
-  /** 正值为敌意，负值为友方。 */
-  readonly hostility: (player: string) => number;
-  /** 牌的保留价值；越低越适合作为费用。 */
-  readonly cost: (card: string) => number;
-}
-export interface SkillAi {
-  /** 主动技能的发动意愿；不大于 0 时不发动。 */
-  readonly value?: (view: AiView) => number;
-  /** 选择目标时偏向友方还是敌方，默认敌方。 */
-  readonly targets?: 'ally' | 'enemy';
 }
 
 /** 校验局部 ID 后直接使用声明本身：不复制、不冻结、不绑定方法。 */
@@ -267,11 +240,6 @@ export class SkillBook implements TriggerSource {
       ids.add(id);
     }
     for (const definition of prepared) this.#definitions.set(definition.id, definition);
-  }
-
-  /** 技能旁声明的 AI 提示；未知技能或无提示时为 undefined。 */
-  hint(id: string): SkillAi | undefined {
-    return this.#definitions.get(id)?.ai;
   }
 
   definition(id: string): SkillDefinition {

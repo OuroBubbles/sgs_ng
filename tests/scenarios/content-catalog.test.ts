@@ -7,8 +7,7 @@ import { createContent } from '../../src/content/catalog';
 import type { SkillDefinition } from '../../src/rules/skills/skills';
 import { createRoleMatch, defaultContent, practiceContent } from '../../src/host/content';
 import { cardView } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { decide } from '../../src/host/ai/think';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
 import { RoleMatch } from '../../src/host/role-match';
@@ -243,11 +242,7 @@ for (const branch of ['draw', 'recover'] as const) {
     });
     const option = await nextRequest(match.room);
     expect(option.kind).toBe('choose-option');
-    expect(
-      decideBasic(observeAgent(match, '甲席'), option, (input) =>
-        match.room.decisions.preview(option.id, input),
-      ),
-    ).toEqual({ kind: 'submit', value: 'draw' });
+    expect(await decide(match, option)).toEqual({ kind: 'submit', value: 'draw' });
     if (branch === 'draw')
       expect(match.room.decisions.preview(option.id, 'recover')?.valid).toBe(false);
     expect(match.room.decisions.submit(option.id, option.token, branch)).toEqual({
@@ -299,7 +294,7 @@ it('混合内容的闻策也能响应标准锦囊，工厂未捕获另一套规�
   expect(await running).toMatchObject({ kind: 'resolved' });
 });
 
-it('演武源码与基础 AI 共用标准动作/具名选项，真实完成整局，无必选卡死', async () => {
+it('演武源码与托管 AI 共用标准动作/具名选项，真实完成整局，无必选卡死', async () => {
   const match = createRoleMatch({
     seed: 42,
     preset: 'workshop:showcase',
@@ -316,9 +311,7 @@ it('演武源码与基础 AI 共用标准动作/具名选项，真实完成整�
         expect(match.room.status).not.toBe('faulted');
         continue;
       }
-      const answer = decideBasic(observeAgent(match, request.player), request, (input) =>
-        match.room.decisions.preview(request.id, input),
-      );
+      const answer = await decide(match, request);
       expect(answer.kind, request.prompt).not.toBe('unsupported');
       if (answer.kind === 'unsupported') break;
       const reply =

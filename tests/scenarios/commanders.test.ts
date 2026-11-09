@@ -7,7 +7,7 @@ import { standardCards } from '../fixtures/standard';
 import { RoleMatch } from '../../src/host/role-match';
 import { createRoleMatch } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
+import { observeAgent } from '../../src/host/ai/seat';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   kingdomOf,
@@ -701,7 +701,7 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
   expect(game.room.world.position('secret-b')).toBe('a:hand');
 });
 
-it('含曹操、张辽的八人局，基础 AI 通过正式委托、替代摸牌和取得材料走到胜负', async () => {
+it('含曹操、张辽的八人局，托管 AI 通过正式委托、替代摸牌和取得材料走到胜负', async () => {
   const lineup = [11, 12, 8, 9, 10, 0, 2, 5].map((index) => standardGenerals[index]!.id);
   const match = createRoleMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 6000 });

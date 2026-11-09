@@ -70,14 +70,4 @@ export default skill(
     pay: 'discard',
     effect: (ctx, { targets: [first, second] }) => useCard(ctx, duel(second!, first!)),
   }),
-  {
-    ai: {
-      value: ({ cards, players, self, cost }) =>
-        cards.some((card) => cost(card.id) <= 5) &&
-        players.filter((p) => p.alive && p.id !== self.id && ['male', 'dual'].includes(p.gender))
-          .length >= 2
-          ? 16
-          : -1,
-    },
-  },
 );

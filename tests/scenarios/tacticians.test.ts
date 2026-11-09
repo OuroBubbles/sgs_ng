@@ -503,7 +503,7 @@ it('支付后失去流离不撤销转移，目标死亡则跳过，不退费用'
 });
 
 it.each(['mixed', 'all-liuli'])(
-  '新武将 %s 对局由基础 AI 经正式决策走到胜负',
+  '新武将 %s 对局由托管 AI 经正式决策走到胜负',
   async (kind) => {
     const lineup =
       kind === 'mixed'

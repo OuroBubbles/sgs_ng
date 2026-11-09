@@ -27,8 +27,8 @@ import { RoleMatch } from '../../src/host/role-match';
 import { SoloSession } from '../../src/host/solo';
 import { createRoleMatch } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { observeAgent } from '../../src/host/ai/seat';
+import { decide } from '../../src/host/ai/think';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 
@@ -466,30 +466,13 @@ it('主持侧专用预览经过授权；暂停藏牌和请求，恢复同一排�
   session.dispose();
   settled(match);
 });
-it('基础 AI 仅按可见私有牌排序，保留全部牌在顶，未知排序模型回退合法初始分组', async () => {
+it('托管 AI 对私有牌的排列经正式预览并被接受', async () => {
   const match = privateMatch();
   await grant(match);
   const running = prepare(match);
   await answer(match, true);
   const request = await nextRequest(match.room);
-  const custom = arranged(['secret1'], ['secret0']);
-  expect(
-    decideBasic(
-      observeAgent(match, 'a'),
-      {
-        ...request,
-        data: {
-          ...(request.data as Record<string, unknown>),
-          initial: custom,
-          reason: 'author:groups',
-        },
-      },
-      (input) => match.room.decisions.preview(request.id, input),
-    ),
-  ).toEqual({ kind: 'submit', value: custom });
-  const response = decideBasic(observeAgent(match, 'a'), request, (input) =>
-    match.room.decisions.preview(request.id, input),
-  );
+  const response = await decide(match, request);
   expect(response.kind).toBe('submit');
   if (response.kind !== 'submit') throw new Error('Expected arrangement.');
   expect(match.room.decisions.preview(request.id, response.value)?.valid).toBe(true);
@@ -579,7 +562,7 @@ it('空城目标确认后失去最后手牌，实际效果重查跳过；决斗�
   expect(skipped.room.world.player('b').hp).toBe(4);
   settled(skipped);
 });
-it('混合八人标准对局的观星由基础 AI 经正式选择完成，最终产生真实胜负', async () => {
+it('混合八人标准对局的观星由托管 AI 经正式选择完成，最终产生真实胜负', async () => {
   const roster = [
     'zhugeliang',
     'caocao',

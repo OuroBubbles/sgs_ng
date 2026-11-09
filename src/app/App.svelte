@@ -195,7 +195,7 @@
     if (view.paused) return '对局已暂停';
     if (view.result) return '对局已结束';
     if (view.automated) {
-      if (view.control?.delegated && view.automated === view.viewer) return '基础 AI 正在代你操作…';
+      if (view.control?.delegated && view.automated === view.viewer) return '托管 AI 正在代你操作…';
       return `${view.automated} 正在思考…`;
     }
     if (remoteLobby?.waitingFor) return `等待 ${remoteLobby.waitingFor} 选择`;
@@ -718,7 +718,7 @@
           ? `联机 · ${remoteLobby?.seat ?? '连接中'}`
           : manualSession
             ? '手动演练'
-            : '单机 · 基础 AI'}</span
+            : '单机 · 托管 AI'}</span
       >{#if online}<button
           class="subtle-button"
           data-back-action={view.status === 'idle' ? '' : undefined}
@@ -793,7 +793,7 @@
               <p>
                 {manualPractice
                   ? '逐席操作，检验技能与结算。'
-                  : '你执掌甲席，其余角色由基础 AI 行动。'}
+                  : '你执掌甲席，其余角色由托管 AI 行动。'}
               </p>
             </div>
             <button
@@ -842,7 +842,7 @@
           <section class="solo-roster" aria-label="本局阵容预览">
             <header>
               <h3>本局席位</h3>
-              <span>{manualPractice ? '全部手动控制' : `你与 ${playerCount - 1} 位基础 AI`}</span>
+              <span>{manualPractice ? '全部手动控制' : `你与 ${playerCount - 1} 位托管 AI`}</span>
             </header>
             <ol>
               {#each lobbySeats as seat (seat.seat)}
@@ -859,7 +859,7 @@
           <details class="solo-options" bind:open={practiceOptionsOpen}>
             <summary
               ><span>演练与复现</span><small
-                >{manualPractice ? '全部手动' : '基础 AI'} · 种子 {seed}</small
+                >{manualPractice ? '全部手动' : '托管 AI'} · 种子 {seed}</small
               ></summary
             >
             <div class="lobby-fields">

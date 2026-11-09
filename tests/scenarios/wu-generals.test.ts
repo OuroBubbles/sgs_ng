@@ -611,7 +611,7 @@ it('未发生实际回复时不开放回复后窗口，满体力仍保留尝试�
   ).toMatchObject({ value: { kind: 'unchanged', attemptedAmount: 1, amount: 0 } });
   expect(after).toBe(0);
 });
-it('三名新吴将八人局由基础 AI 经正式决策走到胜负', async () => {
+it('三名新吴将八人局由托管 AI 经正式决策走到胜负', async () => {
   const lineup = [15, 16, 17, 13, 14, 11, 9, 8].map((i) => standardGenerals[i]!.id);
   const match = createRoleMatch({ seed: 14, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 7000 });

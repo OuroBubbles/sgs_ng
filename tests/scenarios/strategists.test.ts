@@ -30,8 +30,7 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
 import { projectMatch } from '../../src/host/projection';
-import { observeAgent } from '../../src/host/agent-observation';
-import { decideBasic } from '../../src/host/basic-agent';
+import { observeAgent } from '../../src/host/ai/seat';
 import { createRoleMatch } from '../../src/host/content';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';
@@ -678,72 +677,7 @@ it('遗计空牌堆或不足两张时正常结束，不制造必选死锁', asyn
   }
 });
 
-it('基础 AI 鬼才只用本人手牌和公开判定改良结果，未知判定或无需改善时放弃', async () => {
-  for (const reason of ['standard:indulgence', 'unknown', 'already-good']) {
-    const match = privateMatch();
-    await match.room.run('hand', (ctx) =>
-      moveCards(
-        ctx,
-        [{ cards: ['secret-two'], from: 'draw', to: 'a:hand', place: 'bottom' }],
-        'setup',
-      ),
-    );
-    const observation = observeAgent(match, 'a');
-    const request = {
-      id: 'test',
-      token: 1,
-      revision: 0,
-      player: 'a',
-      optional: true,
-      kind: 'cards-targets',
-      prompt: '',
-      data: {
-        reason: 'standard:guicai',
-        judgment: {
-          player: 'a',
-          reason: reason === 'already-good' ? 'standard:indulgence' : reason,
-          card: { suit: reason === 'already-good' ? 'heart' : 'spade', rank: 7 },
-        },
-      },
-    };
-    const choice = decideBasic(observation, request, () => ({ valid: true, feedback: null }));
-    // 黑色本人手牌不能把乐不思蜀改善为红桃，绝不凭空提供牌堆中的心牌。
-    expect(choice.kind).toBe('cancel');
-  }
-});
-
-it('基础 AI 用本人真实红桃手牌改善自己的乐不思蜀，仍经过正式预览与提交', async () => {
-  const match = privateMatch();
-  await grant(match, 'standard:guicai');
-  await match.room.run('hand', (ctx) =>
-    moveCards(
-      ctx,
-      [{ cards: ['secret-one'], from: 'draw', to: 'a:hand', place: 'bottom' }],
-      'setup',
-    ),
-  );
-  const running = match.room.run('judge', (ctx) =>
-    judge(ctx, {
-      player: 'a',
-      reason: 'standard:indulgence',
-      match: (_at, card) => card.suit === 'heart',
-    }),
-  );
-  const request = await nextRequest(match.room);
-  const reply = decideBasic(observeAgent(match, 'a'), request, (value) =>
-    match.room.decisions.preview(request.id, value),
-  );
-  expect(reply).toEqual({ kind: 'submit', value: { cards: ['secret-one'], targets: [] } });
-  if (reply.kind !== 'submit') throw new Error('Expected a legal retrial.');
-  expect(match.room.decisions.submit(request.id, request.token, reply.value)).toEqual({
-    kind: 'accepted',
-  });
-  expect(await running).toMatchObject({
-    value: { matched: true, card: { id: 'secret-one' } },
-  });
-});
-
-it('含司马懿、郭嘉、甄姬的八人局，基础 AI 经正式改判、暗选和分牌走到身份胜负', async () => {
+it('含司马懿、郭嘉、甄姬的八人局，托管 AI 经正式改判、暗选和分牌走到身份胜负', async () => {
   const lineup = [9, 10, 8, 6, 7, 0, 2, 5].map((index) => standardGenerals[index]!.id);
   const match = createRoleMatch({ seed: 3, preset: 'standard:identity', lineup });
   await playMatch(match, { steps: 5000 });

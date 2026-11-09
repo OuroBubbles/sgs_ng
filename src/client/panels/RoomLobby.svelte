@@ -60,7 +60,7 @@
                   : seat.editing
                     ? '已入席'
                     : '查看结果'
-              : '基础 AI'}</span
+              : '托管 AI'}</span
           >
         </article>
       {/each}

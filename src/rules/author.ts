@@ -449,14 +449,14 @@ export const landing = (ctx: Context, draft: DamageDraft) =>
 
 // ───────────────────────── 技能与武将
 
-/** 技能与装备技能的组成部分：触发、修正、主动、转换、用到的持续效果标记，以及可选的 { lord, ai }。 */
+/** 技能与装备技能的组成部分：触发、修正、主动、转换、用到的持续效果标记，以及可选的 { lord }。 */
 export type SkillPart =
   | SkillTrigger
   | SkillModifier
   | ActiveSkill
   | ViewAs
   | Mark<unknown>
-  | Pick<SkillDefinition, 'lord' | 'ai'>;
+  | Pick<SkillDefinition, 'lord'>;
 function compose(parts: readonly SkillPart[]) {
   const of = <T extends SkillPart>(key: string) => parts.filter((part) => key in part) as T[];
   const marks = of<Mark<unknown>>('initial');
@@ -468,7 +468,7 @@ function compose(parts: readonly SkillPart[]) {
       viewAs: of<ViewAs>('make'),
       ...(marks.length ? { marks } : {}),
     },
-    ...parts.filter((part) => 'lord' in part || 'ai' in part),
+    ...parts.filter((part) => 'lord' in part),
   ) as Omit<SkillDefinition, 'id' | 'name'>;
 }
 /** 一个技能：ID、名称、描述，其后直接列出各部分。 */

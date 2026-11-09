@@ -5,7 +5,7 @@ import { projectMatch } from './projection';
 import { emptyPreview } from '../protocol';
 import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
-import { AgentDriver } from './agent-driver';
+import { AgentDriver } from './ai/driver';
 import { createRoleMatch, defaultContent, practiceContent, seatNames } from './content';
 import type { ClientCommand, CommandResult, ServerMessage, SoloSetup } from '../protocol';
 import { closedReply } from '../protocol';

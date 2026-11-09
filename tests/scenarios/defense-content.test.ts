@@ -5,7 +5,7 @@ import { practiceContent } from '../../src/host/content';
 import { useCard } from '../../src/sdk';
 import { shieldOf } from '../../src/rules/combat/shield';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { observeAgent } from '../../src/host/agent-observation';
+import { observeAgent } from '../../src/host/ai/seat';
 import { projectMatch } from '../../src/host/projection';
 import { nextRequest } from '../fixtures/room';
 import { Damage } from '../../src/sdk';
@@ -119,7 +119,7 @@ it.each([false, true])('演武代受真实选择、支付、材料关联与善�
 });
 
 it.each([4, 17])(
-  '护盾/转移演练四人局由基础 AI 真实决策至胜负，seed=%s',
+  '护盾/转移演练四人局由托管 AI 真实决策至胜负，seed=%s',
   async (seed) => {
     const match = createRoleMatch({
       seed,

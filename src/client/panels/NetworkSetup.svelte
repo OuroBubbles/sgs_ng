@@ -61,7 +61,7 @@
     <div class="network-create">
       <span class="network-caption">邀友同席</span>
       <h2>创建房间</h2>
-      <p>在本机主持一张牌桌，与好友及基础 AI 一起对局。</p>
+      <p>在本机主持一张牌桌，与好友及托管 AI 一起对局。</p>
       <form
         onsubmit={async (event) => {
           event.preventDefault();
@@ -132,7 +132,7 @@
         </button>
       </form>
       <small
-        >使用开局页选择的内置内容。前 {humans} 席由玩家加入，其余由基础 AI 行动。端口填 0 可自动分配。</small
+        >使用开局页选择的内置内容。前 {humans} 席由玩家加入，其余由托管 AI 行动。端口填 0 可自动分配。</small
       >
     </div>
   {/if}
