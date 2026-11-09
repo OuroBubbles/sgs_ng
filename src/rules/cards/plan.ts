@@ -57,41 +57,6 @@ export function useDeclarations(world: WorldReader): readonly UseDeclaration[] {
       return entry.value;
     });
 }
-export interface UsePlanView {
-  readonly id: string;
-  readonly actor: string;
-  readonly actionOrder: readonly string[];
-  readonly card: SemanticCard;
-  readonly processing: string;
-  readonly timing: UseTiming;
-  readonly stage: 'use' | 'delayed';
-  readonly parameters: unknown;
-  readonly prohibitedCounters: readonly string[];
-  readonly targets: readonly string[];
-  readonly effects: readonly EffectSnapshot[];
-  /** 元组牌：替换只给角色时保留原元组的后续位置；重复只给角色时复用该目标最近的元组。 */
-  addTarget(ctx: Context, target: UseTarget, reason: string): string;
-  repeatTarget(ctx: Context, target: UseTarget, reason: string): string;
-  removeTarget(ctx: Context, id: string, reason: string): void;
-  canReplaceTarget(ctx: Context, id: string, target: UseTarget, options?: TargetOptions): boolean;
-  /** 构造此刻的改写；与费用合并时须在 pay.legal 重查选择，不跨 await 缓存 Change。 */
-  replaceTargetChange(
-    ctx: Context,
-    id: string,
-    target: UseTarget,
-    reason: string,
-    options?: TargetOptions,
-  ): Change;
-  replaceTarget(
-    ctx: Context,
-    id: string,
-    target: UseTarget,
-    reason: string,
-    options?: TargetOptions,
-  ): string;
-  ignoreEquipment(ctx: Context, slot: string, reason: string): void;
-  snapshot(): UseSnapshot;
-}
 class TargetEffect implements CardEffect {
   #state: EffectSnapshot['state'] = 'pending';
   #targetStep = 0;
@@ -254,8 +219,31 @@ export interface UsePlanInit {
   readonly parameters?: unknown;
   readonly prohibitedCounters?: readonly string[];
 }
+/** 内容与窗口看到的用牌宣告：只读字段与目标改写方法。 */
+export type UsePlanView = Pick<
+  UsePlan,
+  | 'id'
+  | 'actor'
+  | 'actionOrder'
+  | 'card'
+  | 'processing'
+  | 'timing'
+  | 'stage'
+  | 'parameters'
+  | 'prohibitedCounters'
+  | 'targets'
+  | 'effects'
+  | 'addTarget'
+  | 'repeatTarget'
+  | 'removeTarget'
+  | 'canReplaceTarget'
+  | 'replaceTargetChange'
+  | 'replaceTarget'
+  | 'ignoreEquipment'
+  | 'snapshot'
+>;
 /** 宣告改写通过 Change 提交，能与费用合并；封口效果不能改写。 */
-export class UsePlan implements UsePlanView {
+export class UsePlan {
   #handles = new Map<string, TargetEffect>();
   #visited = new Set<string>();
   #open = true;
@@ -414,6 +402,7 @@ export class UsePlan implements UsePlanView {
       (repeat || !this.targets.includes(primaryOf(target)))
     );
   }
+  /** 元组牌：替换只给角色时保留原元组的后续位置；重复只给角色时复用该目标最近的元组。 */
   addTarget(ctx: Context, target: UseTarget, reason: string): string {
     return this.#add(ctx, target, reason, false);
   }
@@ -481,6 +470,7 @@ export class UsePlan implements UsePlanView {
       this.#canTarget(ctx, this.#complete(target, from), false, options)
     );
   }
+  /** 构造此刻的改写；与费用合并时须在 pay.legal 重查选择，不跨 await 缓存 Change。 */
   replaceTargetChange(
     ctx: Context,
     id: string,
