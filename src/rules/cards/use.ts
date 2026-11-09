@@ -37,6 +37,7 @@ import type {
 
 export interface UseFeedback {
   readonly model: 'use';
+  readonly prompt?: string;
   readonly complete: boolean;
   readonly reason: string;
   readonly targetCount: ChoiceCount;
@@ -117,7 +118,7 @@ export function useSelection(
     return {
       player: input.actor,
       kind: 'cards-targets',
-      prompt: '选择用牌目标',
+      prompt: rules?.prompt ?? '选择用牌目标',
       optional: true,
       feedback: (raw) => {
         const parsed = parse(raw);
@@ -287,6 +288,7 @@ export function inspectUse(
       });
     return immutable({
       model: 'use',
+      ...(rules.prompt === undefined ? {} : { prompt: rules.prompt }),
       complete: checked.ok,
       reason: checked.ok ? '' : checked.reason,
       targetCount:

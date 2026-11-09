@@ -293,6 +293,8 @@ export interface UseRules {
   readonly canUse?: (ctx: Context, input: CardUseInput) => string | null;
   /** 单个过滤器选单角色目标；过滤器数组按位置选目标元组，count 计元组个数。 */
   readonly target: TargetFilter | readonly [TargetFilter, ...TargetFilter[]];
+  /** 选目标时的提示（元组牌说明点选顺序）；省略时为通用提示。 */
+  readonly prompt?: string;
   /** 宣告前的附属选择：返回已验证的普通参数；统一管线再做最终校验；取消不支付、不开放用牌窗口。 */
   readonly prepare?: (
     ctx: Context,

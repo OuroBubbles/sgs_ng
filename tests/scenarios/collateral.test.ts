@@ -104,6 +104,19 @@ it('取消附属选择不支付、不开放反制，且没有遗留处理区', a
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);
 });
 
+it('选目标的提示说明元组点选顺序，选到一半时仍保留', async () => {
+  const game = create();
+  await game.room.run('prompt', (ctx) => {
+    const { actor, choice, timing } = intent();
+    const selection = useSelection(ctx, { actor, choice, timing });
+    expect(selection.prompt).toBe('借刀杀人：先选持械者，最后选出杀目标');
+    expect(selection.feedback?.({ cards: [], targets: ['b'] })).toMatchObject({
+      prompt: '借刀杀人：先选持械者，最后选出杀目标',
+      complete: false,
+    });
+  });
+});
+
 it('没有杀自动获得武器；选择拒绝用杀时同样获得，装备能力随实体离场', async () => {
   for (const count of [0, 1]) {
     const game = create(count);

@@ -26,6 +26,7 @@ export default card({
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
+    prompt: '借刀杀人：先选持械者，最后选出杀目标',
     // 目标元组 [持械者, 杀目标]：锦囊只作用于持械者，杀目标随元组记录。
     target: [
       (ctx, { request, target }) =>
