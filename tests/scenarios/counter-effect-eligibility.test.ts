@@ -1,19 +1,17 @@
 import { expect, it, vi } from 'vitest';
 import {
   cardQueries,
-  defaultPhaseBody,
-  defineSkill,
   delayedCard,
-  installCounterspells,
   loseHp,
   modify,
   moveCards,
   recover,
-  runPhase,
-  useDeclarations,
   Resolve,
-  Counter,
 } from '../../src/sdk';
+import { defaultPhaseBody, runPhase } from '../../src/rules/turn/turn';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { installCounterspells, Counter } from '../../src/rules/cards/counter';
+import { useDeclarations } from '../../src/rules/cards/plan';
 import type { Context, UseIntent } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use, die } from '../fixtures/cards';

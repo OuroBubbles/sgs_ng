@@ -1,21 +1,15 @@
 import { expect, it, vi } from 'vitest';
-import {
-  contestCounter,
-  finishGame,
-  installCounterspells,
-  pay,
-  resolveCounter,
-  Use,
-  Resolve,
-  Counter,
-  useCard,
-} from '../../src/sdk';
-import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sdk';
+import { resolveCounter, Use, Resolve, useCard } from '../../src/sdk';
+import { contestCounter, installCounterspells, Counter } from '../../src/rules/cards/counter';
+import { finishGame } from '../../src/rules/game/end';
+import { pay } from '../../src/rules/costs/pay';
+import type { CardEffect, Context, EffectRef } from '../../src/sdk';
+import type { CounterResult } from '../../src/rules/cards/counter';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
-import { Cost } from '../../src/sdk';
+import { Cost } from '../../src/rules/costs/pay';
 import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;

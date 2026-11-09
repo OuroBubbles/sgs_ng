@@ -14,7 +14,10 @@ import { isGameOver } from './game/end';
 import { CardEvent, Cards, moveCards } from './cards/move';
 import type { MoveDeclaration, MoveResult } from './cards/move';
 import { ownedCards } from './cards/types';
-import type { ViewAs, ViewAsInput } from './cards/types';
+import type { UseIntent, ViewAs, ViewAsInput } from './cards/types';
+import { withCardSupply } from './cards/supply';
+import { useCard, validateUse } from './cards/use';
+import type { UseResult } from './cards/use';
 import type { PhysicalCardFace } from './cards/face';
 import { face } from './cards/face';
 import { canDiscard } from './cards/discard';
@@ -377,6 +380,58 @@ export function convert(
       ),
     make: { name: spec.as },
   };
+}
+
+/**
+ * 代出使用（激将式）：宣告 self 后，按行动顺序依次请求其余满足 from 的存活角色打出一张 name，
+ * 首张供出的牌由 intent.actor 按原意图使用；目标、距离与次数仍由使用者承担。无人供牌时为 null。
+ */
+export function useSupplied(
+  ctx: Context,
+  self: SkillHandle,
+  intent: UseIntent,
+  input: { readonly name: string; readonly from: (ctx: Context, actor: string) => boolean },
+): Promise<UseResult | null> {
+  const { name, from } = input;
+  const probe: UseIntent = {
+    ...intent,
+    choice: { kind: 'generated', face: { name }, materials: [], reason: self.skill },
+  };
+  const live = (at: Context) => validateUse(at, probe).ok;
+  return ctx.flow('card.supplied-use', async (at): Promise<UseResult | null> => {
+    // 选择此配方并提交目标已经表示发动；不再追加一次是否发动的询问。
+    if (!(await declare(at, self, { legal: () => live(at) })))
+      return { kind: 'unavailable', reason: `${self.name} was not invoked.` };
+    for (const actor of others(at, intent.actor)) {
+      if (!live(at)) return { kind: 'unavailable', reason: 'Use is no longer available.' };
+      if (!alive(at, actor) || !from(at, actor)) continue;
+      const supplied = await withCardSupply(
+        at,
+        { actor, beneficiary: intent.actor, names: [name], reason: self.skill, available: live },
+        (useAt, { card }) =>
+          useCard(useAt, {
+            ...intent,
+            choice: {
+              kind: 'generated',
+              reason: self.skill,
+              origin: { actor, card },
+              materials: card.materials,
+              face: {
+                name: card.name,
+                suit: card.suit,
+                color: card.color,
+                rank: card.rank,
+                nature: card.nature,
+              },
+            },
+          }),
+      );
+      if (supplied.kind === 'supplied') return supplied.value;
+      if (supplied.kind === 'invalidated')
+        return { kind: 'unavailable', reason: 'Supplied card was invalidated after payment.' };
+    }
+    return null;
+  });
 }
 
 // ───────────────────────── 伤害时点的共同前提

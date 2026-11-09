@@ -1,14 +1,10 @@
 import { expect, it } from 'vitest';
-import {
-  defineMark,
-  defineSkill,
-  finishGame,
-  kill,
-  pay,
-  playRounds,
-  rotationOf,
-  scheduleExtraTurn,
-} from '../../src/sdk';
+import { defineMark, scheduleExtraTurn } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { finishGame } from '../../src/rules/game/end';
+import { kill } from '../../src/rules/combat/life';
+import { pay } from '../../src/rules/costs/pay';
+import { playRounds, rotationOf } from '../../src/rules/turn/order';
 import type { Context } from '../../src/sdk';
 import { cardGame, grant } from '../fixtures/cards';
 

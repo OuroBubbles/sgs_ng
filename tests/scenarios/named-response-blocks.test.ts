@@ -1,18 +1,9 @@
 import { expect, it } from 'vitest';
 import { standardGeneralSkills } from '../fixtures/standard';
-import {
-  effectReference,
-  isResponseBlocked,
-  pay,
-  defineSkill,
-  modify,
-  cardQueries,
-  Use,
-  Resolve,
-  Response,
-  respond,
-  responseTimes,
-} from '../../src/sdk';
+import { modify, cardQueries, Use, Resolve, Response, respond, responseTimes } from '../../src/sdk';
+import { effectReference, isResponseBlocked } from '../../src/rules/cards/types';
+import { pay } from '../../src/rules/costs/pay';
+import { defineSkill } from '../../src/rules/skills/skills';
 import qingguo from '../../src/content/standard/skills/qingguo';
 import type { CardEffect } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';

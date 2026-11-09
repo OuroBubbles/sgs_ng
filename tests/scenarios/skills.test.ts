@@ -1,15 +1,8 @@
 import { testTiming } from '../fixtures/timing';
 import { describe, expect, it } from 'vitest';
-import {
-  defineSkill,
-  on,
-  SkillBook,
-  skillEffective,
-  blockSkill,
-  withLifetime,
-  defineMark,
-  Lifetime,
-} from '../../src/sdk';
+import { on, defineMark } from '../../src/sdk';
+import { defineSkill, SkillBook, skillEffective, blockSkill } from '../../src/rules/skills/skills';
+import { withLifetime, Lifetime } from '../../src/rules/scopes/lifetime';
 import type { Context } from '../../src/sdk';
 import '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';

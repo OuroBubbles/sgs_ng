@@ -3,7 +3,8 @@ import { SoloSession } from '../../src/host/solo';
 import { Match, RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
 import wusheng from '../../src/content/standard/skills/wusheng';
-import { moveCards, finishGame, Use } from '../../src/sdk';
+import { moveCards, Use } from '../../src/sdk';
+import { finishGame } from '../../src/rules/game/end';
 import '../../src/sdk';
 import type { GameSelection, GameView } from '../../src/protocol';
 import { card } from '../fixtures/cards';
@@ -12,7 +13,7 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { createRoleMatch } from '../../src/host/content';
 import type { Context } from '../../src/sdk';
 import type { Validation } from '../../src/core/decisions/hub';
-import { Game } from '../../src/sdk';
+import { Game } from '../../src/rules/game/end';
 import { testTiming } from '../fixtures/timing';
 
 const empty = (): GameSelection => ({ offer: null, cards: [], targets: [] });

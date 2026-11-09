@@ -11,21 +11,18 @@ import {
   damage,
   judge,
   draw,
-  runTurn,
-  runPhase,
-  defaultPhaseBody,
   moveCards,
-  kill,
-  defineSkill,
   modify,
   cardQueries,
-  SkillBook,
   Cards,
   Judgment,
   Damage,
-  Cost,
   useCard,
 } from '../../src/sdk';
+import { runTurn, runPhase, defaultPhaseBody } from '../../src/rules/turn/turn';
+import { kill } from '../../src/rules/combat/life';
+import { defineSkill, SkillBook } from '../../src/rules/skills/skills';
+import { Cost } from '../../src/rules/costs/pay';
 import type { Context, PhaseView } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
 import { standardGenerals } from '../fixtures/standard';

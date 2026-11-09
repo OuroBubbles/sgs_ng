@@ -1,6 +1,10 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
-import { finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
+import { Cards } from '../../src/sdk';
+import { finishGame } from '../../src/rules/game/end';
+import { privateCardPools } from '../../src/rules/cards/private-pool';
+import { runPhase } from '../../src/rules/turn/turn';
+import { Cost } from '../../src/rules/costs/pay';
 import allotment from '../../src/content/workshop/skills/allotment';
 import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';

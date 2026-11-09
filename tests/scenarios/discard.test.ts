@@ -2,24 +2,22 @@ import { expect, it } from 'vitest';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import {
-  defineSkill,
   modify,
   cardQueries,
   payDiscard,
   discardCards,
-  withLifetime,
-  used,
-  blockSkill,
-  runPhase,
-  playPhase,
-  setGender,
   delayedCards,
   moveCards,
   Cards,
-  Cost,
   canDiscard,
 } from '../../src/sdk';
-import type { DiscardQuery, PaymentReceipt, UsageLimit } from '../../src/sdk';
+import { defineSkill, blockSkill } from '../../src/rules/skills/skills';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { used, Cost } from '../../src/rules/costs/pay';
+import { runPhase, playPhase } from '../../src/rules/turn/turn';
+import { setGender } from '../../src/rules/characters/gender';
+import type { DiscardQuery } from '../../src/rules/cards/discard';
+import type { PaymentReceipt, UsageLimit } from '../../src/rules/costs/pay';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import jieyin from '../../src/content/standard/skills/jieyin';
 import { rebuildWorld } from '../../src/core/history/rebuild';

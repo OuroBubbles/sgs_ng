@@ -1,21 +1,21 @@
 import { expect, it } from 'vitest';
 import {
-  blockSkill,
   cardQueries,
   damage,
-  defineSkill,
   modify,
   moveCards,
   ownedCards,
-  withLifetime,
   Use,
   Attack,
   Damage,
-  Cost,
-  inspectUse,
   validateUse,
 } from '../../src/sdk';
-import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
+import { blockSkill, defineSkill } from '../../src/rules/skills/skills';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { Cost } from '../../src/rules/costs/pay';
+import { inspectUse } from '../../src/rules/cards/use';
+import type { CardChoice, DefenseDraft, UseIntent } from '../../src/sdk';
+import type { CardOffer } from '../../src/rules/cards/card';
 import wusheng from '../../src/content/standard/skills/wusheng';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';

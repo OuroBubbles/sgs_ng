@@ -1,10 +1,16 @@
 import { expect, it } from 'vitest';
-import { finishGame, kill, pay, loseHp, recover, Death, Hp, useCard } from '../../src/sdk';
-import type { Context, DeathDraft, RecoveryDraft } from '../../src/sdk';
+import { loseHp, recover, Hp, useCard } from '../../src/sdk';
+import { finishGame } from '../../src/rules/game/end';
+import { kill } from '../../src/rules/combat/life';
+import { pay } from '../../src/rules/costs/pay';
+import { Death } from '../../src/rules/combat/life-events';
+import type { Context } from '../../src/sdk';
+import type { DeathDraft } from '../../src/rules/combat/life';
+import type { RecoveryDraft } from '../../src/rules/combat/recover';
 import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
-import { Cost } from '../../src/sdk';
-import { Dying } from '../../src/sdk';
+import { Cost } from '../../src/rules/costs/pay';
+import { Dying } from '../../src/rules/combat/life-events';
 import { PlayerEvent } from '../../src/rules/combat/life';
 import { testTiming } from '../fixtures/timing';
 

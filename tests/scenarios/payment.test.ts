@@ -1,17 +1,10 @@
 import { expect, it } from 'vitest';
-import {
-  pay,
-  used,
-  moveCards,
-  withLifetime,
-  JointSelection,
-  defineSkill,
-  SkillBook,
-  skillEffective,
-  Cards,
-  Cost,
-} from '../../src/sdk';
-import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
+import { moveCards, JointSelection, Cards } from '../../src/sdk';
+import { pay, used, Cost } from '../../src/rules/costs/pay';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { defineSkill, SkillBook, skillEffective } from '../../src/rules/skills/skills';
+import type { MoveResult } from '../../src/sdk';
+import type { UsageLimit, PaymentIntent } from '../../src/rules/costs/pay';
 import lianying from '../../src/content/standard/skills/lianying';
 import { nextRequest, room, worldSeed } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

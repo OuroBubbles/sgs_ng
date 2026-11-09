@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { ArrangementSelection } from '../../src/sdk';
-import type { ArrangementChoice, ArrangementGroup } from '../../src/sdk';
+import type { ArrangementChoice, ArrangementGroup } from '../../src/core/decisions/arrangement';
 import { nextRequest, room } from '../fixtures/room';
 import { testTiming } from '../fixtures/timing';
 

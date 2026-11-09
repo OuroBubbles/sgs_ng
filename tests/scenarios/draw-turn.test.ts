@@ -1,25 +1,16 @@
 import { expect, it } from 'vitest';
+import { draw, moveCards, Cards, Phase, Turn, cardQueries, modify, useCard } from '../../src/sdk';
+import { withProcessing } from '../../src/rules/cards/processing';
 import {
-  draw,
-  withProcessing,
-  moveCards,
   runTurn,
   runPhase,
   defaultPhaseBody,
   activePhase,
   activeTurn,
-  pay,
-  used,
   runPhase as phase,
-  Cards,
-  Cost,
-  Phase,
-  Turn,
-  cardQueries,
-  modify,
-  useCard,
-} from '../../src/sdk';
-import type { TurnView } from '../../src/sdk';
+} from '../../src/rules/turn/turn';
+import { pay, used, Cost } from '../../src/rules/costs/pay';
+import type { TurnView } from '../../src/rules/turn/turn';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

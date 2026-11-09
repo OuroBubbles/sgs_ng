@@ -11,25 +11,24 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import {
   kingdomOf,
-  setKingdom,
-  roleOf,
-  runPhase,
-  runTurn,
   moveCards,
-  kill,
-  withProcessing,
-  defineSkill,
   modify,
   cardQueries,
   Resolve,
   Cards,
   Response,
   Damage,
-  Cost,
   Phase,
   respond,
   useCard,
 } from '../../src/sdk';
+import { setKingdom } from '../../src/rules/characters/kingdom';
+import { roleOf } from '../../src/rules/game/roles';
+import { runPhase, runTurn } from '../../src/rules/turn/turn';
+import { kill } from '../../src/rules/combat/life';
+import { withProcessing } from '../../src/rules/cards/processing';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { Cost } from '../../src/rules/costs/pay';
 import type { PhaseView, UseIntent } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
 import { CardEvent } from '../../src/sdk';

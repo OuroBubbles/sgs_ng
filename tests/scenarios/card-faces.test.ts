@@ -1,23 +1,24 @@
 import { expect, it } from 'vitest';
 import {
   cardQueries,
-  defineSkill,
   modify,
   moveCards,
   judge,
-  runPhase,
-  activeOffers,
   withRevealedCards,
   chooseOwnedCard,
   Judgment,
   Response,
-  Cost,
-  buildCard,
-  cardOffers,
   face,
   useCard,
 } from '../../src/sdk';
-import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { runPhase } from '../../src/rules/turn/turn';
+import { activeOffers } from '../../src/rules/skills/active';
+import { Cost } from '../../src/rules/costs/pay';
+import { buildCard, cardOffers } from '../../src/rules/cards/card';
+import type { Context } from '../../src/sdk';
+import type { CardFaceChange } from '../../src/rules/cards/face';
+import type { SkillDefinition } from '../../src/rules/skills/skills';
 import wusheng from '../../src/content/standard/skills/wusheng';
 import qingguo from '../../src/content/standard/skills/qingguo';
 import qixi from '../../src/content/standard/skills/qixi';

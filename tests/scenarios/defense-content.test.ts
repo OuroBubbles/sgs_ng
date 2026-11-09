@@ -2,13 +2,14 @@ import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
-import { shieldOf, useCard } from '../../src/sdk';
+import { useCard } from '../../src/sdk';
+import { shieldOf } from '../../src/rules/combat/shield';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { observeAgent } from '../../src/host/agent-observation';
 import { projectMatch } from '../../src/host/projection';
 import { nextRequest } from '../fixtures/room';
 import { Damage } from '../../src/sdk';
-import { Shield } from '../../src/sdk';
+import { Shield } from '../../src/rules/combat/shield';
 import { Skill } from '../../src/sdk';
 
 const content = practiceContent;

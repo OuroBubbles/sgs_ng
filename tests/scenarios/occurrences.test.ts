@@ -1,15 +1,8 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import {
-  defineSkill,
-  on,
-  SkillBook,
-  damage,
-  draw,
-  moveCards,
-  runPhase,
-  runTurn,
-} from '../../src/sdk';
+import { on, damage, draw, moveCards } from '../../src/sdk';
+import { defineSkill, SkillBook } from '../../src/rules/skills/skills';
+import { runPhase, runTurn } from '../../src/rules/turn/turn';
 import type { TriggerOccurrence, TriggerSource } from '../../src/core/runtime/event';
 import type { WorldSeed } from '../../src/core/model/state';
 import type { Room } from '../../src/core/runtime/room';

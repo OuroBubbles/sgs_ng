@@ -2,7 +2,9 @@ import { expect, it } from 'vitest';
 import { cardGame, card, die } from '../fixtures/cards';
 import { covenant } from '../../examples/content/covenant';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { damage, defineMark, handLimit, on, runTurn, skill, Turn } from '../../src/sdk';
+import { damage, defineMark, on, skill, Turn } from '../../src/sdk';
+import { handLimit } from '../../src/rules/cards/rule';
+import { runTurn } from '../../src/rules/turn/turn';
 
 /** 持续效果 = 带 skill 的标记：由使用它的技能登记，持有即生效，到期或回到初值即失效。 */
 const pledge = skill('probe:pledge', '立约', '', covenant);

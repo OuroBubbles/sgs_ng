@@ -1,25 +1,25 @@
 import { expect, it, vi } from 'vitest';
 import {
   cardQueries,
-  defineSkill,
-  finishGame,
-  installCounterspells,
   loseHp,
   modify,
   moveCards,
-  pay,
   recover,
   Use,
   Target,
   Resolve,
   useCard,
 } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { finishGame } from '../../src/rules/game/end';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { pay } from '../../src/rules/costs/pay';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
-import { Counter } from '../../src/sdk';
+import { Counter } from '../../src/rules/cards/counter';
 import { Hp } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;

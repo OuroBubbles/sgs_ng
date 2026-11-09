@@ -1,26 +1,11 @@
 import { expect, it } from 'vitest';
-import {
-  cardQueries,
-  defaultPhaseBody,
-  defineSkill,
-  finishGame,
-  kill,
-  moveCards,
-  modify,
-  runPhase,
-  Use,
-  Target,
-  Resolve,
-  Damage,
-} from '../../src/sdk';
-import type {
-  CardDefinition,
-  CardEffect,
-  Context,
-  TargetStage,
-  UseIntent,
-  UsePlanView,
-} from '../../src/sdk';
+import { cardQueries, moveCards, modify, Use, Target, Resolve, Damage } from '../../src/sdk';
+import { defaultPhaseBody, runPhase } from '../../src/rules/turn/turn';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { finishGame } from '../../src/rules/game/end';
+import { kill } from '../../src/rules/combat/life';
+import type { CardDefinition, CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
+import type { TargetStage } from '../../src/rules/cards/types';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';

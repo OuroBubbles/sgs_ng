@@ -1,14 +1,9 @@
 import { expect, it } from 'vitest';
-import {
-  activeOffers,
-  ownedCards,
-  runPhase,
-  runTurn,
-  setGender,
-  validateActive,
-  Cost,
-  Skill,
-} from '../../src/sdk';
+import { ownedCards, Skill } from '../../src/sdk';
+import { activeOffers, validateActive } from '../../src/rules/skills/active';
+import { runPhase, runTurn } from '../../src/rules/turn/turn';
+import { setGender } from '../../src/rules/characters/gender';
+import { Cost } from '../../src/rules/costs/pay';
 import type { Context, PhaseView } from '../../src/sdk';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { rebuildWorld } from '../../src/core/history/rebuild';

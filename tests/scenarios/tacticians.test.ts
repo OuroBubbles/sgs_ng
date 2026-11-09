@@ -8,24 +8,24 @@ import { RoleMatch } from '../../src/host/role-match';
 import { projectMatch } from '../../src/host/projection';
 import { standardCards } from '../fixtures/standard';
 import {
-  useDeclarations,
-  defineSkill,
   modify,
   cardQueries,
   delayedCards,
-  installCounterspells,
-  kill,
   ownedCards,
   moveCards,
   Use,
   Target,
   Resolve,
-  Cost,
   distance,
   useCard,
   validateUse,
   withinDistance,
 } from '../../src/sdk';
+import { useDeclarations } from '../../src/rules/cards/plan';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { kill } from '../../src/rules/combat/life';
+import { Cost } from '../../src/rules/costs/pay';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';

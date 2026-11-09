@@ -1,18 +1,11 @@
 import { expect, it } from 'vitest';
-import {
-  blockSkill,
-  delayedCards,
-  equip,
-  equipmentInSlot,
-  installCounterspells,
-  moveCards,
-  runPhase,
-  withLifetime,
-  cardOffers,
-  attackRange,
-  buildCard,
-  distance,
-} from '../../src/sdk';
+import { delayedCards, equipmentInSlot, moveCards, attackRange, distance } from '../../src/sdk';
+import { blockSkill } from '../../src/rules/skills/skills';
+import { equip } from '../../src/rules/cards/equipment';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { runPhase } from '../../src/rules/turn/turn';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { cardOffers, buildCard } from '../../src/rules/cards/card';
 import type { SemanticCard, UseIntent } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

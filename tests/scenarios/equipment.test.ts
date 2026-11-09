@@ -1,39 +1,23 @@
-import {
-  attackRange,
-  cardOffers,
-  distance,
-  handLimit,
-  respond,
-  useCard,
-  validateUse,
-} from '../../src/sdk';
+import { attackRange, distance, respond, useCard, validateUse } from '../../src/sdk';
+import { cardOffers } from '../../src/rules/cards/card';
+import { handLimit } from '../../src/rules/cards/rule';
 import { expect, it } from 'vitest';
 import {
-  defineSkill,
   on,
-  equipmentCard,
   equipmentLost,
   equipmentInSlot,
   moveCards,
-  equip,
-  withLifetime,
-  blockSkill,
   modify,
   defineQuery,
   cardQueries,
-  pay,
-  SkillBook,
   Cards,
-  Cost,
 } from '../../src/sdk';
-import type {
-  CardDefinition,
-  Context,
-  CardOffer,
-  CardChoice,
-  UseIntent,
-  SemanticCard,
-} from '../../src/sdk';
+import { defineSkill, blockSkill, SkillBook } from '../../src/rules/skills/skills';
+import { equipmentCard, equip } from '../../src/rules/cards/equipment';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { pay, Cost } from '../../src/rules/costs/pay';
+import type { CardDefinition, Context, CardChoice, UseIntent, SemanticCard } from '../../src/sdk';
+import type { CardOffer } from '../../src/rules/cards/card';
 import wusheng from '../../src/content/standard/skills/wusheng';
 import { standardCards } from '../fixtures/standard';
 import { card, cardGame, use, die } from '../fixtures/cards';

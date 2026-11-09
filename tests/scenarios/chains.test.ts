@@ -7,31 +7,30 @@ import {
   isDirectDamage,
   recover,
   setChained,
-  defineSkill,
-  viewAs,
   ownedCards,
-  runTurn,
-  defaultPhaseBody,
-  finishGame,
-  equipmentCard,
   equipmentEffectiveFor,
   on,
-  SkillBook,
   resolveAttack,
-  Chain,
   Damage,
-  Dying,
-  buildCard,
   useCard,
 } from '../../src/sdk';
-import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
+import { defineSkill, SkillBook } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { runTurn, defaultPhaseBody } from '../../src/rules/turn/turn';
+import { finishGame } from '../../src/rules/game/end';
+import { equipmentCard } from '../../src/rules/cards/equipment';
+import { Chain } from '../../src/rules/combat/chain';
+import { Dying } from '../../src/rules/combat/life-events';
+import { buildCard } from '../../src/rules/cards/card';
+import type { Context, CardDefinition } from '../../src/sdk';
+import type { DamageInput, DamageResult } from '../../src/rules/combat/damage';
 import { card, cardGame, settled, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
 import { Attack } from '../../src/sdk';
-import { Cost } from '../../src/sdk';
+import { Cost } from '../../src/rules/costs/pay';
 import { testTiming } from '../fixtures/timing';
 
 type Game = ReturnType<typeof cardGame>;

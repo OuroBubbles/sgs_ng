@@ -1,21 +1,21 @@
 import { expect, it } from 'vitest';
 import {
   moveCards,
-  withLifetime,
-  used,
   Use,
   Target,
   Resolve,
   Damage,
-  Cost,
   cardQueries,
   modify,
   attackRange,
-  buildCard,
   distance,
   useCard,
 } from '../../src/sdk';
-import type { CardEffect, UsePlanView, UseSnapshot } from '../../src/sdk';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { used, Cost } from '../../src/rules/costs/pay';
+import { buildCard } from '../../src/rules/cards/card';
+import type { CardEffect, UsePlanView } from '../../src/sdk';
+import type { UseSnapshot } from '../../src/rules/cards/types';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

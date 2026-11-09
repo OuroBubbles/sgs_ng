@@ -2,24 +2,23 @@ import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { Room } from '../../src/core/runtime/room';
 import {
-  runTurn,
-  runPhase,
-  activeTurn,
-  kill,
   judge,
-  installRescue,
   loseHp,
-  kingdomChange,
-  installCounterspells,
   scheduleExtraTurn,
-  finishGame,
   Use,
   Target,
   Judgment,
   Response,
   useCard,
 } from '../../src/sdk';
-import type { Context, Timing, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
+import { runTurn, runPhase, activeTurn } from '../../src/rules/turn/turn';
+import { kill } from '../../src/rules/combat/life';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { kingdomChange } from '../../src/rules/characters/kingdom';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { finishGame } from '../../src/rules/game/end';
+import type { Context, CardDefinition, UsePlanView } from '../../src/sdk';
+import type { Timing, ActionAnchor } from '../../src/core/runtime/event';
 import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
 import guicai from '../../src/content/standard/skills/guicai';

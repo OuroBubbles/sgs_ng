@@ -2,31 +2,29 @@ import { expect, it } from 'vitest';
 import {
   delayedCards,
   delayedCard,
-  runTurn,
-  runPhase,
-  defaultPhaseBody,
   moveCards,
-  installCounterspells,
-  defineSkill,
-  viewAs,
   ownedCards,
-  finishGame,
   Target,
   Judgment,
   Cards,
-  Cost,
   Phase,
   Turn,
   cardQueries,
   modify,
   useCard,
 } from '../../src/sdk';
+import { runTurn, runPhase, defaultPhaseBody } from '../../src/rules/turn/turn';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { finishGame } from '../../src/rules/game/end';
+import { Cost } from '../../src/rules/costs/pay';
 import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
-import { Counter } from '../../src/sdk';
+import { Counter } from '../../src/rules/cards/counter';
 import { Damage } from '../../src/sdk';
 import { Delayed } from '../../src/rules/cards/delayed';
 

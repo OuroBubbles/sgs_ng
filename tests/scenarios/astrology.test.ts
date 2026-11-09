@@ -3,22 +3,22 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import {
   ArrangementSelection,
-  runPhase,
   moveCards,
   draw,
-  kill,
-  finishGame,
-  privateCardPools,
   withPrivateTopCards,
-  roleOf,
   Target,
   Cards,
   Phase,
   isTargetProhibited,
   physicalCard,
 } from '../../src/sdk';
+import { runPhase } from '../../src/rules/turn/turn';
+import { kill } from '../../src/rules/combat/life';
+import { finishGame } from '../../src/rules/game/end';
+import { privateCardPools } from '../../src/rules/cards/private-pool';
+import { roleOf } from '../../src/rules/game/roles';
 import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
-import type { ChoiceItem } from '../../src/sdk';
+import type { ChoiceItem } from '../../src/core/decisions/selection';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest, room, answer } from '../fixtures/room';
 import { standardGenerals, standardGeneralSkills } from '../fixtures/standard';

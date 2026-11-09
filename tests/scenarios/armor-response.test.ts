@@ -1,20 +1,19 @@
 import { expect, it } from 'vitest';
 import {
-  blockSkill,
-  defineSkill,
-  equip,
   moveCards,
   on,
-  withLifetime,
   Resolve,
   Use,
   Judgment,
   Response,
-  Cost,
   cardQueries,
   modify,
   useCard,
 } from '../../src/sdk';
+import { blockSkill, defineSkill } from '../../src/rules/skills/skills';
+import { equip } from '../../src/rules/cards/equipment';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { Cost } from '../../src/rules/costs/pay';
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
 import eightDiagram from '../../src/content/standard/cards/eight_diagram';
 import { card, cardGame, use, die } from '../fixtures/cards';

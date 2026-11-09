@@ -1,22 +1,14 @@
 import { expect, it } from 'vitest';
 import { card, cardGame, use, settled, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import {
-  moveCards,
-  setKingdom,
-  runPhase,
-  defineSkill,
-  viewAs,
-  Use,
-  Response,
-  Cost,
-  cardQueries,
-  modify,
-  cardOffers,
-  useCard,
-  validateUse,
-} from '../../src/sdk';
-import type { UseTiming } from '../../src/sdk';
+import { moveCards, Use, Response, cardQueries, modify, useCard, validateUse } from '../../src/sdk';
+import { setKingdom } from '../../src/rules/characters/kingdom';
+import { runPhase } from '../../src/rules/turn/turn';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { Cost } from '../../src/rules/costs/pay';
+import { cardOffers } from '../../src/rules/cards/card';
+import type { UseTiming } from '../../src/rules/cards/types';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Damage } from '../../src/sdk';

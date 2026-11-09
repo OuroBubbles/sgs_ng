@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
-import { ArrangementSelection, createContent, JointSelection, viewAs } from '../../src/sdk';
-import type { ChoiceItem, JointChoice, JointSelectionSpec } from '../../src/sdk';
+import { ArrangementSelection, JointSelection } from '../../src/sdk';
+import { createContent } from '../../src/content/catalog';
+import { viewAs } from '../../src/rules/cards/types';
+import type { JointChoice } from '../../src/sdk';
+import type { ChoiceItem, JointSelectionSpec } from '../../src/core/decisions/selection';
 import { nextRequest, room } from '../fixtures/room';
 
 it('数量声明只读一次原型字段，模型使用已校验的固定范围而不冻结原对象', () => {

@@ -3,27 +3,25 @@ import {
   damage,
   recover,
   loseHp,
-  installRescue,
-  isDying,
-  kill,
   moveCards,
-  defineSkill,
   on,
-  viewAs,
   ownedCards,
-  finishGame,
-  installRoleMode,
   Target,
   Use,
   Cards,
   Damage,
-  Dying,
-  Death,
   Hp,
   cardQueries,
   modify,
 } from '../../src/sdk';
-import type { DeathDraft, DyingResult } from '../../src/sdk';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { isDying, kill } from '../../src/rules/combat/life';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { finishGame } from '../../src/rules/game/end';
+import { installRoleMode } from '../../src/rules/game/roles';
+import { Dying, Death } from '../../src/rules/combat/life-events';
+import type { DeathDraft, DyingResult } from '../../src/rules/combat/life';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

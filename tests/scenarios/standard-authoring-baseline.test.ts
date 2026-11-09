@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import { standardGeneralSkills } from '../fixtures/standard';
-import { loseHp, runPhase, buildCard, useCard, validateUse } from '../../src/sdk';
+import { loseHp, useCard, validateUse } from '../../src/sdk';
+import { runPhase } from '../../src/rules/turn/turn';
+import { buildCard } from '../../src/rules/cards/card';
 import type { CardChoice } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import { createStandardDeck } from '../../src/content/standard/deck';
 import { standardCards } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
-import { genderOf } from '../../src/sdk';
+import { genderOf } from '../../src/rules/characters/gender';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 it('标准 + EX 108 张包含全部 32 种牌，实体身份独立，牌面可选核对本地参考快照', () => {

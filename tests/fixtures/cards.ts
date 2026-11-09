@@ -4,30 +4,26 @@ import type { Card, WorldSeed } from '../../src/core/model/state';
 import { expect } from 'vitest';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { useDeclarations } from '../../src/rules/cards/plan';
-import {
-  createContent,
-  installDelayedCards,
-  activate,
-  activeOffers,
-  defineSkill,
-  kill,
-  rulesOf,
-  useCard,
-} from '../../src/sdk';
+import { rulesOf, useCard } from '../../src/sdk';
+import { createContent } from '../../src/content/catalog';
+import { installDelayedCards } from '../../src/rules/cards/delayed';
+import { activate, activeOffers } from '../../src/rules/skills/active';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { kill } from '../../src/rules/combat/life';
 import type {
-  ActiveChoice,
   CardDefinition,
-  SkillBook,
   SkillHandle,
-  SkillModifier,
   ContentDefinition,
   UseIntent,
-  UseResult,
-  FlowResult,
-  ActionAnchor,
   Context,
   PhaseView,
 } from '../../src/sdk';
+import type { ActiveChoice } from '../../src/rules/skills/active';
+import type { SkillBook } from '../../src/rules/skills/skills';
+import type { SkillModifier } from '../../src/rules/skills/query';
+import type { UseResult } from '../../src/rules/cards/use';
+import type { FlowResult } from '../../src/core/runtime/room';
+import type { ActionAnchor } from '../../src/core/runtime/event';
 import { standardCards } from './standard';
 
 // 固定牌声明可共享；每局目录、装备能力及规则状态仍独立创建。

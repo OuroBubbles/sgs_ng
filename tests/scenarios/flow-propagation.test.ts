@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { Context } from '../../src/sdk';
-import { withProcessing } from '../../src/sdk';
+import { withProcessing } from '../../src/rules/cards/processing';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { room, worldSeed, choose, nextRequest } from '../fixtures/room';
 import { testTiming } from '../fixtures/timing';

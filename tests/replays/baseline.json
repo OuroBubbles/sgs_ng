@@ -36,8 +36,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "5afaaaf45c6a780ab051cc476a56e0ab876f570def0224b43e2adb415ad5f6ec",
-        "facts": "7bb37dc243fe1f782c836d6fa4895d85260d80027fd37da8a87490e1e7bdec8e",
+        "journal": "5814652f8710b19c4e5cee7865173c5469aee90f99f291b54c34766c46ac4b51",
+        "facts": "4b2067c088cd6c73cfa1c54816174a9320276f910bf2503b067c57b7ac9d3bc8",
         "decisions": "cf5910419afad4770baa0f20218e6ce35f40520c24492b643edf932ca5d9136c"
       }
     },
@@ -554,8 +554,8 @@
         "standard:slash"
       ],
       "digest": {
-        "journal": "b110f3fd056e27272a18a36d690aa070244abbb8ffa10897d1a35dd5d66c33a1",
-        "facts": "2b4acd64a44ff595e1cfdbfc251e5b9daca3fc37a4f8aed87348a9ee8350852c",
+        "journal": "f707b3f6aca584a180d8cbb2ff2666664e8453cfeb699b751c3bc395d29be59f",
+        "facts": "9e2f726252aacb3827eaa29c93f2b35e37c30dd9173a61d94ebf0b01932ab37d",
         "decisions": "a35297979c5977ca2852cd811dcc23188b5fe702c6d7633169293941b39ac7c4"
       }
     },

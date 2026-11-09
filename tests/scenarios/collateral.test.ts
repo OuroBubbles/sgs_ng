@@ -1,21 +1,15 @@
 import { expect, it } from 'vitest';
-import {
-  equip,
-  cardQueries,
-  defineSkill,
-  modify,
-  playPhase,
-  runPhase,
-  installCounterspells,
-  moveCards,
-  withLifetime,
-  Use,
-  useCard,
-  useSelection,
-  validateUse,
-  primaryOf,
-} from '../../src/sdk';
-import type { CardOffer, UseIntent, UseTarget } from '../../src/sdk';
+import { cardQueries, modify, moveCards, Use, useCard, validateUse } from '../../src/sdk';
+import { equip } from '../../src/rules/cards/equipment';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { playPhase, runPhase } from '../../src/rules/turn/turn';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { useSelection } from '../../src/rules/cards/use';
+import { primaryOf } from '../../src/rules/cards/types';
+import type { UseIntent } from '../../src/sdk';
+import type { CardOffer } from '../../src/rules/cards/card';
+import type { UseTarget } from '../../src/rules/cards/types';
 import wusheng from '../../src/content/standard/skills/wusheng';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';

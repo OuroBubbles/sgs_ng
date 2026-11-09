@@ -9,22 +9,22 @@ import {
   judge,
   damage,
   moveCards,
-  kill,
-  defineSkill,
   modify,
   cardQueries,
-  privateCardPools,
   withPrivateTopCards,
-  runPhase,
   Cards,
   Judgment,
   Response,
   Damage,
-  Cost,
-  buildCard,
   isResponseProhibited,
   physicalCard,
 } from '../../src/sdk';
+import { kill } from '../../src/rules/combat/life';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { privateCardPools } from '../../src/rules/cards/private-pool';
+import { runPhase } from '../../src/rules/turn/turn';
+import { Cost } from '../../src/rules/costs/pay';
+import { buildCard } from '../../src/rules/cards/card';
 import type { Context } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/host/role-match';
@@ -36,7 +36,7 @@ import { createRoleMatch } from '../../src/host/content';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
-import { Lifetime } from '../../src/sdk';
+import { Lifetime } from '../../src/rules/scopes/lifetime';
 import { Skill } from '../../src/sdk';
 
 const source = { kind: 'general', id: 'test' } as const;

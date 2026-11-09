@@ -2,25 +2,17 @@ import { expect, it, vi } from 'vitest';
 import { Match, RoleMatch } from '../../src/host/role-match';
 import { SoloSession } from '../../src/host/solo';
 import { standardCards } from '../fixtures/standard';
-import {
-  activePhase,
-  activeTurn,
-  cancelExtraTurn,
-  defineMark,
-  finishGame,
-  kill,
-  pendingExtraTurns,
-  phaseKinds,
-  runTurn,
-  scheduleExtraTurn,
-  takeExtraTurn,
-  Turn,
-} from '../../src/sdk';
-import type { Context, PhaseBody, PhaseKind, TurnOrigin, TurnView } from '../../src/sdk';
+import { defineMark, scheduleExtraTurn, Turn } from '../../src/sdk';
+import { activePhase, activeTurn, phaseKinds, runTurn } from '../../src/rules/turn/turn';
+import { cancelExtraTurn, pendingExtraTurns, takeExtraTurn } from '../../src/rules/turn/extra';
+import { finishGame } from '../../src/rules/game/end';
+import { kill } from '../../src/rules/combat/life';
+import type { Context } from '../../src/sdk';
+import type { PhaseBody, PhaseKind, TurnOrigin, TurnView } from '../../src/rules/turn/turn';
 import { cardGame, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
-import { Game } from '../../src/sdk';
+import { Game } from '../../src/rules/game/end';
 
 const cause = { kind: 'rule', seq: null, data: null } as const;
 const stop = (ctx: Context) => finishGame(ctx, { winners: ['a'], reason: 'probe-completed' });

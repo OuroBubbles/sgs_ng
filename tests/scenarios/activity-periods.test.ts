@@ -2,19 +2,11 @@ import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import keji from '../../src/content/standard/skills/keji';
 import guicai from '../../src/content/standard/skills/guicai';
-import {
-  activePhase,
-  activeTurn,
-  cardActivities,
-  judge,
-  runPhase,
-  runTurn,
-  Lifetime,
-  Phase,
-  Turn,
-  useCard,
-} from '../../src/sdk';
-import type { CardActivity, Context, PhaseView } from '../../src/sdk';
+import { cardActivities, judge, Phase, Turn, useCard } from '../../src/sdk';
+import { activePhase, activeTurn, runPhase, runTurn } from '../../src/rules/turn/turn';
+import { Lifetime } from '../../src/rules/scopes/lifetime';
+import type { Context, PhaseView } from '../../src/sdk';
+import type { CardActivity } from '../../src/rules/cards/activity';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';

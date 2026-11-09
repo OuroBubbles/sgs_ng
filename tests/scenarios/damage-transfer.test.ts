@@ -2,24 +2,19 @@ import { expect, it } from 'vitest';
 import {
   damage,
   changeShield,
-  shieldOf,
   setChained,
   isChained,
-  isChainDamage,
   isDirectDamage,
-  pay,
-  finishGame,
   Cards,
   Damage,
-  Cost,
 } from '../../src/sdk';
-import type {
-  DamageDraft,
-  DamageResult,
-  DamageTransferIntent,
-  Context,
-  Timing,
-} from '../../src/sdk';
+import { shieldOf } from '../../src/rules/combat/shield';
+import { isChainDamage } from '../../src/rules/combat/damage';
+import { pay, Cost } from '../../src/rules/costs/pay';
+import { finishGame } from '../../src/rules/game/end';
+import type { DamageDraft, Context } from '../../src/sdk';
+import type { DamageResult, DamageTransferIntent } from '../../src/rules/combat/damage';
+import type { Timing } from '../../src/core/runtime/event';
 import { cardGame, card, settled } from '../fixtures/cards';
 import { testTiming } from '../fixtures/timing';
 

@@ -1,369 +1,127 @@
-/** 内容开发门面：共享实际规则对象与操作；普通源码和未来扩展使用同一接口。 */
-export { defineEvent, timing } from '../core/runtime/event';
-export type {
-  Trigger,
-  Timing,
-  TriggerOccurrence,
-  WindowOptions,
-  ActionAnchor,
-  TriggerSource,
-} from '../core/runtime/event';
-export { playRounds, rotationOf, turnActionAnchor } from '../rules/turn/order';
-export type { NextTurn, Rotation, RoundsOptions } from '../rules/turn/order';
-export type { Context, FlowBody, FlowResult } from '../core/runtime/room';
-export type { Decision, DecisionSpec, DecisionResult, Validation } from '../core/decisions/hub';
-export type {
-  Card,
-  Player,
-  Zone,
-  CardMove,
-  SkillInstance,
-  SkillSource,
-  SkillGrant,
-  WorldReader,
-} from '../core/model/state';
-export type { Fact, HistoryReader } from '../core/history/journal';
-export { isFact } from '../core/history/journal';
-export type { DeepReadonly } from '../core/model/value';
-export { JointSelection } from '../core/decisions/selection';
-export { chooseOne } from '../core/decisions/choice';
-export { ArrangementSelection } from '../core/decisions/arrangement';
-export type {
-  ArrangementChoice,
-  ArrangementGroup,
-  ArrangementSpec,
-} from '../core/decisions/arrangement';
-export type {
-  JointChoice,
-  ChoiceItem,
-  SelectionFeedback,
-  JointSelectionSpec,
-} from '../core/decisions/selection';
-export {
-  defineSkill,
-  SkillBook,
-  skillEffective,
-  skillLost,
-  blockSkill,
-  rulesOf,
-  queryRule,
-  cardDef,
-} from '../rules/skills/skills';
-export type {
-  SkillDefinition,
-  SkillTrigger,
-  SkillHandle,
-  SkillBinding,
-  SkillProvider,
-  SkillChange,
-  SkillAi,
-  AiView,
-  AiSeat,
-} from '../rules/skills/skills';
+/**
+ * 内容作者的唯一入口：写武将、技能与牌所需的全部名字。分组即用法——
+ * 定义（skill / general / card …）、时点（on 的第一个参数）、查询、动词与选择模型。
+ * 测试、主持端与内核之间直接引用各自模块，不经过这里。
+ */
+
+// ───────────────────────── 定义
+export { skill, general, equipment, action, convert, dealtWith, landing } from '../rules/author';
+export { card, deckOf } from '../content/catalog';
+export type { ContentDefinition, PackDefinition } from '../content/catalog';
+export { delayedCard } from '../rules/cards/delayed';
+export type { DelayedInput } from '../rules/cards/delayed';
 export { on } from '../rules/skills/on';
-export type { TriggerSpec, TriggerHook } from '../rules/skills/on';
 export { defineQuery, modify } from '../rules/skills/query';
-export { genderOf, genderChange, setGender, differentGender } from '../rules/characters/gender';
-export type { Gender } from '../rules/characters/gender';
-export { kingdomOf, kingdomChange, setKingdom } from '../rules/characters/kingdom';
-export { askInvoke, invoke, declare } from '../rules/skills/invoke';
-export type { Declaration } from '../rules/skills/invoke';
-// 作者门面：多数武将只需要这一组。
+export * as cardQueries from '../rules/cards/queries';
+export { defineMark } from '../rules/state/mark';
+export type { Mark } from '../rules/state/mark';
+export { defineEvent, timing } from '../core/runtime/event';
+export type { Context } from '../core/runtime/room';
+export type { SkillHandle } from '../rules/skills/skills';
+export type { ActiveInput } from '../rules/skills/active';
+export type {
+  CardChoice,
+  CardDefinition,
+  CardEffect,
+  CardFixedTargetsInput,
+  EffectRef,
+  SemanticCard,
+  UseIntent,
+  ViewAsInput,
+} from '../rules/cards/types';
+
+// ───────────────────────── 时点：on(Damage.inflicting, …)
+export { Skill } from '../rules/skills/skills';
+export { Lifetime } from '../rules/scopes/lifetime';
+export { Cost } from '../rules/costs/pay';
+export { Cards, CardEvent } from '../rules/cards/move';
+export { Use, Target, Resolve } from '../rules/cards/use';
+export { Response } from '../rules/cards/response';
+export { Counter } from '../rules/cards/counter';
+export { Judgment } from '../rules/cards/judge';
+export { Equipment } from '../rules/cards/equipment';
+export { Damage } from '../rules/combat/damage';
+export { Attack } from '../rules/combat/attack';
+export { Hp } from '../rules/combat/recover';
+export { Chain } from '../rules/combat/chain';
+export { Shield } from '../rules/combat/shield';
+export { Dying, Death } from '../rules/combat/life-events';
+export { Phase, Turn } from '../rules/turn/turn';
+export { Game } from '../rules/game/end';
+
+// ───────────────────────── 查询
 export {
   HE,
   alive,
   others,
-  cardLabel,
-  discardable,
+  peers,
   wounded,
   isMale,
-  peers,
   turnOwner,
+  cardLabel,
+  discardable,
   nth,
-  obtain,
-  obtainJudgment,
-  takeCard,
-  give,
-  select,
-  selection,
-  askDiscard,
-  action,
-  convert,
-  skill,
-  equipment,
-  dealtWith,
-  landing,
-  general,
 } from '../rules/author';
-export type {
-  Areas,
-  AskOptions,
-  Picked,
-  ActionContext,
-  ActionSpec,
-  AuthoredGeneral,
-} from '../rules/author';
-export { activeOffers, validateActive, activate } from '../rules/skills/active';
-export type {
-  ActiveSkill,
-  ActiveInput,
-  ActiveRunInput,
-  ActiveChoice,
-  ActiveOffer,
-} from '../rules/skills/active';
-export { defineGeneral, GeneralBook, generalOf, generalChange } from '../rules/characters/general';
-export type { GeneralDefinition } from '../rules/characters/general';
-export { isResponseSatisfied } from '../rules/cards/response';
-export type { ResponseOpportunity } from '../rules/cards/response';
-export type { QueryType, SkillModifier, ModifyInput } from '../rules/skills/query';
-export * as cardQueries from '../rules/cards/queries';
-export type { PhysicalCardFace, CardFaceRequest, CardFaceChange } from '../rules/cards/face';
-export {
-  equipmentCard,
-  equip,
-  equippedCards,
-  equipmentInSlot,
-  equipmentLost,
-  equipmentEffectiveFor,
-  Equipment,
-} from '../rules/cards/equipment';
-export type { EquipmentSlot, EquipmentDefinition, EquipResult } from '../rules/cards/equipment';
-export { defineMark, MarkEvent } from '../rules/state/mark';
-export type { Mark, MarkSlot, MarkSpec } from '../rules/state/mark';
-export { withCardSupply } from '../rules/cards/supply';
-export type { CardSupplyInput, SuppliedCard, SupplyResult } from '../rules/cards/supply';
-export { lifetimeOf, withLifetime } from '../rules/scopes/lifetime';
-export type { Scope } from '../rules/scopes/lifetime';
-export { pay, payDiscard, used } from '../rules/costs/pay';
-export type {
-  Limit,
-  UsageLimit,
-  PaymentResult,
-  PaymentSpec,
-  PaymentReceipt,
-  PaymentIntent,
-} from '../rules/costs/pay';
-export { moveCards, declared } from '../rules/cards/move';
-export type { MoveResult, MoveDeclaration, Declared } from '../rules/cards/move';
-export { discardCards, canDiscard } from '../rules/cards/discard';
-export type { DiscardRequest, DiscardQuery, DiscardResult } from '../rules/cards/discard';
-export { withProcessing } from '../rules/cards/processing';
-export type { Processing, ProcessingCleanup } from '../rules/cards/processing';
-export { withPrivateTopCards, privateCardPools } from '../rules/cards/private-pool';
-export type { PrivatePoolInput } from '../rules/cards/private-pool';
-export { damage } from '../rules/combat/damage';
-export type {
-  DamageInput,
-  DamageDraft,
-  DamageTransferIntent,
-  DamageResult,
-  DamageOrigin,
-  DamageTransfer,
-  DamageTransferResult,
-} from '../rules/combat/damage';
-export { isDirectDamage, isChainDamage } from '../rules/combat/damage';
-export { chainChange, isChained, setChained } from '../rules/combat/chain';
-export type { ChainChange, ChainResult } from '../rules/combat/chain';
-export { shieldOf, shieldChange, changeShield } from '../rules/combat/shield';
-export type { ShieldInput, ShieldChange, ShieldResult } from '../rules/combat/shield';
-export { resolveAttack } from '../rules/combat/attack';
-export type { DefenseDraft, AttackResult, AttackDamage } from '../rules/combat/attack';
-export { recover } from '../rules/combat/recover';
-export type {
-  RecoveryInput,
-  RecoveryResult,
-  RecoveryDraft,
-  RecoveryEdit,
-} from '../rules/combat/recover';
-export { cardActivities } from '../rules/cards/activity';
-export type { CardActivity, CardActivityPhase } from '../rules/cards/activity';
+export { kingdomOf } from '../rules/characters/kingdom';
+export { differentGender } from '../rules/characters/gender';
+export { currentPhase } from '../rules/turn/turn';
+export type { PhaseView } from '../rules/turn/turn';
+export { isGameOver } from '../rules/game/end';
+export { rulesOf, cardDef } from '../rules/skills/skills';
 export { face } from '../rules/cards/face';
-export {
-  defineCard,
-  buildCard,
-  physicalCard,
-  parseCardChoice,
-  cardOffers,
-  hasCardOffers,
-} from '../rules/cards/card';
-export type { CardOffer } from '../rules/cards/card';
-export {
-  useCard,
-  validateUse,
-  inspectUse,
-  useSelection,
-  askUse,
-  resolveDelayed,
-  Use,
-  Target,
-  Resolve,
-} from '../rules/cards/use';
-export type { UseResult, UseOfferRequest, AskedUseResult, UseFeedback } from '../rules/cards/use';
+export { physicalCard } from '../rules/cards/card';
+export { ownedCards } from '../rules/cards/types';
+export { canDiscard, discardCards } from '../rules/cards/discard';
 export {
   distance,
   withinDistance,
   attackRange,
-  handLimit,
   responseTimes,
   isTargetProhibited,
   isResponseProhibited,
-  targetCount,
 } from '../rules/cards/rule';
-export { respond, useResponse } from '../rules/cards/response';
-export type { ResponseResult } from '../rules/cards/response';
-export type { CardResponse, ResponseSubject } from '../rules/cards/played';
-export {
-  ownedCards,
-  primaryOf,
-  tupleOf,
-  viewAs,
-  effectReference,
-  isResponseBlocked,
-  useReference,
-  timingSnapshot,
-  colorOfSuit,
-} from '../rules/cards/types';
-export { contestCounter, resolveCounter, installCounterspells } from '../rules/cards/counter';
-export type { CounterResult, CounterOutcome, CounterRequest } from '../rules/cards/counter';
-export type {
-  CardChoice,
-  CardDefinition,
-  SemanticCard,
-  CardFace,
-  CardColor,
-  Nature,
-  ViewAs,
-  ViewAsInput,
-  ViewAsMakeInput,
-  ViewAsUseInput,
-  UseIntent,
-  UseRequest,
-  UseTiming,
-  ResponseUseOpportunity,
-  CardEffect,
-  EffectRef,
-  ResponseBlock,
-  UseSnapshot,
-  CounterOpportunity,
-  CounterSubject,
-  CardUseRef,
-  TimingSnapshot,
-  ResolveTargets,
-  TargetResolver,
-  UseRules,
-  UseTarget,
-  TargetFilter,
-  CardUseInput,
-  CardTargetInput,
-  CardFixedTargetsInput,
-  CardEffectInput,
-  CardExecuteInput,
-  TargetOptions,
-  TargetStage,
-} from '../rules/cards/types';
+export { equipmentInSlot, equipmentLost, equipmentEffectiveFor } from '../rules/cards/equipment';
+export { isChained, setChained } from '../rules/combat/chain';
+export { isDirectDamage, damage } from '../rules/combat/damage';
+export type { DamageDraft } from '../rules/combat/damage';
+export { cardActivities } from '../rules/cards/activity';
 export type { UsePlanView } from '../rules/cards/plan';
-export { useDeclarations } from '../rules/cards/plan';
-export { draw, reshuffle } from '../rules/cards/draw';
-export type { DrawInput, DrawRequest, DrawDraft, DrawResult } from '../rules/cards/draw';
-export { withRevealedCards } from '../rules/cards/reveal';
+
+// ───────────────────────── 动词（自带存活与终局检查）
 export {
-  delayedCard,
-  delayedCards,
-  placeDelayed,
-  moveDelayed,
-  canPlaceDelayed,
-  installDelayedCards,
-  resolveJudgmentPhase,
-} from '../rules/cards/delayed';
-export type { DelayedRules, DelayedInput, DelayedCard } from '../rules/cards/delayed';
-export { judge } from '../rules/cards/judge';
-export type {
-  JudgmentInput,
-  JudgmentCard,
-  JudgmentResult,
-  RetrialInput,
-} from '../rules/cards/judge';
-export type { RevealInput, RevealedCards } from '../rules/cards/reveal';
-export { chooseOwnedCard } from '../rules/cards/choose';
-export type { OwnedCardChoice, ChosenOwnedCard } from '../rules/cards/choose';
-export {
-  runTurn,
-  runPhase,
-  currentPhase,
-  defaultPhaseBody,
-  playPhase,
-  phaseKinds,
-  activeTurn,
-  activePhase,
-} from '../rules/turn/turn';
-export { enterDying, kill, isDying } from '../rules/combat/life';
-export type {
-  HealthCause,
-  DyingInput,
-  DyingEvent,
-  DyingResult,
-  DeathInput,
-  DeathEvent,
-  BurialEvent,
-  DeathDraft,
-  DeathResult,
-} from '../rules/combat/life';
-export { installRescue } from '../rules/combat/rescue';
+  obtain,
+  obtainJudgment,
+  takeCard,
+  give,
+  askDiscard,
+  useSupplied,
+  select,
+  selection,
+} from '../rules/author';
+export { draw } from '../rules/cards/draw';
+export { recover } from '../rules/combat/recover';
 export { loseHp } from '../rules/combat/lose-hp';
-export type { HpLossInput, HpLossResult } from '../rules/combat/lose-hp';
-export { finishGame, resultOf, isGameOver } from '../rules/game/end';
-export type { GameResult } from '../rules/game/end';
-export {
-  assignRoles,
-  roleOf,
-  roleSeats,
-  roleRoster,
-  judgeRoles,
-  installRoleMode,
-} from '../rules/game/roles';
-export type { Role, RoleSeat } from '../rules/game/roles';
-export type {
-  PhaseKind,
-  PhaseView,
-  PhaseSnapshot,
-  PhaseResult,
-  TurnView,
-  TurnResult,
-  TurnOrigin,
-  TurnOptions,
-  PhaseBody,
-} from '../rules/turn/turn';
-export {
-  pendingExtraTurns,
-  scheduleExtraTurn,
-  cancelExtraTurn,
-  takeExtraTurn,
-} from '../rules/turn/extra';
-export type { ExtraTurn, ExtraTurnRequest } from '../rules/turn/extra';
-export { card, createContent, deckOf } from '../content/catalog';
-export type {
-  AuthoredCard,
-  ContentDefinition,
-  ContentCatalog,
-  PackDefinition,
-  CardPresentation,
-  GeneralPresentation,
-  DeckDefinition,
-} from '../content/catalog';
-export { Skill } from '../rules/skills/skills';
-export { Response } from '../rules/cards/response';
-export { Lifetime } from '../rules/scopes/lifetime';
-export { Cost } from '../rules/costs/pay';
-export { Cards, CardEvent } from '../rules/cards/move';
-export { Damage } from '../rules/combat/damage';
-export { Chain } from '../rules/combat/chain';
-export { Shield } from '../rules/combat/shield';
-export { Attack } from '../rules/combat/attack';
-export { Hp } from '../rules/combat/recover';
-export { Counter } from '../rules/cards/counter';
-export { Judgment } from '../rules/cards/judge';
-export { Phase } from '../rules/turn/turn';
-export { Turn } from '../rules/turn/turn';
-export { Dying } from '../rules/combat/life-events';
-export { Death } from '../rules/combat/life-events';
-export { Game } from '../rules/game/end';
+export { changeShield } from '../rules/combat/shield';
+export { moveCards, declared } from '../rules/cards/move';
+export type { MoveResult } from '../rules/cards/move';
+export { judge } from '../rules/cards/judge';
+export { useCard, validateUse, askUse } from '../rules/cards/use';
+export { respond } from '../rules/cards/response';
+export type { ResponseOpportunity } from '../rules/cards/response';
+export { resolveAttack } from '../rules/combat/attack';
+export type { DefenseDraft } from '../rules/combat/attack';
+export { resolveCounter } from '../rules/cards/counter';
+export { delayedCards, placeDelayed, moveDelayed, canPlaceDelayed } from '../rules/cards/delayed';
+export { withPrivateTopCards } from '../rules/cards/private-pool';
+export { withRevealedCards } from '../rules/cards/reveal';
+export type { Processing } from '../rules/cards/processing';
+export { chooseOwnedCard } from '../rules/cards/choose';
+export { scheduleExtraTurn } from '../rules/turn/extra';
+export { declare, askInvoke } from '../rules/skills/invoke';
+export { payDiscard } from '../rules/costs/pay';
+
+// ───────────────────────── 选择模型
+export { chooseOne } from '../core/decisions/choice';
+export { JointSelection } from '../core/decisions/selection';
+export type { JointChoice } from '../core/decisions/selection';
+export { ArrangementSelection } from '../core/decisions/arrangement';

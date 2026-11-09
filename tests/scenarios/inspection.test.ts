@@ -1,6 +1,7 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
-import type { Context, Decision } from '../../src/sdk';
+import type { Context } from '../../src/sdk';
+import type { Decision } from '../../src/core/decisions/hub';
 import '../../src/sdk';
 import '../../src/core/history/rebuild';
 import { room, nextRequest, choose } from '../fixtures/room';

@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
-import { judge, moveCards, withProcessing, finishGame, Judgment, Cards } from '../../src/sdk';
+import { judge, moveCards, Judgment, Cards } from '../../src/sdk';
+import { withProcessing } from '../../src/rules/cards/processing';
+import { finishGame } from '../../src/rules/game/end';
 import { card, cardGame, die } from '../fixtures/cards';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 

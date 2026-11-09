@@ -1,40 +1,36 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import {
-  blockSkill,
-  defineSkill,
   draw,
-  equip,
-  equipmentCard,
   equipmentLost,
-  invoke,
-  kill,
   moveCards,
   on,
-  pay,
-  skillLost,
-  withLifetime,
-  activeOffers,
-  runPhase,
   modify,
   cardQueries,
-  viewAs,
   ownedCards,
   Cards,
-  Death,
-  Lifetime,
   Skill,
-  buildCard,
-  handLimit,
   useCard,
 } from '../../src/sdk';
+import { blockSkill, defineSkill, skillLost } from '../../src/rules/skills/skills';
+import { equip, equipmentCard } from '../../src/rules/cards/equipment';
+import { invoke } from '../../src/rules/skills/invoke';
+import { kill } from '../../src/rules/combat/life';
+import { pay } from '../../src/rules/costs/pay';
+import { withLifetime, Lifetime } from '../../src/rules/scopes/lifetime';
+import { activeOffers } from '../../src/rules/skills/active';
+import { runPhase } from '../../src/rules/turn/turn';
+import { viewAs } from '../../src/rules/cards/types';
+import { Death } from '../../src/rules/combat/life-events';
+import { buildCard } from '../../src/rules/cards/card';
+import { handLimit } from '../../src/rules/cards/rule';
 import type { Context, SkillHandle, PhaseView } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, settled } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
-import { Cost } from '../../src/sdk';
+import { Cost } from '../../src/rules/costs/pay';
 import { PlayerEvent } from '../../src/rules/combat/life';
 
 const original = { kind: 'general', id: 'original' } as const;

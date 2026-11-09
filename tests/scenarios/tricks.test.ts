@@ -1,10 +1,7 @@
 import { expect, it } from 'vitest';
 import {
-  installCounterspells,
   withRevealedCards,
   moveCards,
-  defineSkill,
-  viewAs,
   chooseOwnedCard,
   Use,
   Target,
@@ -14,6 +11,9 @@ import {
   modify,
   useCard,
 } from '../../src/sdk';
+import { installCounterspells } from '../../src/rules/cards/counter';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
 import type { CardDefinition } from '../../src/sdk';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

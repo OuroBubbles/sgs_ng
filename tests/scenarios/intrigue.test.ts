@@ -16,33 +16,32 @@ import { projectMatch } from '../../src/host/projection';
 import { standardCards } from '../fixtures/standard';
 import {
   chooseOne,
-  runPhase,
-  activeOffers,
   draw,
   moveCards,
-  defineSkill,
   modify,
   cardQueries,
-  setGender,
-  setKingdom,
   ownedCards,
-  installCounterspells,
   resolveCounter,
-  kill,
   Use,
   Target,
   Resolve,
-  Counter,
   Judgment,
   Cards,
   Response,
   Damage,
-  Cost,
   Phase,
   distance,
   respond,
   validateUse,
 } from '../../src/sdk';
+import { runPhase } from '../../src/rules/turn/turn';
+import { activeOffers } from '../../src/rules/skills/active';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { setGender } from '../../src/rules/characters/gender';
+import { setKingdom } from '../../src/rules/characters/kingdom';
+import { installCounterspells, Counter } from '../../src/rules/cards/counter';
+import { kill } from '../../src/rules/combat/life';
+import { Cost } from '../../src/rules/costs/pay';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';

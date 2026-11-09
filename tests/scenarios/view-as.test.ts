@@ -1,26 +1,14 @@
-import {
-  buildCard,
-  cardDef,
-  cardOffers,
-  face,
-  hasCardOffers,
-  useCard,
-  validateUse,
-  cardQueries,
-  modify,
-} from '../../src/sdk';
+import { cardDef, face, useCard, validateUse, cardQueries, modify } from '../../src/sdk';
+import { buildCard, cardOffers, hasCardOffers } from '../../src/rules/cards/card';
 import { expect, it } from 'vitest';
-import { defineSkill, viewAs, ownedCards, Use, Resolve, Damage } from '../../src/sdk';
+import { ownedCards, Use, Resolve, Damage } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
 import wusheng from '../../src/content/standard/skills/wusheng';
-import type {
-  CardChoice,
-  Context,
-  SkillDefinition,
-  ViewAsInput,
-  ViewAsMakeInput,
-  ViewAsUseInput,
-  UseResult,
-} from '../../src/sdk';
+import type { CardChoice, Context, ViewAsInput } from '../../src/sdk';
+import type { SkillDefinition } from '../../src/rules/skills/skills';
+import type { ViewAsMakeInput, ViewAsUseInput } from '../../src/rules/cards/types';
+import type { UseResult } from '../../src/rules/cards/use';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

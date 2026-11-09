@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { damage, moveCards, Damage } from '../../src/sdk';
-import type { DamageDraft, DamageResult } from '../../src/sdk';
+import type { DamageDraft } from '../../src/sdk';
+import type { DamageResult } from '../../src/rules/combat/damage';
 import { room } from '../fixtures/room';
 import { testTiming } from '../fixtures/timing';
 

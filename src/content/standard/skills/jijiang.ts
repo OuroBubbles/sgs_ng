@@ -8,20 +8,10 @@ import {
   peers,
   skill,
   on,
-  declare,
-  withCardSupply,
+  useSupplied,
   Response,
-  useCard,
-  validateUse,
 } from '../../../sdk';
-import type {
-  CardChoice,
-  Context,
-  SemanticCard,
-  SkillHandle,
-  UseIntent,
-  ViewAsInput,
-} from '../../../sdk';
+import type { Context, SkillHandle, ViewAsInput } from '../../../sdk';
 
 /** 激将本阶段是否已请求失败；阶段结束自动清除。 */
 const failed = defineMark('standard:jijiang-failed', false, { scope: 'phase' });
@@ -29,27 +19,6 @@ const failed = defineMark('standard:jijiang-failed', false, { scope: 'phase' });
 function markFailed(ctx: Context, self: SkillHandle) {
   if (currentPhase(ctx) && !isGameOver(ctx.world)) failed.set(ctx, self.owner, true);
 }
-
-const providedChoice = (card: SemanticCard, actor: string, reason: string): CardChoice => ({
-  kind: 'generated',
-  reason,
-  origin: { actor, card },
-  materials: card.materials,
-  face: {
-    name: card.name,
-    suit: card.suit,
-    color: card.color,
-    rank: card.rank,
-    nature: card.nature,
-  },
-});
-
-const probeChoice: CardChoice = {
-  kind: 'generated',
-  face: { name: 'standard:slash' },
-  materials: [],
-  reason: 'standard:jijiang',
-};
 
 export default skill(
   'standard:jijiang',
@@ -79,41 +48,13 @@ export default skill(
     available: (ctx: Context, { self, purpose }: ViewAsInput) =>
       purpose === 'use' && peers(ctx, self.owner, '蜀').length > 0 && !failed.of(ctx, self.owner),
     make: { name: 'standard:slash' },
-    use: (ctx, { self, intent }) =>
-      ctx.flow('jijiang.use', async (at) => {
-        const probe: UseIntent = { ...intent, choice: probeChoice };
-        const live = (current: Context) => validateUse(current, probe).ok;
-        // 选择此配方并提交目标已经表示发动；不再追加一次是否发动的询问。
-        if (!(await declare(at, self, { legal: () => live(at) })))
-          return { kind: 'unavailable', reason: 'Jijiang was not invoked.' };
-        for (const actor of others(at, self.owner)) {
-          if (!live(at)) return { kind: 'unavailable', reason: 'Use is no longer available.' };
-          if (!alive(at, actor) || kingdomOf(at.world, actor) !== '蜀') continue;
-          const supplied = await withCardSupply(
-            at,
-            {
-              actor,
-              beneficiary: self.owner,
-              names: ['standard:slash'],
-              reason: self.skill,
-              available: live,
-            },
-            (useAt, supply) =>
-              useCard(useAt, {
-                ...intent,
-                choice: providedChoice(supply.card, actor, self.skill),
-              }),
-          );
-          if (supplied.kind === 'supplied') return supplied.value;
-          if (supplied.kind === 'invalidated')
-            return {
-              kind: 'unavailable',
-              reason: 'Supplied card was invalidated after payment.',
-            };
-        }
-        markFailed(at, self);
-        return { kind: 'unavailable', reason: 'No Shu player supplied Slash.' };
-      }),
+    use: async (ctx, { self, intent }) => {
+      const from = (at: Context, actor: string) => kingdomOf(at.world, actor) === '蜀';
+      const used = await useSupplied(ctx, self, intent, { name: 'standard:slash', from });
+      if (used) return used;
+      markFailed(ctx, self);
+      return { kind: 'unavailable', reason: 'No Shu player supplied Slash.' };
+    },
   },
   { lord: true },
 );

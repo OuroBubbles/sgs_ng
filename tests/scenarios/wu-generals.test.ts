@@ -13,26 +13,26 @@ import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import {
   recover,
-  kill,
-  runPhase,
-  runTurn,
-  activeOffers,
   moveCards,
-  defineSkill,
   modify,
   cardQueries,
-  setKingdom,
-  installRescue,
   loseHp,
   cardActivities,
   judge,
   Hp,
-  Cost,
-  inspectUse,
   useCard,
   validateUse,
 } from '../../src/sdk';
-import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
+import { kill } from '../../src/rules/combat/life';
+import { runPhase, runTurn } from '../../src/rules/turn/turn';
+import { activeOffers } from '../../src/rules/skills/active';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { setKingdom } from '../../src/rules/characters/kingdom';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { Cost } from '../../src/rules/costs/pay';
+import { inspectUse } from '../../src/rules/cards/use';
+import type { Context, PhaseView } from '../../src/sdk';
+import type { RecoveryDraft } from '../../src/rules/combat/recover';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';

@@ -5,7 +5,8 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { activePhase, activeTurn, useDeclarations } from '../../src/sdk';
+import { activePhase, activeTurn } from '../../src/rules/turn/turn';
+import { useDeclarations } from '../../src/rules/cards/plan';
 
 /** 驱动真实整局并验证终局不变量；阵容、预算和技能断言仍由场景负责。 */
 export async function playMatch(

@@ -10,34 +10,19 @@ import { RoleMatch } from '../../src/host/role-match';
 import { createRoleMatch } from '../../src/host/content';
 import { World } from '../../src/core/state/world';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import {
-  activeOffers,
-  activate,
-  validateActive,
-  runPhase,
-  playPhase,
-  defineSkill,
-  SkillBook,
-  GeneralBook,
-  defineGeneral,
-  generalOf,
-  genderOf,
-  setGender,
-  moveCards,
-  installRescue,
-  used,
-  withLifetime,
-  blockSkill,
-  equipmentCard,
-  JointSelection,
-  ownedCards,
-  pay,
-  Cards,
-  Cost,
-  Phase,
-} from '../../src/sdk';
+import { moveCards, JointSelection, ownedCards, Cards, Phase } from '../../src/sdk';
+import { activeOffers, activate, validateActive } from '../../src/rules/skills/active';
+import { runPhase, playPhase } from '../../src/rules/turn/turn';
+import { defineSkill, SkillBook, blockSkill } from '../../src/rules/skills/skills';
+import { GeneralBook, defineGeneral, generalOf } from '../../src/rules/characters/general';
+import { genderOf, setGender } from '../../src/rules/characters/gender';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { used, pay, Cost } from '../../src/rules/costs/pay';
+import { withLifetime } from '../../src/rules/scopes/lifetime';
+import { equipmentCard } from '../../src/rules/cards/equipment';
 import { inspectActive, activeAvailable } from '../../src/rules/skills/active';
-import type { ActiveSkill, ActiveRunInput, Context, PhaseView } from '../../src/sdk';
+import type { Context, PhaseView } from '../../src/sdk';
+import type { ActiveSkill, ActiveRunInput } from '../../src/rules/skills/active';
 import { Hp } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';

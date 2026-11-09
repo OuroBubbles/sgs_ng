@@ -12,29 +12,29 @@ import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import {
-  runPhase,
-  runTurn,
   currentPhase,
-  activeOffers,
-  setKingdom,
   moveCards,
-  kill,
   loseHp,
-  installRescue,
-  withCardSupply,
-  defineSkill,
-  viewAs,
   modify,
   cardQueries,
   Cards,
   Response,
-  Cost,
-  buildCard,
-  cardOffers,
   useCard,
   validateUse,
 } from '../../src/sdk';
-import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
+import { withCardSupply } from '../../src/rules/cards/supply';
+import { runPhase, runTurn } from '../../src/rules/turn/turn';
+import { activeOffers } from '../../src/rules/skills/active';
+import { setKingdom } from '../../src/rules/characters/kingdom';
+import { kill } from '../../src/rules/combat/life';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { Cost } from '../../src/rules/costs/pay';
+import { buildCard, cardOffers } from '../../src/rules/cards/card';
+import type { Context, PhaseView, CardChoice } from '../../src/sdk';
+import type { SuppliedCard } from '../../src/rules/cards/supply';
+import type { UseResult } from '../../src/rules/cards/use';
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';

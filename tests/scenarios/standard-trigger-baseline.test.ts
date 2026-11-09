@@ -1,7 +1,8 @@
 import { generalGame } from '../fixtures/generals';
 import { setImmediate } from 'node:timers/promises';
 import { expect, it } from 'vitest';
-import { ownedCards, runPhase, validateUse } from '../../src/sdk';
+import { ownedCards, validateUse } from '../../src/sdk';
+import { runPhase } from '../../src/rules/turn/turn';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';

@@ -21,7 +21,7 @@ import { protocolHash, buildMismatch } from '../../src/protocol/build';
 import { readFile } from 'node:fs/promises';
 import { contentHash, defaultContent, practiceContent } from '../../src/host/content';
 import { Match } from '../../src/host/role-match';
-import { Game } from '../../src/sdk';
+import { Game } from '../../src/rules/game/end';
 
 const cleanup: (() => void | Promise<void>)[] = [];
 

@@ -1,20 +1,20 @@
 import { expect, it } from 'vitest';
 import {
   differentGender,
-  defineSkill,
   modify,
   cardQueries,
-  genderOf,
-  kill,
   moveCards,
-  setGender,
   Use,
   Target,
   Cards,
   Damage,
-  Cost,
 } from '../../src/sdk';
-import type { DamageDraft, Gender, UseIntent } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { genderOf, setGender } from '../../src/rules/characters/gender';
+import { kill } from '../../src/rules/combat/life';
+import { Cost } from '../../src/rules/costs/pay';
+import type { DamageDraft, UseIntent } from '../../src/sdk';
+import type { Gender } from '../../src/rules/characters/gender';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

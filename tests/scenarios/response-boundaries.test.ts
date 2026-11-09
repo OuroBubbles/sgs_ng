@@ -1,23 +1,24 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
-  SkillBook,
   judge,
-  withCardSupply,
   loseHp,
-  installRescue,
-  defineSkill,
   modify,
   cardQueries,
-  pay,
   Use,
   Cards,
   Response,
-  Dying,
-  Cost,
   useCard,
   validateUse,
 } from '../../src/sdk';
-import type { Context, EffectRef, ResponseResult, Timing, SkillDefinition } from '../../src/sdk';
+import { withCardSupply } from '../../src/rules/cards/supply';
+import { SkillBook, defineSkill } from '../../src/rules/skills/skills';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { pay, Cost } from '../../src/rules/costs/pay';
+import { Dying } from '../../src/rules/combat/life-events';
+import type { Context, EffectRef } from '../../src/sdk';
+import type { ResponseResult } from '../../src/rules/cards/response';
+import type { Timing } from '../../src/core/runtime/event';
+import type { SkillDefinition } from '../../src/rules/skills/skills';
 import { Room } from '../../src/core/runtime/room';
 import { standardCards } from '../fixtures/standard';
 import guicai from '../../src/content/standard/skills/guicai';

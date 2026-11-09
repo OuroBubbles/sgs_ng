@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { createContent } from '../../src/sdk';
+import { createContent } from '../../src/content/catalog';
 import { standard } from '../fixtures/standard';
 import assets from '../../src/content/standard/assets.json';
 import { createRoleMatch, defaultContent } from '../../src/host/content';

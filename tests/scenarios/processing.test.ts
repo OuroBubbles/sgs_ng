@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { withProcessing, moveCards, Cards } from '../../src/sdk';
+import { moveCards, Cards } from '../../src/sdk';
+import { withProcessing } from '../../src/rules/cards/processing';
 import type { Processing } from '../../src/sdk';
 import { nextRequest, room } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

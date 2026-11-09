@@ -2,17 +2,16 @@ import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
 import {
   changeShield,
-  shieldOf,
   damage,
   isChained,
   setChained,
   loseHp,
   recover,
-  finishGame,
   Damage,
-  Dying,
-  Shield,
 } from '../../src/sdk';
+import { shieldOf, Shield } from '../../src/rules/combat/shield';
+import { finishGame } from '../../src/rules/game/end';
+import { Dying } from '../../src/rules/combat/life-events';
 import type { Context, DamageDraft } from '../../src/sdk';
 import { card, cardGame, settled } from '../fixtures/cards';
 import { standardGeneralSkills } from '../fixtures/standard';

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { damage, draw, Cards, Damage, buildCard, respond } from '../../src/sdk';
+import { damage, draw, Cards, Damage, respond } from '../../src/sdk';
+import { buildCard } from '../../src/rules/cards/card';
 import { card, cardGame } from '../fixtures/cards';
 import { choose, nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';

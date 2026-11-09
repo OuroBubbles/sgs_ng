@@ -7,17 +7,11 @@ import paoxiao from '../../src/content/standard/skills/paoxiao';
 import qixi from '../../src/content/standard/skills/qixi';
 import xiaoji from '../../src/content/standard/skills/xiaoji';
 import { standardGenerals } from '../fixtures/standard';
-import {
-  runPhase,
-  defineSkill,
-  modify,
-  cardQueries,
-  moveCards,
-  generalOf,
-  roleOf,
-  useCard,
-  validateUse,
-} from '../../src/sdk';
+import { modify, cardQueries, moveCards, useCard, validateUse } from '../../src/sdk';
+import { runPhase } from '../../src/rules/turn/turn';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { generalOf } from '../../src/rules/characters/general';
+import { roleOf } from '../../src/rules/game/roles';
 import { createRoleMatch } from '../../src/host/content';
 import { CardEvent } from '../../src/sdk';
 

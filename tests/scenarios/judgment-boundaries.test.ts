@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { judge, finishGame, draw, Judgment } from '../../src/sdk';
-import type { Context, JudgmentResult } from '../../src/sdk';
+import { judge, draw, Judgment } from '../../src/sdk';
+import { finishGame } from '../../src/rules/game/end';
+import type { Context } from '../../src/sdk';
+import type { JudgmentResult } from '../../src/rules/cards/judge';
 import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';

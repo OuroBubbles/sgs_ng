@@ -1,18 +1,11 @@
 import type { Context } from '../../src/sdk';
 import { expect, it } from 'vitest';
-import {
-  installCounterspells,
-  resolveCounter,
-  defineSkill,
-  viewAs,
-  ownedCards,
-  finishGame,
-  Use,
-  Target,
-  Resolve,
-  Counter,
-} from '../../src/sdk';
-import type { CounterOpportunity, UseTiming } from '../../src/sdk';
+import { resolveCounter, ownedCards, Use, Target, Resolve } from '../../src/sdk';
+import { installCounterspells, Counter } from '../../src/rules/cards/counter';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { viewAs } from '../../src/rules/cards/types';
+import { finishGame } from '../../src/rules/game/end';
+import type { CounterOpportunity, UseTiming } from '../../src/rules/cards/types';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

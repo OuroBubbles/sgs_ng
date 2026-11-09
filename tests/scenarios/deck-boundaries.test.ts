@@ -1,14 +1,15 @@
 import { expect, it } from 'vitest';
 import {
   draw,
-  finishGame,
   judge,
   moveCards,
   withPrivateTopCards,
   withRevealedCards,
   Cards,
 } from '../../src/sdk';
-import type { Context, DrawDraft } from '../../src/sdk';
+import { finishGame } from '../../src/rules/game/end';
+import type { Context } from '../../src/sdk';
+import type { DrawDraft } from '../../src/rules/cards/draw';
 import { card, cardGame, use, conserved, die } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
 import { Deck } from '../../src/rules/cards/draw';

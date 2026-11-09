@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
 import { rebuildWorld } from '../../src/core/history/rebuild';
+import { damage, draw, on, Cards } from '../../src/sdk';
 import {
   assignRoles,
   roleRoster,
@@ -9,26 +10,20 @@ import {
   roleOf,
   judgeRoles,
   installRoleMode,
-  resultOf,
-  finishGame,
-  kill,
-  damage,
-  draw,
-  activePhase,
-  activeTurn,
-  defineSkill,
-  on,
-  runTurn,
-  installRescue,
-  Cards,
-  Death,
-} from '../../src/sdk';
-import type { Role, GameResult } from '../../src/sdk';
+} from '../../src/rules/game/roles';
+import { resultOf, finishGame } from '../../src/rules/game/end';
+import { kill } from '../../src/rules/combat/life';
+import { activePhase, activeTurn, runTurn } from '../../src/rules/turn/turn';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { installRescue } from '../../src/rules/combat/rescue';
+import { Death } from '../../src/rules/combat/life-events';
+import type { Role } from '../../src/rules/game/roles';
+import type { GameResult } from '../../src/rules/game/end';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
 import { Draw } from '../../src/rules/cards/draw';
-import { Game } from '../../src/sdk';
+import { Game } from '../../src/rules/game/end';
 import { PlayerEvent } from '../../src/rules/combat/life';
 import { testTiming } from '../fixtures/timing';
 

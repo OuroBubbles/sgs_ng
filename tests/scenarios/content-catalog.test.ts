@@ -1,8 +1,10 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { defineSkill, rulesOf, on, moveCards, loseHp, createContent, useCard } from '../../src/sdk';
-import type { SkillDefinition } from '../../src/sdk';
+import { rulesOf, on, moveCards, loseHp, useCard } from '../../src/sdk';
+import { defineSkill } from '../../src/rules/skills/skills';
+import { createContent } from '../../src/content/catalog';
+import type { SkillDefinition } from '../../src/rules/skills/skills';
 import { createRoleMatch, defaultContent, practiceContent } from '../../src/host/content';
 import { cardView } from '../../src/host/projection';
 import { observeAgent } from '../../src/host/agent-observation';
