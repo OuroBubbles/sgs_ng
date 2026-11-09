@@ -3,7 +3,7 @@ import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills, standardGenerals } from '../fixtures/standard';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { RoleMatch } from '../../src/host/role-match';
 import { createRoleMatch } from '../../src/host/content';
 import { projectMatch } from '../../src/host/projection';

@@ -19,10 +19,10 @@ import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/host/role-match';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
 import { Skill } from '../../src/sdk';
-import { Weapon } from '../../src/content/standard/weapons';
+import { Weapon } from '../../src/content/standard/card-kit';
 import { Discard } from '../../src/rules/cards/discard';
 
 type Game = ReturnType<typeof cardGame>;

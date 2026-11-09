@@ -19,7 +19,7 @@ import {
 } from '../../src/sdk';
 import type { Context, EffectRef, ResponseResult, Timing, SkillDefinition } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { guicai } from '../../src/content/standard/generals/simayi';
 import { wushuang } from '../../src/content/standard/generals/lvbu';
 import { rebuildWorld } from '../../src/core/history/rebuild';

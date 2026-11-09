@@ -172,10 +172,11 @@ export function delayedCard(
   input: {
     readonly id: string;
     readonly label: string;
+    readonly description?: string;
     readonly self?: boolean;
   } & DelayedRules,
 ): CardDefinition {
-  const { id, label, self = false, resolve, cancelled } = input;
+  const { id, label, description, self = false, resolve, cancelled } = input;
   const source = (effect: CardEffect): CardUseRef => ({
     useId: effect.useId,
     actor: effect.actor,
@@ -187,6 +188,7 @@ export function delayedCard(
     id,
     type: 'trick',
     label,
+    ...(description === undefined ? {} : { description }),
     counterable: true,
     delayed: {
       resolve: resolve.bind(input),

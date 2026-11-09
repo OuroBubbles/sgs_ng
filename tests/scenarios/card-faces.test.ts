@@ -31,7 +31,7 @@ import { card, cardGame, use, chooseAndActivate as activate, settled } from '../
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { RoleMatch } from '../../src/host/role-match';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { cardView, projectMatch } from '../../src/host/projection';
 import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';

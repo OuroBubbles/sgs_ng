@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { createStandardDeck } from '../../src/content/standard/deck';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import { genderOf } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';

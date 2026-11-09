@@ -6,7 +6,7 @@ import { standardGeneralSkills } from '../fixtures/standard';
 import { createRoleMatch } from '../../src/host/content';
 import { RoleMatch } from '../../src/host/role-match';
 import { projectMatch } from '../../src/host/projection';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import {
   useDeclarations,
   defineSkill,

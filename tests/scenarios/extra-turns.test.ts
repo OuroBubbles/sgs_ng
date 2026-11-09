@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { Match, RoleMatch } from '../../src/host/role-match';
 import { SoloSession } from '../../src/host/solo';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import {
   activePhase,
   activeTarget,

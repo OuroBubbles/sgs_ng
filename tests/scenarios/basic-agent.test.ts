@@ -6,7 +6,7 @@ import { createRoleMatch } from '../../src/host/content';
 import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { chooseOwnedCard, moveCards, Use, askUse, useCard } from '../../src/sdk';
 import { nextRequest } from '../fixtures/room';
 import type { Card, FlowResult } from '../../src/sdk';

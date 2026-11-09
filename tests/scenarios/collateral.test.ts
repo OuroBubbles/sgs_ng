@@ -21,7 +21,7 @@ import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { CardEvent } from '../../src/sdk';
-import { Collateral } from '../../src/content/standard/collateral';
+import { Collateral } from '../../src/content/standard/cards/collateral';
 import { Equipment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;

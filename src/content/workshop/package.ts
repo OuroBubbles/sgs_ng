@@ -23,6 +23,8 @@ import { allotment } from './allotment';
 export const prepare: CardDefinition = {
   id: 'workshop:prepare',
   label: '整备',
+  description:
+    '作者演示牌。对自己使用，选择摸两张牌，或回复 1 点体力。未受伤时只能摸牌；可被无懈可击。',
   type: 'trick',
   counterable: true,
   use: {
@@ -53,6 +55,8 @@ export const prepare: CardDefinition = {
 export const bind: CardDefinition = {
   id: 'workshop:bind',
   label: '缚阵',
+  description:
+    '作者演示牌。选择一至两名角色，分别切换其连环状态。可选择自己；每个目标可被无懈可击。',
   type: 'trick',
   counterable: true,
   use: {
@@ -66,6 +70,8 @@ export const bind: CardDefinition = {
 export const ember: CardDefinition = {
   id: 'workshop:ember',
   label: '引焰',
+  description:
+    '作者演示牌。对一名其他角色造成 1 点火焰伤害。若目标处于连环，其受到的伤害会依次传给当时的其他连环角色；每名角色受到伤害时解除连环。可被无懈可击。',
   type: 'trick',
   counterable: true,
   nature: 'fire',
@@ -104,6 +110,7 @@ export const hearing = {
 export const relicJade = equipmentCard({
   id: 'workshop:relic_jade',
   label: '遗玉',
+  description: '防具。离开你的装备区后，你可以摸一张牌。手牌中的遗玉被弃置不会发动。',
   slot: 'armor',
   skill: {
     id: 'workshop:jade-echo',
@@ -168,37 +175,6 @@ export default {
       gender: 'male',
       maxHp: 4,
       skills: ['workshop:hearing', 'standard:wusheng'],
-    },
-  ],
-  cardViews: [
-    {
-      id: ward.id,
-      kind: 'trick',
-      description:
-        '作者演示牌。对自己使用，获得 2 点护盾。伤害先消耗护盾，余量才扣体力；完全吸收仍属于受到伤害，不阻断连环。失去体力不消耗护盾。可被无懈可击。',
-    },
-    {
-      id: bind.id,
-      kind: 'trick',
-      description:
-        '作者演示牌。选择一至两名角色，分别切换其连环状态。可选择自己；每个目标可被无懈可击。',
-    },
-    {
-      id: ember.id,
-      kind: 'trick',
-      description:
-        '作者演示牌。对一名其他角色造成 1 点火焰伤害。若目标处于连环，其受到的伤害会依次传给当时的其他连环角色；每名角色受到伤害时解除连环。可被无懈可击。',
-    },
-    {
-      id: prepare.id,
-      kind: 'trick',
-      description:
-        '作者演示牌。对自己使用，选择摸两张牌，或回复 1 点体力。未受伤时只能摸牌；可被无懈可击。',
-    },
-    {
-      id: relicJade.id,
-      kind: 'equipment',
-      description: '防具。离开你的装备区后，你可以摸一张牌。手牌中的遗玉被弃置不会发动。',
     },
   ],
   decks: [

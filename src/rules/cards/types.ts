@@ -312,6 +312,8 @@ export interface CardDefinition {
   readonly id: string;
   readonly type: 'basic' | 'trick' | 'equipment';
   readonly label: string;
+  /** 规则说明（与技能说明同等地位）；大厅与卡面详情直接显示。 */
+  readonly description?: string;
   readonly nature?: Nature;
   readonly response?: boolean;
   readonly counterable?: boolean;

@@ -26,7 +26,7 @@ export default general('scholar', '学士', '群', 3, [study]);
 
 `skill(id, name, description, ...parts)` 是作者层写法：每个部件按形状归类——`on(...)` 为触发、`modify(...)` 为查询修正、带 `run` 的为主动技、带 `make` 的为转换，带 `lord` / `ai` 的对象为选项。内核仍是 `defineSkill({ id, name, description, triggers, ... })` 对象形，需要 getter 或自定义结构时直接使用。
 
-技能回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper），不再有接收 CardBook 的技能工厂；装备能力同样只写静态 `skill`。
+技能与牌的回调需要本局牌目录时调用 `rulesOf(ctx)`（或 `cardDef` / `cardLabel` / `face` 等作者 helper）；回调只收到 `ctx` 与具名输入，没有目录参数。
 
 ## 添加武将
 
@@ -34,7 +34,48 @@ export default general('scholar', '学士', '群', 3, [study]);
 2. 素材可选，按约定放在 `public/<包>/`：`portraits/<名>.jpg|png|webp`、`audio/death/<名>.mp3`、`audio/skill/<技能名><n>.mp3`。
 3. 重启主持端（`pnpm dev` 会自动重启）。不改其它文件、不重新构建网页；只有改界面时才需要 `pnpm build`。
 
-内容包是 `src/content/` 下含 `package.ts` 的目录（目录名以 `.disabled` 结尾则跳过），由 [load-content](../src/host/load-content.ts) 发现：`package.ts` 默认导出包定义（牌、牌组、`practice` 等；可写成接收 `{ id, media }` 的函数）。顺序确定：标准包先行，其余按目录名；包内武将先按 `order`（标准包保留原包顺序，影响大厅与按种子抽将），其余按文件名追加。重复 ID、ID 与文件名不符、默认导出不是 `general`/`skill`、`order` 指向不存在的文件、约定目录里找不到对应武将的立绘或阵亡语音，都会让主持端启动失败并指出文件。各包源码的 SHA-256 即 `contentHash`，随 hello 与 `/catalog` 发出。
+## 添加牌：一牌一文件
+
+标准牌位于 [src/content/standard/cards/](../src/content/standard/cards/)，每个文件 `export default` 一种牌：普通牌用 `card({...})`，装备用 `equipment(id, label, slot, description, ...parts)`（与 `skill(...)` 同序，部件即装备技能），延时锦囊用 `delayedCard({...})`。规则说明 `description` 与规则写在同一处，大厅和卡面详情直接显示；`kind` 只选无卡图时的卡面纹样（缺省按类别：基本 other、锦囊 trick、装备 equipment）。几种牌共用的小工具放在包根的普通模块（如 [card-kit.ts](../src/content/standard/card-kit.ts)），只有 `cards/` 下的文件会被当作牌。
+
+```ts
+// src/content/standard/cards/ex_nihilo.ts
+import { card, draw } from '../../../sdk';
+
+export default card({
+  id: 'standard:ex_nihilo',
+  type: 'trick',
+  label: '无中生有',
+  kind: 'draw',
+  description: '出牌阶段对自己使用，摸两张牌。',
+  counterable: true,
+  use: {
+    count: { min: 1, max: 1 },
+    target: (_ctx, { request, target }) => request.actor === target,
+    resolve: (ctx, { effect }) =>
+      draw(ctx, { player: effect.target, count: 2, reason: 'standard:ex_nihilo' }),
+  },
+});
+```
+
+1. 在包的 `cards/` 下新建 `<名>.ts`，ID 为 `<包>:<名>`；牌按文件名排列（牌的先后不影响结算）。
+2. 素材可选：`cards/<名>.png`（卡图）、`icons/<名>.png` 或 `marks/<名>.png`（图标）、`audio/card/<male|female>/<名>.mp3`；装备缺省用 `icons/<栏位>.png` 与 `audio/card/common/<栏位>.mp3`（两种坐骑都记作 `horse`）。
+3. 把实体牌加进牌组（[deck.ts](../src/content/standard/deck.ts)），重启主持端。
+
+**有序目标元组**：需要“先选 A、再选与 A 相关的 B”的牌（借刀杀人），`target` 写成过滤器数组，第 i 个过滤器收到已选前缀 `chosen`；首位是效果目标（受目标禁令约束），结算时从 `effect.tuple` 取整组。玩家逐个点选，界面按过滤器个数自动分组；流离等转移只给新角色时沿用原元组的后续位置。
+
+```ts
+target: [
+  (ctx, { request, target }) => target !== request.actor && equipmentInSlot(ctx, target, 'weapon').length > 0,
+  (ctx, { request, target, chosen: [holder] }) => canSlash(ctx, holder!, target),
+],
+async resolve(ctx, { effect }) {
+  const [holder, victim] = effect.tuple as [string, string];
+  // ...
+},
+```
+
+内容包是 `src/content/` 下含 `package.ts` 的目录（目录名以 `.disabled` 结尾则跳过），由 [load-content](../src/host/load-content.ts) 发现：`package.ts` 默认导出包定义（牌组、`practice`、`order` 等）。顺序确定：标准包先行，其余按目录名；包内武将先按 `order`（标准包保留原包顺序，影响大厅与按种子抽将），其余按文件名追加；牌与技能按文件名。重复 ID、ID 与文件名不符、默认导出形状不对（武将须为 `general`、技能须为 `skill`、牌须带 ID / 类别 / 牌名 / 说明）、`order` 指向不存在的文件、约定目录里找不到对应武将的立绘或阵亡语音、找不到对应牌的卡图，都会让主持端启动失败并指出文件。各包源码的 SHA-256 即 `contentHash`，随 hello 与 `/catalog` 发出。
 
 ## 触发技：唯一的 on
 
@@ -81,13 +122,13 @@ export const Provision = defineEvent('provision', {
 
 ## 组合与运行
 
-用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立 CardBook / SkillBook，技能经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果由创建它的技能在 `skill(..., { effects: [...] })` 中引用即自动登记（裸衣的 `luoyiAftereffect` 见 [xuchu.ts](../src/content/standard/generals/xuchu.ts)）；不属于任何技能的效果才写进 `ContentDefinition.effects`。
+用 [createContent](../src/content/catalog.ts) 将一份或多份 `ContentDefinition` 组合为本局目录，例如 `createContent(standard, practice)`。声明按引用使用，不复制、不冻结、不绑定，定义对象应视为常量；每局 createBooks 创建独立的 SkillBook（技能、牌与效果目录），规则经 `rulesOf(ctx)` 读到的就是该局目录。持续生效的独立效果由创建它的技能在 `skill(..., { effects: [...] })` 中引用即自动登记（裸衣的 `luoyiAftereffect` 见 [xuchu.ts](../src/content/standard/generals/xuchu.ts)）；不属于任何技能的效果才写进 `ContentDefinition.effects`。
 
 用 [createRoleMatch](../src/host/content.ts) 运行普通场景时提供 `{ seed, preset, lineup, content }`；阵容长度决定人数，无固定阵容的练习局使用 `{ count, seed, preset }`。content 可传普通 ContentDefinition 或已有目录；直接建局时 deck 可写目录牌组 ID 或实体牌数组。
 
 [研习示例](../examples/content/study.ts) 与 [渡口](../examples/content/harbor/index.ts) 是可直接 import 的完整源码，[真实场景](../tests/scenarios/content-examples.test.ts) 验证取消、宣告与来源失效。未来扩展只保留 `ContentDefinition` / `createContent` 这一组合接口。
 
-底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 可省略局部 id（默认取时点 ID）；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase, book })` 与 `(ctx, { self, phase, book, choice, selection })`；转换回调 `(ctx, { self, book, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，具名查询见 [queries.ts](../src/rules/cards/queries.ts)；卡牌 use 回调见 [types.ts](../src/rules/cards/types.ts)。
+底层声明的通用约定仍然有效：技能可直接写普通对象并 `satisfies SkillDefinition`；active / viewAs 的 label 可省略；on 可省略局部 id（默认取时点 ID）；局部 ID 冲突在登记时报错，批量登记失败整批不生效。主动技能底层回调为 `(ctx, { self, phase })` 与 `(ctx, { self, phase, choice, selection })`；转换回调 `(ctx, { self, purpose })`；查询修正 `modify(query, (ctx, { input, self }) => value)`，具名查询见 [queries.ts](../src/rules/cards/queries.ts)；卡牌 use 回调见 [types.ts](../src/rules/cards/types.ts)。
 
 ## ctx、self 与普通函数
 
@@ -107,7 +148,7 @@ export const Provision = defineEvent('provision', {
 | ---------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
 | 在时点参与结算               | `on(Event.timing, { who, when, ask/cost, keep, effect })` | —（技能与独立效果共用）；`when` 为纯查询，`effect` 可等待                | [刚烈](../src/content/standard/generals/xiahoudun.ts)     |
 | 出牌阶段主动发动             | `action({ limit, cards, targets, pay, effect })`          | `active` 中的 `available` / `selection` / `run`                          | [结姻](../src/content/standard/generals/sunshangxiang.ts) |
-| 将材料解释为另一张牌         | `convert(id, { as, match, areas })`                       | `viewAs`；用牌与响应规则继续由 CardBook 处理                             | [武圣](../src/content/standard/generals/guanyu.ts)        |
+| 将材料解释为另一张牌         | `convert(id, { as, match, areas })`                       | `viewAs`；用牌与响应规则继续由统一用牌管线处理                           | [武圣](../src/content/standard/generals/guanyu.ts)        |
 | 修正牌面、距离或限制         | —                                                         | `modify` + 具名 `cardQueries`；自定义组合可用 `defineQuery`              | [谦逊](../src/content/standard/generals/luxun.ts)         |
 | 创建失去技能后仍可存在的效果 | —                                                         | `EffectDefinition` / `EffectBook`，实例数据存 World                      | [裸衣](../src/content/standard/generals/xuchu.ts)         |
 | 定义新的规则时点             | —                                                         | `defineEvent(id, { x: timing<T>() })` + `ctx.window`，跨文件直接共享对象 | [渡口](../examples/content/harbor/index.ts)               |

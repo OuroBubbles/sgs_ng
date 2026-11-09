@@ -10,16 +10,25 @@ import type { SkillDefinition } from '../rules/skills/skills';
 import { defineEffect } from '../rules/effects/effects';
 import type { EffectDefinition } from '../rules/effects/effects';
 
+/** 牌的展示资源；说明是规则文本，写在牌定义的 description 上。 */
 export interface CardPresentation {
   readonly id: string;
-  readonly kind: CardKind;
-  readonly description: string;
+  /** 无卡图时的卡面纹样；缺省按类别（基本 other、锦囊 trick、装备 equipment）。 */
+  readonly kind?: CardKind;
   readonly icon?: string;
   /** 完整卡面；当前点数、花色由投影叠加，缺图时仍可显示文字。 */
   readonly image?: string;
   /** 使用/打出时按实际角色性别选择，不影响规则判定。 */
   readonly voices?: Readonly<Partial<Record<'male' | 'female', string>>>;
 }
+
+/**
+ * `cards/*.ts` 的默认导出：牌定义本身，可另给无卡图时的卡面纹样 kind。
+ * 装备与延时锦囊分别用 `equipment(...)` / `delayedCard(...)` 写，纹样按类别。
+ */
+export type AuthoredCard = CardDefinition & { readonly kind?: CardKind };
+/** 一种牌：ID、类别、牌名、说明与用牌规则写在同一个对象里（类型提示用）。 */
+export const card = (definition: AuthoredCard): AuthoredCard => definition;
 
 /** 展示资源不进入规则状态、历史或 AI 观察。 */
 export interface GeneralPresentation {
@@ -53,7 +62,8 @@ export interface ContentDefinition {
 
 /**
  * 内容包描述：`src/content/<包>/package.ts` 的默认导出。主持端启动时发现包目录，
- * 并把 `generals/*.ts`（默认导出武将）与 `skills/*.ts`（默认导出技能）并入本包，无需登记。
+ * 并把 `generals/*.ts`（默认导出武将）、`cards/*.ts`（默认导出牌）与 `skills/*.ts`（默认导出技能）
+ * 并入本包，无需登记；展示资源按约定从 `public/<包>/` 取得。
  */
 export interface PackDefinition extends ContentDefinition {
   /** 只在机制演武中启用（依赖其他包的练习内容）。 */
@@ -64,16 +74,6 @@ export interface PackDefinition extends ContentDefinition {
    */
   readonly order?: readonly string[];
 }
-
-/** 加载器交给包描述的环境：包 ID（目录名）与本包公开媒体（`public/<包>/`）的 URL 解析。 */
-export interface PackSetup {
-  readonly id: string;
-  /** 文件存在时返回稳定 URL `/<包>/<file>`，否则 undefined。 */
-  readonly media: (file: string) => string | undefined;
-}
-
-/** package.ts 可直接导出描述，或导出接收 PackSetup 的函数（需要按媒体是否存在组装展示时）。 */
-export type PackModule = PackDefinition | ((setup: PackSetup) => PackDefinition);
 
 export interface ContentCatalog {
   readonly cards: readonly CardDefinition[];
@@ -138,10 +138,9 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
   const cardEntries = immutable(
     definitions
       .flatMap((entry) => entry.cardViews ?? [])
-      .map(({ id, kind, description, icon, image, voices }) => ({
+      .map(({ id, kind, icon, image, voices }) => ({
         id,
-        kind,
-        description,
+        ...(kind === undefined ? {} : { kind }),
         ...(icon === undefined ? {} : { icon }),
         ...(image === undefined ? {} : { image }),
         ...(voices === undefined ? {} : { voices }),

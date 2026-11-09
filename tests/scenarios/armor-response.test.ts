@@ -16,7 +16,7 @@ import {
   useCard,
 } from '../../src/sdk';
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
-import { eightDiagram } from '../../src/content/standard/armor';
+import eightDiagram from '../../src/content/standard/cards/eight_diagram';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

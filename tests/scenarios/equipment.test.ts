@@ -35,7 +35,7 @@ import type {
   SemanticCard,
 } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

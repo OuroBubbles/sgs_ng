@@ -26,7 +26,7 @@ export function prelinkContent(project = process.cwd()) {
       const files = list(root);
       const media = list(resolve(project, 'public'));
       const modules = files
-        .filter((file) => /^[^/]+\/(package|(generals|skills)\/[^/]+)\.ts$/.test(file))
+        .filter((file) => /^[^/]+\/(package|(generals|cards|skills)\/[^/]+)\.ts$/.test(file))
         .map(
           (file) => `${JSON.stringify(file)}: () => import(${JSON.stringify(resolve(root, file))})`,
         );

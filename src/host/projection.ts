@@ -1,6 +1,6 @@
 import { face } from '../rules/cards/face';
 import { Use } from '../rules/cards/use';
-import { cardDef } from '../rules/skills/skills';
+import { cardDef, rulesOf } from '../rules/skills/skills';
 import type { WorldReader } from '../core/model/state';
 import type { HistoryReader } from '../core/history/journal';
 import type { DecisionRequest } from '../core/decisions/hub';
@@ -53,8 +53,8 @@ import { Game } from '../rules/game/end';
 import { Delayed } from '../rules/cards/delayed';
 import { Judgment } from '../rules/cards/judge';
 import { Counter } from '../rules/cards/counter';
-import { Collateral } from '../content/standard/collateral';
-import { Weapon } from '../content/standard/weapons';
+import { Collateral } from '../content/standard/cards/collateral';
+import { Weapon } from '../content/standard/card-kit';
 import { Fanjian } from '../content/standard/generals/zhouyu';
 
 export function record(value: unknown): Record<string, unknown> {
@@ -108,8 +108,10 @@ function presentCard(match: RoleMatch, id: string, card: Face): CardView {
   return {
     id,
     name: definition.label,
-    kind: presentation?.kind ?? 'other',
-    description: presentation?.description ?? '请参阅当前内容定义。',
+    kind:
+      presentation?.kind ??
+      (definition.type === 'basic' ? 'other' : definition.type === 'trick' ? 'trick' : 'equipment'),
+    description: definition.description ?? '请参阅当前内容定义。',
     ...(presentation?.icon ? { icon: presentation.icon } : {}),
     ...(presentation?.image ? { image: presentation.image } : {}),
     ...(definition.equipment ? { slot: definition.equipment.slot } : {}),
@@ -491,7 +493,7 @@ function publicHistory(
       kind: 'judgment',
       processing: processing(d.processing),
     });
-    return `${d.player}的${match.content?.cardViews[d.reason] ? cardDef(match.room, d.reason).label : '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
+    return `${d.player}的${rulesOf(match.room).cards.get(d.reason)?.label ?? '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
   });
   on(Judgment.cardObtained, ({ declaration: d }) => `${d.player}获得判定牌${cardName(d.card)}`);
   on(

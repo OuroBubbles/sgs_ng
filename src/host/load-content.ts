@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import type {
+  AuthoredCard,
+  CardPresentation,
   ContentDefinition,
   GeneralPresentation,
   PackDefinition,
-  PackSetup,
 } from '../content/catalog';
 import type { GeneralDefinition } from '../rules/characters/general';
 import type { SkillDefinition } from '../rules/skills/skills';
@@ -25,7 +26,7 @@ export interface ContentTree {
 }
 
 export interface LoadedPack {
-  /** 包 ID 即目录名，也是武将/技能文件 ID 的前缀与媒体目录名。 */
+  /** 包 ID 即目录名，也是武将/牌/技能文件 ID 的前缀与媒体目录名。 */
   readonly id: string;
   readonly practice: boolean;
   readonly definition: ContentDefinition;
@@ -52,6 +53,15 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const text = (value: unknown) => typeof value === 'string' && value.trim() !== '';
 const isSkill = (value: unknown): value is SkillDefinition =>
   record(value) && text(value.id) && text(value.name);
+const cardTypes = ['basic', 'trick', 'equipment'];
+const cardKinds = ['slash', 'peach', 'dodge', 'duel', 'draw', 'trick', 'equipment', 'other'];
+const isCard = (value: unknown): value is AuthoredCard =>
+  record(value) &&
+  text(value.id) &&
+  text(value.label) &&
+  text(value.description) &&
+  cardTypes.includes(value.type as string) &&
+  (value.kind === undefined || cardKinds.includes(value.kind as string));
 const isGeneral = (value: unknown): value is General =>
   record(value) &&
   text(value.id) &&
@@ -66,8 +76,8 @@ const isGeneral = (value: unknown): value is General =>
 
 /**
  * 发现并装入内容包（类 FreeKill `packages/<包>/init.lua`）：内容根下每个含 `package.ts` 的目录即一个包
- * （目录名以 `.disabled` 结尾则跳过）；包内 `generals/*.ts` 与 `skills/*.ts` 的默认导出自动并入，
- * 不维护登记表。顺序确定：标准包先行，其余按目录名；包内文件按 `order` 后接文件名。
+ * （目录名以 `.disabled` 结尾则跳过）；包内 `generals/*.ts`、`cards/*.ts` 与 `skills/*.ts` 的默认导出
+ * 自动并入，不维护登记表。顺序确定：标准包先行，其余按目录名；武将按 `order` 后接文件名，牌与技能按文件名。
  * 定义不合约定时启动即报错并指出文件。
  */
 export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
@@ -94,6 +104,7 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
     .filter((id) => !id.endsWith('.disabled'))
     .sort(packOrder);
   const generalSource = new Map<string, string>();
+  const cardSource = new Map<string, string>();
   const skillSource = new Map<string, { skill: SkillDefinition; file: string }>();
   const claimSkill = (skill: SkillDefinition, file: string) => {
     const known = skillSource.get(skill.id);
@@ -110,23 +121,10 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
       file.startsWith(id + '/') ? [file.slice(id.length + 1)] : [],
     );
     const mediaSet = new Set(mediaFiles);
-    const media: PackSetup['media'] = (file) => (mediaSet.has(file) ? `/${id}/${file}` : undefined);
-    const entry = await exported(descriptorFile);
-    let descriptor: unknown;
-    try {
-      descriptor =
-        typeof entry === 'function'
-          ? (entry as (setup: PackSetup) => unknown)({ id, media })
-          : entry;
-    } catch (error) {
-      fail(
-        descriptorFile,
-        `pack setup threw (${error instanceof Error ? error.message : String(error)})`,
-        error,
-      );
-    }
+    const media = (file: string) => (mediaSet.has(file) ? `/${id}/${file}` : undefined);
+    const descriptor = await exported(descriptorFile);
     if (!record(descriptor))
-      fail(descriptorFile, 'default export must be a pack definition object or function.');
+      fail(descriptorFile, 'default export must be a pack definition object.');
     const { practice = false, order = [], ...definition } = descriptor as PackDefinition;
     const scan = (folder: string) =>
       tree.files.filter(
@@ -181,17 +179,62 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
       generalSource.set(general.id, file);
       for (const skill of general.abilities ?? []) claimSkill(skill, file);
     }
+    const cards: { card: AuthoredCard; file: string }[] = [
+      ...(definition.cards ?? []).map((card) => ({ card, file: descriptorFile })),
+    ];
+    for (const file of scan('cards'))
+      cards.push({
+        card: await owned(file, isCard, 'card(...), equipment(...) or delayedCard(...)'),
+        file,
+      });
+    for (const { card, file } of cards) {
+      const known = cardSource.get(card.id);
+      if (known) fail(file, `card ${card.id} is also defined in ${where(known)}.`);
+      cardSource.set(card.id, file);
+    }
     for (const skill of definition.skills ?? []) claimSkill(skill, descriptorFile);
 
-    // 展示按约定从 public/<包>/ 取：portraits/<名>.(jpg|png|webp)、audio/death/<名>.mp3、
-    // audio/skill/<技能名><n>.mp3。约定目录里没有对应武将的文件多半是拼错，启动即报。
+    // 展示按约定从 public/<包>/ 取：武将 portraits/<名>.(jpg|png|webp)、audio/death/<名>.mp3、
+    // audio/skill/<技能名><n>.mp3；牌 cards/<名>.png、icons/<名>.png（或 marks/<名>.png）、
+    // audio/card/<male|female>/<名>.mp3，装备缺省时用 icons/<栏位>.png 与 audio/card/common/<栏位>.mp3
+    // （两种坐骑栏位都记作 horse）。约定目录里没有对应武将或牌的文件多半是拼错，启动即报。
     const names = new Set(generals.map(({ general }) => localId(general.id)));
-    for (const file of mediaFiles)
+    const cardNames = new Set(cards.map(({ card }) => localId(card.id)));
+    for (const file of mediaFiles) {
       if (
         (file.startsWith('portraits/') || file.startsWith('audio/death/')) &&
         !names.has(stemOf(file))
       )
         fail(`${id}/${file}`, `no general "${id}:${stemOf(file)}" in pack "${id}".`);
+      if (file.startsWith('cards/') && !cardNames.has(stemOf(file)))
+        fail(`${id}/${file}`, `no card "${id}:${stemOf(file)}" in pack "${id}".`);
+    }
+    const explicitCards = new Set((definition.cardViews ?? []).map((view) => view.id));
+    const derivedCards = cards.flatMap(({ card }): CardPresentation[] => {
+      if (explicitCards.has(card.id)) return [];
+      const name = localId(card.id);
+      const slot = card.equipment?.slot.replace(/^(offensive|defensive)-horse$/, 'horse');
+      const icon =
+        media(`icons/${name}.png`) ??
+        media(`marks/${name}.png`) ??
+        (slot ? media(`icons/${slot}.png`) : undefined);
+      const image = media(`cards/${name}.png`);
+      const voices = Object.fromEntries(
+        (['male', 'female'] as const).flatMap((gender) => {
+          const voice =
+            media(`audio/card/${gender}/${name}.mp3`) ??
+            (slot ? media(`audio/card/common/${slot}.mp3`) : undefined);
+          return voice ? [[gender, voice]] : [];
+        }),
+      );
+      const view = {
+        ...(card.kind ? { kind: card.kind } : {}),
+        ...(icon ? { icon } : {}),
+        ...(image ? { image } : {}),
+        ...(Object.keys(voices).length ? { voices } : {}),
+      };
+      return Object.keys(view).length ? [{ id: card.id, ...view }] : [];
+    });
     const explicit = new Set((definition.generalViews ?? []).map((view) => view.id));
     const derived = generals.flatMap(({ general }): GeneralPresentation[] => {
       if (explicit.has(general.id)) return [];
@@ -225,8 +268,10 @@ export async function loadContent(tree: ContentTree): Promise<LoadedContent> {
       definition: {
         ...definition,
         generals: generals.map(({ general }) => general),
+        cards: cards.map(({ card }) => card),
         skills: [...(definition.skills ?? []), ...looseSkills],
         generalViews: [...(definition.generalViews ?? []), ...derived],
+        cardViews: [...(definition.cardViews ?? []), ...derivedCards],
       },
     });
   }

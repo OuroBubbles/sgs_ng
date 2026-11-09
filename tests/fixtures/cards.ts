@@ -28,7 +28,7 @@ import type {
   Context,
   PhaseView,
 } from '../../src/sdk';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from './standard';
 
 // 固定牌声明可共享；每局目录、装备能力及规则状态仍独立创建。
 const baseCards = createContent({ cards: standardCards }).cards;

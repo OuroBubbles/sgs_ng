@@ -1,6 +1,6 @@
 # 标准规则裁定
 
-本页记录标准＋EX 内容在本项目中的规则裁定，以及锁定每条裁定的场景测试。实现以 [武将](../src/content/standard/generals/)、[牌定义](../src/content/standard/cards.ts)、[实体牌表](../src/content/standard/deck.ts) 与 [牌面说明](../src/content/standard/presentation.ts) 为准；技能文本只写在内容源码里，不在别处复制。
+本页记录标准＋EX 内容在本项目中的规则裁定，以及锁定每条裁定的场景测试。实现以 [武将](../src/content/standard/generals/)、[牌](../src/content/standard/cards/)（一牌一文件，说明随定义）与 [实体牌表](../src/content/standard/deck.ts) 为准；技能文本只写在内容源码里，不在别处复制。
 
 FreeKill / noname 只作为本地参考分别查阅，不把不同项目、不同模式的文本拼成一套规则；它们也不代表上游最新版本。覆盖的证据是行为测试本身：通用机制证明与具体声明证明分开保留（武圣不能借龙胆的额度场景，无中生有不能借决斗的反制记录）。
 

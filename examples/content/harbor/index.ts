@@ -32,6 +32,7 @@ export function provisionBy(event: ProvisionResult, owner: string): boolean {
 const provision: CardDefinition = {
   id: 'harbor:provision',
   label: '备航',
+  description: '对自己使用，摸两张牌。可以被无懈可击。渡客使用时可先发动潮声摸一张牌。',
   type: 'trick',
   counterable: true,
   use: {
@@ -77,13 +78,6 @@ export default {
     },
   ],
   generalViews: [{ id: 'harbor:guest', portrait }],
-  cardViews: [
-    {
-      id: provision.id,
-      kind: 'trick',
-      description: '对自己使用，摸两张牌。可以被无懈可击。渡客使用时可先发动潮声摸一张牌。',
-    },
-  ],
   decks: [
     {
       id: 'harbor:crossing',

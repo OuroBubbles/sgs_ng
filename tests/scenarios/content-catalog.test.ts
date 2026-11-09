@@ -124,9 +124,9 @@ it('组合拒绝重复定义和失效引用，另一局已经创建的目录保�
     }).createBooks(),
   ).toThrow(/Unknown skill/);
   expect(valid.skills.definition('skill')).toMatchObject({ id: 'skill', name: '技' });
-  expect(() =>
-    createContent({ cardViews: [{ id: 'missing', kind: 'other', description: '' }] }),
-  ).toThrow(/unknown card/);
+  expect(() => createContent({ cardViews: [{ id: 'missing', kind: 'other' }] })).toThrow(
+    /unknown card/,
+  );
 });
 
 it('普通定义与预装配目录共用牌组和效果装配，单机入口无需预先组合目录', async () => {

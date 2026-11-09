@@ -1,5 +1,12 @@
-import type { CardDefinition } from '../../sdk';
-import { askUse, validateUse, declared, defineEvent, equipmentInSlot, obtain } from '../../sdk';
+import {
+  askUse,
+  card,
+  declared,
+  defineEvent,
+  equipmentInSlot,
+  obtain,
+  validateUse,
+} from '../../../sdk';
 
 export const Collateral = defineEvent('collateral', {
   weaponTaken: declared<{
@@ -10,10 +17,12 @@ export const Collateral = defineEvent('collateral', {
   }>(),
 });
 
-export const collateral: CardDefinition = {
+export default card({
   id: 'standard:collateral',
   type: 'trick',
   label: '借刀杀人',
+  description:
+    '选择一名有武器的其他角色，再指定其攻击范围内一个合法杀目标。前者对后者使用一张杀，否则你获得其武器。',
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
@@ -53,4 +62,4 @@ export const collateral: CardDefinition = {
       });
     },
   },
-};
+});

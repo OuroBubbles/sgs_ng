@@ -36,7 +36,7 @@ flowchart LR
 
 `sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合。主持端启动时由 [load-content](../src/host/load-content.ts) 扫描 `src/content/<包>/package.ts` 与包内 `generals/*.ts`、`skills/*.ts`（Bun 直接 import 源码；桌面 Node 产物由 [prelink-content](../scripts/prelink-content.mjs) 预链接同一棵树），校验后按确定顺序组合；没有登记表、安装、依赖清单或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`；主持端把扫描到的内容源码哈希 `contentHash` 随 hello 与 `/catalog` 发出。
 
-网页端边界有三道检查：eslint 禁止网页端导入 core / rules / content / sdk / host / server / `assets.json`；[导入图测试](../tests/scenarios/web-boundary.test.ts) 从 `src/main.ts` 沿运行时导入走查；`pnpm build` 之后 [check-web-bundle](../scripts/check-web-bundle.mjs) 扫描 `dist` 脚本中的主持端标记（如 `CardBook`）。大厅需要的武将、牌组与技能说明由主持端 `GET /catalog`（[catalog](../src/host/catalog.ts)）提供。
+网页端边界有三道检查：eslint 禁止网页端导入 core / rules / content / sdk / host / server / `assets.json`；[导入图测试](../tests/scenarios/web-boundary.test.ts) 从 `src/main.ts` 沿运行时导入走查；`pnpm build` 之后 [check-web-bundle](../scripts/check-web-bundle.mjs) 扫描 `dist` 脚本中的主持端标记（如规则报错文本）。大厅需要的武将、牌组与技能说明由主持端 `GET /catalog`（[catalog](../src/host/catalog.ts)）提供。
 
 当前目录如下；不把尚未建立的接口或目录列为既有实现。
 

@@ -427,16 +427,18 @@ export const skill = (
   ...parts: readonly SkillPart[]
 ): SkillDefinition => ({ id, name, description, ...compose(parts) });
 
-/** 一张装备牌：ID、牌名、栏位（武器写 { weapon: 攻击范围 }），其后列出装备技能的各部分。 */
+/** 一张装备牌：ID、牌名、栏位（武器写 { weapon: 攻击范围 }）、说明，其后列出装备技能的各部分。 */
 export function equipment(
   id: string,
   label: string,
   slot: Exclude<EquipmentSlot, 'weapon'> | { readonly weapon: number },
+  description: string,
   ...parts: readonly SkillPart[]
 ): CardDefinition {
   return equipmentCard({
     id,
     label,
+    description,
     ...(typeof slot === 'string' ? { slot } : { slot: 'weapon', range: slot.weapon }),
     ...(parts.length ? { skill: compose(parts) } : {}),
   });

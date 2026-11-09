@@ -90,6 +90,52 @@ it('往包里放一个武将文件即被发现：order 之外的文件按文件�
   expect(match.generals.definition('sample:gamma').name).toBe('gamma');
 });
 
+const cardFile = (stem: string, extra = '') =>
+  `import { card } from 'SDK';\nexport default card({ id: 'sample:${stem}', type: 'trick', label: '${stem}', description: '无效果。',${extra} use: { count: { min: 0, max: 0 }, target: () => false, execute: () => null } });\n`;
+
+it('往包里放一个牌文件即被发现：按文件名排列，说明随定义，卡图与语音按约定并入', async () => {
+  const sample = await packTree({
+    'sample/package.ts': `export default {};\n`,
+    'sample/cards/omen.ts': cardFile('omen', " kind: 'draw',"),
+    'sample/cards/charm.ts': `import { equipment } from 'SDK';\nexport default equipment('sample:charm', '护符', 'armor', '防具。无效果。');\n`,
+  });
+  for (const file of [
+    'cards/omen.png',
+    'audio/card/female/omen.mp3',
+    'icons/armor.png',
+    'audio/card/common/armor.mp3',
+  ]) {
+    await mkdir(dirname(join(sample.root, 'public/sample', file)), { recursive: true });
+    await writeFile(join(sample.root, 'public/sample', file), '');
+  }
+  const loaded = (await loadContent(await sample.tree())).packs[0]!.definition;
+  expect(loaded.cards!.map((entry) => [entry.id, entry.description])).toEqual([
+    ['sample:charm', '防具。无效果。'],
+    ['sample:omen', '无效果。'],
+  ]);
+  expect(loaded.cardViews).toEqual([
+    {
+      id: 'sample:charm',
+      icon: '/sample/icons/armor.png',
+      voices: {
+        male: '/sample/audio/card/common/armor.mp3',
+        female: '/sample/audio/card/common/armor.mp3',
+      },
+    },
+    {
+      id: 'sample:omen',
+      kind: 'draw',
+      image: '/sample/cards/omen.png',
+      voices: { female: '/sample/audio/card/female/omen.mp3' },
+    },
+  ]);
+  // 新牌只加文件即可进入本局目录。
+  expect(createContent(loaded).cards.map((entry) => entry.id)).toEqual([
+    'sample:charm',
+    'sample:omen',
+  ]);
+});
+
 it('目录名带 .disabled 的包不加载，也不计入内容哈希', async () => {
   const sample = await packTree({
     'sample/package.ts': `export default {};\n`,
@@ -146,6 +192,27 @@ it.each([
     /sample\/generals\/beta\.ts: failed to load \(boom\)/,
   ],
   [
+    '牌 ID 与文件名不符',
+    { 'sample/package.ts': `export default {};\n`, 'sample/cards/omen.ts': cardFile('sign') },
+    /sample\/cards\/omen\.ts: ID must be "sample:omen"/,
+  ],
+  [
+    '牌缺少说明',
+    {
+      'sample/package.ts': `export default {};\n`,
+      'sample/cards/omen.ts': `export default { id: 'sample:omen', type: 'trick', label: '兆' };\n`,
+    },
+    /sample\/cards\/omen\.ts: default export must be card/,
+  ],
+  [
+    '重复牌 ID',
+    {
+      'sample/package.ts': `import omen from './cards/omen';\nexport default { cards: [{ ...omen }] };\n`,
+      'sample/cards/omen.ts': cardFile('omen'),
+    },
+    /sample\/cards\/omen\.ts: card sample:omen is also defined in .*sample\/package\.ts/,
+  ],
+  [
     '同 ID 的不同技能',
     {
       'sample/package.ts': `export default {};\n`,
@@ -160,6 +227,15 @@ it.each([
 ])('启动时拒绝%s并指出文件', async (_name, files, error) => {
   const sample = await packTree(files);
   await expect(loadContent(await sample.tree())).rejects.toThrow(error);
+});
+
+it('约定卡图目录里找不到对应牌的文件在启动时报出', async () => {
+  const sample = await packTree({ 'sample/package.ts': `export default {};\n` });
+  await mkdir(join(sample.root, 'public/sample/cards'), { recursive: true });
+  await writeFile(join(sample.root, 'public/sample/cards/omen.png'), '');
+  await expect(loadContent(await sample.tree())).rejects.toThrow(
+    /sample\/cards\/omen\.png: no card "sample:omen"/,
+  );
 });
 
 it('约定媒体目录里找不到对应武将的文件（多半是拼错）在启动时报出', async () => {

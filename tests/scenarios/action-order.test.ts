@@ -23,7 +23,7 @@ import {
 } from '../../src/sdk';
 import type { Context, Timing, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
 import { RoleMatch } from '../../src/host/role-match';
-import { standardCards } from '../../src/content/standard/cards';
+import { standardCards } from '../fixtures/standard';
 import { guicai } from '../../src/content/standard/generals/simayi';
 import { hujia } from '../../src/content/standard/generals/caocao';
 import { jijiang } from '../../src/content/standard/generals/liubei';

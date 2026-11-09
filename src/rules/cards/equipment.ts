@@ -144,13 +144,14 @@ export function equipmentCard(
   input: {
     readonly id: string;
     readonly label: string;
+    readonly description?: string;
   } & Omit<EquipmentDefinition, 'skill'> & {
       /** 装备技能默认以 `${id}-ability` 为 ID、以牌名为技能名；需要另立名号时才显式给出。 */
       readonly skill?: Omit<SkillDefinition, 'id' | 'name'> &
         Partial<Pick<SkillDefinition, 'id' | 'name'>>;
     },
 ): CardDefinition {
-  const { id, label, slot, range } = input;
+  const { id, label, description, slot, range } = input;
   const skill = input.skill && { id: `${id}-ability`, name: label, ...input.skill };
   if (!slot || (range !== undefined && (!Number.isSafeInteger(range) || range < 1)))
     throw new Error('Invalid equipment range.');
@@ -158,6 +159,7 @@ export function equipmentCard(
     id,
     type: 'equipment',
     label,
+    ...(description === undefined ? {} : { description }),
     equipment: {
       slot,
       ...(range === undefined ? {} : { range }),
