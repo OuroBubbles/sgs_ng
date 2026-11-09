@@ -12,7 +12,7 @@ import {
   Cost,
 } from '../../src/sdk';
 import type { UsageLimit, PaymentIntent, MoveResult } from '../../src/sdk';
-import { lianying } from '../../src/content/standard/generals/luxun';
+import lianying from '../../src/content/standard/skills/lianying';
 import { nextRequest, room, worldSeed } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Skill } from '../../src/sdk';

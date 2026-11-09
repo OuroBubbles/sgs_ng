@@ -18,14 +18,14 @@ import {
   useCard,
 } from '../../src/sdk';
 import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/generals/guanyu';
-import { qingguo } from '../../src/content/standard/generals/zhenji';
-import { qixi } from '../../src/content/standard/generals/ganning';
-import { longdan } from '../../src/content/standard/generals/zhaoyun';
-import { jijiu } from '../../src/content/standard/generals/huatuo';
-import { guose } from '../../src/content/standard/generals/daqiao';
-import { guicai } from '../../src/content/standard/generals/simayi';
-import { fanjian } from '../../src/content/standard/generals/zhouyu';
+import wusheng from '../../src/content/standard/skills/wusheng';
+import qingguo from '../../src/content/standard/skills/qingguo';
+import qixi from '../../src/content/standard/skills/qixi';
+import longdan from '../../src/content/standard/skills/longdan';
+import jijiu from '../../src/content/standard/skills/jijiu';
+import guose from '../../src/content/standard/skills/guose';
+import guicai from '../../src/content/standard/skills/guicai';
+import fanjian from '../../src/content/standard/skills/fanjian';
 import { vermilion } from '../../src/content/workshop/faces';
 import { card, cardGame, use, chooseAndActivate as activate, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

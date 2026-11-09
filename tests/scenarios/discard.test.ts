@@ -21,7 +21,7 @@ import {
 } from '../../src/sdk';
 import type { DiscardQuery, PaymentReceipt, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
-import { jieyin } from '../../src/content/standard/generals/sunshangxiang';
+import jieyin from '../../src/content/standard/skills/jieyin';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Discard } from '../../src/rules/cards/discard';
 import { testTiming } from '../fixtures/timing';

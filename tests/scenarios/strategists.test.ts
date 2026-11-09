@@ -3,7 +3,8 @@ import { playMatch } from '../fixtures/match';
 import { card, grant, settled } from '../fixtures/cards';
 import { nextRequest, answer, cancel } from '../fixtures/room';
 import { standardGeneralSkills } from '../fixtures/standard';
-import { tiandu, yiji } from '../../src/content/standard/generals/guojia';
+import tiandu from '../../src/content/standard/skills/tiandu';
+import yiji from '../../src/content/standard/skills/yiji';
 import {
   judge,
   damage,

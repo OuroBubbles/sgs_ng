@@ -55,7 +55,7 @@ import { Judgment } from '../rules/cards/judge';
 import { Counter } from '../rules/cards/counter';
 import { Collateral } from '../content/standard/cards/collateral';
 import { Weapon } from '../content/standard/card-kit';
-import { Fanjian } from '../content/standard/generals/zhouyu';
+import { Fanjian } from '../content/standard/skills/fanjian';
 
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};

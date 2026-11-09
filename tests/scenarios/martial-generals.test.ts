@@ -2,10 +2,10 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
-import { longdan } from '../../src/content/standard/generals/zhaoyun';
-import { paoxiao } from '../../src/content/standard/generals/zhangfei';
-import { qixi } from '../../src/content/standard/generals/ganning';
-import { xiaoji } from '../../src/content/standard/generals/sunshangxiang';
+import longdan from '../../src/content/standard/skills/longdan';
+import paoxiao from '../../src/content/standard/skills/paoxiao';
+import qixi from '../../src/content/standard/skills/qixi';
+import xiaoji from '../../src/content/standard/skills/xiaoji';
 import { standardGenerals } from '../fixtures/standard';
 import {
   runPhase,

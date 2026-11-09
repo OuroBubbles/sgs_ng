@@ -16,7 +16,7 @@ import {
   primaryOf,
 } from '../../src/sdk';
 import type { CardOffer, UseIntent, UseTarget } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/generals/guanyu';
+import wusheng from '../../src/content/standard/skills/wusheng';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

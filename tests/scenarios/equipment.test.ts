@@ -34,7 +34,7 @@ import type {
   UseIntent,
   SemanticCard,
 } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/generals/guanyu';
+import wusheng from '../../src/content/standard/skills/wusheng';
 import { standardCards } from '../fixtures/standard';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

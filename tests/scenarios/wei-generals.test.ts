@@ -2,9 +2,10 @@ import { expect, it } from 'vitest';
 import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, room, answer } from '../fixtures/room';
-import { ganglie } from '../../src/content/standard/generals/xiahoudun';
-import { stripped } from '../../src/content/standard/generals/xuchu';
-import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
+import ganglie from '../../src/content/standard/skills/ganglie';
+import { stripped } from '../../src/content/standard/skills/luoyi';
+import luoshen from '../../src/content/standard/skills/luoshen';
+import qingguo from '../../src/content/standard/skills/qingguo';
 import { standardGeneralSkills } from '../fixtures/standard';
 import {
   damage,

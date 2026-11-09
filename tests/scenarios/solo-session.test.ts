@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { SoloSession } from '../../src/host/solo';
 import { Match, RoleMatch } from '../../src/host/role-match';
 import { standardCards } from '../fixtures/standard';
-import { wusheng } from '../../src/content/standard/generals/guanyu';
+import wusheng from '../../src/content/standard/skills/wusheng';
 import { moveCards, finishGame, Use } from '../../src/sdk';
 import '../../src/sdk';
 import type { GameSelection, GameView } from '../../src/protocol';

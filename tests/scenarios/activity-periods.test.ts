@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { keji } from '../../src/content/standard/generals/lvmeng';
-import { guicai } from '../../src/content/standard/generals/simayi';
+import keji from '../../src/content/standard/skills/keji';
+import guicai from '../../src/content/standard/skills/guicai';
 import {
   activePhase,
   activeTurn,

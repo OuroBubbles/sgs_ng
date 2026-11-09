@@ -11,7 +11,7 @@ import {
 } from '../../src/sdk';
 import { expect, it } from 'vitest';
 import { defineSkill, viewAs, ownedCards, Use, Resolve, Damage } from '../../src/sdk';
-import { wusheng } from '../../src/content/standard/generals/guanyu';
+import wusheng from '../../src/content/standard/skills/wusheng';
 import type {
   CardChoice,
   Context,

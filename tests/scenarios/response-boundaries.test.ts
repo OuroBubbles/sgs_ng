@@ -20,8 +20,8 @@ import {
 import type { Context, EffectRef, ResponseResult, Timing, SkillDefinition } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
 import { standardCards } from '../fixtures/standard';
-import { guicai } from '../../src/content/standard/generals/simayi';
-import { wushuang } from '../../src/content/standard/generals/lvbu';
+import guicai from '../../src/content/standard/skills/guicai';
+import wushuang from '../../src/content/standard/skills/wushuang';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, use } from '../fixtures/cards';
 import { worldSeed, nextRequest, answer } from '../fixtures/room';

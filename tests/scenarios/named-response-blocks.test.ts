@@ -13,7 +13,7 @@ import {
   respond,
   responseTimes,
 } from '../../src/sdk';
-import { qingguo } from '../../src/content/standard/generals/zhenji';
+import qingguo from '../../src/content/standard/skills/qingguo';
 import type { CardEffect } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';

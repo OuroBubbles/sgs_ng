@@ -47,7 +47,7 @@ import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '
 import { generalGame } from '../fixtures/generals';
 import { standardGenerals } from '../fixtures/standard';
 import { CardEvent } from '../../src/sdk';
-import { Fanjian } from '../../src/content/standard/generals/zhouyu';
+import { Fanjian } from '../../src/content/standard/skills/fanjian';
 import { Skill } from '../../src/sdk';
 import { testTiming } from '../fixtures/timing';
 type Game = ReturnType<typeof cardGame>;
