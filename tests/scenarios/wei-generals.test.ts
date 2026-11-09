@@ -3,7 +3,7 @@ import { playMatch } from '../fixtures/match';
 import { card, cardGame, use, grant, settled } from '../fixtures/cards';
 import { nextRequest, room, answer } from '../fixtures/room';
 import { ganglie } from '../../src/content/standard/generals/xiahoudun';
-import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
+import { stripped } from '../../src/content/standard/generals/xuchu';
 import { luoshen, qingguo } from '../../src/content/standard/generals/zhenji';
 import { standardGeneralSkills } from '../fixtures/standard';
 import {
@@ -178,7 +178,6 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
   const game = cardGame({
     hands: { a: [] },
     skills: standardGeneralSkills,
-    effects: [luoyiAftereffect],
     draw: ['one', 'two', 'three', 'four'].map((id) => card(id, 'slash')),
   });
   await grant(game, 'standard:luoyi');
@@ -189,7 +188,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
     eligible: (_ctx, paid) => paid.skill === 'standard:luoyi' && !nested,
     async run(ctx) {
       nested = true;
-      expect(game.skills.effects.instances(ctx.world, luoyiAftereffect)).toHaveLength(1);
+      expect(stripped.of(ctx, 'a')).toBe(true);
       await draw(ctx, { player: 'a', count: 2, reason: 'draw-phase' });
     },
   });
@@ -202,7 +201,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
     { count: 2, input: { count: 2 } },
     { count: 1, input: { phase: { kind: 'draw' } } },
   ]);
-  expect(game.skills.effects.instances(game.room.world, luoyiAftereffect)).toHaveLength(0);
+  expect(game.room.world.snapshot.states.some((state) => state.key === stripped.id)).toBe(false);
   expect(JSON.stringify(results)).not.toContain('lifetime');
   settled(game);
 });
@@ -211,7 +210,6 @@ it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失�
   const game = cardGame({
     hands: { a: [card('s1', 'slash'), card('s2', 'slash')] },
     skills: standardGeneralSkills,
-    effects: [luoyiAftereffect],
     draw: [card('draw', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -247,7 +245,6 @@ it('决斗目标打回伤害仍是实际来源，但不是其本人使用的决�
   const game = cardGame({
     hands: { a: [card('response', 'slash')], b: [card('duel', 'duel')] },
     skills: standardGeneralSkills,
-    effects: [luoyiAftereffect],
     draw: [card('draw', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -284,7 +281,6 @@ it.each(['physical', 'generated'] as const)(
     const game = cardGame({
       hands: { a: kind === 'physical' ? [card('duel', 'duel')] : [], b: [] },
       skills: standardGeneralSkills,
-      effects: [luoyiAftereffect],
       draw: [card('draw', 'jink')],
     });
     await grant(game, 'standard:luoyi');
@@ -329,7 +325,6 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
   const game = cardGame({
     hands: { a: [card('nested', 'slash'), card('outer', 'slash'), card('cancelled', 'slash')] },
     skills: standardGeneralSkills,
-    effects: [luoyiAftereffect],
     draw: [card('d1', 'jink'), card('d2', 'jink')],
   });
   await grant(game, 'standard:luoyi');
@@ -338,10 +333,7 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
     id: 'cancel-bonus',
     owner: null,
     eligible: () => suppress,
-    async run(ctx) {
-      for (const bonus of game.skills.effects.instances(ctx.world, luoyiAftereffect))
-        await game.skills.effects.end(ctx, bonus.id, 'test:bonus-cancelled');
-    },
+    run: (ctx) => stripped.set(ctx, 'a', false),
   });
   const slash = (ctx: Context, id: string, target = 'b') =>
     useCard(ctx, {
@@ -380,7 +372,6 @@ it('拒绝裸衣保留两张摸牌；零摸牌不询问，独立阶段不虚构�
     const game = cardGame({
       hands: { a: [] },
       skills: standardGeneralSkills,
-      effects: [luoyiAftereffect],
       draw: [card('one', 'jink'), card('two', 'jink')],
     });
     await grant(game, 'standard:luoyi');
@@ -609,21 +600,17 @@ it('倾国可用黑色手牌响应闪，拒绝红牌、装备和他人的牌，�
   settled(game);
 });
 
-it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得最终目录', () => {
+it('技能目录在装配期一次登记，重复或缺 ID 的定义整体拒绝；工厂取得最终目录', () => {
   const definition = defineSkill({ id: 'test:one', name: '甲', triggers: [] });
-  const skills = new SkillBook([definition]);
   const other = defineSkill({ id: 'test:other', name: '乙', triggers: [] });
-  expect(() => skills.register([other, definition])).toThrow(
+  expect(() => new SkillBook([other, definition, definition])).toThrow(
     'Duplicate skill definition: test:one.',
   );
-  expect(() => skills.definition(other.id)).toThrow(/Unknown/);
-  expect(() => skills.register([other, { id: '', name: '缺少 ID' }])).toThrow(/requires an ID/);
-  expect(() => skills.definition(other.id)).toThrow(/Unknown/);
+  expect(() => new SkillBook([other, { id: '', name: '缺少 ID' }])).toThrow(/requires an ID/);
+  const skills = new SkillBook([definition, other]);
   expect(skills.definition(definition.id)).toBe(definition);
-  skills.register([other]);
   const detach = skills.attach(room());
   detach();
-  expect(() => skills.register([])).toThrow(/sealed/);
   const game = cardGame({ skills: [ganglie] });
   expect(game.skills).toBeInstanceOf(SkillBook);
   expect(game.skills.definition('standard:ganglie').name).toBe('刚烈');

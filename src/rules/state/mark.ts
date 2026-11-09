@@ -5,12 +5,15 @@ import type { Context } from '../../core/runtime/room';
 import { assertLifetime, lifetimeOf } from '../scopes/lifetime';
 import type { Lifetime, Scope } from '../scopes/lifetime';
 import { defineEvent, timing } from '../../core/runtime/event';
+import type { SkillDefinition } from '../skills/skills';
 
 /**
  * 标记：类型化的局内状态，挂在角色（owner）或全局（null）上，按作用域自动到期。
  * - 0 是计数（非负整数），false 是标志，其余形状直接存放冻结后的普通数据；
  * - scope 'phase' / 'turn' / 'round' 写入时取 ctx 所在的当前阶段/回合/轮，结束即清除；'game' 不到期；
- * - source 区分同一标记的多个命名空间（如各技能各自的次数），省略即共用。
+ * - source 区分同一标记的多个命名空间（如各技能各自的次数），省略即共用；
+ * - skill：持续效果。角色持有该标记（当前作用域内不为初值）且存活时拥有这个技能，
+ *   与授予无关，失去来源技能也不移除；标记到期或回到初值即失效。
  */
 export const MarkEvent = defineEvent('mark', {
   changed: timing<unknown>(),
@@ -26,6 +29,7 @@ export interface Mark<T> {
   readonly id: string;
   readonly initial: DeepReadonly<T>;
   readonly scope: Scope;
+  readonly skill?: SkillDefinition;
   /** 读取；未设置或作用域外为 initial。game 标记或显式 lifetime 只需 World。 */
   of(at: Context | WorldReader, owner?: string | null, slot?: MarkSlot): DeepReadonly<T>;
   /** 绝对值 Change，可与费用、伤害等同次提交。 */
@@ -49,6 +53,8 @@ export interface Mark<T> {
 
 export interface MarkSpec<T> {
   readonly scope?: Scope;
+  /** 持有者因这个标记而拥有的技能（持续效果）。 */
+  readonly skill?: SkillDefinition;
   /** 需要更严格的形状时给出；默认计数为非负整数、标志为布尔，其余接受任意普通数据。 */
   readonly accepts?: (input: unknown) => input is T;
 }
@@ -84,6 +90,7 @@ export function defineMark<T>(id: string, initial: T, spec: MarkSpec<T> = {}): M
     id,
     initial: value,
     scope,
+    ...(spec.skill ? { skill: spec.skill } : {}),
     of(at: Context | WorldReader, owner: string | null = null, slot: MarkSlot = {}) {
       const world = isContext(at) ? at.world : at;
       const life = lifetime(at, slot);

@@ -16,7 +16,6 @@ import type { Room } from '../../src/core/runtime/room';
 import { room, nextRequest, choose, answer, cancel } from '../fixtures/room';
 import { card, cardGame, grant, settled, die } from '../fixtures/cards';
 import { standardGeneralSkills } from '../fixtures/standard';
-import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { Draw } from '../../src/rules/cards/draw';
 import { Skill } from '../../src/sdk';
@@ -628,7 +627,6 @@ function scenario() {
     hands: { a: [] },
     draw: Array.from({ length: 14 }, (_, i) => card(`x${i}`, 'peach', i === 2 ? 'spade' : 'heart')),
     skills: standardGeneralSkills,
-    effects: [luoyiAftereffect],
   });
 }
 it('两点伤害的遗计可以只执行一次后先刚烈，再继续第二次遗计', async () => {

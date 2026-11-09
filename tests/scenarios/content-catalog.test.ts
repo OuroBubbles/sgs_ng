@@ -11,7 +11,6 @@ import { rebuildWorld } from '../../src/core/history/rebuild';
 import { nextRequest } from '../fixtures/room';
 import { RoleMatch } from '../../src/host/role-match';
 import { standard } from '../fixtures/standard';
-import { luoyiAftereffect } from '../../src/content/standard/generals/xuchu';
 
 it('普通源码直接组合无命名空间的定义，保留时点身份、本局目录和真实技能结算', async () => {
   const window = testTiming<{ player: string }>('plain.window');
@@ -73,14 +72,13 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
 });
 
 it('内置源码显式组合标准与演武牌、武将和牌组，不自动发现目录', () => {
-  // 独立效果可经普通定义组合；技能工厂不能再偷偷重复登记它。
-  const content = createContent({ ...standard, effects: [] }, { effects: [luoyiAftereffect] });
+  // 持续效果的技能随使用它的技能（裸衣）一起登记；每局各得一份目录。
+  const content = createContent(standard);
   const first = content.createBooks();
   const second = content.createBooks();
   expect(first.skills.definition('standard:luoyi').name).toBe('裸衣');
-  expect(second.skills.effects).not.toBe(first.skills.effects);
-  for (const { skills } of [first, second])
-    expect(() => skills.effects.register([luoyiAftereffect])).toThrow(/Duplicate effect/);
+  expect(first.skills.definition('standard:luoyi-bonus').name).toBe('裸衣');
+  expect(second.skills).not.toBe(first.skills);
   expect(defaultContent.cards).toHaveLength(32);
   expect(defaultContent.generals).toHaveLength(26);
   expect(defaultContent.createDeck('standard:identity')).toHaveLength(108);
@@ -129,7 +127,7 @@ it('组合拒绝重复定义和失效引用，另一局已经创建的目录保�
   );
 });
 
-it('普通定义与预装配目录共用牌组和效果装配，单机入口无需预先组合目录', async () => {
+it('普通定义与预装配目录共用牌组和技能装配，单机入口无需预先组合目录', async () => {
   for (const content of [standard, createContent(standard)]) {
     const offline = createRoleMatch({
       seed: 1,
@@ -150,16 +148,7 @@ it('普通定义与预装配目录共用牌组和效果装配，单机入口无�
       deck: 'standard:identity',
       content,
     });
-    await match.room.run('effect', (ctx) =>
-      match.skills.effects.add(ctx, luoyiAftereffect, {
-        owner: 'a',
-        data: { actor: 'a', turn: 'probe' },
-      }),
-    );
-    expect(match.skills.effects.instances(match.room.world, luoyiAftereffect)[0]?.data).toEqual({
-      actor: 'a',
-      turn: 'probe',
-    });
+    expect(match.skills.definition('standard:luoyi-bonus').name).toBe('裸衣');
     expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(
       match.room.world.snapshot,
     );

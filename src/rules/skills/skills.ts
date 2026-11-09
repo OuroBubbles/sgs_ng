@@ -4,17 +4,18 @@ import type { Context, Room } from '../../core/runtime/room';
 import { defineEvent, timing } from '../../core/runtime/event';
 import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
+import type { LifetimeEnd } from '../scopes/lifetime';
 import { defineMark } from '../state/mark';
+import type { Mark } from '../state/mark';
 import type { ViewAs } from '../cards/types';
 import { viewAs } from '../cards/types';
 import type { QueryType, SkillModifier } from './query';
 import type { ActiveSkill } from './active';
-import { EffectBook } from '../effects/effects';
-import type { EffectDefinition } from '../effects/effects';
 import type { CardDefinition } from '../cards/types';
 import { defineCard } from '../cards/card';
 import { equipmentAbilities } from '../cards/equipment';
 import { Death } from '../combat/life-events';
+import type { BurialEvent } from '../combat/life-events';
 import type { PaymentReceipt } from '../costs/pay';
 
 export interface SkillHandle {
@@ -64,8 +65,8 @@ export interface SkillDefinition {
   readonly active?: readonly ActiveSkill[];
   /** 与技能同处一处的 AI 提示；规则从不读取。 */
   readonly ai?: SkillAi;
-  /** 技能创建的独立效果；内容装配按引用自动登记，与武将的技能同理。 */
-  readonly effects?: readonly EffectDefinition[];
+  /** 技能用到的标记；带 skill 的标记（持续效果）随技能自动登记。 */
+  readonly marks?: readonly Mark<unknown>[];
 }
 
 /** AI 只看到观察者视角的简化局面；提示函数必须是纯函数。 */
@@ -91,11 +92,6 @@ export interface SkillAi {
   readonly value?: (view: AiView) => number;
   /** 选择目标时偏向友方还是敌方，默认敌方。 */
   readonly targets?: 'ally' | 'enemy';
-}
-
-/** 执行侧返回声明本身；Provider 输入仍可使用普通 SkillDefinition。 */
-interface DefinedBinding extends SkillBinding {
-  readonly definition: SkillDefinition;
 }
 
 /** 校验局部 ID 后直接使用声明本身：不复制、不冻结、不绑定方法。 */
@@ -186,14 +182,10 @@ function sameSource(a: SkillSource, b: SkillSource): boolean {
   return a.kind === b.kind && a.id === b.id;
 }
 
-function checkSnapshots(value: unknown): void {
-  if (!Array.isArray(value)) throw new Error('Skill snapshots must be an array.');
-}
-
 // 每局挂接时登记 World → 规则目录；规则函数与作者代码都由 ctx 取得，不再传递目录对象。
 const attachedBooks = new WeakMap<WorldReader, SkillBook>();
 
-/** 当前对局的规则目录（技能、牌定义、独立效果）。只能在已挂接目录的 Room 中调用。 */
+/** 当前对局的规则目录（技能与牌定义）。只能在已挂接目录的 Room 中调用。 */
 export function rulesOf(ctx: Pick<Context, 'world'>): SkillBook {
   const book = attachedBooks.get(ctx.world);
   if (!book) throw new Error('No rule catalog is attached to this room.');
@@ -217,45 +209,61 @@ export function cardDef(ctx: Pick<Context, 'world'>, name: string): CardDefiniti
   return definition;
 }
 
-/** 每局的规则目录：不可变定义可共享；授予/失效/次数在 World，Provider 登记仅留在执行侧。 */
+/** 持续效果：持有带 skill 的标记（当前作用域内不为初值）的存活角色拥有该技能。 */
+function markAbilities(marks: readonly Mark<unknown>[]): SkillProvider {
+  const byKey = new Map(marks.map((mark) => [mark.id, mark]));
+  return {
+    collect(world) {
+      const bindings = new Map<string, SkillBinding>();
+      for (const { key, owner } of world.snapshot.states) {
+        const mark = byKey.get(key);
+        if (!mark?.skill || owner === null) continue;
+        const id = JSON.stringify(['mark', owner, key]);
+        const self: SkillHandle = Object.freeze({
+          id,
+          owner,
+          skill: mark.skill.id,
+          name: mark.skill.name,
+          origin: null,
+          active: (ctx: Context) =>
+            ctx.world.player(owner).alive && mark.of(ctx, owner) !== mark.initial,
+        });
+        bindings.set(id, { self, definition: mark.skill });
+      }
+      return [...bindings.values()];
+    },
+  };
+}
+
+/** 历史窗口：刚失去、到期或随死亡移除的技能实例仍可响应这一次窗口。 */
+const snapshots = new Map<object, (payload: never) => readonly SkillInstance[]>([
+  [Skill.changed, (change: SkillChange) => (change.before ? [change.before] : [])],
+  [Lifetime.ended, (ended: LifetimeEnd) => ended.skillsBefore],
+  [Death.buried, (event: BurialEvent) => event.burial.skillsBefore],
+  [Death.finished, (event: BurialEvent) => event.burial.skillsBefore],
+]);
+
+/** 每局的规则目录：不可变定义可共享；授予/失效/次数在 World，派生能力由 Provider 从 World 读出。 */
 export class SkillBook implements TriggerSource {
-  readonly effects = new EffectBook();
   /** 本局牌定义（牌名 → 定义）；装备牌的能力由同一目录派生。 */
   readonly cards: ReadonlyMap<string, CardDefinition>;
   readonly #definitions = new Map<string, SkillDefinition>();
   // 只共享不可变实例的身份描述；有效性仍逐次读取传入的 World。
-  readonly #bindingsByInstance = new WeakMap<SkillInstance, DefinedBinding>();
-  #providers = new Map<SkillProvider, object>();
-  #attachments = new Map<WorldReader, object>();
-  #collecting = 0;
-  #snapshots = new Map<object, (payload: unknown) => readonly SkillInstance[]>();
-  #sealed = false;
+  readonly #bindingsByInstance = new WeakMap<SkillInstance, SkillBinding>();
+  readonly #providers = new Set<SkillProvider>();
 
   constructor(definitions: readonly SkillDefinition[] = [], cards: readonly CardDefinition[] = []) {
     const prepared = cards.map(defineCard);
     this.cards = new Map(prepared.map((card) => [card.id, card]));
     if (this.cards.size !== prepared.length) throw new Error('Duplicate or empty card definition.');
-    this.register(definitions);
-    this.registerSnapshots(Skill.changed, (change) => (change.before ? [change.before] : []));
-    this.registerSnapshots(Lifetime.ended, (ended) => ended.skillsBefore);
-    this.registerSnapshots(Death.buried, (event) => event.burial.skillsBefore);
-    this.registerSnapshots(Death.finished, (event) => event.burial.skillsBefore);
+    const owners = [...definitions, ...prepared.flatMap((card) => card.equipment?.skill ?? [])];
+    const marks = [...new Set(owners.flatMap((definition) => definition.marks ?? []))];
+    this.#register([...definitions, ...marks.flatMap((mark) => mark.skill ?? [])]);
     this.addProvider(equipmentAbilities(prepared));
+    this.addProvider(markAbilities(marks));
   }
 
-  /** 装配期声明窗口中的历史来源。只有该窗口收集候选，不进入当前能力目录。 */
-  registerSnapshots<T>(
-    window: Timing<T, unknown>,
-    read: (payload: T) => readonly SkillInstance[],
-  ): void {
-    if (this.#sealed) throw new Error('Skill snapshots are sealed after attachment.');
-    if (this.#snapshots.has(window)) throw new Error('Duplicate skill snapshot reader.');
-    this.#snapshots.set(window, (payload) => read(payload as T));
-  }
-
-  /** 装配期可追加技能定义；挂接后目录固定。 */
-  register(definitions: readonly SkillDefinition[]): void {
-    if (this.#sealed) throw new Error('Skill definitions are sealed after attachment.');
+  #register(definitions: readonly SkillDefinition[]): void {
     const prepared = definitions.map(defineSkill);
     const ids = new Set<string>();
     for (const { id } of prepared) {
@@ -263,8 +271,6 @@ export class SkillBook implements TriggerSource {
         throw new Error(`Duplicate skill definition: ${id}.`);
       ids.add(id);
     }
-
-    // 全部校验与规范化完成后再写入；提交阶段不调用内容代码。
     for (const definition of prepared) this.#definitions.set(definition.id, definition);
   }
 
@@ -281,88 +287,43 @@ export class SkillBook implements TriggerSource {
 
   attach(room: Room): () => void {
     for (const instance of room.world.snapshot.skills) this.definition(instance.skill);
+    if (attachedBooks.has(room.world)) throw new Error('Room already has a rule catalog.');
     const removeSource = room.addTriggerSource(this);
-    let removeEffects: () => void;
-    try {
-      removeEffects = this.effects.attach(room);
-    } catch (error) {
-      removeSource();
-      throw error;
-    }
-    const registration = {};
-    // 关闭只停止结算；终局房间仍可只读投影牌面，故仅显式卸载时才移除目录查找。
-    const detach = (closing: boolean) => {
-      removeSource();
-      removeEffects();
-      cancelCleanup();
-      if (this.#attachments.get(room.world) === registration) this.#attachments.delete(room.world);
-      if (!closing && attachedBooks.get(room.world) === this) attachedBooks.delete(room.world);
-    };
-    const cancelCleanup = room.onClose(() => detach(true));
-    this.#attachments.set(room.world, registration);
     attachedBooks.set(room.world, this);
-    this.#sealed = true;
-    return () => detach(false);
-  }
-
-  /** 装配期可省略 Context；运行期安装/卸载必须属于本目录唯一挂接的 Room。 */
-  addProvider(provider: SkillProvider, ctx?: Context): (ctx?: Context) => void {
-    this.#assertProviderWriting(ctx);
-    if (this.#providers.has(provider)) throw new Error('Skill provider is already installed.');
-    const registration = {};
-    this.#providers.set(provider, registration);
-    return (at?: Context) => {
-      this.#assertProviderWriting(at);
-      if (this.#providers.get(provider) === registration) this.#providers.delete(provider);
+    // 关闭只停止结算；终局房间仍可只读投影牌面，故仅显式卸载时才移除目录查找。
+    const cancelCleanup = room.onClose(removeSource);
+    return () => {
+      removeSource();
+      cancelCleanup();
+      attachedBooks.delete(room.world);
     };
   }
 
-  #assertProviderWriting(ctx?: Context): void {
-    if (this.#collecting) throw new Error('Skill providers cannot change during collection.');
-    if (ctx) {
-      ctx.assertActive();
-      if (this.#attachments.size !== 1 || !this.#attachments.has(ctx.world))
-        throw new Error('Runtime skill providers require a single attached Room.');
-    } else if (this.#sealed) throw new Error('Runtime skill providers require an active Context.');
+  /** 装配期加入派生能力的来源；返回卸载函数。 */
+  addProvider(provider: SkillProvider): () => void {
+    this.#providers.add(provider);
+    return () => this.#providers.delete(provider);
   }
 
   bindings(
     world: WorldReader,
     window?: { readonly type: object; readonly payload: unknown },
-  ): readonly DefinedBinding[] {
-    this.#collecting++;
-    try {
-      return this.#bindings(world, window);
-    } finally {
-      this.#collecting--;
-    }
-  }
-
-  #bindings(
-    world: WorldReader,
-    window?: { readonly type: object; readonly payload: unknown },
-  ): readonly DefinedBinding[] {
+  ): readonly SkillBinding[] {
     let instances = world.snapshot.skills;
-    const read = window && this.#snapshots.get(window.type);
+    const read = window && snapshots.get(window.type);
     if (read) {
-      const snapshots = read(window.payload);
-      checkSnapshots(snapshots);
-      // 普通查询直接读取当前列表；只有显式历史窗口需要合并与身份冲突检查。
+      // 普通查询直接读取当前列表；只有显式历史窗口需要合并刚移除的实例。
       const merged = new Map(instances.map((instance) => [instance.id, instance]));
-      for (const instance of snapshots) {
-        const current = merged.get(instance.id);
-        if (current && (current.owner !== instance.owner || current.skill !== instance.skill))
-          throw new Error('Conflicting historical skill identity.');
-        if (!current) merged.set(instance.id, instance);
-      }
+      for (const instance of read(window.payload as never))
+        if (!merged.has(instance.id)) merged.set(instance.id, instance);
       instances = [...merged.values()];
     }
-    const bindings: DefinedBinding[] = instances.map((instance) => {
+    const bindings: SkillBinding[] = instances.map((instance) => {
       const previous = this.#bindingsByInstance.get(instance);
       if (previous) return previous;
       const { id, owner, skill } = instance;
       const definition = this.definition(skill);
-      const binding: DefinedBinding = Object.freeze({
+      const binding: SkillBinding = Object.freeze({
         self: Object.freeze({
           id,
           owner,
@@ -376,29 +337,13 @@ export class SkillBook implements TriggerSource {
       this.#bindingsByInstance.set(instance, binding);
       return binding;
     });
-    for (const [provider, registration] of this.#providers) {
-      for (const { self, definition } of provider.collect(world, window)) {
-        // 旧引用只属于这一次登记。
-        bindings.push({
-          definition: defineSkill(definition),
-          self: Object.freeze({
-            id: self.id,
-            owner: self.owner,
-            skill: self.skill,
-            name: self.name,
-            origin: self.origin,
-            active: (at: Context) =>
-              this.#providers.get(provider) === registration && self.active(at),
-          }),
-        });
-      }
-    }
+    for (const provider of this.#providers) bindings.push(...provider.collect(world, window));
     if (new Set(bindings.map(({ self }) => self.id)).size !== bindings.length)
       throw new Error('Duplicate ability instance.');
     return bindings;
   }
 
-  binding(world: WorldReader, id: string): DefinedBinding | undefined {
+  binding(world: WorldReader, id: string): SkillBinding | undefined {
     return this.bindings(world).find(({ self }) => self.id === id);
   }
 
@@ -409,29 +354,25 @@ export class SkillBook implements TriggerSource {
     base: Value,
   ): Value {
     return ctx.query(() => {
-      // 单项回调先检查同步性；合并后的普通值可能已把 Promise 隐藏掉。
       let value = base;
       for (const { self, definition } of this.bindings(ctx.world)) {
         const modifiers = definition.modifiers?.filter((modifier) => modifier.query === query);
-        if (!modifiers?.length) continue;
-        if (!self.active(ctx)) continue;
+        if (!modifiers?.length || !self.active(ctx)) continue;
         for (const modifier of modifiers) {
           const contribution = modifier.contribution(ctx, input, self) as Value | undefined;
           if (contribution !== undefined) value = query.combine(value, contribution);
         }
       }
-      for (const contribution of this.effects.contributions(ctx, query, input))
-        value = query.combine(value, contribution);
       return value;
     });
   }
 
   collect<T>(type: Timing<T, unknown>, world: WorldReader, payload: T): readonly Trigger<T>[] {
-    return this.bindings(world, { type, payload }).flatMap(({ self, definition }) => {
-      return (definition.triggers ?? [])
+    return this.bindings(world, { type, payload }).flatMap(({ self, definition }) =>
+      (definition.triggers ?? [])
         .filter((trigger) => trigger.window === type)
-        .map((trigger) => ({ ...trigger.bind(self), label: definition.name }));
-    });
+        .map((trigger) => ({ ...trigger.bind(self), label: definition.name })),
+    );
   }
 
   grant(ctx: Context, input: GrantSkill): Promise<SkillChange> {

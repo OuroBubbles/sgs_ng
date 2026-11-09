@@ -29,7 +29,6 @@ import {
   useCard,
 } from '../../src/sdk';
 import type { Context, SkillHandle, PhaseView } from '../../src/sdk';
-import type { SkillInstance } from '../../src/core/model/state';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { card, cardGame, settled } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
@@ -560,120 +559,6 @@ it('每个 occurrence 有独立的后效资格，拒绝第一次不吞掉第二�
   expect(game.room.history.facts(testTiming('probe.occurrence'))[0]?.data.detail).toEqual({
     index: 2,
   });
-  expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
-  settled(game);
-});
-
-it('自定义窗口显式提供技能快照；目录不读取任意历史，登记在挂接后封口', async () => {
-  const window = testTiming<{ readonly before: readonly SkillInstance[] }>('probe.snapshot');
-  const legacy = defineSkill({
-    id: 'probe:custom',
-    name: '旧来源',
-    triggers: [
-      on(window, {
-        locked: true,
-        id: 'retained',
-        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        async effect(ctx, _event, self) {
-          if (await invoke(ctx, self, '是否发动旧来源？'))
-            ctx.commit(testTiming('probe.custom'), [], null);
-        },
-      }),
-    ],
-  });
-  const game = cardGame({
-    skills: [legacy],
-    setup: (book) => {
-      book.registerSnapshots(window, (event) => event.before);
-      expect(() => book.registerSnapshots(window, (event) => event.before)).toThrow('Duplicate');
-    },
-  });
-  expect(() => game.skills.registerSnapshots(window, () => [])).toThrow('sealed');
-  let before: readonly SkillInstance[];
-  const running = game.room.run('custom', async (ctx) => {
-    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
-    before = ctx.world.snapshot.skills;
-    await game.skills.revoke(ctx, 'a', legacy.id, original);
-    expect(game.skills.bindings(ctx.world)).toHaveLength(0);
-    await ctx.window(window, { before }, { subject: 'a' });
-  });
-  await answer(game);
-  await running;
-  expect(game.room.history.facts(testTiming('probe.custom'))).toHaveLength(1);
-  settled(game);
-});
-
-it.each(['invalid-array', 'conflicting-owner'] as const)(
-  '历史快照的 %s 在执行效果前报作者错误',
-  async (kind) => {
-    const window = testTiming<{ readonly before: readonly SkillInstance[] }>('probe.bad-snapshot');
-    const legacy = defineSkill({
-      id: 'probe:snapshot-error',
-      name: '快照错误',
-      triggers: [
-        on(window, {
-          locked: true,
-          id: 'effect',
-          effect: (ctx) => {
-            ctx.commit(testTiming('probe.unexpected'), [], null);
-          },
-        }),
-      ],
-    });
-    const game = cardGame({
-      skills: [legacy],
-      setup: (book) => {
-        book.registerSnapshots(window, (event) =>
-          kind === 'invalid-array'
-            ? (undefined as unknown as readonly SkillInstance[])
-            : event.before.map((skill) => ({ ...skill, owner: 'b' })),
-        );
-      },
-    });
-    await expect(
-      game.room.run('event', async (ctx) => {
-        await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
-        await ctx.window(window, { before: ctx.world.snapshot.skills });
-      }),
-    ).rejects.toThrow(kind === 'invalid-array' ? /array/ : /Conflicting/);
-    expect(game.room.history.facts(testTiming('probe.unexpected'))).toHaveLength(0);
-  },
-);
-
-it('同一历史身份重复出现在自定义快照中，不复制发动次数', async () => {
-  const window = testTiming<{ readonly before: readonly SkillInstance[] }>(
-    'probe.duplicate-snapshot',
-  );
-  const legacy = defineSkill({
-    id: 'probe:deduplicated',
-    name: '同一来源',
-    triggers: [
-      on(window, {
-        locked: true,
-        id: 'lost',
-        retain: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        when: (ctx, event, self) => event.before.some((old) => skillLost(ctx.world, old, self)),
-        async effect(ctx, _event, self) {
-          await invoke(ctx, self, '只应询问一次');
-        },
-      }),
-    ],
-  });
-  const game = cardGame({
-    skills: [legacy],
-    setup: (book) => {
-      book.registerSnapshots(window, (event) => [...event.before, ...event.before]);
-    },
-  });
-  const running = game.room.run('event', async (ctx) => {
-    await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
-    const before = ctx.world.snapshot.skills;
-    await game.skills.revoke(ctx, 'a', legacy.id, original);
-    await ctx.window(window, { before });
-  });
-  await answer(game);
-  await running;
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(1);
   settled(game);
 });

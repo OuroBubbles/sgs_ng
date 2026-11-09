@@ -1,7 +1,6 @@
 import type { Context } from '../../core/runtime/room';
 import type { Timing, Trigger, TriggerOccurrence } from '../../core/runtime/event';
 import { isGameOver } from '../game/end';
-import type { EffectHandle } from '../effects/effects';
 import type { SkillHandle } from './skills';
 import { declare, invoke } from './invoke';
 import type { Declaration } from './invoke';
@@ -14,7 +13,7 @@ type Hook<T, R> = (ctx: Context, event: T, self: SkillHandle) => R;
  * - ask：询问「是否发动」后宣告；cost：先做选择（返回 null/false 视为不发动），再宣告；
  * - declare：宣告附带的数据、变更或代价；keep：宣告时的合法条件（与「未终局」一同检查）；
  * - 宣告即生效：其后条件改变或失去技能不撤销，只在终局时截断 effect。
- * 同一声明既可放进技能 triggers，也可放进独立效果 create(self).triggers（效果不询问、不宣告）。
+ * 持续效果（带 skill 的标记）里的触发通常写 locked：它们不询问、不宣告。
  */
 export interface TriggerSpec<T, V = true> {
   /** 默认使用时点 ID；同一技能中重名的处理器须显式区分。 */
@@ -56,15 +55,12 @@ export interface TriggerSpec<T, V = true> {
   ) => unknown;
 }
 
-/** on 的结果：技能与独立效果共用的触发声明，由所属目录绑定到具体实例。 */
+/** on 的结果：触发声明，由规则目录绑定到具体技能实例。 */
 export interface TriggerHook {
   readonly id: string;
   readonly window: object;
-  bind(self: SkillHandle | EffectHandle): Trigger<unknown>;
+  bind(self: SkillHandle): Trigger<unknown>;
 }
-
-const isEffect = (self: SkillHandle | EffectHandle): self is EffectHandle =>
-  typeof (self as EffectHandle).current === 'function';
 
 export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T, V>): TriggerHook {
   const {
@@ -114,43 +110,14 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
     await effect?.(ctx, payload, self, value, at);
   }
 
-  const common = (self: { id: string; owner: string }, order: 'automatic' | 'choose') => ({
-    id: JSON.stringify([self.id, id]),
-    owner: self.owner,
-    ...(spec.group === undefined ? {} : { group: spec.group }),
-    order: spec.order ?? order,
-  });
-
-  /** 独立效果：实例仍存在即有资格；以只读的来源视图调用同一套回调。 */
-  function bindEffect(record: EffectHandle): Trigger<unknown> {
-    if (staged || spec.retain)
-      throw new Error(`Effect trigger ${record.type}/${id} cannot ask, pay or retain.`);
-    const self: SkillHandle = Object.freeze({
-      id: record.id,
-      owner: record.owner ?? '',
-      skill: record.type,
-      name: record.type,
-      origin: null,
-      active: (ctx: Context) => record.current(ctx.world) !== null,
-    });
-    return {
-      ...common(self, 'automatic'),
-      owner: record.owner,
-      label: record.type,
-      ...(times === undefined
-        ? {}
-        : { times: (ctx: Context, payload: unknown) => times(ctx, payload as T, self) }),
-      eligible: (ctx, payload, at) =>
-        record.current(ctx.world) !== null && matches(ctx, payload as T, self, at),
-      run: (ctx, payload, at) => resolve(ctx, payload as T, self, at),
-    };
-  }
-
   function bindSkill(self: SkillHandle): Trigger<unknown> {
     const available = (ctx: Context, payload: T) =>
       self.active(ctx) || (spec.retain?.(ctx, payload, self) ?? false);
     return {
-      ...common(self, locked ? 'automatic' : 'choose'),
+      id: JSON.stringify([self.id, id]),
+      owner: self.owner,
+      ...(spec.group === undefined ? {} : { group: spec.group }),
+      order: spec.order ?? (locked ? 'automatic' : 'choose'),
       ...(times === undefined
         ? {}
         : { times: (ctx: Context, payload: unknown) => times(ctx, payload as T, self) }),
@@ -183,7 +150,6 @@ export function on<T, V = true>(window: Timing<T, unknown>, spec: TriggerSpec<T,
   return Object.freeze({
     id,
     window,
-    bind: (self: SkillHandle | EffectHandle) =>
-      isEffect(self) ? bindEffect(self) : bindSkill(self),
+    bind: bindSkill,
   });
 }

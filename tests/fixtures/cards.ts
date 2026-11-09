@@ -123,12 +123,12 @@ export function cardSeed(options: CardSetup = {}) {
 
 export function cardGame(
   options: CardSetup &
-    Pick<ContentDefinition, 'skills' | 'effects'> & {
+    Pick<ContentDefinition, 'skills'> & {
       readonly definitions?: readonly CardDefinition[];
       /** 测试专用的全局规则修正（如禁止指定某目标），以始终生效的来源提供。 */
       readonly rules?: readonly SkillModifier[];
       readonly actionAnchor?: ActionAnchor;
-      /** 测试专用：在 attach 封存前装配快照读取器、能力提供者等。 */
+      /** 测试专用：在 attach 前装配能力提供者等。 */
       readonly setup?: (skills: SkillBook) => void;
     } = {},
 ) {

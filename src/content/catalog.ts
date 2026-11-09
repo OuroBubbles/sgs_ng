@@ -7,8 +7,6 @@ import { GeneralBook, defineGeneral } from '../rules/characters/general';
 import type { GeneralDefinition } from '../rules/characters/general';
 import { SkillBook, defineSkill } from '../rules/skills/skills';
 import type { SkillDefinition } from '../rules/skills/skills';
-import { defineEffect } from '../rules/effects/effects';
-import type { EffectDefinition } from '../rules/effects/effects';
 
 /** 牌的展示资源；说明是规则文本，写在牌定义的 description 上。 */
 export interface CardPresentation {
@@ -50,8 +48,6 @@ export interface ContentDefinition {
   readonly cards?: readonly CardDefinition[];
   /** 不属于任何武将的技能；武将引用的技能对象会自动登记。 */
   readonly skills?: readonly SkillDefinition[];
-  /** 不由任何技能引用的独立效果；技能 `effects` 引用的效果会自动登记。 */
-  readonly effects?: readonly EffectDefinition[];
   readonly generals?: readonly (GeneralDefinition & {
     readonly abilities?: readonly SkillDefinition[];
   })[];
@@ -126,14 +122,6 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
       ),
     ].map(defineSkill),
   );
-  // 显式列出的独立效果原样登记（重复即报错）；技能 effects 引用的同一对象只补登一次。
-  const listed = definitions.flatMap((entry) => entry.effects ?? []);
-  const effects = Object.freeze(
-    [
-      ...listed,
-      ...new Set(skills.flatMap((skill) => skill.effects ?? []).filter((e) => !listed.includes(e))),
-    ].map(defineEffect),
-  );
   // 与规则定义一样，先固定公开字段，再校验与建索引；不重复读取作者 getter。
   const cardEntries = immutable(
     definitions
@@ -159,7 +147,6 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
   for (const [kind, entries] of [
     ['card', cards],
     ['general', generals],
-    ['effect', effects],
     ['deck', decks],
     ['card presentation', cardEntries],
     ['general presentation', generalEntries],
@@ -184,7 +171,6 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
     generalViews: immutable(Object.fromEntries(generalEntries.map((view) => [view.id, view]))),
     createBooks() {
       const registry = new SkillBook(skills, cards);
-      registry.effects.register(effects);
       return { skills: registry, generals: new GeneralBook(generals, registry) };
     },
     createDeck(id: string) {
