@@ -3,6 +3,7 @@ import type { Context } from '../../core/runtime/room';
 import { counterNames } from '../../rules/cards/counter';
 import { handLimit } from '../../rules/cards/rule';
 import type { CardDefinition } from '../../rules/cards/types';
+import { delayedCards } from '../../rules/cards/delayed';
 import { isChained } from '../../rules/combat/chain';
 import { rescueNames } from '../../rules/combat/rescue';
 import { shieldOf } from '../../rules/combat/shield';
@@ -88,7 +89,7 @@ function strength(ctx: Context, rules: SkillBook, player: string, own: boolean):
   const equipment = world
     .zone(`${player}:equipment`)
     .cards.reduce((sum, id) => sum + equipWorth(rules.cards.get(world.card(id).name)), 0);
-  const pending = world.zone(`${player}:judgment`).cards.length;
+  const pending = delayedCards(world, player).length;
   const extra = pendingExtraTurns(world).filter((turn) => turn.owner === player).length;
   return (
     hpWorth(Math.max(0, seat.hp)) +
