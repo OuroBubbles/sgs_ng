@@ -82,12 +82,12 @@ it('内置源码显式组合标准与演武牌、武将和牌组，不自动发�
   for (const { skills } of [first, second])
     expect(() => skills.effects.register([luoyiAftereffect])).toThrow(/Duplicate effect/);
   expect(defaultContent.cards).toHaveLength(32);
-  expect(defaultContent.generals).toHaveLength(25);
+  expect(defaultContent.generals).toHaveLength(26);
   expect(defaultContent.createDeck('standard:identity')).toHaveLength(108);
   expect(defaultContent.createDeck('standard:mechanics')).toHaveLength(288);
   expect(() => defaultContent.createDeck('workshop:showcase')).toThrow(/Unknown deck/);
   expect(practiceContent.cards).toHaveLength(37);
-  expect(practiceContent.generals).toHaveLength(30);
+  expect(practiceContent.generals).toHaveLength(31);
   for (const [id, count] of [
     ['faces', 40],
     ['showcase', 44],

@@ -246,11 +246,13 @@ it('标准武将保持原包顺序：package.ts 的 order 决定大厅列表与�
     'zhouyu',
     'diaochan',
     'zhugeliang',
+    // order 之外的文件按文件名追加。
+    'liushan',
   ]);
 });
 
 it('首六武将完整初始化，主公奖励叠加目录体力，空武将引用不会被当作机制角色', async () => {
-  expect(standardGenerals).toHaveLength(25);
+  expect(standardGenerals).toHaveLength(26);
   const match = createRoleMatch({
     seed: 42,
     preset: 'standard:identity',

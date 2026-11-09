@@ -207,7 +207,7 @@ it('实时候选刷新使旧 token 和旧集合失效，必选不可取消，一
 });
 
 it.each([2, 4, 8])('诸葛亮初始化与观星数量按 %s 人局存活人数计算，上限五张', async (count) => {
-  expect(standardGenerals).toHaveLength(25);
+  expect(standardGenerals).toHaveLength(26);
   const match = createRoleMatch({
     seed: 19,
     preset: 'standard:identity',

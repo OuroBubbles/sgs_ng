@@ -31,8 +31,8 @@ afterAll(async () => {
       {
         capturedAt: new Date().toISOString(),
         generals: defaultContent.generals.map((general) => general.id),
-        complete: evidence.length === 25,
-        expected: 25,
+        complete: evidence.length === generals.length,
+        expected: generals.length,
         cases: evidence,
       },
       null,
@@ -41,8 +41,8 @@ afterAll(async () => {
   );
 });
 
-it('标准二十五将统一初始化：目录字段、主公技能与体力奖励及事实重建', async () => {
-  expect(generals).toHaveLength(25);
+it('标准二十六将统一初始化：目录字段、主公技能与体力奖励及事实重建', async () => {
+  expect(generals).toHaveLength(26);
   // 保留迁入场景的种子；其余目录项使用 42。六席同将同时检查主公和非主公。
   const seeds: Readonly<Record<string, number>> = {
     'standard:liubei': 14,

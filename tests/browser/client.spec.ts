@@ -170,12 +170,12 @@ test('不访问内容数据库即可组合内置源码，切换后刷新目录�
   // 整个标签可点击；保留触控高度，同时限制意外换行撑高侧栏。
   expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
   expect(toggleBox!.height).toBeLessThan(60);
-  await expect(hero.locator('option')).toHaveCount(25);
+  await expect(hero.locator('option')).toHaveCount(26);
   await expect(deck.locator('option')).toHaveCount(2);
   await toggle.check();
-  await expect(hero.locator('option')).toHaveCount(30);
+  await expect(hero.locator('option')).toHaveCount(31);
   await expect(stats.getByText('37', { exact: true })).toBeVisible();
-  await expect(stats.getByText('30', { exact: true })).toBeVisible();
+  await expect(stats.getByText('31', { exact: true })).toBeVisible();
   await expect(deck.locator('option[value="workshop:showcase"]')).toHaveText('机制演武（44 张）');
   await hero.selectOption('workshop:guest');
   await npc.selectOption('workshop:guest');
@@ -184,9 +184,9 @@ test('不访问内容数据库即可组合内置源码，切换后刷新目录�
   await expect(hero).toHaveValue('standard:guanyu');
   await expect(npc).toHaveValue('preset');
   await expect(deck).toHaveValue('standard:identity');
-  await expect(hero.locator('option')).toHaveCount(25);
+  await expect(hero.locator('option')).toHaveCount(26);
   await expect(stats.getByText('32', { exact: true })).toBeVisible();
-  await expect(stats.getByText('25', { exact: true })).toBeVisible();
+  await expect(stats.getByText('26', { exact: true })).toBeVisible();
   await hero.selectOption('standard:zhaoyun');
   await toggle.check();
   await expect(hero).toHaveValue('standard:zhaoyun');
@@ -2862,7 +2862,7 @@ test('启动页与大厅分区导航保留配置，内容变更后可进入真�
   await expect(page.getByRole('checkbox', { name: '机制演武', exact: true })).toBeChecked();
   await expect(
     page.getByRole('combobox', { name: '你的武将', exact: true }).locator('option'),
-  ).toHaveCount(30);
+  ).toHaveCount(31);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '.artifacts/ui/lobby-solo-' + info.project.name + '.png' });
   await page.getByRole('button', { name: '‹ 返回首页', exact: true }).click();
@@ -2896,7 +2896,7 @@ test('大厅检索真实武将后直接选将，切页保留开局与连接草�
   await expect(gallery).toContainText('没有找到该武将');
   await search.fill('赵云');
   await expect(gallery.getByRole('button')).toHaveCount(1);
-  await expect(gallery.getByRole('status')).toHaveText('1 / 25 名武将');
+  await expect(gallery.getByRole('status')).toHaveText('1 / 26 名武将');
   await expect(
     gallery.getByRole('button', { name: '选择赵云并前往单机演武', exact: true }),
   ).toHaveAccessibleDescription('蜀 · 体力 4');

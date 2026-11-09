@@ -110,7 +110,7 @@ export const Provision = defineEvent('provision', {
 
 ## 主动技：action
 
-`action({ id, limit, cards, targets, pay, selection, declare, effect })` 生成 `active` 能力：`limit` 为每阶段次数（键为技能 ID 末段），`cards: { count, areas, filter }` 与 `targets: { count, filter }` 生成联合选择，`pay: 'discard'` 弃置所选牌作为费用；复杂配对等约束可用 `selection` 自写 JointSelection 模型。effect 取得 `{ self, phase, cards, targets }`。
+`action({ id, limit, cards, targets, pay, selection, declare, effect })` 生成 `active` 能力：`limit: { per: 'phase' | 'turn' | 'round' | 'game', times }` 为次数限制（按技能定义计数，重新授予不重置），`cards: { count, areas, filter }` 与 `targets: { count, filter }` 生成联合选择，`pay: 'discard'` 弃置所选牌作为费用；复杂配对等约束可用 `selection` 自写 JointSelection 模型。effect 取得 `{ self, phase, cards, targets }`。
 
 ## 规则动词自带存活与终局处理
 
@@ -177,9 +177,20 @@ JointSelection 的 cards / targets 候选函数可直接返回稳定 ID 数组�
 
 ## 状态、只读值与生存期
 
-局内计数和标记用 `defineState` / `readState` / `setState`，不要放在共享定义或模块级可变变量中。`stateChange` 可与费用组成同一提交。`UsageLimit` 的 source 由规则选择：按技能定义计数可防止同阶段重新授予重置，按实例计数则区分每次获得。
+局内计数和标记（类 FreeKill 的 mark）用 `defineMark(id, initial, { scope? })` 声明一次，不要放在共享定义或模块级可变变量中。数字标记默认校验为非负整数、布尔标记为布尔值，其余形状可传 `accepts`。`scope: 'phase' | 'turn' | 'round'` 的标记随当前阶段/回合/轮自动到期，作用域外读到初值，无需手写清理：
 
-阶段、回合等使用有身份的 `Lifetime`，嵌套阶段和额外回合各自独立。普通 Flow 不自动变成回合生存期。独立效果使用自己的到期条件，失去创建它的技能不代表效果一律消失；写法见 [裸衣](../src/content/standard/generals/xuchu.ts) 与 [独立效果场景](../tests/scenarios/independent-effects.test.ts)。
+```ts
+const skipped = defineMark('standard:fangquan-skipped', false, { scope: 'turn' });
+skipped.of(ctx, self.owner); // 读
+skipped.set(ctx, self.owner, true); // 写并入历史
+declare: (ctx, phase, self) => ({
+  changes: [phase.skipChange(ctx, self.skill), skipped.change(ctx, self.owner, true)], // 与发动同次提交
+});
+```
+
+次数限制只有一种写法 `Limit = { per, times }`：牌写在 `use.limit`（杀为 `{ per: 'phase', times: 1 }`），主动技写在 `action({ limit })`。修正用牌规则只用一个具名查询 `cardQueries.useRule`，返回 `{ times?, targets?, range? }` 的增量，`Infinity` 表示不限（咆哮 `{ times: Infinity }`、方天画戟 `{ targets: 2 }`、奇才 `{ range: Infinity }`）。
+
+阶段、回合、轮使用有身份的 `Lifetime`，嵌套阶段和额外回合各自独立。谁进行下一个回合只由规则层的 `playRounds` 决定：额外回合（`scheduleExtraTurn`，类 FreeKill `gainAnExtraTurn`）在当前回合结束后、下一个正常回合前执行，属于当前轮且不移动正常轮转；模式只提供座次、首席与每回合前的交接钩子。放权见 [fangquan.ts](../src/content/standard/skills/fangquan.ts)。普通 Flow 不自动变成回合生存期。独立效果使用自己的到期条件，失去创建它的技能不代表效果一律消失；写法见 [裸衣](../src/content/standard/generals/xuchu.ts) 与 [独立效果场景](../tests/scenarios/independent-effects.test.ts)。
 
 World、事实和接纳后的决策值在类型与运行时均只读；需要本地修改数组时先复制。领域草案通过其公开方法修改，封口后不能继续改写。`ctx.query` 与所有合法性查询不能写状态、取随机数或 await；违规异步规则查询立即冻结本局。
 

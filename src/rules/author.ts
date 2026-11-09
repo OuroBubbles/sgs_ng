@@ -209,13 +209,20 @@ export async function askDiscard(
     readonly prompt: string;
     readonly reason: string;
     readonly areas?: Areas;
+    /** 只允许弃置符合条件的牌，如享乐只收基本牌。 */
+    readonly filter?: (ctx: Context, card: PhysicalCardFace) => boolean;
   },
 ): Promise<boolean> {
-  const { count, prompt, reason, areas = ['hand'] } = spec;
+  const { count, prompt, reason, areas = ['hand'], filter } = spec;
   const live = () => alive(ctx, player) && !isGameOver(ctx.world);
   if (!live()) return false;
   const model = selection(ctx, {
-    cards: () => (live() ? discardable(ctx, player, reason, areas) : []),
+    cards: () =>
+      live()
+        ? discardable(ctx, player, reason, areas).filter(
+            (id) => !filter || filter(ctx, face(ctx, id)),
+          )
+        : [],
     cardCount: { min: count, max: count },
   });
   const picked = await select(ctx, player, model, prompt, spec);

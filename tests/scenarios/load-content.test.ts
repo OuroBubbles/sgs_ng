@@ -45,7 +45,8 @@ it('标准包按 package.ts 的 order 排列，与历史登记顺序一致，内
     'standard:zhaoyun',
     'standard:zhangfei',
   ]);
-  expect(ids).toHaveLength(25);
+  expect(ids).toHaveLength(26);
+  expect(ids.at(-1)).toBe('standard:liushan');
   expect(contentHash).toMatch(/^[0-9a-f]{64}$/);
 });
 
