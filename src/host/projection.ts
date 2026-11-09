@@ -365,16 +365,14 @@ function publicHistory(
     ({ declaration: d }) =>
       `${d.actor}因【借刀杀人】获得 ${d.holder} 的${d.cards.map(cardName).join('、')}`,
   );
-  on(Skill.invoked, ({ actor, skill, cards, declaration }, fact, play) => {
+  on(Skill.invoked, ({ actor, skill, declaration }, fact, play) => {
     const voice = skillVoice(actor, skill ?? '', fact.seq);
     if (voice) play({ voice });
-    // 技能宣告是各技能自定的数据；作者层总会写入 label，个别技能附带公开目标。
-    const declared = declaration as {
-      readonly label?: string;
-      readonly targets?: readonly string[];
-      readonly redirect?: { readonly from: string; readonly to: string };
-    };
-    return `${actor}发动【${declared.label || '技能'}】${skill === 'standard:rende' ? `，将 ${cards.length} 张牌交给 ${(declared.targets ?? []).join('、')}` : ''}${skill === 'standard:liuli' && declared.redirect ? `，将杀从 ${declared.redirect.from} 转移给 ${declared.redirect.to}` : ''}`;
+    // 技能宣告是各技能自定的数据；作者层总会写入 label，选了角色的技能附带公开目标。
+    // 交牌、移牌等后果由各自的事实另行叙述，这里不按技能 ID 拼专用文案。
+    const declared = declaration as { readonly label?: string; readonly targets?: unknown };
+    const targets = Array.isArray(declared.targets) ? declared.targets.map(String) : [];
+    return `${actor}发动【${declared.label || '技能'}】${targets.length ? `，目标 ${targets.join('、')}` : ''}`;
   });
   on(
     Discard.limited,

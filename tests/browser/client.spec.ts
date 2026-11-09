@@ -1013,7 +1013,8 @@ test('刘备仁德从手牌交出两张，公开记录只说明数量和接收�
   });
   await confirm(page).click();
   await expect(hand(page)).toHaveCount(before - 2);
-  await expect(page.getByTestId('journal')).toContainText('甲席发动【仁德】，将 2 张牌交给 乙席');
+  await expect(page.getByTestId('journal')).toContainText('甲席发动【仁德】，目标 乙席');
+  await expect(page.getByTestId('journal')).toContainText('甲席将 2 张牌交给 乙席');
 });
 test('刘备激将由真实蜀 AI 供杀，刘备使用并占用本阶段杀次数', async ({ page }, info) => {
   await page
@@ -1338,7 +1339,7 @@ test('大乔流离同时支付与转移，记录和桌面牌指向新目标', as
   await expect(
     page.getByTestId('table-cards').locator('[aria-label$="杀 → 乙席"]').first(),
   ).toBeAttached();
-  await expect(page.getByTestId('journal')).toContainText('将杀从 甲席 转移给 乙席');
+  await expect(page.getByTestId('journal')).toContainText('甲席发动【流离】，目标 乙席');
   await expect(page.getByTestId('hand-cards').getByTestId(id!)).toHaveCount(0);
   await expect(page.getByTestId('journal')).toContainText('甲席发动【流离】');
   await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);

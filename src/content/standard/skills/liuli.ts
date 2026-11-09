@@ -83,7 +83,6 @@ export default skill(
         {
           cancel: '不发动流离',
           reason: self.skill,
-          describe: () => ({ previousTargets: use.effects.map((entry) => entry.target) }),
         },
       ),
     declare(ctx, { use, effect }, self, picked) {
@@ -97,7 +96,7 @@ export default skill(
             ignoreDistance: true,
           }),
         ],
-        data: { targets: [target], redirect: { useId: use.id, from: self.owner, to: target } },
+        data: { targets: [target] },
       };
     },
   }),
