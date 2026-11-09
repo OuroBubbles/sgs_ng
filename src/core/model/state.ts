@@ -16,7 +16,6 @@ export interface SkillSource {
 
 export interface SkillGrant {
   readonly source: SkillSource;
-  readonly enabled: boolean;
   readonly scopeId: string | null;
 }
 

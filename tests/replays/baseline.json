@@ -36,8 +36,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "5814652f8710b19c4e5cee7865173c5469aee90f99f291b54c34766c46ac4b51",
-        "facts": "4b2067c088cd6c73cfa1c54816174a9320276f910bf2503b067c57b7ac9d3bc8",
+        "journal": "6002329c3d971ac5e8216384a43d329dcc7dcf4e5b69609c20154d743961fdb3",
+        "facts": "849858452fdcdf10d28e1119f54122ecb678d1eb504b42b089035fc46745c607",
         "decisions": "cf5910419afad4770baa0f20218e6ce35f40520c24492b643edf932ca5d9136c"
       }
     },
@@ -76,8 +76,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "99cac603ae84df756c719996ae2409c23a7b798fa189788f69fcb6a87010523a",
-        "facts": "b452b3f30bb260ad94ea9afb2b902ffd0391030e896a81436c8f3e2a562ccc49",
+        "journal": "132fbbef9434741a51cb06687d55dbb82e178ff313aa55e7f2443b2d7d856cc4",
+        "facts": "6ba6a60aaf0e3a247d4a2c68ef90698cebd81984a1e1675dc21cbd0e0cf6e106",
         "decisions": "c88319599facb575fed25a9f0590b454017a5deeb18b112941c0d5bc65db00f3"
       }
     },
@@ -118,8 +118,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "b64bf5160a8447df775923499cf8120a67b0586c68ca613622ac14e558449b53",
-        "facts": "297c50df678f7d119dce75eac9ad6a498a728d2d8d9497e30b9d994b73990b78",
+        "journal": "7b09bcbc9c3bfcaff0b73a7d94b02875e2753265bf9eece4a645ed7b33d1ce19",
+        "facts": "852a46d2a3d9e31cf8cf97dd906687ca75e5500d3b7f3adf5fe77747c435f64e",
         "decisions": "68c41a63dc597d4e7746dedd7683b79f99104dad770575660a0da1f8ef3b128d"
       }
     },
@@ -155,8 +155,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "90f5405d5a5281f29613a08f4141238e1821c85e599658dab537b3b8f1dd0e7c",
-        "facts": "708c451ab1e0cfa0cc0109508b2aad937ef37c22058512551ecb3e7eb509a0af",
+        "journal": "2576d57eb9544841b6c3ad190185993a5e311975f29e94bbd2463418082cdf6f",
+        "facts": "167baf7f021e11e4563eb3e9351df760483b81029c977827863656b9d487bfca",
         "decisions": "cccc1b117a6c88d3dc66e57b2b89250627b179f7a82462c137c902b155bbcff8"
       }
     },
@@ -190,8 +190,8 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "826e9ca305e1949b750f5aab8f5b6184e8b97acde34e4653450764059511fdea",
-        "facts": "140f28235cd55cf802697b30d56d99945c11fdaad421f52a4a42b7e908038497",
+        "journal": "f10c5670d4f66b1865a88bf2b8b57ea39e9e8b74b0011e9e0b5c79ed2a0e8d5c",
+        "facts": "df0cde48e0dd89f9e7fda00f2f3fc0eb91993effb5b70d7e63ec7720708fe43f",
         "decisions": "b0e29bd3a22c5eec9284dc8e9dcf3bd00a394cb4cf20c5aad7ef8247468e316e"
       }
     },
@@ -243,8 +243,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "bd77dddd6ee2bf3559423c9c6f08866ebec33b3a59e84d9c70182fe95b83fcc9",
-        "facts": "41dc2f56733e1f1f96eaa1efd1061f30cefc4c027bd1ef080f47ba9ad8c4cb44",
+        "journal": "030dfc40260bcad643f29d60364b63e2c342021d64f8a0725c438b137e48b984",
+        "facts": "faaba234d1defbe1fb7ea77c1723834415efdfca1b6fcc8f9800f55f4455f17f",
         "decisions": "9c51df0821f11b795373747f49375448c24fbbfe4d856b24e5aa1bb10d1e5e4b"
       }
     },
@@ -284,8 +284,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "6ebd6354ddc8bbc30a5095b3adcc93a2641f2b1f400140840825dde64bd299ea",
-        "facts": "2011c35f176818544d8eee5e3c04c69dfb5ca1302cbf47614b269e6aec163f16",
+        "journal": "c81613291ce9c9cb8d312ecbe5f93691c1c9536749b3a6b69900aeaa45a0d285",
+        "facts": "f1d4b24c348ae1bef615e20d74b35ab53da4457b20f296368250fc818c0a2adb",
         "decisions": "87080800588d1ff973911d6cd2ff2a0645f218d4bd8a90e0c9d221294e7d3220"
       }
     },
@@ -328,8 +328,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "99f1f4c8a6c76f215283b897e58db26d4af285a1f1ef95d041eedb47ed7fa781",
-        "facts": "c6654dfab35e6a9c24b8a84bc7e1459105c4139dbddd0f9b18f7be55c834f424",
+        "journal": "cd91e4e37691e5921332b10956c147118af824672b573215044ce46463633e19",
+        "facts": "588e5816671c03c3b7fb3096bdb75d7a27c508ae826b61b86feb0b8893066763",
         "decisions": "faed5ed527618ca9b5a905cf1464c8320e342b2f2aa0dc9419ea1f8f4605c009"
       }
     },
@@ -364,8 +364,8 @@
         "standard:slash"
       ],
       "digest": {
-        "journal": "c960a4082c94bf82ec60752b57d913fc45fb1ed9b234aa003a1384ba4eb149d5",
-        "facts": "a48da8c23b6f6fc7db8196a77948d66644bb072498d252bba87d30267903ab21",
+        "journal": "9326586096d328e5d8e9cde0eabf7e9bcb47cfb8bc0524113bb66bdf0e40fc73",
+        "facts": "2ab95357eba1a2edf2f576a048042d6991a40696bc34607380d063668d94d29b",
         "decisions": "56701292360ad1e2cd06096f1ec513fd4e284e2d449b8f09ac94cf892a6641b6"
       }
     },
@@ -401,8 +401,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "1e65ddea1df9b53306b3f6e8ecc76a7526b3d492190cb2a8ac70c70db92657db",
-        "facts": "a43cb7fd023c723bb10ef065c7b3567f8432149e0c897e70ede988b3800fcd44",
+        "journal": "c31f7d37e93f306287b8365d34ff4f15c655641da265b63009ca8225f9cfb765",
+        "facts": "547a3865c56f8cb9c89788c6f827c61c33bd80c17631ccb90ef4f04e99665f5d",
         "decisions": "f9e0ad4f1cec669271f00c2d4de8ee4e10bfbf66241b428f63a8961ce58bcd42"
       }
     },
@@ -432,8 +432,8 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "2991bbc5565ead65a7a45ab9aa14eb77f8fb488d6e03ac431f7f0d732994ef07",
-        "facts": "e87ec43f9bb66070b1b07796df7ff2255e3d43b63d2b77dddfd3ed90d6290a1a",
+        "journal": "17be01058110763210e9324d6d29c08d98804a8389a167de526a082bcba884e0",
+        "facts": "a29c9a9a5e82baa45b564b37b68a1eebcd4625c44d50a57611684a772ecd03ee",
         "decisions": "ebc0cdc2594842f24f87a9403cd9cbac30a9991a26e3594bb0562180348b5a12"
       }
     },
@@ -479,8 +479,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "1950006550a85ca7865dcb1b35d31cc23f8ab301c4efefc74cb57db09fe1585d",
-        "facts": "aa6a4694a0100382a28cc0c20f801eb6db16b24da933a88f53dff953b3fa2555",
+        "journal": "44673be3913188b17e08a8aae262901500cf5b556ebc51f80c7b1fa5cd08f16c",
+        "facts": "9cba78f10c148d243462cffe0d0836f84b1db260e605240de32dea387b7c5c7d",
         "decisions": "f26d578c0daabd11c54b7029d7306c1bca775f7d416282aa1e1b5ba7ebf1f1e0"
       }
     },
@@ -519,8 +519,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "99076a7965772a60a0cadf5a3519c093a6f38f1fb20105140bb60bcb68d9799e",
-        "facts": "c51eaac8a4f6fb77bbc9425a36f7e17379eda9fa61ceb86cea92604d5b76e703",
+        "journal": "19f8f1877ae2aab4be9c25951670d803d6eefb88be887d609332b2a37a8c40db",
+        "facts": "b63425497be4a32d9d74791e2ea72b8123c37e13226adcae2cf1b1ad5caba1b1",
         "decisions": "a6f05288bbc2095c4b3266fa3fdce0b05a535650cc06f118be06deaecdd60c3c"
       }
     },
@@ -554,8 +554,8 @@
         "standard:slash"
       ],
       "digest": {
-        "journal": "f707b3f6aca584a180d8cbb2ff2666664e8453cfeb699b751c3bc395d29be59f",
-        "facts": "9e2f726252aacb3827eaa29c93f2b35e37c30dd9173a61d94ebf0b01932ab37d",
+        "journal": "7926b44679ea1081ec943c559b18729d4d6855436477c106ee5219ed9420b4bd",
+        "facts": "a74d4ee4a907e9c432cf9d7372e90959ba360d88358e872e42f8f9ba20014a9e",
         "decisions": "a35297979c5977ca2852cd811dcc23188b5fe702c6d7633169293941b39ac7c4"
       }
     },
@@ -590,8 +590,8 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "ce5e7216f7fe457c20b53d97f2416347456d77cc398f1345d0a4e77195f07e56",
-        "facts": "1411c18cd90c2ec8651e5e2cc49055d49a4eaa1da35a406595aa35c665e9e2c7",
+        "journal": "89c116c3acbf79cc039e1b9208f60dd04ae9f37e2c7fa94b90f3ef9b9bea6a2d",
+        "facts": "e3f120277855a784f4c0027ee3ee136351ede4337fdedda835d1fa247b90f4a5",
         "decisions": "cd023276959bbaa77f7fade677809c50425dae5056e83cd6f3367665444affd8"
       }
     },
@@ -635,8 +635,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "213ca91b567d86f49a3569ac02ec5af17f8a38f421cedfd3de8dd57fad6a740c",
-        "facts": "af7c5d0b039c2d338510f544effe908d8728c61d0836322d6df463ec6275a425",
+        "journal": "f78276e4f6c8ed990f100cdc72735b8cb8761ee4bf33712042f385f82d5e4150",
+        "facts": "3802f6e22049c7be6532752f13aa43f6fe118daf90ff04e0e6c91f44a9a0b5de",
         "decisions": "e544b80233d2bdd9dd14f39e855927edafa201154f7ee8770d2e09b3821d1110"
       }
     },
@@ -680,8 +680,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "a0d28701479664e908ba77f75b0b998ea3603aa7e4b5a3623ca646c30a94f10d",
-        "facts": "886a4472592d136ffc5102c699f1c3ad543c2610abf9039c8311d3ac91134a5d",
+        "journal": "f4d56d73ece9c7b60b6b7b587dd3705a653e5c56ce8ddf6d76623f3e38fffc29",
+        "facts": "369a32489e75a2d8ed69c22ac4d81cd6bae8e8c8a5e8ca1144a26493b45c7f1f",
         "decisions": "ce9499250fc34fdec0d5efc63779da95d2ee1610ca771d3f8ae124dc1024cbbc"
       }
     },
@@ -721,8 +721,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "0ec4a3ffb181d3794e90e74ccac7ea7c1f5f02205e484b904d5005a81744dcd3",
-        "facts": "a487b00126d9ab3e056ec7955a104a5add93d1cb8baf2f65b0679a53f02e6baf",
+        "journal": "729b51eefa3f2b7ddb374de545c7a8580322ce9f9478f509a63dcfcf34b8e5ad",
+        "facts": "6541038cd87a9dbf77bf0cb47e0d733884991610edd7b56d32d5672ae456ed28",
         "decisions": "4fe14f95097f822364f680b33a21708e4a40bec07e230d23e801b00d28d898e4"
       }
     },
@@ -769,8 +769,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "6790cea38c7970fb1c943cafcaab132fd6f77fee7b93ebb40617978ad8f9bef3",
-        "facts": "b2cc88a9a4b822d32b68741122b919416039486699fcb67259343072d4553d98",
+        "journal": "723189b7a4bd4570c662acb21e8bf10644435370a1212f7353429caab51177b2",
+        "facts": "50773a30e16accf80e39fd5854a0e4c0653f839f93cc570fdb8c513166aabfec",
         "decisions": "369ef7b92bbce3edb01de4c4548a9f79a878a6958217679e9f9a7df5e99ded40"
       }
     },
@@ -798,8 +798,8 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "f01fd3113c2842a615b3c8a15edda7b7f3427cc0092c4860beea2193af9d49be",
-        "facts": "d93ce04411601e24d0a4d6a2b05d8fe739d3735ca010d5bae0e2d33d7b390495",
+        "journal": "d2b1d67b95eaa87dc22492540c278e75565990713211cf6f2045ac09fd5a1e18",
+        "facts": "516ed3e1ab030a01dedbf34932687adc3e75501a08e4b562771f51255171c2ec",
         "decisions": "50843070966f5fe2cdf3011b426e0c507d91e276e0618f1715f00c3878327d69"
       }
     },
@@ -833,8 +833,8 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "d40f81fd1ff6de7b9158b612f69618f2931613205be42b2b8eaa274c24a3be62",
-        "facts": "dc69d6a00b1cd44a40b5c7eee0fa9caf27d1373d660c6b634cbd96aad4de82da",
+        "journal": "a0759010428702aab935afcbc8cbcc46bb3a1c9f6799d97fd9e3e18578f95c38",
+        "facts": "05ea6f125c754b2c909f6b63f3b225b67aed167da11d9523962d211f4c91251e",
         "decisions": "f4d610502b2f7c7b67353d5e98f395616d4d6c6f7d237284858150cc75a93ffb"
       }
     },
@@ -877,8 +877,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "162b4d5af773a1903cb9eae7c7040ca443b4d075d2159989f00b2a0c6d89b2b6",
-        "facts": "2e6ab9a6d688df8cad14ddbf1cbdaffbad2ba1d0f3f8a003572bbcdb3f4adb27",
+        "journal": "1ab083fd6460762417650f2c4e29efa3aa27c730486904836ab0294860edb501",
+        "facts": "c824c3a4dc08a4365738a5f78e55de7eb6d6cb5bbc08a6339aa94bb541f99851",
         "decisions": "c02efebe726884d25020c3b1a1580b36688be0c06d4de6d9dc59e3a96443d037"
       }
     },
@@ -910,8 +910,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "c74af46b46b107c85a25e209249e421b1be910306134361beef716cff4d165be",
-        "facts": "28ece9fbfad397cbc0210ccc3a4c07360edf69101177ffa35dd031f435c1fc56",
+        "journal": "089d70a6e94555e30f06ba1f0ff246561fd5756ff64351fc37fda90f4384b9cd",
+        "facts": "7f06c5128633eef94e21972be212d4b46760cbe649bd1f452c5112a080e0b699",
         "decisions": "2f114f431c3ebee261dfe187deb4a9815294bbadef130c2d06981755d3bd86cb"
       }
     },
@@ -945,8 +945,8 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "11677229657d8ec77502abdfd308e66760035a4cbb513ce54bdbb710df3bbc61",
-        "facts": "893c2d805748135c1c69f92f574ab71a95d18f19bfc9e200c376d22db282abe6",
+        "journal": "dbca01d378e41decf7d571170642639cb010d7506f181a19abd0bf0d091d77c4",
+        "facts": "4891be916d273fecc22cb7babcf3476678f0ef4e3f5b2041f04c12c350aefa34",
         "decisions": "18e586b228f9c266596aa1a65a8e17f60daf5615ea0f3119b3e25bb99d4f35dc"
       }
     },
@@ -979,8 +979,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "9072ba4b6da4899d877af607ad1524e1a03dab8d3960f60b93fdcc865fc4c798",
-        "facts": "0fdec09f76478e9344313ccdd13b30ce27844e6bcbab6ea01dea7d6a3f37ca8b",
+        "journal": "02e820ceffdc0fecb6b91030e20217f50f7b77e81c39e66c981e3bce8a2b4e9d",
+        "facts": "b3499a04fbae89bf3765f268c831e17546854523271a80c48bfbd707f45e6a5b",
         "decisions": "140fdf9de66bfc6440377584574af36fa249eabe2b9f5c569955b8a56419a91a"
       }
     },
@@ -1026,8 +1026,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "d8ddfbd8c6694bc37df387bc675db6b2a651b1b842d5656d1ff07a88703dbef6",
-        "facts": "3b7fcab55185932a48dbae0b153cfe53d66d5910ae4943ec2a6aa83477372600",
+        "journal": "ebc79d84b9120fc48bcd83b874d492534003102cdf3593fe9feead17e604bfe4",
+        "facts": "ef9d144e545a0b505b74a40b606b91aab00efc6d0747e25ee85bd5c350f4db65",
         "decisions": "999a134edb4939069bd19077419cd1483ae0fcc3908e9a06cff8dcbfb15d600e"
       }
     },
@@ -1069,8 +1069,8 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "46558b4dafc0b9da50f09407d81a7cf5cd36f8ee5edcc2f03542b824bcf8763a",
-        "facts": "b9efae5bc9bd6aa62626f22fe0ca160393d25415966871a99272f17d634ba5fd",
+        "journal": "ac16ad3f5940c44a32425ee7de18f6e456ce4973ebc897bf985e4cd83df0ff82",
+        "facts": "e220f4517707415f3ee0e50c1355a1629845041b313626145d899d847f56962b",
         "decisions": "511978dc7dbf3deac92d1bcbe030965a201790c557c337122c4a58cae026bd41"
       }
     },
@@ -1120,8 +1120,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "47cea5493107328809e9f9bdae6a57ead28005be64f316bccd50b8ee072462ad",
-        "facts": "c102e386c547808b33b3f14c63c343893af3353184ccababbcc729bac215afbd",
+        "journal": "ec0077b52b6e4aab6bb2b3f8593e66ff2788f6a09a37f842c843e87847fa34c3",
+        "facts": "0f524b18887545942576e600cd3ed7b0c059817edbf001b7936db4555bace757",
         "decisions": "a31609e40c122b5e8f30aa253b83a4a0cf56300775097b08a079051e6df3a56a"
       }
     },
@@ -1165,8 +1165,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "ea4a444ca3578764fad790b6d005e313a2a341adb69911b8e173b32738a951da",
-        "facts": "c758ce6d9c8a392ec8d8ee4b4890d325aaee0fc6256fa21f318af49349e17b14",
+        "journal": "d160524779d878415ef13c9906cb20aae2d075021564c1d3f03f50cb9d559172",
+        "facts": "07a039f7f11ce55a603fbe30a5b871985f2df832aefa4e13211aeff70a071272",
         "decisions": "933def9a2711eafa4ec391bc029cebdf1a64e9dcad3a3fbc234c9509996a2f22"
       }
     },
@@ -1218,8 +1218,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "910f929c799b96568b6e0969b181fb4ad829815a0b0e52ea16166a5b02437745",
-        "facts": "e8ee7a55bc1da71f3c2a2c17dc52af418818e285b9a72376183438d14e8feeff",
+        "journal": "9a42f02f21ac534fba105a883e98cafcbe3f9705a77c17c11eb9e7a29ed43c4d",
+        "facts": "f687d6df306fe580567af70e72224ddaf4a5a4ef959564c2b1ebeaee2809da26",
         "decisions": "8b696dbdb80195d9fb6dabce5e457f04ff0bc1eb871aa8702cded5eeeb1cd36f"
       }
     },
@@ -1264,8 +1264,8 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "6dbf665babb3ee9b2e67826bb8ff56627ea09ec716e4aafbf21cc2e456d5ab42",
-        "facts": "44c99e398b54d07660bdfbd54ced63e40ee6f97723a7d2ba32202c42c8d89cac",
+        "journal": "0362524ce2a34f631327ef87be61042088686ea9e9df4f833951f8ffc3715ce3",
+        "facts": "005fdb0a37d50d25469f6beacd3dbdc06c2abfdc8d46a04a2a6ff676d5a413d3",
         "decisions": "efe00f9584fd6e7ef74eda607d6a79f72a855d6ced8d7f6d2a8367aa37abec2e"
       }
     },
@@ -1320,8 +1320,8 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "de0b476c9025574775c28faa8674ccca4c8bf75a557f2584c057777a05679895",
-        "facts": "45e56d431574fdd246040b39a8be38d7f6818c5143d2c18eca3313deb777abd9",
+        "journal": "c458ee7a7b4e22d395f1550f5efc8ca765a4a0a1d17bfd53aa85f88672dc98e9",
+        "facts": "527668408dce3d420d1b6bf6409ce38a0fc84bdf006117992ce18d6d9fc6bb5d",
         "decisions": "36944a4273f20eaab06566298069e3c191bef3572a9c0b4e5c163fbac9a4558a"
       }
     }

@@ -278,8 +278,6 @@ it('失效不是技能失去，部分撤销也不重复发动；最后一个有�
   await game.room.run('sources', async (ctx) => {
     await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: original });
     await game.skills.grant(ctx, { owner: 'a', skill: legacy.id, source: additional });
-    await game.skills.setEnabled(ctx, 'a', legacy.id, original, false);
-    await game.skills.setEnabled(ctx, 'a', legacy.id, original, true);
     await game.skills.revoke(ctx, 'a', legacy.id, original);
     expect(game.room.history.facts(testTiming('probe.retained'))).toHaveLength(0);
     await game.skills.revoke(ctx, 'a', legacy.id, additional);

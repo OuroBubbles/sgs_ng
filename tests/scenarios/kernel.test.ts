@@ -758,9 +758,7 @@ describe('Window 候选、行动顺序与纯查询', () => {
                   id: 'new-instance',
                   skill: 'new',
                   owner: 'a',
-                  grants: [
-                    { source: { kind: 'effect', id: 'grant' }, enabled: true, scopeId: null },
-                  ],
+                  grants: [{ source: { kind: 'effect', id: 'grant' }, scopeId: null }],
                 },
               },
             ],

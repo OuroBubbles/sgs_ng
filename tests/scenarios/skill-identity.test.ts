@@ -76,7 +76,7 @@ async function resolveAction(game: Game, rule: Scenario) {
 }
 
 for (const rule of cases) {
-  for (const change of ['recreate', 'disable-enable', 'additional-source'] as const) {
+  for (const change of ['recreate', 'additional-source'] as const) {
     it(`${rule.name}支付后${change}不刷新本阶段次数；新阶段仍可再次发动且原后效完整结束`, async () => {
       const game = scenario();
       const skill = `standard:${rule.id}`;
@@ -92,9 +92,6 @@ for (const rule of cases) {
           if (change === 'recreate') {
             await game.skills.revoke(ctx, 'a', skill, original);
             await game.skills.grant(ctx, { owner: 'a', skill, source: original });
-          } else if (change === 'disable-enable') {
-            await game.skills.setEnabled(ctx, 'a', skill, original, false);
-            await game.skills.setEnabled(ctx, 'a', skill, original, true);
           } else {
             await game.skills.grant(ctx, { owner: 'a', skill, source: additional });
             await game.skills.revoke(ctx, 'a', skill, original);
@@ -203,45 +200,40 @@ it.each(cases)('$name嵌套同角色出牌阶段有独立次数，返回后外�
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
 
-it.each([false, true])(
-  '授予/启停/撤销技能以拥有者为事件主体，活动回合优先为 %s',
-  async (inTurn) => {
-    const game = scenario();
-    const seen: string[] = [];
-    for (const owner of ['a', 'b', 'c', 'd'])
-      game.room.on(Skill.changed, {
-        id: `changed:${owner}`,
-        owner,
-        eligible: () => true,
-        run: () => {
-          seen.push(owner);
-        },
-      });
-    const body = async (ctx: Context) => {
-      await game.skills.grant(ctx, { owner: 'c', skill: 'standard:kurou', source: original });
-      await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, false);
-      await game.skills.setEnabled(ctx, 'c', 'standard:kurou', original, true);
-      await game.skills.revoke(ctx, 'c', 'standard:kurou', original);
-    };
-    await game.room.run('change', async (ctx) => {
-      if (inTurn) await runTurn(ctx, 'b', { phases: ['play'], body: (at) => body(at) });
-      else await body(ctx);
+it.each([false, true])('授予/撤销技能以拥有者为事件主体，活动回合优先为 %s', async (inTurn) => {
+  const game = scenario();
+  const seen: string[] = [];
+  for (const owner of ['a', 'b', 'c', 'd'])
+    game.room.on(Skill.changed, {
+      id: `changed:${owner}`,
+      owner,
+      eligible: () => true,
+      run: () => {
+        seen.push(owner);
+      },
     });
-    const order = inTurn ? ['b', 'c', 'd', 'a'] : ['c', 'd', 'a', 'b'];
-    expect(seen).toEqual(Array.from({ length: 4 }, () => order).flat());
-    const orders = game.room.history.entries.filter(
-      (entry) =>
-        entry.type === 'window.order' &&
-        (entry.data as { window: string }).window === Skill.changed.id,
-    );
-    expect(orders.map((entry) => entry.data)).toEqual(
-      Array.from({ length: 4 }, () => ({
-        window: Skill.changed.id,
-        subject: 'c',
-        anchor: inTurn ? 'b' : 'c',
-        override: false,
-      })),
-    );
-    expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
-  },
-);
+  const body = async (ctx: Context) => {
+    await game.skills.grant(ctx, { owner: 'c', skill: 'standard:kurou', source: original });
+    await game.skills.revoke(ctx, 'c', 'standard:kurou', original);
+  };
+  await game.room.run('change', async (ctx) => {
+    if (inTurn) await runTurn(ctx, 'b', { phases: ['play'], body: (at) => body(at) });
+    else await body(ctx);
+  });
+  const order = inTurn ? ['b', 'c', 'd', 'a'] : ['c', 'd', 'a', 'b'];
+  expect(seen).toEqual(Array.from({ length: 2 }, () => order).flat());
+  const orders = game.room.history.entries.filter(
+    (entry) =>
+      entry.type === 'window.order' &&
+      (entry.data as { window: string }).window === Skill.changed.id,
+  );
+  expect(orders.map((entry) => entry.data)).toEqual(
+    Array.from({ length: 2 }, () => ({
+      window: Skill.changed.id,
+      subject: 'c',
+      anchor: inTurn ? 'b' : 'c',
+      override: false,
+    })),
+  );
+  expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
+});

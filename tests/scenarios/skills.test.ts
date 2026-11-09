@@ -90,7 +90,7 @@ describe('技能实例与独立授予来源', () => {
     expect(hits).toEqual(['new']);
   });
 
-  it('多来源授予、开关和撤销保持同一实例与单次触发，句柄按实际 World 查询', async () => {
+  it('多来源授予和撤销保持同一实例与单次触发，句柄按实际 World 查询', async () => {
     const game = room();
     const other = room();
     const window = testTiming<null>('test.skill');
@@ -130,22 +130,10 @@ describe('技能实例与独立授予来源', () => {
         const otherHandle = book.binding(other.world, id)!.self;
         expect(handle.active({ world: other.world } as Context)).toBe(true);
 
-        await book.setEnabled(ctx, 'a', 'test:skill', general, false);
         expect(skillEffective(ctx.world, id)).toBe(true);
         expect(handle.active(ctx)).toBe(true);
-        await book.setEnabled(ctx, 'a', 'test:skill', equipment, false);
-        expect(skillEffective(ctx.world, id)).toBe(false);
-        expect(handle.active(ctx)).toBe(false);
         expect(otherHandle.active({ world: other.world } as Context)).toBe(true);
-        expect(otherHandle.active(ctx)).toBe(false);
-        await ctx.window(window, null);
-        expect(hits).toEqual([]);
-
-        await book.setEnabled(ctx, 'a', 'test:skill', general, true);
-        expect(skillEffective(ctx.world, id)).toBe(true);
-        expect(handle.active(ctx)).toBe(true);
-
-        await book.setEnabled(ctx, 'a', 'test:skill', equipment, true);
+        expect(otherHandle.active(ctx)).toBe(true);
         await ctx.window(window, null);
         await book.revoke(ctx, 'a', 'test:skill', general);
         await ctx.window(window, null);

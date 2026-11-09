@@ -119,11 +119,7 @@ export const skillBlocked = defineMark('core:skill-blocked', false);
 
 export function skillEffective(world: WorldReader, instance: string): boolean {
   const current = world.snapshot.skills.find((skill) => skill.id === instance);
-  return (
-    current !== undefined &&
-    current.grants.some((grant) => grant.enabled) &&
-    !isSkillBlocked(world, current.owner, instance)
-  );
+  return current !== undefined && !isSkillBlocked(world, current.owner, instance);
 }
 
 export function isSkillBlocked(world: WorldReader, owner: string, instance: string): boolean {
@@ -146,7 +142,6 @@ export function skillLost(
     before?.id === self.id &&
     before.owner === self.owner &&
     before.skill === self.skill &&
-    before.grants.some((grant) => grant.enabled) &&
     !world.snapshot.skills.some((current) => current.id === self.id) &&
     !isSkillBlocked(world, self.owner, self.id)
   );
@@ -392,7 +387,7 @@ export class SkillBook implements TriggerSource {
         owner: input.owner,
         grants: [
           ...(before?.grants ?? []),
-          { source: input.source, enabled: true, scopeId: input.lifetime?.id ?? null },
+          { source: input.source, scopeId: input.lifetime?.id ?? null },
         ],
       });
       return this.#change(child, before, after);
@@ -409,28 +404,6 @@ export class SkillBook implements TriggerSource {
         return immutable({ kind: 'unchanged', before, after: before });
       const grants = before.grants.filter((grant) => !sameSource(grant.source, source));
       return this.#change(child, before, grants.length ? { ...before, grants } : null);
-    });
-  }
-
-  setEnabled(
-    ctx: Context,
-    owner: string,
-    skill: string,
-    source: SkillSource,
-    enabled: boolean,
-  ): Promise<SkillChange> {
-    return ctx.flow('skill.enable', (child) => {
-      const before =
-        child.world.snapshot.skills.find(
-          (instance) => instance.owner === owner && instance.skill === skill,
-        ) ?? null;
-      const grant = before?.grants.find((item) => sameSource(item.source, source));
-      if (!before || !grant || grant.enabled === enabled)
-        return immutable({ kind: 'unchanged', before, after: before });
-      return this.#change(child, before, {
-        ...before,
-        grants: before.grants.map((item) => (item === grant ? { ...item, enabled } : item)),
-      });
     });
   }
 
