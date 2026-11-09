@@ -16,17 +16,19 @@ import { UsePlan } from './plan';
 import type { UsePlanView } from './plan';
 import { withProcessing } from './processing';
 import { isTargetProhibited, targetCount, usageLimit } from './rule';
-import { isResponseBlocked, timingSnapshot, victimOf } from './types';
+import { isResponseBlocked, primaryOf, timingSnapshot, tupleOf } from './types';
 import type {
   CardChoice,
   CardEffect,
   CardUseRef,
   EffectRef,
   EffectSnapshot,
+  TargetFilter,
   TargetResolver,
   UseIntent,
   UseRequest,
   UseRules,
+  UseTarget,
   UseSnapshot,
   UseTiming,
 } from './types';
@@ -99,72 +101,41 @@ export const Resolve = defineEvent('resolve', {
   }>(),
 });
 
-/** 玩家草稿可以包含附属选择；只有验证后的真实意图进入用牌与效果管线。 */
+/** 玩家按位置逐个点选角色；元组牌按 target 过滤器个数分组为有序目标元组。 */
 export function useSelection(
   ctx: Context,
   input: Omit<UseIntent, 'targets' | 'parameters'>,
-): Decision<Pick<UseIntent, 'targets' | 'parameters'>> {
+): Decision<Pick<UseIntent, 'targets'>> {
   return ctx.query(() => {
-    const intent: UseIntent = { ...input, targets: [] };
-    const built = buildCard(ctx, intent.actor, intent.choice, 'use');
+    const built = buildCard(ctx, input.actor, input.choice, 'use');
     const rules = built.ok ? cardDef(ctx, built.value.name).use : undefined;
-    const victim = rules?.victim;
-    // 附属目标是最后选出的一名角色：记入 parameters.victim，不进入效果目标。
-    const split = (targets: readonly string[]): Pick<UseIntent, 'targets' | 'parameters'> =>
-      victim
-        ? { targets: targets.slice(0, -1), parameters: { victim: targets.at(-1) } }
-        : { targets };
+    const arity = rules ? targetFilters(rules).length : 1;
     const parse = (raw: unknown): Validation<readonly string[]> =>
       !raw || typeof raw !== 'object' || !('targets' in raw) || !isStringArray(raw.targets)
         ? invalid('Expected target IDs.')
         : { ok: true, value: raw.targets };
-    const check = (targets: readonly string[]) =>
-      victim && targets.length < 2
-        ? invalid('Illegal target.')
-        : validateUse(ctx, { ...intent, ...split(targets) });
     return {
-      player: intent.actor,
+      player: input.actor,
       kind: 'cards-targets',
-      prompt: victim?.prompt ?? '选择用牌目标',
+      prompt: '选择用牌目标',
       optional: true,
       feedback: (raw) => {
         const parsed = parse(raw);
         if (!parsed.ok) return null;
-        if (!victim) return inspectUse(ctx, { ...intent, targets: parsed.value });
-        const targets = parsed.value;
-        const complete = (next: readonly string[]) => check(next).ok;
-        const reachable = (next: readonly string[]) =>
-          complete(next) ||
-          ctx.world.snapshot.players.some(
-            (player) => player.alive && !next.includes(player.id) && complete([...next, player.id]),
-          );
-        const done = check(targets);
-        const valid = !targets.length || reachable(targets);
-        return immutable({
-          model: 'use',
-          complete: done.ok,
-          reason: done.ok ? '' : done.reason,
-          prompt: victim.prompt,
-          targetCount: {
-            min: valid && !done.ok ? Math.max(2, targets.length + 1) : 2,
-            max: 'all',
-          },
-          fixedTargets: [],
-          targets: ctx.world.snapshot.players.map((player) => {
-            const selected = targets.includes(player.id);
-            return {
-              id: player.id,
-              selected,
-              selectable: selected || (player.alive && reachable([...targets, player.id])),
-            };
-          }),
-        });
+        const whole = parsed.value.length - (parsed.value.length % arity);
+        return inspectUse(
+          ctx,
+          { ...input, targets: groupTargets(parsed.value.slice(0, whole), arity) },
+          parsed.value.slice(whole),
+        );
       },
       validate: (raw) => {
         const parsed = parse(raw);
         if (!parsed.ok) return parsed;
-        const legal = check(parsed.value);
-        return legal.ok ? { ok: true, value: split(parsed.value) } : legal;
+        if (parsed.value.length % arity) return invalid('Incomplete target tuple.');
+        const targets = groupTargets(parsed.value, arity);
+        const legal = validateUse(ctx, { ...input, targets });
+        return legal.ok ? { ok: true, value: { targets } } : legal;
       },
     };
   });
@@ -172,7 +143,13 @@ export function useSelection(
 
 export function validateUse(ctx: Context, intent: UseIntent): Validation<UseRequest> {
   return ctx.query(() => {
-    if (!isStringArray(intent.targets)) return invalid('Expected target IDs.');
+    if (
+      !Array.isArray(intent.targets) ||
+      Array.from(intent.targets).some(
+        (target) => typeof target !== 'string' && !isStringArray(target),
+      )
+    )
+      return invalid('Expected target IDs.');
     const built = buildCard(ctx, intent.actor, intent.choice, 'use');
     if (!built.ok) return built;
     if (
@@ -234,7 +211,6 @@ export function validateUse(ctx: Context, intent: UseIntent): Validation<UseRequ
     if (!rules) return invalid('This card cannot be actively used.');
     if (rules.timings && !rules.timings.includes(intent.timing.kind))
       return invalid('Card is unavailable at this timing.');
-    if (rules.victim && typeof victimOf(request) !== 'string') return invalid('Missing victim.');
     if (rules.fixedTargets) {
       if (intent.targets.length) return invalid('Fixed-target cards do not accept manual targets.');
       const targets = immutable(
@@ -252,7 +228,7 @@ export function validateUse(ctx: Context, intent: UseIntent): Validation<UseRequ
       };
     }
     if (
-      new Set(intent.targets).size !== intent.targets.length ||
+      new Set(intent.targets.map(primaryOf)).size !== intent.targets.length ||
       !countValid(
         targetCount(ctx, request),
         intent.targets.length,
@@ -270,8 +246,12 @@ export function validateUse(ctx: Context, intent: UseIntent): Validation<UseRequ
   });
 }
 
-/** 目标的部分选择反馈由规则生成；最终可用性仍完整复用 validateUse。 */
-export function inspectUse(ctx: Context, intent: UseIntent): UseFeedback {
+/** 目标的部分选择反馈由规则生成；partial 是尚未选满的元组前缀。最终可用性仍完整复用 validateUse。 */
+export function inspectUse(
+  ctx: Context,
+  intent: UseIntent,
+  partial: readonly string[] = [],
+): UseFeedback {
   return ctx.query(() => {
     const built = buildCard(ctx, intent.actor, intent.choice, 'use');
     const rules = built.ok ? cardDef(ctx, built.value.name).use : undefined;
@@ -284,7 +264,8 @@ export function inspectUse(ctx: Context, intent: UseIntent): UseFeedback {
         fixedTargets: [],
         targets: [],
       });
-    const checked = validateUse(ctx, intent);
+    const checked = partial.length ? invalid('Incomplete target tuple.') : validateUse(ctx, intent);
+    const arity = targetFilters(rules).length;
     const request: UseRequest = {
       actor: intent.actor,
       card: built.value,
@@ -294,29 +275,36 @@ export function inspectUse(ctx: Context, intent: UseIntent): UseFeedback {
     };
     const count = targetCount(ctx, request);
     const max = count.max === 'all' ? ctx.world.snapshot.players.length : count.max;
+    const selected = [...intent.targets.flatMap(tupleOf), ...partial];
     if (rules.fixedTargets)
       return immutable({
         model: 'use',
         complete: checked.ok,
         reason: checked.ok ? '' : checked.reason,
         targetCount: { min: 0, max: 0 },
-        fixedTargets: checked.ok ? checked.value.targets : [],
+        fixedTargets: checked.ok ? checked.value.targets.map(primaryOf) : [],
         targets: [],
       });
     return immutable({
       model: 'use',
       complete: checked.ok,
       reason: checked.ok ? '' : checked.reason,
-      targetCount: count,
+      targetCount:
+        arity === 1
+          ? count
+          : { min: count.min * arity, max: count.max === 'all' ? 'all' : count.max * arity },
       fixedTargets: [],
-      targets: ctx.world.snapshot.players.map((player) => ({
-        id: player.id,
-        selected: intent.targets.includes(player.id),
-        selectable:
-          intent.targets.includes(player.id) ||
-          (intent.targets.length < max &&
-            legalTarget(ctx, { ...request, targets: [...intent.targets, player.id] }, player.id)),
-      })),
+      targets: ctx.world.snapshot.players.map((player) => {
+        const next = arity === 1 ? player.id : [...partial, player.id];
+        return {
+          id: player.id,
+          selected: selected.includes(player.id),
+          selectable:
+            selected.includes(player.id) ||
+            (intent.targets.length < max &&
+              legalTarget(ctx, { ...request, targets: [...intent.targets, next] }, next, true)),
+        };
+      }),
     });
   });
 }
@@ -663,11 +651,33 @@ export function abilityHandle(ctx: Context, id: string): SkillHandle {
   if (!binding) throw new Error('Ability source is no longer available.');
   return binding.self;
 }
-function legalTarget(ctx: Context, request: UseRequest, target: string): boolean {
+const targetFilters = (rules: UseRules): readonly TargetFilter[] =>
+  typeof rules.target === 'function' ? [rules.target] : rules.target;
+/** 按牌定义的元组长度把逐个点选的角色分组；单角色目标保持字符串。 */
+const groupTargets = (ids: readonly string[], arity: number): readonly UseTarget[] =>
+  arity === 1
+    ? ids
+    : Array.from({ length: ids.length / arity }, (_, i) => ids.slice(i * arity, (i + 1) * arity));
+/** 元组逐位过滤；首位是效果目标，另受目标禁令约束。prefix 时只检查已选前缀。 */
+function legalTarget(
+  ctx: Context,
+  request: UseRequest,
+  target: UseTarget,
+  prefix = false,
+): boolean {
+  const rules = cardDef(ctx, request.card.name).use;
+  if (!rules) return false;
+  const filters = targetFilters(rules);
+  const tuple = tupleOf(target);
   return ctx.query(
     () =>
-      ctx.world.snapshot.players.some((player) => player.id === target && player.alive) &&
-      !isTargetProhibited(ctx, request.actor, target, request.card) &&
-      (cardDef(ctx, request.card.name).use?.target(ctx, { request, target }) ?? false),
+      (typeof target === 'string' ? filters.length === 1 : filters.length > 1) &&
+      (prefix ? tuple.length <= filters.length : tuple.length === filters.length) &&
+      tuple.every(
+        (id, i) =>
+          ctx.world.snapshot.players.some((player) => player.id === id && player.alive) &&
+          (i > 0 || !isTargetProhibited(ctx, request.actor, id, request.card)) &&
+          filters[i]!(ctx, { request, target: id, chosen: tuple.slice(0, i) }),
+      ),
   );
 }

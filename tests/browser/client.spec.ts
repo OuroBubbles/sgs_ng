@@ -2458,7 +2458,7 @@ for (const attack of [false, true]) {
     } else await page.getByRole('button', { name: '放弃使用', exact: true }).click();
     await passCountersUntil(page, 'play-action');
     await expect(page.getByTestId('journal')).toContainText(
-      '乙席使用【借刀杀人】 → 甲席，令其对 乙席 使用杀',
+      '乙席使用【借刀杀人】 → 甲席（→ 乙席）',
     );
     if (attack) {
       await expect(page.getByTestId('target-乙席')).toHaveAccessibleName(/体力3\/4/);

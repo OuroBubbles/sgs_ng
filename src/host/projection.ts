@@ -37,7 +37,7 @@ import { isFact } from '../core/history/journal';
 import type { Fact } from '../core/history/journal';
 import type { Timing } from '../core/runtime/event';
 import type { Card } from '../core/model/state';
-import { victimOf } from '../rules/cards/types';
+import { primaryOf, tupleOf } from '../rules/cards/types';
 import type { UseSnapshot } from '../rules/cards/types';
 import { Skill } from '../rules/skills/skills';
 import { Discard } from '../rules/cards/discard';
@@ -343,7 +343,8 @@ function publicHistory(
         genderOf(world, actor) === 'female' ? 'female' : 'male'
       ];
     if (voice) play({ voice });
-    const targets = declaration.targets ?? [];
+    const tuples = (declaration.targets ?? []).map(tupleOf);
+    const targets = tuples.map(primaryOf);
     if (actions.length < 3) actionUses.set(fact.seq, declaration.useId ?? '');
     const responding = fact.data.kind === CardEvent.responded.id;
     actions.push({
@@ -355,7 +356,7 @@ function publicHistory(
       processing: processing(declaration.processing),
     });
     const { beneficiary } = declaration;
-    return `${actor}${responding && beneficiary && beneficiary !== actor ? `为${beneficiary}` : ''}${responding ? '打出' : '使用'}【${card.name}】${targets.length ? ` → ${targets.join('、')}` : ''}${declaration.card.name === 'standard:collateral' ? `，令其对 ${victimOf(declaration)} 使用杀` : ''}`;
+    return `${actor}${responding && beneficiary && beneficiary !== actor ? `为${beneficiary}` : ''}${responding ? '打出' : '使用'}【${card.name}】${tuples.length ? ` → ${tuples.map(([first, ...rest]) => (rest.length ? `${first}（→ ${rest.join('、')}）` : first)).join('、')}` : ''}`;
   });
   on(
     Collateral.weaponTaken,

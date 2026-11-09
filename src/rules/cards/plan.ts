@@ -8,17 +8,19 @@ import type {
   CardEffect,
   EffectSnapshot,
   SemanticCard,
+  UseTarget,
   TargetOptions,
   TargetStage,
   UseSnapshot,
   UseTiming,
 } from './types';
-import { targetStages, timingSnapshot } from './types';
+import { primaryOf, targetStages, timingSnapshot } from './types';
 import { CardEvent } from './move';
 
 interface DeclaredEffect {
   readonly effectId: string;
   readonly target: string;
+  readonly tuple?: readonly string[];
   readonly cancelled: string | null;
   readonly ignoredEquipment: EffectSnapshot['ignoredEquipment'];
   readonly responseRequirements: NonNullable<EffectSnapshot['responseRequirements']>;
@@ -67,22 +69,23 @@ export interface UsePlanView {
   readonly prohibitedCounters: readonly string[];
   readonly targets: readonly string[];
   readonly effects: readonly EffectSnapshot[];
-  addTarget(ctx: Context, target: string, reason: string): string;
-  repeatTarget(ctx: Context, target: string, reason: string): string;
+  /** 元组牌：替换只给角色时保留原元组的后续位置；重复只给角色时复用该目标最近的元组。 */
+  addTarget(ctx: Context, target: UseTarget, reason: string): string;
+  repeatTarget(ctx: Context, target: UseTarget, reason: string): string;
   removeTarget(ctx: Context, id: string, reason: string): void;
-  canReplaceTarget(ctx: Context, id: string, target: string, options?: TargetOptions): boolean;
+  canReplaceTarget(ctx: Context, id: string, target: UseTarget, options?: TargetOptions): boolean;
   /** 构造此刻的改写；与费用合并时须在 pay.legal 重查选择，不跨 await 缓存 Change。 */
   replaceTargetChange(
     ctx: Context,
     id: string,
-    target: string,
+    target: UseTarget,
     reason: string,
     options?: TargetOptions,
   ): Change;
   replaceTarget(
     ctx: Context,
     id: string,
-    target: string,
+    target: UseTarget,
     reason: string,
     options?: TargetOptions,
   ): string;
@@ -117,6 +120,10 @@ class TargetEffect implements CardEffect {
   }
   get target() {
     return this.plan.declaredEffect(this.effectId).target;
+  }
+  get tuple() {
+    const declared = this.plan.declaredEffect(this.effectId);
+    return declared.tuple ?? [declared.target];
   }
   get state(): EffectSnapshot['state'] {
     return this.plan.declaredEffect(this.effectId).cancelled !== null ? 'cancelled' : this.#state;
@@ -216,6 +223,7 @@ class TargetEffect implements CardEffect {
       effectId: this.effectId,
       actor: this.actor,
       target: this.target,
+      ...(this.plan.declaredEffect(this.effectId).tuple ? { tuple: this.tuple } : {}),
       card: this.card,
       processing: this.processing,
       state: this.state,
@@ -236,11 +244,11 @@ export interface UsePlanInit {
   readonly card: SemanticCard;
   readonly processing: string;
   readonly timing: UseTiming;
-  readonly targets: readonly string[];
+  readonly targets: readonly UseTarget[];
   readonly ctx: Context;
   readonly lifetime: Lifetime;
   /** 追加/转移目标的合法性；原目标的合法性已由用牌验证。 */
-  readonly accepts: (ctx: Context, target: string, options?: TargetOptions) => boolean;
+  readonly accepts: (ctx: Context, target: UseTarget, options?: TargetOptions) => boolean;
   readonly stage?: 'use' | 'delayed';
   readonly effectPrefix?: string;
   readonly parameters?: unknown;
@@ -282,7 +290,7 @@ export class UsePlan implements UsePlanView {
     this.effectPrefix = effectPrefix;
     const actionOrder = ctx.actionOrder(actor);
     const orderedTargets = [...targets].sort(
-      (a, b) => actionOrder.indexOf(a) - actionOrder.indexOf(b),
+      (a, b) => actionOrder.indexOf(primaryOf(a)) - actionOrder.indexOf(primaryOf(b)),
     );
     this.#retained = immutable({
       id,
@@ -290,7 +298,8 @@ export class UsePlan implements UsePlanView {
       actionOrder,
       effects: orderedTargets.map((target, i) => ({
         effectId: `${effectPrefix}:effect:${i + 1}`,
-        target,
+        target: primaryOf(target),
+        ...(typeof target === 'string' ? {} : { tuple: target }),
         cancelled: null,
         ignoredEquipment: [],
         responseRequirements: [],
@@ -368,7 +377,7 @@ export class UsePlan implements UsePlanView {
   }
   editEffect(ctx: Context, id: string, edit: (entry: DeclaredEffect) => DeclaredEffect): void {
     this.assertMutable(ctx);
-    if (!this.#unsealed(id)) throw new Error('Target effect is sealed.');
+    if (!this.#unsealed(id)) throw new Error('UseTarget effect is sealed.');
     const state = this.#declaration();
     this.#commit(ctx, {
       ...state,
@@ -391,33 +400,41 @@ export class UsePlan implements UsePlanView {
       ),
     });
   }
-  #canTarget(ctx: Context, target: string, repeat: boolean, options?: TargetOptions): boolean {
+  /** 只给角色时沿用 from 的元组尾部（借刀转移持械者仍对原杀目标）。 */
+  #complete(target: UseTarget, from: DeclaredEffect | undefined): UseTarget {
+    return typeof target === 'string' && from?.tuple ? [target, ...from.tuple.slice(1)] : target;
+  }
+  #canTarget(ctx: Context, target: UseTarget, repeat: boolean, options?: TargetOptions): boolean {
     return (
       this.#open &&
       this.lifetime.active &&
       this.lifetime.belongsTo(ctx.world) &&
       ctx.cause.scopePath.includes(this.lifetime.id) &&
       ctx.query(() => this.acceptsTarget(ctx, target, options)) &&
-      (repeat || !this.targets.includes(target))
+      (repeat || !this.targets.includes(primaryOf(target)))
     );
   }
-  addTarget(ctx: Context, target: string, reason: string): string {
+  addTarget(ctx: Context, target: UseTarget, reason: string): string {
     return this.#add(ctx, target, reason, false);
   }
-  repeatTarget(ctx: Context, target: string, reason: string): string {
-    return this.#add(ctx, target, reason, true);
+  repeatTarget(ctx: Context, target: UseTarget, reason: string): string {
+    const from = [...this.#declaration().effects]
+      .reverse()
+      .find((entry) => entry.target === target);
+    return this.#add(ctx, this.#complete(target, from), reason, true);
   }
-  #newEffect(state: UseDeclaration, target: string): DeclaredEffect {
+  #newEffect(state: UseDeclaration, target: UseTarget): DeclaredEffect {
     return {
       effectId: `${this.effectPrefix}:effect:${state.effects.length + 1}`,
-      target,
+      target: primaryOf(target),
+      ...(typeof target === 'string' ? {} : { tuple: target }),
       cancelled: null,
       ignoredEquipment: state.ignoredEquipment,
       responseRequirements: [],
       responseBlocks: [],
     };
   }
-  #add(ctx: Context, target: string, reason: string, repeat: boolean): string {
+  #add(ctx: Context, target: UseTarget, reason: string, repeat: boolean): string {
     this.assertMutable(ctx);
     if (!reason || !this.#canTarget(ctx, target, repeat))
       throw new Error('Invalid added target; repeat it explicitly for a duplicate.');
@@ -431,7 +448,7 @@ export class UsePlan implements UsePlanView {
         {
           kind: repeat ? 'repeat' : 'add',
           effectId: effect.effectId,
-          target,
+          target: effect.target,
           reason,
           fromEffectId: null,
         },
@@ -456,17 +473,18 @@ export class UsePlan implements UsePlanView {
       ],
     });
   }
-  canReplaceTarget(ctx: Context, id: string, target: string, options?: TargetOptions): boolean {
+  canReplaceTarget(ctx: Context, id: string, target: UseTarget, options?: TargetOptions): boolean {
+    const from = this.#declaration().effects.find((entry) => entry.effectId === id);
     return (
-      this.#declaration().effects.some((entry) => entry.effectId === id) &&
+      from !== undefined &&
       this.#unsealed(id) &&
-      this.#canTarget(ctx, target, false, options)
+      this.#canTarget(ctx, this.#complete(target, from), false, options)
     );
   }
   replaceTargetChange(
     ctx: Context,
     id: string,
-    target: string,
+    target: UseTarget,
     reason: string,
     options?: TargetOptions,
   ): Change {
@@ -474,7 +492,7 @@ export class UsePlan implements UsePlanView {
     if (!reason || !this.canReplaceTarget(ctx, id, target, options))
       throw new Error('Invalid replacement target.');
     const state = this.#declaration();
-    const effect = this.#newEffect(state, target);
+    const effect = this.#newEffect(state, this.#complete(target, this.declaredEffect(id)));
     return stateChange(ctx, declarationKey, this.#stateTarget(), {
       ...state,
       effects: [
@@ -485,14 +503,20 @@ export class UsePlan implements UsePlanView {
       ],
       edits: [
         ...state.edits,
-        { kind: 'replace', effectId: effect.effectId, target, reason, fromEffectId: id },
+        {
+          kind: 'replace',
+          effectId: effect.effectId,
+          target: effect.target,
+          reason,
+          fromEffectId: id,
+        },
       ],
     });
   }
   replaceTarget(
     ctx: Context,
     id: string,
-    target: string,
+    target: UseTarget,
     reason: string,
     options?: TargetOptions,
   ): string {
@@ -500,7 +524,7 @@ export class UsePlan implements UsePlanView {
     ctx.commit(CardEvent.targetReplaced, [change], {
       useId: this.id,
       fromEffectId: id,
-      target,
+      target: primaryOf(target),
       reason,
     });
     return this.#declaration().effects.at(-1)!.effectId;

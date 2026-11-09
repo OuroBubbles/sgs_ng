@@ -223,7 +223,8 @@ export type { ResponseResult } from '../rules/cards/response';
 export type { CardResponse, ResponseSubject } from '../rules/cards/played';
 export {
   ownedCards,
-  victimOf,
+  primaryOf,
+  tupleOf,
   viewAs,
   effectReference,
   isResponseBlocked,
@@ -259,6 +260,8 @@ export type {
   ResolveTargets,
   TargetResolver,
   UseRules,
+  UseTarget,
+  TargetFilter,
   CardUseInput,
   CardTargetInput,
   CardFixedTargetsInput,

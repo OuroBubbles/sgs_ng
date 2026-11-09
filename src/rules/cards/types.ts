@@ -154,23 +154,29 @@ export type TimingSnapshot =
       readonly subject: CounterSubject;
       readonly root: EffectRef;
     };
+/**
+ * 一个用牌目标：单个角色，或按牌定义 target 过滤器顺序排列的角色元组（如借刀杀人的 [持械者, 杀目标]）。
+ * 元组首位是效果目标；单元素元组规范写作字符串。
+ */
+export type UseTarget = string | readonly string[];
+export const tupleOf = (target: UseTarget): readonly string[] =>
+  typeof target === 'string' ? [target] : target;
+export const primaryOf = (target: UseTarget): string =>
+  typeof target === 'string' ? target : target[0]!;
 export interface UseIntent {
   readonly actor: string;
   readonly choice: CardChoice;
-  readonly targets: readonly string[];
+  readonly targets: readonly UseTarget[];
   readonly timing: UseTiming;
   /** 规则调用者可预填附属选择；牌定义必须验证，普通玩家输入不直接透传。 */
   readonly parameters?: unknown;
   /** 本次用牌明确禁止的反制牌名，不改变整种牌的定义。 */
   readonly prohibitedCounters?: readonly string[];
 }
-/** 声明了 use.victim 的牌：管线已校验 parameters.victim 为字符串。 */
-export const victimOf = (use: { readonly parameters?: unknown }): string =>
-  (use.parameters as { readonly victim: string } | undefined)?.victim as string;
 export interface UseRequest {
   readonly actor: string;
   readonly card: SemanticCard;
-  readonly targets: readonly string[];
+  readonly targets: readonly UseTarget[];
   readonly timing: UseTiming;
   readonly parameters?: unknown;
   readonly targetOptions?: TargetOptions;
@@ -191,6 +197,8 @@ export interface EffectRef {
   readonly effectId: string;
   readonly actor: string;
   readonly target: string;
+  /** 元组目标的完整角色序列（首位即 target）；单角色目标省略。 */
+  readonly tuple?: readonly string[];
   readonly card: SemanticCard;
   readonly processing: string;
   readonly prohibitedCounters?: readonly string[];
@@ -221,6 +229,8 @@ export interface EffectSnapshot extends EffectRef {
   readonly reason: string | null;
 }
 export interface CardEffect extends EffectRef {
+  /** 本效果的目标元组；单角色目标为 [target]。 */
+  readonly tuple: readonly string[];
   readonly state: EffectSnapshot['state'];
   readonly targetStage: TargetStage | null;
   cancel(ctx: Context, reason: string): void;
@@ -259,7 +269,10 @@ export interface CardUseInput {
 }
 export interface CardTargetInput extends CardUseInput {
   readonly target: string;
+  /** 同一目标元组中已选的前序角色；单角色目标为空。 */
+  readonly chosen: readonly string[];
 }
+export type TargetFilter = (ctx: Context, input: CardTargetInput) => boolean;
 export interface CardFixedTargetsInput {
   readonly actor: string;
   readonly card: SemanticCard;
@@ -278,9 +291,8 @@ export interface UseRules {
   readonly timings?: readonly UseTiming['kind'][];
   readonly usage?: { readonly key: string; readonly max: number };
   readonly canUse?: (ctx: Context, input: CardUseInput) => string | null;
-  readonly target: (ctx: Context, input: CardTargetInput) => boolean;
-  /** 附属目标（如借刀杀人的杀目标）：玩家最后选出的一名角色记入 parameters.victim，用 victimOf 读取。 */
-  readonly victim?: { readonly prompt: string };
+  /** 单个过滤器选单角色目标；过滤器数组按位置选目标元组，count 计元组个数。 */
+  readonly target: TargetFilter | readonly [TargetFilter, ...TargetFilter[]];
   /** 宣告前的附属选择：返回已验证的普通参数；统一管线再做最终校验；取消不支付、不开放用牌窗口。 */
   readonly prepare?: (
     ctx: Context,

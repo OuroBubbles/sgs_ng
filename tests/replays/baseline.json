@@ -45,7 +45,7 @@
       "id": "4p-01",
       "seed": 59,
       "lineup": ["standard:huanggai", "standard:zhenji", "standard:huatuo", "standard:daqiao"],
-      "entries": 11123,
+      "entries": 11121,
       "facts": 1585,
       "decisions": 123,
       "result": {
@@ -76,9 +76,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "7989def1bf98e2e4dbe8fd7e1c0eaf73751a048ab0c2a56e8937113089c2c265",
-        "facts": "5d5a0a45a420b14af4a9ba38f89b4ba302e02813b1013bd442d2f8f99e376593",
-        "decisions": "7e2f565d8f1f63227d6749a52e65d5f495615f4b5e827916ed986240708ac54b"
+        "journal": "7dd3da22c8c61b8139d114a20adfed32b70a6a35ce47afca3e859c117a03fbdf",
+        "facts": "e20d15bcfb7e0c406604a8c156d77b2d8b5aef9de6ec9064e285c0b6e63bf11d",
+        "decisions": "c146c785792b1039d55fc0b09b6e9e4bba59af71a33620691756a2344b131754"
       }
     },
     {
@@ -164,7 +164,7 @@
       "id": "4p-04",
       "seed": 110,
       "lineup": ["standard:zhangfei", "standard:caocao", "standard:luxun", "standard:diaochan"],
-      "entries": 7957,
+      "entries": 7955,
       "facts": 1117,
       "decisions": 86,
       "result": {
@@ -190,9 +190,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "dc189b733cd1fcb3c45b359dccc4c76125016ae91e33325a693c1fbe73d47462",
-        "facts": "1ca01607f81bfc223dd21cb9cf8344702b6915b87e3b5b8afc2b9851f788ffe9",
-        "decisions": "e7c566b75965f0b1009b4c1bcae962187c53c134e42576dd76efe90475cdcc7c"
+        "journal": "96fc542afc87812be8eafbb54052e3aadd5f994539265f5cd649c04b9098d94e",
+        "facts": "79b0d4e02b561d7ca9a86f0b079fa550d3b6329f36c690d01134af5bc352a085",
+        "decisions": "fb8d7e8a9c9dfcba7d1387a9f824453c86adc5b01d778103de52a0e8f5d3146d"
       }
     },
     {
@@ -204,7 +204,7 @@
         "standard:huangyueying",
         "standard:zhugeliang"
       ],
-      "entries": 28924,
+      "entries": 28922,
       "facts": 4120,
       "decisions": 389,
       "result": {
@@ -243,9 +243,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "26576792fde1d7296335cb8f98507b78a23e9e2f13d1b708be60bc688e7b5c74",
-        "facts": "a97082dd004a2e7b53093c121019475631f08a9e1b7da8ef473e3d32b7366a5e",
-        "decisions": "e48015e4950216ee41aec95fa1d6edb8919230f8f67ce14ca0d6e4344b74c6f4"
+        "journal": "c6d5faee9577a202c038c19abba0b5ff5c4d9b0c133778add5eaeef958507fa0",
+        "facts": "b053a2d8fc04d1bbc860b977593d912064e7164732fc1f1e2a525637cdb1637a",
+        "decisions": "e34db7800dbf5e26f9d159dfea79ef046069b267fe19000c1ce516cbc6ca1c9e"
       }
     },
     {
@@ -293,7 +293,7 @@
       "id": "4p-07",
       "seed": 161,
       "lineup": ["standard:xuchu", "standard:huatuo", "standard:daqiao", "standard:huanggai"],
-      "entries": 6587,
+      "entries": 6585,
       "facts": 935,
       "decisions": 75,
       "result": {
@@ -321,9 +321,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "df038e5ad520ca74bd1b42f547611dc8f3a4a409799329d35fc318bc8a4ee6af",
-        "facts": "dc3e45cd25aa0eb4213089219194376d171b2e526f5f63cc2dfb7b70fcdc1a6c",
-        "decisions": "88bab26c8f147f8eade28c0c6f1a961052e4e2fe4ba164c2597778247504aaab"
+        "journal": "e5804ff6ca3c57daf03391cf18c130d69d1ea44e468a657d9d38b7c8b04e9bd2",
+        "facts": "e043e0e06cb09cf39920e2c1986b8a69d3cd7a0770fa1b66a3d714c796aee440",
+        "decisions": "39f1cfad94bc52edb2e63ff63fc3f59cb02ebd2b41fdd74ca16dfd84357f025d"
       }
     },
     {
@@ -335,7 +335,7 @@
         "standard:machao",
         "standard:sunshangxiang"
       ],
-      "entries": 16168,
+      "entries": 16164,
       "facts": 2298,
       "decisions": 213,
       "result": {
@@ -368,9 +368,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "43178fefd1a124f7298e88c310ac393fdd9657ec4eda01e63702c03d65f9acae",
-        "facts": "ce8ac58ae55a5388b7ba2e6a6d9b71fcaebc55ec84887e2ca56f11dae2f64219",
-        "decisions": "d6388cfee1f34c065e005d48a3195d1107cd155b8ab7aeb47ad9a0b59d336efe"
+        "journal": "da645bd45bb176e9d282bcf0e90b51782b064f6422b75957950ae3cce9106304",
+        "facts": "4937138f92e17c7d8b1e4623f54ff28b1262fe4ff4a35d97f17587f49d0a92ad",
+        "decisions": "09bfea25fefb56234d05279087d420ac5301d3100a2c00201d40da44504e2c9a"
       }
     },
     {
@@ -491,7 +491,7 @@
       "id": "4p-12",
       "seed": 246,
       "lineup": ["standard:zhangliao", "standard:lvbu", "standard:guanyu", "standard:xiahoudun"],
-      "entries": 11083,
+      "entries": 11081,
       "facts": 1607,
       "decisions": 124,
       "result": {
@@ -523,9 +523,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "57ccbbd687f40a07fcb511aa3a673541e92e1a053c51ca1593cd13d07afa7cc2",
-        "facts": "78e5fe681e5b26a2db8019cea99f79e7aa3e99af0d2820c28927e8c9fa6c7466",
-        "decisions": "a712b5111555fc92508716a7865432424a0ba3e548fea773effea239cb40c83b"
+        "journal": "0588ab23f6da67eca3fc5be52b7f62c02db5fea583249f179129653077545eea",
+        "facts": "9d2c6ab1c2e0402f4dbf198dbda63777a4a8c50a072cb7d768a6b1b3ea93df2a",
+        "decisions": "72747628524401fc966c286b7552e05edf1de6e14b40f2907ab4000a7a1eb2c7"
       }
     },
     {
@@ -720,7 +720,7 @@
         "standard:xiahoudun",
         "standard:zhangliao"
       ],
-      "entries": 9492,
+      "entries": 9490,
       "facts": 1364,
       "decisions": 116,
       "result": {
@@ -750,9 +750,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "4542e35d9d8b35f2620fc524852d40b5bc2df8885442ffa30794b628b62e80c8",
-        "facts": "0e4727c819e2fc39d390896b37d1ec142f382da448e1b3450c9d97a85216882b",
-        "decisions": "34f9790fdc391c9fb2586df82bc561b8fdaef731ddde040522acdc8261579c10"
+        "journal": "8fda769f3161c0064a573b4ce4ede1923d508bd2020b428a30dfdb01bb5187b7",
+        "facts": "43f5260cd9f49e03029e17253e926c8842998b64024e7a4512392a8938703334",
+        "decisions": "7c18b409080b90798b921936f11736d5f822710a8fc8e02879ff24cd517efdbb"
       }
     },
     {
@@ -792,7 +792,7 @@
       "id": "4p-20",
       "seed": 382,
       "lineup": ["standard:daqiao", "standard:sunshangxiang", "standard:zhenji", "standard:huatuo"],
-      "entries": 30176,
+      "entries": 30172,
       "facts": 4354,
       "decisions": 348,
       "result": {
@@ -824,9 +824,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "79416086cc04dd7a4c94d5f1aeff344f430ec9ab9463a41076fc5d11f4d3906e",
-        "facts": "a9212d1f94957c90eb6c62ee0f5449fef9556ca2613d774d6cc453d30046ccec",
-        "decisions": "d082ef5919ddbb6e0a6dfbfdf7835eb0bb6552982d725f600ad705f1de91a703"
+        "journal": "6e4f77b0d0f1ee3e3ffbd6f848b7a63b8e0657010bea676e0f2399873125addd",
+        "facts": "9b3e8d7f14880ded50e67b7b7648fcc25879846a5a940e25395b2ae23eb79277",
+        "decisions": "e0f2fd4ee9352d8294fc4523992b40c07cf46c6c2a264cc07adab2497272202b"
       }
     },
     {
@@ -942,7 +942,7 @@
         "standard:zhangliao",
         "standard:huangyueying"
       ],
-      "entries": 9725,
+      "entries": 9723,
       "facts": 1380,
       "decisions": 118,
       "result": {
@@ -968,9 +968,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "79557fd68bd15b82221cadfb8294e16a24fd62e8a973781aee2f942fc05091d4",
-        "facts": "c2f0dedbfed7731fff8e84963579e2cdcb03cefe59cc2b34659a2077168d82f5",
-        "decisions": "95e0759f40faa4c91765754f7ff58296d0e0373fc2454f61b8e4aa009142c937"
+        "journal": "f451dd1b83983831ebaa4ae601af05bf1fb03e877fe47dc6ea8d65cf88f8d30c",
+        "facts": "43c7c81217562a43ce1fcbd6f7deec2e84129215c464b53da78e1b747893cd2a",
+        "decisions": "24d7b47e6020ddba4ccadbb342373b3f5d3b6abe850dad8b2ecdbb95e2b4f04b"
       }
     },
     {
@@ -986,7 +986,7 @@
         "standard:huangyueying",
         "standard:machao"
       ],
-      "entries": 10328,
+      "entries": 10326,
       "facts": 1412,
       "decisions": 118,
       "result": {
@@ -1011,9 +1011,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "11fa7bae7e80c32bb75b0fcdb709b5b30c077d1dfece9c2ad3d79120bc00a92f",
-        "facts": "4866f230681d5a6b27c2ecdee8658900cc6a6e9b5f19222589b09f24527c879c",
-        "decisions": "49d440a8f3c864d078894f76cda6a5cbdad48949f2fecc8ee73466489e6e827b"
+        "journal": "12805fb9fdf9494e57d0c799e6f4f7f920be391ac5600200a530c55c23d8bfbc",
+        "facts": "195ff6bcfa154cb09284347fdc30bb94069734c56b742f0ce1eb0d2050bed13f",
+        "decisions": "e3d8431ed90ee1f280ff6a744b004088c92e19edc21be489624a9f59ecde1fac"
       }
     },
     {
@@ -1029,7 +1029,7 @@
         "standard:zhouyu",
         "standard:guanyu"
       ],
-      "entries": 18003,
+      "entries": 17999,
       "facts": 2429,
       "decisions": 227,
       "result": {
@@ -1065,9 +1065,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "f878026e46de5dcb7e38f4ddee0c9d661e8e3112b74e3e774473bdfde2947b42",
-        "facts": "60cca54e88052f2327c2bc7ea5d0813f4541ab2c0642f15e56c085f26efbc46e",
-        "decisions": "d25dda0500a43fc463cab613527708f3022571d3ccadf1e448014b689078f45d"
+        "journal": "cecef9912835aed0c837e390d5b2e02131cdd6a0200d298abc21a47583a23d62",
+        "facts": "ef64d552051308a8bdcbf5048ce4ef701dd0ec9850c4943d7b9b680dcd62ac33",
+        "decisions": "ad7d934819dfd927853d7116dd3f86262c7af186d6c795b30de0dc0a52881bdc"
       }
     },
     {
@@ -1130,7 +1130,7 @@
         "standard:ganning",
         "standard:zhenji"
       ],
-      "entries": 26903,
+      "entries": 26895,
       "facts": 3710,
       "decisions": 287,
       "result": {
@@ -1166,9 +1166,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "a7d576afc0b6ae88eaf2bdcadb7e010a02a7b8950f270b425364c87b0d892b50",
-        "facts": "fced1d16617fed251d7ec5dbd9ae5c030560f05b77229c164954bf0c49e86137",
-        "decisions": "a8f4b1430bf03a0204b93c15528c454df958297b56848d81b899b283ebaa16ca"
+        "journal": "c78c2b7b739affb8fb559597c0a8307f89b7861f3ace7e873856a11eec145d3e",
+        "facts": "84c0eb222634b8647e2b84a4959642d8129af2aca3d53331259faa1186773fd8",
+        "decisions": "0eef2249ba7f8280b23e14f3d80df6e65bbf896ee99a6502a23ae00facc06507"
       }
     },
     {
@@ -1184,7 +1184,7 @@
         "standard:simayi",
         "standard:zhangliao"
       ],
-      "entries": 20950,
+      "entries": 20948,
       "facts": 2925,
       "decisions": 244,
       "result": {
@@ -1220,9 +1220,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "53b7ea42f0f5832d558c43d5ca711f5ec50875d939a3b2a48b3df6c285ecbadb",
-        "facts": "b2770e0d233c1257356c136df8767e82ee68ee0a60cb959aeff85f5b835bb700",
-        "decisions": "54464cc26e187ac55597c312e2cdb80ccf550052aac02822677ef590d64310bc"
+        "journal": "a12738c449ca160d3030a136453b631a7cdb82ec7e8f2dac68559ba0c2cc94c3",
+        "facts": "c4d1f5f21267a763a8830f2e60183cf66722e3dd2747dcc859b11ef9fea777b3",
+        "decisions": "42441dd334a87f40b6209eba3e28a6e667d6a699e4ff9ea7db58693840994e0e"
       }
     },
     {
@@ -1238,7 +1238,7 @@
         "standard:liubei",
         "standard:lvmeng"
       ],
-      "entries": 22136,
+      "entries": 22132,
       "facts": 3035,
       "decisions": 239,
       "result": {
@@ -1275,9 +1275,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "050df1b512c7e7997206d9a77d8764da87c1fd9ba58a63c4722ad4da89cc99a5",
-        "facts": "3ade915e1644ea07abce9aa1f9a2580288efd4aab3f8b99b9e70971332700d5e",
-        "decisions": "597e0bb60cb61fc4c2bfb6b9a3462d7e5ed9ffb2a27f3d1ad5945d5b948a3698"
+        "journal": "996f1bce0f86844db77bde45637fc687221fd04fff9e543e444af66dea6e9707",
+        "facts": "c47ca3cf517b1d621d14ea230a7be04da1035f978c913544801e3b4d9bc8a77c",
+        "decisions": "4d936b7679525b26abe4bbac6d35f8e659a7e47d45162243478d7adcac0b32b6"
       }
     }
   ]

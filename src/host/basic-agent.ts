@@ -295,12 +295,16 @@ export function decideBasic(
     }
     if (name === 'standard:amazing_grace') return 12 - expense;
     if (name === 'standard:collateral') {
-      const victim = observation.players.find((player) => player.id === targets.at(-1));
-      return victim
-        ? targets.slice(0, -1).reduce((sum, id) => sum + hostility(id) * 12, 0) +
-            hostility(victim.id) * (30 + Math.max(0, 4 - victim.hp) * 4) -
-            expense
-        : -100;
+      // 逐个点选的目标按 [持械者, 杀目标] 成对排列。
+      let total = -expense;
+      for (let i = 0; i < targets.length; i += 2) {
+        const victim = observation.players.find((player) => player.id === targets[i + 1]);
+        if (!victim) return -100;
+        total +=
+          hostility(targets[i]!) * 12 +
+          hostility(victim.id) * (30 + Math.max(0, 4 - victim.hp) * 4);
+      }
+      return targets.length ? total : -100;
     }
     if (name === 'standard:god_salvation')
       return (

@@ -40,40 +40,40 @@ FreeKill / noname 只作为本地参考分别查阅，不把不同项目、不�
 
 实体表为标准＋EX 108 张、32 种定义（[deck.ts](../src/content/standard/deck.ts)）。同类坐骑分别列出；机制练习牌组不是标准实体表。
 
-| 牌         | 需核对的具体语义                                          | 专项证据入口                                                                                                      |
-| ---------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 杀         | 距离/阶段次数、目标身份、完整闪响应/伤害、材料善后        | [用牌](../tests/scenarios/use-card.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)                 |
-| 闪         | 只进入当前响应用途，独立支付与打出完成事实                | [响应用途](../tests/scenarios/armor-response.test.ts)、[响应边界](../tests/scenarios/response-boundaries.test.ts) |
-| 桃         | 普通自救/指定濒死者、实际回复裁剪与材料清理               | [生命](../tests/scenarios/life.test.ts)、[待决边界](../tests/scenarios/life-boundaries.test.ts)                   |
-| 决斗       | 从目标轮流打杀、实际胜方伤害、连续要求、局部中止          | [锦囊](../tests/scenarios/tricks.test.ts)、[响应边界](../tests/scenarios/response-boundaries.test.ts)             |
-| 无中生有   | 自己摸二，反制、洗牌后资格与当前牌序                      | [锦囊](../tests/scenarios/tricks.test.ts)、[牌堆边界](../tests/scenarios/deck-boundaries.test.ts)                 |
-| 无懈可击   | 针对一个目标效果/另一张无懈，嵌套反制层次                 | [反制](../tests/scenarios/counter.test.ts)、[响应禁令](../tests/scenarios/intrigue.test.ts)                       |
-| 南蛮入侵   | 全部其他目标依次打杀，目标各自独立后效                    | [锦囊](../tests/scenarios/tricks.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)                   |
-| 万箭齐发   | 全部其他目标依次打闪，防具/供闪分别核对，不误用杀专属规则 | [锦囊](../tests/scenarios/tricks.test.ts)、[主公供牌](../tests/scenarios/commanders.test.ts)                      |
-| 桃园结义   | 全体受伤目标回复，非受伤者不产生实际回复                  | [锦囊](../tests/scenarios/tricks.test.ts)、[回复](../tests/scenarios/wu-generals.test.ts)                         |
-| 五谷丰登   | 按目标数公开池、逐目标选牌、剩余牌善后                    | [锦囊](../tests/scenarios/tricks.test.ts)                                                                         |
-| 顺手牵羊   | 距离一，暗手牌/公开装备/逻辑判定牌选择与重查              | [锦囊](../tests/scenarios/tricks.test.ts)、[延时牌](../tests/scenarios/delayed.test.ts)                           |
-| 过河拆桥   | 效果弃置权限、暗选与逻辑延时牌整体                        | [弃置](../tests/scenarios/discard.test.ts)、[锦囊](../tests/scenarios/tricks.test.ts)                             |
-| 借刀杀人   | 宣告前附属目标、真实出杀或交当前武器、取消不支付          | [借刀](../tests/scenarios/collateral.test.ts)、[准备](../tests/scenarios/use-preparation.test.ts)                 |
-| 乐不思蜀   | 其他目标判定区、无懈/红桃、跳本回合下个出牌阶段           | [延时牌](../tests/scenarios/delayed.test.ts)、[额外回合](../tests/scenarios/extra-turns.test.ts)                  |
-| 闪电       | 自身装入、黑桃二至九无来源雷伤、不命中/无懈传递           | [延时牌](../tests/scenarios/delayed.test.ts)、[连环](../tests/scenarios/chains.test.ts)                           |
-| 诸葛连弩   | 范围一，杀次数无限，作为材料时能力剔除                    | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
-| 雌雄双股剑 | 范围二，异性目标弃手牌或来源摸牌                          | [双剑](../tests/scenarios/swords.test.ts)                                                                         |
-| 青釭剑     | 范围二，仅当前杀效果忽略目标防具                          | [防具](../tests/scenarios/armor-response.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)           |
-| 青龙偃月刀 | 范围三，闪后对同目标追加独立用杀，豁免距离/阶段次数       | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
-| 丈八蛇矛   | 范围三，两手牌作杀，颜色与多材料实际支付                  | [装备](../tests/scenarios/equipment.test.ts)、[牌面](../tests/scenarios/card-faces.test.ts)                       |
-| 贯石斧     | 范围三，弃二张其他牌突破防御，费用后效不撤销声明          | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
-| 方天画戟   | 范围四，材料含全部非空手牌时至多额外两目标                | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
-| 麒麟弓     | 范围五，直接杀伤害中弃目标当前合法坐骑                    | [武器](../tests/scenarios/weapons.test.ts)、[连环](../tests/scenarios/chains.test.ts)                             |
-| 寒冰剑     | 范围二，防伤后依次重选目标至多二张可弃手牌/装备           | [双剑](../tests/scenarios/swords.test.ts)、[连环](../tests/scenarios/chains.test.ts)                              |
-| 八卦阵     | 判定供闪，红判生成响应；忽略防具和禁响应分别生效          | [防具](../tests/scenarios/armor-response.test.ts)、[鬼才牌面](../tests/scenarios/card-faces.test.ts)              |
-| 仁王盾     | 黑杀效果无效，颜色独立于花色，青釭按效果忽略              | [防具](../tests/scenarios/armor-response.test.ts)                                                                 |
-| 赤兔       | 进攻距离减一，作为材料不借用离场能力                      | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
-| 大宛       | 同类进攻坐骑，与赤兔同槽而非额外叠加                      | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
-| 紫骍       | 同类进攻坐骑，独立实体/目录身份                           | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
-| 绝影       | 防御距离加一，失去后立即撤销                              | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
-| 的卢       | 同类防御坐骑，与绝影同槽                                  | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
-| 爪黄飞电   | 同类防御坐骑，独立实体/目录身份                           | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
+| 牌         | 需核对的具体语义                                                      | 专项证据入口                                                                                                      |
+| ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 杀         | 距离/阶段次数、目标身份、完整闪响应/伤害、材料善后                    | [用牌](../tests/scenarios/use-card.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)                 |
+| 闪         | 只进入当前响应用途，独立支付与打出完成事实                            | [响应用途](../tests/scenarios/armor-response.test.ts)、[响应边界](../tests/scenarios/response-boundaries.test.ts) |
+| 桃         | 普通自救/指定濒死者、实际回复裁剪与材料清理                           | [生命](../tests/scenarios/life.test.ts)、[待决边界](../tests/scenarios/life-boundaries.test.ts)                   |
+| 决斗       | 从目标轮流打杀、实际胜方伤害、连续要求、局部中止                      | [锦囊](../tests/scenarios/tricks.test.ts)、[响应边界](../tests/scenarios/response-boundaries.test.ts)             |
+| 无中生有   | 自己摸二，反制、洗牌后资格与当前牌序                                  | [锦囊](../tests/scenarios/tricks.test.ts)、[牌堆边界](../tests/scenarios/deck-boundaries.test.ts)                 |
+| 无懈可击   | 针对一个目标效果/另一张无懈，嵌套反制层次                             | [反制](../tests/scenarios/counter.test.ts)、[响应禁令](../tests/scenarios/intrigue.test.ts)                       |
+| 南蛮入侵   | 全部其他目标依次打杀，目标各自独立后效                                | [锦囊](../tests/scenarios/tricks.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)                   |
+| 万箭齐发   | 全部其他目标依次打闪，防具/供闪分别核对，不误用杀专属规则             | [锦囊](../tests/scenarios/tricks.test.ts)、[主公供牌](../tests/scenarios/commanders.test.ts)                      |
+| 桃园结义   | 全体受伤目标回复，非受伤者不产生实际回复                              | [锦囊](../tests/scenarios/tricks.test.ts)、[回复](../tests/scenarios/wu-generals.test.ts)                         |
+| 五谷丰登   | 按目标数公开池、逐目标选牌、剩余牌善后                                | [锦囊](../tests/scenarios/tricks.test.ts)                                                                         |
+| 顺手牵羊   | 距离一，暗手牌/公开装备/逻辑判定牌选择与重查                          | [锦囊](../tests/scenarios/tricks.test.ts)、[延时牌](../tests/scenarios/delayed.test.ts)                           |
+| 过河拆桥   | 效果弃置权限、暗选与逻辑延时牌整体                                    | [弃置](../tests/scenarios/discard.test.ts)、[锦囊](../tests/scenarios/tricks.test.ts)                             |
+| 借刀杀人   | 宣告前选定目标元组 [持械者, 杀目标]、真实出杀或交当前武器、取消不支付 | [借刀](../tests/scenarios/collateral.test.ts)、[准备](../tests/scenarios/use-preparation.test.ts)                 |
+| 乐不思蜀   | 其他目标判定区、无懈/红桃、跳本回合下个出牌阶段                       | [延时牌](../tests/scenarios/delayed.test.ts)、[额外回合](../tests/scenarios/extra-turns.test.ts)                  |
+| 闪电       | 自身装入、黑桃二至九无来源雷伤、不命中/无懈传递                       | [延时牌](../tests/scenarios/delayed.test.ts)、[连环](../tests/scenarios/chains.test.ts)                           |
+| 诸葛连弩   | 范围一，杀次数无限，作为材料时能力剔除                                | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
+| 雌雄双股剑 | 范围二，异性目标弃手牌或来源摸牌                                      | [双剑](../tests/scenarios/swords.test.ts)                                                                         |
+| 青釭剑     | 范围二，仅当前杀效果忽略目标防具                                      | [防具](../tests/scenarios/armor-response.test.ts)、[目标四层](../tests/scenarios/target-stages.test.ts)           |
+| 青龙偃月刀 | 范围三，闪后对同目标追加独立用杀，豁免距离/阶段次数                   | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
+| 丈八蛇矛   | 范围三，两手牌作杀，颜色与多材料实际支付                              | [装备](../tests/scenarios/equipment.test.ts)、[牌面](../tests/scenarios/card-faces.test.ts)                       |
+| 贯石斧     | 范围三，弃二张其他牌突破防御，费用后效不撤销声明                      | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
+| 方天画戟   | 范围四，材料含全部非空手牌时至多额外两目标                            | [武器](../tests/scenarios/weapons.test.ts)                                                                        |
+| 麒麟弓     | 范围五，直接杀伤害中弃目标当前合法坐骑                                | [武器](../tests/scenarios/weapons.test.ts)、[连环](../tests/scenarios/chains.test.ts)                             |
+| 寒冰剑     | 范围二，防伤后依次重选目标至多二张可弃手牌/装备                       | [双剑](../tests/scenarios/swords.test.ts)、[连环](../tests/scenarios/chains.test.ts)                              |
+| 八卦阵     | 判定供闪，红判生成响应；忽略防具和禁响应分别生效                      | [防具](../tests/scenarios/armor-response.test.ts)、[鬼才牌面](../tests/scenarios/card-faces.test.ts)              |
+| 仁王盾     | 黑杀效果无效，颜色独立于花色，青釭按效果忽略                          | [防具](../tests/scenarios/armor-response.test.ts)                                                                 |
+| 赤兔       | 进攻距离减一，作为材料不借用离场能力                                  | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
+| 大宛       | 同类进攻坐骑，与赤兔同槽而非额外叠加                                  | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
+| 紫骍       | 同类进攻坐骑，独立实体/目录身份                                       | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
+| 绝影       | 防御距离加一，失去后立即撤销                                          | [装备](../tests/scenarios/equipment.test.ts)                                                                      |
+| 的卢       | 同类防御坐骑，与绝影同槽                                              | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
+| 爪黄飞电   | 同类防御坐骑，独立实体/目录身份                                       | [装备](../tests/scenarios/equipment.test.ts)、[实体表](../tests/scenarios/deck.test.ts)                           |
 
 ## 项目采用的规则语义
 

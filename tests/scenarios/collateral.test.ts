@@ -13,8 +13,9 @@ import {
   useCard,
   useSelection,
   validateUse,
+  primaryOf,
 } from '../../src/sdk';
-import type { CardOffer, UseIntent } from '../../src/sdk';
+import type { CardOffer, UseIntent, UseTarget } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
 import { card, cardGame, use, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
@@ -24,12 +25,11 @@ import { Collateral } from '../../src/content/standard/collateral';
 import { Equipment } from '../../src/sdk';
 
 type Game = ReturnType<typeof cardGame>;
-const intent = (parameters: unknown = { victim: 'c' }): UseIntent => ({
+const intent = (target: UseTarget = ['b', 'c']): UseIntent => ({
   actor: 'a',
   choice: { kind: 'physical', card: 'borrow' },
-  targets: ['b'],
+  targets: [target],
   timing: { kind: 'effect' },
-  parameters,
 });
 function create(slashes = 0) {
   return cardGame({
@@ -51,7 +51,7 @@ function killPlayer(game: Game, target: string) {
   });
 }
 
-it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随后完整使用杀', async () => {
+it('同一草稿按元组提交持械者与出杀目标；锦囊只结算持械者，随后完整使用杀', async () => {
   const game = create(1);
   const running = game.room.run('phase', (ctx) =>
     runPhase(ctx, 'a', 'play', (at, phase) => playPhase(at, phase)),
@@ -81,8 +81,7 @@ it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随�
   await answer(game, { kind: 'physical', card: 's0' }, 'use-card');
   expect((await running).kind).toBe('resolved');
   expect(game.room.history.facts(CardEvent.finished)[1]?.data.detail).toMatchObject({
-    parameters: { victim: 'c' },
-    effects: [{ target: 'b' }],
+    effects: [{ target: 'b', tuple: ['b', 'c'] }],
   });
   expect(game.room.world.player('c').hp).toBe(3);
   expect(game.room.world.position('weapon')).toBe('b:equipment');
@@ -123,11 +122,11 @@ it('没有杀自动获得武器；选择拒绝用杀时同样获得，装备能�
   }
 });
 
-it.each([null, {}, { victim: 'b' }, { victim: 'd' }, { victim: 'unknown' }])(
-  '附属目标无效时不宣告、不支付：%j',
-  async (parameters) => {
+it.each<UseTarget>(['b', ['b'], ['b', 'b'], ['b', 'd'], ['b', 'unknown'], ['b', 'c', 'd']])(
+  '目标元组无效时不宣告、不支付：%j',
+  async (target) => {
     const game = create();
-    expect(await use(game, intent(parameters))).toMatchObject({ value: { kind: 'unavailable' } });
+    expect(await use(game, intent(target))).toMatchObject({ value: { kind: 'unavailable' } });
     expect(game.room.world.position('borrow')).toBe('a:hand');
     expect(game.room.history.facts(CardEvent.used)).toHaveLength(0);
   },
@@ -145,7 +144,7 @@ it('受害者可以是借刀者；禁止锦囊指定受害者不冒充禁止指�
       ),
     ],
   });
-  const running = use(game, intent({ victim: 'a' }));
+  const running = use(game, intent(['b', 'a']));
   await answer(game, { kind: 'physical', card: 'slash' }, 'use-card');
   await running;
   expect(game.room.world.player('a').hp).toBe(3);
@@ -311,7 +310,9 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
     triggers: [],
     modifiers: [
       modify(cardQueries.extraTargets, (_ctx, { input: use }) =>
-        use.card.name === 'standard:collateral' && use.targets.includes('b') ? 1 : undefined,
+        use.card.name === 'standard:collateral' && use.targets.some((t) => primaryOf(t) === 'b')
+          ? 1
+          : undefined,
       ),
     ],
   });
@@ -348,10 +349,15 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
         ? game.room.run('use', (ctx) => {
             const { actor, choice, timing } = intent();
             const selection = useSelection(ctx, { actor, choice, timing });
-            const selected = selection.validate({ cards: [], targets: ['b', 'd', 'c'] });
+            const selected = selection.validate({ cards: [], targets: ['b', 'c', 'd', 'c'] });
             expect(selected).toEqual({
               ok: true,
-              value: { targets: ['b', 'd'], parameters: { victim: 'c' } },
+              value: {
+                targets: [
+                  ['b', 'c'],
+                  ['d', 'c'],
+                ],
+              },
             });
             if (!selected.ok) throw new Error(selected.reason);
             return useCard(ctx, { actor, choice, timing, ...selected.value });
@@ -371,12 +377,12 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
   }
 });
 
-it('外部修改预填参数不改变已宣告受害者', async () => {
+it('外部修改预填目标元组不改变已宣告受害者', async () => {
   const game = create(1);
-  const input = { victim: 'c' };
+  const input = ['b', 'c'];
   const running = use(game, intent(input));
   const request = await nextRequest(game.room);
-  input.victim = 'a';
+  input[1] = 'a';
   await answer(game, { kind: 'physical', card: 's0' }, 'use-card');
   await running;
   expect(request.data).toMatchObject({ targets: ['c'] });

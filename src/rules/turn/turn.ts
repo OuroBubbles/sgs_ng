@@ -10,7 +10,7 @@ import type { Context } from '../../core/runtime/room';
 import { draw } from '../cards/draw';
 import { resolveJudgmentPhase } from '../cards/delayed';
 import { ownedCards } from '../cards/types';
-import type { CardChoice, UseTiming } from '../cards/types';
+import type { CardChoice, UseTarget, UseTiming } from '../cards/types';
 import { payDiscard } from '../costs/pay';
 import { isGameOver } from '../game/end';
 import {
@@ -285,8 +285,7 @@ export async function playPhase(ctx: Context, phase: PhaseView): Promise<void> {
       | ActiveChoice
       | {
           readonly choice: CardChoice;
-          readonly targets: readonly string[];
-          readonly parameters?: unknown;
+          readonly targets: readonly UseTarget[];
         }
     >({
       player: phase.owner,
@@ -335,7 +334,6 @@ export async function playPhase(ctx: Context, phase: PhaseView): Promise<void> {
       choice: answer.value.choice,
       targets: answer.value.targets,
       timing,
-      ...(answer.value.parameters === undefined ? {} : { parameters: answer.value.parameters }),
     });
   }
 }

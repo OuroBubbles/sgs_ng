@@ -6,7 +6,7 @@ import type { Timing } from '../../core/runtime/event';
 import type { DrawDraft, DrawResult } from './draw';
 import type { RevealedCards } from './reveal';
 import type { PaymentReceipt } from '../costs/pay';
-import type { SemanticCard, TimingSnapshot, UseSnapshot } from './types';
+import type { SemanticCard, UseTarget, TimingSnapshot, UseSnapshot } from './types';
 
 export interface MoveResult {
   readonly kind: 'moved' | 'unchanged';
@@ -84,7 +84,7 @@ export interface CardPlay {
   readonly card: SemanticCard;
   readonly processing: string;
   readonly useId?: string;
-  readonly targets?: readonly string[];
+  readonly targets?: readonly UseTarget[];
   readonly beneficiary?: string;
   readonly parameters?: unknown;
   readonly context?: TimingSnapshot;
