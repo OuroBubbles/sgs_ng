@@ -1,4 +1,4 @@
-import type { WorldReader } from '../../core/model/state';
+import type { WorldReader, WorldSeed } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { draw } from '../cards/draw';
@@ -45,6 +45,17 @@ export function roleOf(world: WorldReader, player: string): Role {
   const seat = roleSeats(world).find((seat) => seat.player === player);
   if (!seat) throw new Error(`Role not assigned: ${player}`);
   return seat.role;
+}
+
+/** 想象的局面（AI 推演）：把种子里的身份表换成另一种与观察者所知一致的排列，不提交事实。 */
+export function withRoleSeats(world: WorldSeed, seats: readonly RoleSeat[]): WorldSeed {
+  const value = immutable(seats);
+  return {
+    ...world,
+    states: world.states.map((state) =>
+      state.key === roleState.id && state.owner === null ? { ...state, value } : state,
+    ),
+  };
 }
 
 export function assignRoles(ctx: Context, input: readonly RoleSeat[]): void {

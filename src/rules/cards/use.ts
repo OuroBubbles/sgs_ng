@@ -515,6 +515,7 @@ export function askUse(ctx: Context, request: UseOfferRequest): Promise<AskedUse
           ? {
               counter: {
                 card: timing.opportunity.root.card.name,
+                actor: timing.opportunity.root.actor,
                 target: timing.opportunity.root.target,
                 depth: timing.opportunity.depth,
               },

@@ -29,6 +29,9 @@ export interface CounterRequest {
   /** 同步纯相关性；普通后效可直接查询机会，回调内部仍受只读守卫约束。 */
   readonly relevant?: (ctx: Context) => boolean;
 }
+/** 默认的反制牌名（无懈可击）；具体机会可另行指定。 */
+export const counterNames: readonly string[] = Object.freeze(['standard:nullification']);
+
 export const Counter = defineEvent('counter', {
   opening: timing<CounterOpportunity>(),
   finished: timing<CounterResult>(),
@@ -40,7 +43,7 @@ export function contestCounter(ctx: Context, request: CounterRequest): Promise<C
     const subject = immutable(request.subject);
     const root = effectReference(request.root);
     const restricted = subject.kind === 'effect' ? subject.effect : subject.use;
-    const names = immutable(request.names ?? ['standard:nullification']);
+    const names = immutable(request.names ?? counterNames);
     const relevant = request.relevant?.bind(request);
     const allowedNames = names.filter((name) => !restricted.prohibitedCounters?.includes(name));
     if (!allowedNames.length) {
@@ -142,9 +145,9 @@ export async function resolveCounter(ctx: Context, use: UsePlanView): Promise<Co
 }
 export function installCounterspells(
   room: Room,
-  names: readonly string[] = ['standard:nullification'],
+  names: readonly string[] = counterNames,
 ): () => void {
-  const counterNames = immutable(names);
+  const allowed = immutable(names);
   return room.on(Resolve.starting, {
     id: 'standard:counterspell',
     owner: null,
@@ -152,14 +155,14 @@ export function installCounterspells(
     eligible: (ctx, { effect, use, available }) =>
       available(ctx) &&
       cardDef(ctx, effect.card.name).counterable === true &&
-      counterNames.some((name) => !effect.prohibitedCounters?.includes(name)) &&
+      allowed.some((name) => !effect.prohibitedCounters?.includes(name)) &&
       (!cardDef(ctx, effect.card.name).delayed || use.stage === 'delayed'),
     async run(ctx, { effect, available }) {
       const root = effectReference(effect);
       const result = await contestCounter(ctx, {
         subject: { kind: 'effect', effect: root },
         root,
-        names: counterNames,
+        names: allowed,
         relevant: available,
       });
 

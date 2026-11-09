@@ -82,9 +82,11 @@ export class RoleMatch {
   readonly skills: SkillBook;
   readonly generals: GeneralBook;
   readonly initial: WorldSeed;
+  /** 阶段体（默认规则或测试注入）；推演副本沿用同一个。 */
+  readonly body: PhaseBody;
   #players: readonly MatchPlayer[];
   #roles: readonly Role[] | null;
-  #body: PhaseBody;
+  #anchor: ActionAnchor;
 
   constructor(options: RoleMatchOptions) {
     roleRoster(options.players.length);
@@ -130,7 +132,8 @@ export class RoleMatch {
         this.#roles.filter((role) => role === 'lord').length !== 1)
     )
       throw new Error('Invalid preset roles.');
-    this.#body = options.phaseBody ?? defaultPhaseBody;
+    this.body = options.phaseBody ?? defaultPhaseBody;
+    this.#anchor = options.actionAnchor ?? turnActionAnchor;
     for (const card of deck)
       if (!this.skills.cards.has(card.name))
         throw new Error(`Unknown card definition: ${card.name}`);
@@ -180,17 +183,18 @@ export class RoleMatch {
         ]),
       ],
     });
-    this.room = new Room({
-      id: options.id,
-      seed: options.seed,
-      world: this.initial,
-      actionAnchor: options.actionAnchor ?? turnActionAnchor,
-    });
-    this.skills.attach(this.room);
-    installRescue(this.room);
-    installCounterspells(this.room);
-    installDelayedCards(this.room);
-    installRoleMode(this.room);
+    this.room = this.fork(options.id, options.seed, this.initial);
+  }
+
+  /** 同一目录与模式规则、以给定局面为起点的新房间：原局用初始局面，AI 推演用想象的局面。 */
+  fork(id: string, seed: number, world: WorldSeed): Room {
+    const room = new Room({ id, seed, world, actionAnchor: this.#anchor });
+    this.skills.attach(room);
+    installRescue(room);
+    installCounterspells(room);
+    installDelayedCards(room);
+    installRoleMode(room);
+    return room;
   }
 
   get progress(): MatchProgress | null {
@@ -276,7 +280,7 @@ export class RoleMatch {
       await playRounds(ctx, {
         seats: this.#players.map((player) => player.id),
         first,
-        body: this.#body,
+        body: this.body,
         // 热座交接也是无可用动作时的暂停点；不靠计时器或无限空转推进回合。
         async ready(at, next) {
           const ready = await at.ask<true>({

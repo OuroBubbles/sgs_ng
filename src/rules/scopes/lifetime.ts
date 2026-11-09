@@ -25,9 +25,26 @@ export interface LifetimeEnd {
   readonly skillsBefore: readonly SkillInstance[];
 }
 
+/** 推演副本接续另一生存期的作用域状态（见 withLifetime 的 adopt）。 */
+export interface LifetimeAdoption {
+  readonly id: string;
+  readonly from: string;
+}
+
 export const Lifetime = defineEvent('lifetime', {
   ended: timing<LifetimeEnd>(),
+  adopted: timing<LifetimeAdoption>(),
 });
+
+/** 作用域状态的条目 ID：同一键、持有者、来源与生存期共用一条。 */
+export function stateEntryId(
+  key: string,
+  owner: string | null,
+  source: string | null,
+  lifetime: string | null,
+): string {
+  return JSON.stringify([key, owner, source, lifetime]);
+}
 
 export function assertLifetime(ctx: Context, lifetime: Lifetime | null): void {
   ctx.assertActive();
@@ -53,6 +70,14 @@ const scopeOf: Readonly<Record<string, Exclude<Scope, 'game'>>> = {
 };
 const open = new WeakMap<WorldReader, Map<string, Lifetime>>();
 
+/** 此刻仍开着的最内层命名作用域（轮/回合/阶段）的 ID；只读 World，供推演副本接续。 */
+export function openLifetime(world: WorldReader, scope: Exclude<Scope, 'game'>): string | null {
+  let found: string | null = null;
+  for (const lifetime of open.get(world)?.values() ?? [])
+    if (lifetime.scope === scope && lifetime.active) found = lifetime.id;
+  return found;
+}
+
 /** ctx 所在的最内层、仍存活的命名作用域；game 与不在其中时为 null。 */
 export function lifetimeOf(ctx: Context, scope: Scope): Lifetime | null {
   const lifetimes = open.get(ctx.world);
@@ -64,10 +89,15 @@ export function lifetimeOf(ctx: Context, scope: Scope): Lifetime | null {
   return null;
 }
 
+/**
+ * adopt：从另一 World 复制来的局面里，仍挂在旧生存期（如原局当前回合）上的标记与授予
+ * 改挂到这个新生存期，使推演副本能从“回合/阶段进行中”接着结算。普通规则不传。
+ */
 export async function withLifetime<T>(
   ctx: Context,
   kind: string,
   body: (ctx: Context, lifetime: Lifetime) => T | Promise<T>,
+  adopt?: string | null,
 ): Promise<T> {
   const scope = scopeOf[kind] ?? null;
   return ctx.flow(`lifetime:${kind}`, async (owner) => {
@@ -87,6 +117,10 @@ export async function withLifetime<T>(
       active = false;
       lifetimes.delete(lifetime.id);
     });
+    if (adopt) {
+      const changes = rehome(owner.world, adopt, lifetime.id);
+      if (changes.length) owner.commit(Lifetime.adopted, changes, { id: lifetime.id, from: adopt });
+    }
     const result = await owner.attempt(kind, (child) => body(child, lifetime));
     active = false;
 
@@ -116,4 +150,31 @@ export async function withLifetime<T>(
     if (result.kind === 'aborted') return owner.abort(result.reason);
     return result.value;
   });
+}
+
+function rehome(world: WorldReader, from: string, to: string): Change[] {
+  const changes: Change[] = [];
+  for (const state of world.snapshot.states.filter((entry) => entry.scopeId === from)) {
+    changes.push({ kind: 'removeState', state: state.id });
+    changes.push({
+      kind: 'setState',
+      state: {
+        ...state,
+        id: stateEntryId(state.key, state.owner, state.source, to),
+        scopeId: to,
+      },
+    });
+  }
+  for (const skill of world.snapshot.skills)
+    if (skill.grants.some((grant) => grant.scopeId === from))
+      changes.push({
+        kind: 'setSkill',
+        skill: {
+          ...skill,
+          grants: skill.grants.map((grant) =>
+            grant.scopeId === from ? { ...grant, scopeId: to } : grant,
+          ),
+        },
+      });
+  return changes;
 }

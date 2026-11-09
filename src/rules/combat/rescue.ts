@@ -3,6 +3,9 @@ import type { Room } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
 import { Dying } from './life-events';
 
+/** 救援时征询的牌名：濒死结算唯一认可的“救命牌”。 */
+export const rescueNames: readonly string[] = Object.freeze(['standard:peach']);
+
 /** 标准救援装配：从当前回合角色起按座次，每人可连续使用桃直到脱离濒死或放弃。 */
 export function installRescue(room: Room): () => void {
   return room.on(Dying.rescue, {
@@ -23,7 +26,7 @@ export function installRescue(room: Room): () => void {
         ) {
           const answer = await askUse(ctx, {
             actor,
-            names: ['standard:peach'],
+            names: rescueNames,
             targets: [event.player],
             timing: { kind: 'rescue', dying: event.player },
             prompt: `${event.player} 濒死，还需要 ${1 - ctx.world.player(event.player).hp} 个桃`,

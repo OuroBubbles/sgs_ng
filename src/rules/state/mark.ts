@@ -2,7 +2,7 @@ import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { DeepReadonly } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { assertLifetime, lifetimeOf } from '../scopes/lifetime';
+import { assertLifetime, lifetimeOf, stateEntryId } from '../scopes/lifetime';
 import type { Lifetime, Scope } from '../scopes/lifetime';
 import { defineEvent, timing } from '../../core/runtime/event';
 import type { SkillDefinition } from '../skills/skills';
@@ -85,7 +85,7 @@ export function defineMark<T>(id: string, initial: T, spec: MarkSpec<T> = {}): M
     return lifetimeOf(at, scope);
   };
   const entryId = (owner: string | null, slot: MarkSlot, life: Lifetime | null) =>
-    JSON.stringify([id, owner, slot.source ?? null, life?.id ?? null]);
+    stateEntryId(id, owner, slot.source ?? null, life?.id ?? null);
   const mark: Mark<T> = Object.freeze({
     id,
     initial: value,
