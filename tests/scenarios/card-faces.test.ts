@@ -26,7 +26,7 @@ import jijiu from '../../src/content/standard/skills/jijiu';
 import guose from '../../src/content/standard/skills/guose';
 import guicai from '../../src/content/standard/skills/guicai';
 import fanjian from '../../src/content/standard/skills/fanjian';
-import { vermilion } from '../../src/content/workshop/faces';
+import vermilion from '../../src/content/workshop/skills/vermilion';
 import { card, cardGame, use, chooseAndActivate as activate, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

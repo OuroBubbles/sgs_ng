@@ -703,7 +703,7 @@ it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否�
   });
   const request = await nextRequest(match.room);
   expect(request.kind).toBe('invoke');
-  expect(request.prompt).toContain('玉碎');
+  expect(request.prompt).toContain('遗玉');
   expect(match.room.decisions.submit(request.id, request.token, accept)).toEqual({
     kind: 'accepted',
   });
@@ -714,7 +714,7 @@ it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否�
   expect(match.room.history.facts(Skill.invoked)).toHaveLength(Number(accept));
   if (accept)
     expect(match.room.history.facts(Skill.invoked)[0]?.data.detail).toMatchObject({
-      skill: 'workshop:jade-echo',
+      skill: 'workshop:relic_jade-ability',
       instance: JSON.stringify(['equipment', '甲席', 'relic-card-2']),
     });
   expect(rebuildWorld(match.initial, match.room.history.facts())).toEqual(

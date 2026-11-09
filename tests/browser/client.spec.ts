@@ -324,7 +324,7 @@ for (const accept of [false, true]) {
     await expect(equipment.getByRole('button', { name: /遗玉/ })).toHaveCount(1);
     await page.getByTestId('hand-cards').getByTestId('card-relic-card-14').click();
     await confirm(page).click();
-    await expect(page.getByTestId('decision-hint')).toContainText('是否发动【玉碎】');
+    await expect(page.getByTestId('decision-hint')).toContainText('是否发动【遗玉】');
     await expect(equipment.getByRole('button', { name: /遗玉/ })).toHaveCount(0);
     await expect(equipment.getByRole('button', { name: /八卦阵/ })).toHaveCount(1);
     await expect(hand(page)).toHaveCount(before - 2);
@@ -332,8 +332,8 @@ for (const accept of [false, true]) {
     await expect(page.locator('[data-decision-kind="play-action"]')).toBeVisible();
     await expect(hand(page)).toHaveCount(before - 2 + Number(accept));
     await expect(jade).toHaveCount(0);
-    if (accept) await expect(page.getByTestId('journal')).toContainText('甲席发动【玉碎】');
-    else await expect(page.getByTestId('journal')).not.toContainText('甲席发动【玉碎】');
+    if (accept) await expect(page.getByTestId('journal')).toContainText('甲席发动【遗玉】');
+    else await expect(page.getByTestId('journal')).not.toContainText('甲席发动【遗玉】');
     await expect(page.getByRole('dialog', { name: /请交给/ })).toHaveCount(0);
     await page.screenshot({
       path: `.artifacts/ui/retained-equipment-${accept ? 'invoke' : 'decline'}-${info.project.name}.png`,

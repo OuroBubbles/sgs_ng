@@ -169,7 +169,7 @@ JointSelection 的 cards / targets 候选函数可直接返回稳定 ID 数组�
 
 技能支付只传 skill，付款人来自其 owner，如 `pay(ctx, { skill: self, reason: self.skill, limit })`；普通支付显式传 actor，两种来源互斥。reason 始终由调用者声明。零材料支付可省略 cards 和 to；声明材料时两者必须一起提供，弃置费用可用 `payDiscard` 固定目的区。支付入口重新检查角色、来源、次数与材料，返回 `paid/unavailable`。费用与次数提交后，移牌及支付后效完整结束才返回，取消后效不自动退款。不要按 UI 点击计次。
 
-需要在费用确定时同步修改待决草案，可使用 `PaymentIntent`。它的 `available` 是纯查询，`committed` 必须同步，先于支付后效；异步宣告属于代码故障。普通技能通常无需直接使用此入口，实际例子见 [伤害转移](../src/content/workshop/defense.ts)。
+需要在费用确定时同步修改待决草案，可使用 `PaymentIntent`。它的 `available` 是纯查询，`committed` 必须同步，先于支付后效；异步宣告属于代码故障。普通技能通常无需直接使用此入口，实际例子见 [伤害转移](../src/content/workshop/skills/relay.ts)。
 
 “后续还需要什么条件”由技能文本决定。来源在发动前必须有效；已经宣告的效果不因为来源消失而统一回滚，也不应在每个 await 后机械添加 `self.active(...)`。确实要求目标仍存活、当前阶段未结束或仍持有技能时，用动态候选及 `available` 表达，并由实际操作最终校验。区分草案、按发动时固定的来源与已经提交的结果。
 

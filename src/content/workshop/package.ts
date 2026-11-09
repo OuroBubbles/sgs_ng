@@ -1,265 +1,92 @@
-import type { Card, CardDefinition, PackDefinition, SkillDefinition } from '../../sdk';
-import {
-  chooseOne,
-  draw,
-  invoke,
-  on,
-  recover,
-  equipmentCard,
-  equipmentLost,
-  damage,
-  isChained,
-  setChained,
-  Use,
-  Cards,
-  cardDef,
-} from '../../sdk';
-import { relay, ward } from './defense';
-import { vermilion, createFaceDeck } from './faces';
-import { insight, echo } from './learning';
-import { allotment } from './allotment';
+import type { Card, PackDefinition } from '../../sdk';
 
-/** 作者演示牌；复用标准锦囊与选择流程，无专用 UI 或内核分支。 */
-export const prepare: CardDefinition = {
-  id: 'workshop:prepare',
-  label: '整备',
-  description:
-    '作者演示牌。对自己使用，选择摸两张牌，或回复 1 点体力。未受伤时只能摸牌；可被无懈可击。',
-  type: 'trick',
-  counterable: true,
-  use: {
-    count: { min: 1, max: 1 },
-    target: (_ctx, { request, target }) => target === request.actor,
-    async resolve(ctx, { effect }) {
-      const player = ctx.world.player(effect.target);
-      const answer = await ctx.ask(
-        chooseOne({
-          player: effect.target,
-          prompt: '整备：选择一项',
-          reason: 'workshop:prepare',
-          options: [
-            { id: 'draw', label: '摸两张牌' },
-            ...(player.hp < player.maxHp ? [{ id: 'recover', label: '回复一点体力' }] : []),
-          ],
-        }),
-      );
-      if (answer.kind !== 'chosen') return ctx.abort('整备选择中止。');
-      if (answer.value === 'recover')
-        await recover(ctx, { from: effect.actor, to: effect.target, amount: 1, card: effect });
-      else await draw(ctx, { player: effect.target, count: 2, reason: 'workshop:prepare' });
-    },
-  },
-};
+/** 按 [牌名, 张数] 依次展开；花色默认四色轮转，点数 1–13 循环。 */
+function deck(
+  prefix: string,
+  counts: readonly (readonly [string, number])[],
+  suit = (index: number): Card['suit'] =>
+    (['spade', 'heart', 'club', 'diamond'] as const)[index % 4]!,
+): () => readonly Card[] {
+  return () =>
+    counts
+      .flatMap(([name, count]) => Array<string>(count).fill(name))
+      .map((name, index) => ({
+        id: `${prefix}-${index + 1}`,
+        name,
+        suit: suit(index),
+        rank: (index % 13) + 1,
+      }));
+}
 
-/** 普通多目标锦囊；每个目标结算时读取当前状态，不在客户端维护连环列表。 */
-export const bind: CardDefinition = {
-  id: 'workshop:bind',
-  label: '缚阵',
-  description:
-    '作者演示牌。选择一至两名角色，分别切换其连环状态。可选择自己；每个目标可被无懈可击。',
-  type: 'trick',
-  counterable: true,
-  use: {
-    count: { min: 1, max: 2 },
-    target: () => true,
-    resolve: (ctx, { effect }) =>
-      setChained(ctx, effect.target, !isChained(ctx.world, effect.target), effect.card.name),
-  },
-};
-
-export const ember: CardDefinition = {
-  id: 'workshop:ember',
-  label: '引焰',
-  description:
-    '作者演示牌。对一名其他角色造成 1 点火焰伤害。若目标处于连环，其受到的伤害会依次传给当时的其他连环角色；每名角色受到伤害时解除连环。可被无懈可击。',
-  type: 'trick',
-  counterable: true,
-  nature: 'fire',
-  use: {
-    count: { min: 1, max: 1 },
-    target: (_ctx, { request, target }) => target !== request.actor,
-    resolve: (ctx, { effect }) =>
-      damage(ctx, {
-        from: effect.actor,
-        to: effect.target,
-        amount: 1,
-        nature: effect.card.nature,
-        card: effect,
-      }),
-  },
-};
-
-/** 工厂拿到本局目录，因此其他内容与转换锦囊也按真实牌类型判定。 */
-export const hearing = {
-  id: 'workshop:hearing',
-  name: '闻策',
-  description: '当你使用锦囊牌时，你可以摸一张牌。',
-  triggers: [
-    on(Use.declared, {
-      when: (ctx, use, self) =>
-        use.actor === self.owner && cardDef(ctx, use.card.name).type === 'trick',
-      async effect(ctx, _event, self) {
-        const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
-        if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
-      },
-    }),
-  ],
-} satisfies SkillDefinition;
-
-/** 历史来源仍可普通 invoke；当前装备、转换与查询目录不会重新获得这件牌。 */
-export const relicJade = equipmentCard({
-  id: 'workshop:relic_jade',
-  label: '遗玉',
-  description: '防具。离开你的装备区后，你可以摸一张牌。手牌中的遗玉被弃置不会发动。',
-  slot: 'armor',
-  skill: {
-    id: 'workshop:jade-echo',
-    name: '玉碎',
-    description: '遗玉离开你的装备区后，你可以摸一张牌。不是装备时被弃置不会发动。',
-    triggers: [
-      on(Cards.moved, {
-        retain: (ctx, moved, self) =>
-          ctx.world.player(self.owner).alive && equipmentLost(ctx.world, moved, self),
-        when: (ctx, moved, self) => equipmentLost(ctx.world, moved, self),
-        async effect(ctx, _event, self) {
-          const accepted = await invoke(ctx, self, '是否发动【玉碎】摸一张牌？');
-          if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });
-        },
-      }),
-    ],
-  },
-});
-
-/** 机制演武包：依赖标准包的牌与技能，只在演武中启用。 */
+/**
+ * 机制演武包：依赖标准包的牌与技能，只在演武中启用。generals/、cards/、skills/ 下每个文件
+ * 即一名武将、一种牌或一个技能（余响不属于任何武将，由拾慧授予）。
+ */
 export default {
   practice: true,
-  cards: [prepare, relicJade, bind, ember, ward],
-  skills: [hearing, relay, vermilion, insight, echo, allotment],
-  generals: [
-    {
-      id: 'workshop:quartermaster',
-      name: '筹策客',
-      kingdom: '群',
-      gender: 'male',
-      maxHp: 4,
-      skills: ['workshop:allotment'],
-    },
-    {
-      id: 'workshop:inquirer',
-      name: '问道客',
-      kingdom: '群',
-      gender: 'male',
-      maxHp: 4,
-      skills: ['workshop:insight'],
-    },
-    {
-      id: 'workshop:vermilion_guest',
-      name: '绯衣客',
-      kingdom: '群',
-      gender: 'female',
-      maxHp: 3,
-      skills: [vermilion.id, 'standard:wusheng'],
-    },
-    {
-      id: 'workshop:guardian',
-      name: '守阵客',
-      kingdom: '群',
-      gender: 'female',
-      maxHp: 4,
-      skills: ['workshop:relay'],
-    },
-    {
-      id: 'workshop:guest',
-      name: '演武客',
-      kingdom: '群',
-      gender: 'male',
-      maxHp: 4,
-      skills: ['workshop:hearing', 'standard:wusheng'],
-    },
-  ],
+  order: ['quartermaster', 'inquirer', 'vermilion_guest', 'guardian', 'guest'],
   decks: [
-    { id: 'workshop:faces', label: '牌面演练（40 张）', create: createFaceDeck },
+    {
+      id: 'workshop:faces',
+      label: '牌面演练（40 张）',
+      // 全黑桃便于观察印刷牌与当前牌面差别；配比仍能完成真实基础 AI 对局。
+      create: deck(
+        'face-card',
+        [
+          ['standard:slash', 18],
+          ['standard:jink', 8],
+          ['standard:peach', 8],
+          ['standard:ex_nihilo', 4],
+          ['standard:eight_diagram', 2],
+        ],
+        () => 'spade',
+      ),
+    },
     {
       id: 'workshop:defense',
       label: '护盾与转移（48 张）',
-      create() {
-        const names = [
-          ...Array<string>(8).fill(ward.id),
-          ...Array<string>(8).fill(bind.id),
-          ...Array<string>(8).fill(ember.id),
-          ...Array<string>(12).fill('standard:slash'),
-          ...Array<string>(6).fill('standard:jink'),
-          ...Array<string>(6).fill('standard:peach'),
-        ];
-        const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
-        return names.map((name, i) => ({
-          id: `defense-card-${i + 1}`,
-          name,
-          suit: suits[i % 4]!,
-          rank: (i % 13) + 1,
-        }));
-      },
+      create: deck('defense-card', [
+        ['workshop:ward', 8],
+        ['workshop:bind', 8],
+        ['workshop:ember', 8],
+        ['standard:slash', 12],
+        ['standard:jink', 6],
+        ['standard:peach', 6],
+      ]),
     },
     {
       id: 'workshop:chains',
       label: '连环演练（48 张）',
-      create() {
-        const names = [
-          ...Array<string>(12).fill(bind.id),
-          ...Array<string>(8).fill(ember.id),
-          ...Array<string>(12).fill('standard:slash'),
-          ...Array<string>(8).fill('standard:jink'),
-          ...Array<string>(8).fill('standard:peach'),
-        ];
-        const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
-        return names.map((name, i) => ({
-          id: `chain-card-${i + 1}`,
-          name,
-          suit: suits[i % 4]!,
-          rank: (i % 13) + 1,
-        }));
-      },
+      create: deck('chain-card', [
+        ['workshop:bind', 12],
+        ['workshop:ember', 8],
+        ['standard:slash', 12],
+        ['standard:jink', 8],
+        ['standard:peach', 8],
+      ]),
     },
     {
       id: 'workshop:showcase',
       label: '机制演武（44 张）',
-      create() {
-        const names = [
-          ...Array<string>(12).fill('standard:slash'),
-          ...Array<string>(12).fill('standard:jink'),
-          ...Array<string>(8).fill('standard:peach'),
-          ...Array<string>(4).fill('standard:duel'),
-          ...Array<string>(4).fill('standard:ex_nihilo'),
-          ...Array<string>(4).fill(prepare.id),
-        ];
-        const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
-        return names.map((name, i) => ({
-          id: `workshop-card-${i + 1}`,
-          name,
-          suit: suits[i % 4]!,
-          rank: (i % 13) + 1,
-        }));
-      },
+      create: deck('workshop-card', [
+        ['standard:slash', 12],
+        ['standard:jink', 12],
+        ['standard:peach', 8],
+        ['standard:duel', 4],
+        ['standard:ex_nihilo', 4],
+        ['workshop:prepare', 4],
+      ]),
     },
     {
       id: 'workshop:relics',
       label: '遗玉演练（40 张）',
-      create() {
-        const names = [
-          ...Array<string>(8).fill(relicJade.id),
-          ...Array<string>(8).fill('standard:eight_diagram'),
-          ...Array<string>(12).fill('standard:slash'),
-          ...Array<string>(8).fill('standard:jink'),
-          ...Array<string>(4).fill('standard:peach'),
-        ];
-        const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
-        return names.map((name, i) => ({
-          id: `relic-card-${i + 1}`,
-          name,
-          suit: suits[i % 4]!,
-          rank: (i % 13) + 1,
-        }));
-      },
+      create: deck('relic-card', [
+        ['workshop:relic_jade', 8],
+        ['standard:eight_diagram', 8],
+        ['standard:slash', 12],
+        ['standard:jink', 8],
+        ['standard:peach', 4],
+      ]),
     },
   ],
 } satisfies PackDefinition;

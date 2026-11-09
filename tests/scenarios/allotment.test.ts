@@ -1,7 +1,7 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { finishGame, privateCardPools, runPhase, Cards, Cost } from '../../src/sdk';
-import { allotment } from '../../src/content/workshop/allotment';
+import allotment from '../../src/content/workshop/skills/allotment';
 import { card, cardGame, die } from '../fixtures/cards';
 import { nextRequest, answer } from '../fixtures/room';
 import { rebuildWorld } from '../../src/core/history/rebuild';

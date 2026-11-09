@@ -1,7 +1,8 @@
 import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { damage } from '../../src/sdk';
-import { insight, echo } from '../../src/content/workshop/learning';
+import insight from '../../src/content/workshop/skills/insight';
+import echo from '../../src/content/workshop/skills/echo';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
 import { card, cardGame } from '../fixtures/cards';
