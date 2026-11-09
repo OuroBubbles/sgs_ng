@@ -9,9 +9,9 @@
         "standard:liubei",
         "standard:lvbu"
       ],
-      "entries": 16209,
-      "facts": 2382,
-      "decisions": 197,
+      "entries": 7999,
+      "facts": 1160,
+      "decisions": 88,
       "result": {
         "winners": [
           "甲席",
@@ -22,18 +22,14 @@
       "usedCards": [
         "standard:amazing_grace",
         "standard:archery_attack",
-        "standard:axe",
-        "standard:blade",
-        "standard:chitu",
         "standard:collateral",
         "standard:dayuan",
         "standard:dilu",
         "standard:dismantlement",
         "standard:double_swords",
-        "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:halberd",
+        "standard:indulgence",
         "standard:jink",
         "standard:kylin_bow",
         "standard:nullification",
@@ -44,9 +40,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "ba3347e440426dd68a1a0a00432f98f9c4c6abf4fb5122184f9d7bfdb5edcae4",
-        "facts": "3585ec4da1c83c2ed2fbf56fd07f859d08653e1938a1c14053ee258590df249c",
-        "decisions": "cceb80f7bc0a53420d24f8831fc6f37a5a3ebbc82b49b8cae2d8cb1406ac3988"
+        "journal": "e1bce8ddf7700c8e03de059980d26c9949e5930545a9de08aab55bbf759f59e8",
+        "facts": "3430c86ee45bb9a80e5bd15f9fba114ed9b68f853a436cb68207381089bd9ca8",
+        "decisions": "98890a5b32ce406073eda829dffbca87c6ee48cd7411f589812039625b4da9a5"
       }
     },
     {
@@ -58,48 +54,36 @@
         "standard:huatuo",
         "standard:daqiao"
       ],
-      "entries": 24694,
-      "facts": 3641,
-      "decisions": 323,
+      "entries": 6135,
+      "facts": 882,
+      "decisions": 75,
       "result": {
         "winners": [
-          "丁席"
+          "乙席"
         ],
-        "reason": "role:renegade-survives"
+        "reason": "role:lord-dead"
       },
       "usedCards": [
-        "standard:amazing_grace",
-        "standard:axe",
-        "standard:blade",
+        "standard:archery_attack",
         "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
-        "standard:dayuan",
-        "standard:dilu",
         "standard:dismantlement",
-        "standard:double_swords",
-        "standard:duel",
         "standard:eight_diagram",
-        "standard:ex_nihilo",
-        "standard:god_salvation",
-        "standard:halberd",
-        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
-        "standard:jueying",
         "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:spear",
-        "standard:zhuahuangfeidian",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "b7c9e691018e71f142ab7688ab70cd3c003690a4c545e32568ccdb243e8b1996",
-        "facts": "8aa42135a47a126c126e474380032ac79fe63740efce4512c4a8983f975a8c1c",
-        "decisions": "c3d14d73b94c9d130e123fb2797312ff8df150c278148ddd902e47693d4df172"
+        "journal": "24a455fb524cc43b9707ec519bbeaf7df212c144a81c1c26ed2169fc8862cc9b",
+        "facts": "8fae3944a049866962ecfdc0ce6758ff630f3a0788815cca3f03b16338bd344b",
+        "decisions": "2dd2ef00aab80c6c57aa5bd0c089ef24d71b98b8bb60c019d0a45b2cb282e16d"
       }
     },
     {
@@ -111,9 +95,9 @@
         "standard:sunquan",
         "standard:machao"
       ],
-      "entries": 12954,
-      "facts": 1909,
-      "decisions": 161,
+      "entries": 12833,
+      "facts": 1894,
+      "decisions": 158,
       "result": {
         "winners": [
           "甲席",
@@ -133,6 +117,7 @@
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
@@ -147,9 +132,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "440779d70880b710ad531edd239dc1a15fae216cc93b3dd9fd5e962534aab972",
-        "facts": "9db34928e13e098be59d3a114db9addb0b2d9def05a8eb9bbc4b7454285591d9",
-        "decisions": "6d0bc1a1bc6243e8bb8a0357d45e93e4529137d524343a21fd247c4dc348ad68"
+        "journal": "54126e3334028be786bdd7d1dbf964c6fe568ca1d92fe6384f42fd006961fd9d",
+        "facts": "0b7c310e8f3bbcafc5a8b65812606d4240e090d4990f2cecc3f5b3c3e7f0617f",
+        "decisions": "fed783bce85a69d5712ccefba651f9bc679865b228089e6c43af62d56623d096"
       }
     },
     {
@@ -161,9 +146,9 @@
         "standard:lvmeng",
         "standard:zhouyu"
       ],
-      "entries": 5677,
-      "facts": 798,
-      "decisions": 82,
+      "entries": 8387,
+      "facts": 1221,
+      "decisions": 113,
       "result": {
         "winners": [
           "乙席",
@@ -172,26 +157,29 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
+        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:chitu",
-        "standard:dayuan",
-        "standard:dilu",
+        "standard:crossbow",
         "standard:dismantlement",
         "standard:double_swords",
+        "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
+        "standard:indulgence",
         "standard:jink",
         "standard:peach",
         "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
-        "standard:snatch"
+        "standard:snatch",
+        "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "6c89cb6d1c12297cefe13a5d98a9f5e81785576bbbca6b219988eb07a84d9211",
-        "facts": "6e6340ea53de15742184ecfc9114827d7116828716239e5866b5cb4ecc2b09f0",
-        "decisions": "ae2f4ff8556bdcdebf5dd68bc1d4bd1c1d46892ab4ab60cba4744642a30b90f1"
+        "journal": "cdf33470f52f07ea24ed3b08422573be9a4fff074784026baa181662df6aa41a",
+        "facts": "2a57626fe1b6bed611b87c41a74e06410ca09e00774629c3652340cde03b1d1d",
+        "decisions": "cbf720b329cea48e06a9f9a241c5f8f3c3ff2911438d6a357feee0db9b2e2cbc"
       }
     },
     {
@@ -203,8 +191,8 @@
         "standard:luxun",
         "standard:diaochan"
       ],
-      "entries": 9532,
-      "facts": 1381,
+      "entries": 9732,
+      "facts": 1412,
       "decisions": 113,
       "result": {
         "winners": [
@@ -223,9 +211,11 @@
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:nioh_shield",
+        "standard:nullification",
         "standard:peach",
         "standard:qinggang_sword",
         "standard:savage_assault",
@@ -234,9 +224,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "56e1e8be797fe20b7fff630cb6eae685a919d3ce5ad6aee847ccaf6dbb41d06f",
-        "facts": "6b623d39267dabdaeb7258cf678e750a1c03a595e7294ab7f357b065d162bfd0",
-        "decisions": "f3e568c3d388b7984e53f6421b940e0f56f5f2f2f8b0f6d513e41a83a90c2fb9"
+        "journal": "e588add8f8ea4d4c2ae4dc26eb77d249165f5749c98885a1e6e85eca689b7b1b",
+        "facts": "014460e84841309749789c7e4fb28a4b8891218675f4d778fcad87437400ce03",
+        "decisions": "b3f11a06abb642108c08213cd26576572467f0bf7fc67a7c90a1944be31d7e63"
       }
     },
     {
@@ -248,17 +238,17 @@
         "standard:huangyueying",
         "standard:zhugeliang"
       ],
-      "entries": 14957,
-      "facts": 2176,
-      "decisions": 208,
+      "entries": 18682,
+      "facts": 2717,
+      "decisions": 255,
       "result": {
         "winners": [
-          "甲席"
+          "乙席",
+          "丙席"
         ],
-        "reason": "role:lord-dead"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:axe",
         "standard:blade",
@@ -267,26 +257,26 @@
         "standard:crossbow",
         "standard:dayuan",
         "standard:dismantlement",
-        "standard:double_swords",
-        "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
         "standard:nullification",
         "standard:peach",
+        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:zhuahuangfeidian",
-        "standard:zixing"
+        "standard:spear",
+        "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "95fa79d44c8b019204adabae40df07d3db390290c73fe6776fbb0c2c860948a1",
-        "facts": "c7ac37d8f6bf82ccfc81d08699d07607e87bb4d8956a328801d0a762c6337588",
-        "decisions": "69b41503dc62c631beeceac9b779a06f01c03efa8f68f70ad5216eee4404ec11"
+        "journal": "b423a361039127a6dc554c6b090c229b5ef2b306233380284282b9eec615b1f0",
+        "facts": "8c054b5bd6e3a47b4fb89f380655b2cf479046cfab20aee1a26bc33fc856582d",
+        "decisions": "95687be27016ba50d4986e57f44c7345598b4fde4dd079efe09ba3eeb0624b62"
       }
     },
     {
@@ -298,9 +288,9 @@
         "standard:lvbu",
         "standard:liushan"
       ],
-      "entries": 5373,
-      "facts": 746,
-      "decisions": 55,
+      "entries": 13922,
+      "facts": 2018,
+      "decisions": 177,
       "result": {
         "winners": [
           "甲席"
@@ -308,23 +298,35 @@
         "reason": "role:lord-dead"
       },
       "usedCards": [
+        "standard:archery_attack",
+        "standard:axe",
+        "standard:collateral",
         "standard:crossbow",
         "standard:dilu",
         "standard:dismantlement",
         "standard:double_swords",
         "standard:duel",
         "standard:ex_nihilo",
+        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
+        "standard:jueying",
         "standard:kylin_bow",
+        "standard:nioh_shield",
+        "standard:nullification",
         "standard:peach",
+        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
-        "standard:snatch"
+        "standard:snatch",
+        "standard:spear",
+        "standard:zhuahuangfeidian",
+        "standard:zixing"
       ],
       "digest": {
-        "journal": "99f00e470e8c164fc61b344779a455223f846c3a2573f9b7aef482762fead9eb",
-        "facts": "16ee7b55b8f1a9b55facfb127c904ad79cb1255a7cef66ee13c2861b9ba74803",
-        "decisions": "2c1e1a3befd1b3f33319957b986c30f9987015446f40b0d341c97df76245afd6"
+        "journal": "43b0ec46179135f1df4b52bba48dbe55dc36161a76e6583f5394460c2635e8a1",
+        "facts": "4412d6321d5ffaaa4a57b1e6db13c0ea6ca43a02b7e949ac2784ca2f77be8c71",
+        "decisions": "5a27358203f15f2fbfe0a273ec80e7666a29eb4816768ef967d4c32cdff18390"
       }
     },
     {
@@ -336,50 +338,34 @@
         "standard:daqiao",
         "standard:guanyu"
       ],
-      "entries": 41048,
-      "facts": 6103,
-      "decisions": 579,
+      "entries": 4531,
+      "facts": 660,
+      "decisions": 49,
       "result": {
         "winners": [
-          "乙席"
+          "甲席",
+          "丙席"
         ],
-        "reason": "role:renegade-survives"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
-        "standard:archery_attack",
-        "standard:axe",
         "standard:blade",
-        "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
         "standard:dilu",
-        "standard:dismantlement",
-        "standard:double_swords",
         "standard:duel",
-        "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
-        "standard:halberd",
-        "standard:ice_sword",
-        "standard:jink",
-        "standard:jueying",
-        "standard:kylin_bow",
-        "standard:nioh_shield",
-        "standard:nullification",
-        "standard:peach",
-        "standard:qinggang_sword",
+        "standard:indulgence",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:zhuahuangfeidian",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "ce12874fa8d06117c500a710dad46444fec115ae8a7bf33044798781674fad2d",
-        "facts": "58adaa1e49340d53fe909b0df765e6e9744a0467f446725fe9318186956c6f9d",
-        "decisions": "84eca51653afe6e62e773861e6b1b6297a237a7648ca41306b07eb35c6c59b9a"
+        "journal": "ff60ef4872037013e426c0b08862fb4e5e6ad543f52471febf027adf8ff63d91",
+        "facts": "295454968d5800834bb7233d6c8a8e9143e621dd52a98484006eed6f770c1d9e",
+        "decisions": "a11077bcfa80c7888346c64a695ae53157399867408b38e2686a31f3b06b1f3e"
       }
     },
     {
@@ -391,9 +377,9 @@
         "standard:machao",
         "standard:huanggai"
       ],
-      "entries": 17233,
-      "facts": 2515,
-      "decisions": 245,
+      "entries": 12971,
+      "facts": 1891,
+      "decisions": 170,
       "result": {
         "winners": [
           "甲席"
@@ -405,14 +391,16 @@
         "standard:archery_attack",
         "standard:axe",
         "standard:collateral",
+        "standard:crossbow",
         "standard:dayuan",
-        "standard:dilu",
         "standard:dismantlement",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
+        "standard:jueying",
         "standard:kylin_bow",
         "standard:nullification",
         "standard:peach",
@@ -420,13 +408,14 @@
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
+        "standard:spear",
         "standard:zhuahuangfeidian",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "28e415ccb3fc673c564f4cdc6aac442592bed7c184e1dc796e93498222e58355",
-        "facts": "833c07e40b65f8c313545d9e96cf3220ab3ba033e2b16882e8591724ce0ad8a9",
-        "decisions": "54dfe212f787f82bdb1a001690c5f68de88de636579fb7b36f9f572b6ae79774"
+        "journal": "58f60636e14259a02ed760f3834cf1dd02b113170ebde7b031eead51181f4365",
+        "facts": "ec3a5c4c3ccf864a514325b4facb96d743753929a367de62bb678293c926152e",
+        "decisions": "5bc0c9cc4bba067dc0b1416d307fb37e217d2f97566d7cdc0f6144462462a837"
       }
     },
     {
@@ -438,9 +427,9 @@
         "standard:zhouyu",
         "standard:sunshangxiang"
       ],
-      "entries": 4837,
-      "facts": 685,
-      "decisions": 64,
+      "entries": 11868,
+      "facts": 1724,
+      "decisions": 177,
       "result": {
         "winners": [
           "甲席",
@@ -449,25 +438,32 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:archery_attack",
+        "standard:amazing_grace",
         "standard:axe",
+        "standard:blade",
+        "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
         "standard:dismantlement",
+        "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
+        "standard:indulgence",
         "standard:jink",
+        "standard:kylin_bow",
         "standard:nullification",
         "standard:peach",
         "standard:savage_assault",
-        "standard:slash"
+        "standard:slash",
+        "standard:snatch",
+        "standard:spear"
       ],
       "digest": {
-        "journal": "1eceeba350a3cb9c23014e7b2eddcda6a627adc884745b5a45b59a48dd63e35b",
-        "facts": "556ebcc0561bac81cb78808e2e85f9aa6832a4486189eb136640a7330c8e3633",
-        "decisions": "2429302c7ab6e9137fea160a4e2de9b80c835a8a4ffd49f241a55647808c5a93"
+        "journal": "a9158765dac2d3bc2e99bde41e22558df1eefcd48310c040ccfe29bb41ee20fa",
+        "facts": "ad6e15d6752cd1b9d5fd89ef7acb3442074315d453c8dbd3151616f06fd37b70",
+        "decisions": "eca2031b7581427b1e31fdf3a300e3964d450966a0f877039408d229d00c0621"
       }
     },
     {
@@ -479,47 +475,36 @@
         "standard:diaochan",
         "standard:zhaoyun"
       ],
-      "entries": 15017,
-      "facts": 2216,
-      "decisions": 204,
+      "entries": 6444,
+      "facts": 938,
+      "decisions": 74,
       "result": {
         "winners": [
-          "甲席"
+          "乙席",
+          "丁席"
         ],
-        "reason": "role:renegade-survives"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
         "standard:archery_attack",
-        "standard:axe",
-        "standard:collateral",
-        "standard:crossbow",
         "standard:dayuan",
         "standard:dismantlement",
         "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
-        "standard:halberd",
-        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
-        "standard:jueying",
         "standard:kylin_bow",
-        "standard:nioh_shield",
         "standard:nullification",
-        "standard:peach",
-        "standard:qinggang_sword",
-        "standard:savage_assault",
         "standard:slash",
-        "standard:snatch",
         "standard:spear",
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "dbcce284411e14cfd48945c49010413dad3f531a9a316044c59065a353b91233",
-        "facts": "7146fe610a3107c3133330783cd17fb42c16be04e95b1d1a2b9ededea9bd324f",
-        "decisions": "019a1767a078f0c5bf4e29d1461023006d11468ac3b9749ceb0eb6ef6118bb75"
+        "journal": "1081ea9363bb65167def0d8d75e183126fa433c2eda697d9fc2ecefe38d4156e",
+        "facts": "e2a1a010a3fffab76059d10369cab20b5f9fcbbd5d573bc1c079dbb1dd73a2bb",
+        "decisions": "918bf83d6de2e4a989732807a2ff18f2b4073ec1c5a330a71099a37508034596"
       }
     },
     {
@@ -531,9 +516,9 @@
         "standard:zhugeliang",
         "standard:zhangfei"
       ],
-      "entries": 14357,
-      "facts": 2127,
-      "decisions": 195,
+      "entries": 10110,
+      "facts": 1498,
+      "decisions": 131,
       "result": {
         "winners": [
           "甲席",
@@ -542,7 +527,6 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:blade",
         "standard:collateral",
@@ -553,8 +537,8 @@
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:nullification",
@@ -562,12 +546,13 @@
         "standard:qinggang_sword",
         "standard:slash",
         "standard:snatch",
+        "standard:spear",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "e92e1bbfd3a3da32b4fc3ed8d37d2e90a1fbee672cfabd1b516f88035563d7be",
-        "facts": "3a67e45f1a3f188203e89b554e417ecb1d0a9e79f7d77fc1dc73c5f477615b9b",
-        "decisions": "65a281309f27050cdd389d8c99af755ad4c101a23c0ab753d427f362282ca751"
+        "journal": "8c3476c2813281a9aae818135153e9e280a19dff788501f101041e85f02da18d",
+        "facts": "241ea52f67301f32d53e75f6c7038321b33dc8f47cca9eeffcbb8a98ae686eee",
+        "decisions": "421f470f0b5f8977b9c21a9f3ac1f4d0206805024cadf7714232b97e63bffcca"
       }
     },
     {
@@ -579,9 +564,9 @@
         "standard:liushan",
         "standard:ganning"
       ],
-      "entries": 39455,
-      "facts": 5749,
-      "decisions": 562,
+      "entries": 16071,
+      "facts": 2323,
+      "decisions": 206,
       "result": {
         "winners": [
           "乙席",
@@ -590,6 +575,7 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
+        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:axe",
         "standard:blade",
@@ -598,19 +584,18 @@
         "standard:dayuan",
         "standard:dilu",
         "standard:dismantlement",
-        "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:god_salvation",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
         "standard:nullification",
         "standard:peach",
-        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
@@ -619,9 +604,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "53dbf458e3dc20fd859bf3be53bc5ebea9034ef1e567237f81465c573d40e9c6",
-        "facts": "c7f3e1c72a88bded9b5207ffc21247163c23538a5bb8e011f25a59c5f7461bfa",
-        "decisions": "4624d9dbd8f1e045dad377e36a86e86da2468af1d097bd79f4355b3775921134"
+        "journal": "d539925b1d3c0a289258a838c396a745c30880a25173f2f1aae0fa23035956b2",
+        "facts": "f5d123d9e8a639e071180dc83e8b1b42d7eb61084233ae06376fa0a3e884ebe6",
+        "decisions": "6d7a0aa31465cdcdf69620d036db7f5752ec84c1f96b41007e49b7038d3e95a5"
       }
     },
     {
@@ -633,9 +618,9 @@
         "standard:guanyu",
         "standard:xiahoudun"
       ],
-      "entries": 7803,
-      "facts": 1145,
-      "decisions": 95,
+      "entries": 26367,
+      "facts": 3979,
+      "decisions": 327,
       "result": {
         "winners": [
           "丁席"
@@ -645,27 +630,38 @@
       "usedCards": [
         "standard:amazing_grace",
         "standard:archery_attack",
+        "standard:axe",
         "standard:blade",
+        "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
+        "standard:dilu",
         "standard:dismantlement",
         "standard:double_swords",
+        "standard:duel",
+        "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
+        "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
+        "standard:kylin_bow",
         "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
         "standard:savage_assault",
-        "standard:slash"
+        "standard:slash",
+        "standard:snatch",
+        "standard:spear",
+        "standard:zhuahuangfeidian",
+        "standard:zixing"
       ],
       "digest": {
-        "journal": "6efafad5320f381e0efdca3217c51c8e9afb5014a1bae65eb81f9d4b24924887",
-        "facts": "7035e5baea39b9dd4653f89f7ddd418a76b9f4e6c491f578ddb65506cf36dc55",
-        "decisions": "956c01250154d75e235e240156b163ef9a5e991f9083939edd6906d4c786a153"
+        "journal": "3dfab04bb9ad480760ccfecba0abef48ff8520fa51e600e2aadbe82269ca6c85",
+        "facts": "3dd2b2cfbec8ae913f3f72b5c165ead6e474ebf3ef0bd1cb2011eb91d90205ae",
+        "decisions": "66e5f728a280126a853a7d4867fa6784285eb251f8ff75ed6c0ebf6e590c6e42"
       }
     },
     {
@@ -677,20 +673,17 @@
         "standard:huanggai",
         "standard:xuchu"
       ],
-      "entries": 28396,
-      "facts": 4236,
-      "decisions": 378,
+      "entries": 15310,
+      "facts": 2273,
+      "decisions": 192,
       "result": {
         "winners": [
-          "乙席",
-          "丁席"
+          "甲席"
         ],
-        "reason": "role:opponents-eliminated"
+        "reason": "role:lord-dead"
       },
       "usedCards": [
-        "standard:archery_attack",
         "standard:axe",
-        "standard:blade",
         "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
@@ -701,13 +694,11 @@
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
-        "standard:jueying",
-        "standard:kylin_bow",
         "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
-        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
@@ -715,9 +706,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "9b37a99f76bd844e8ec3543b99afed018636497a141d45a52f09dd79e64ae108",
-        "facts": "5a705a353a82177a53d63995b3f89631ddff0a15e7f6f7bf61a4b2cd6fac5718",
-        "decisions": "03dc049f15961bebddf502d40ffa703e5c31a48417834e9519018a008b761143"
+        "journal": "5ff5cc462905a3135b72976cd51f48f7b582104c2ab904457ebaee278a76f85f",
+        "facts": "c508a29d4393b92de81e41cebec55cdd1705dc5c7d31513246ed254637c2002a",
+        "decisions": "b2d9ef8605f075cd94f9f527f7ad3fb74aa28083a1784a599751b4bfa25ef5ef"
       }
     },
     {
@@ -729,121 +720,31 @@
         "standard:sunshangxiang",
         "standard:zhenji"
       ],
-      "entries": 12845,
-      "facts": 1852,
-      "decisions": 198,
+      "entries": 12327,
+      "facts": 1773,
+      "decisions": 188,
       "result": {
         "winners": [
-          "丁席"
+          "丙席"
         ],
-        "reason": "role:lord-dead"
+        "reason": "role:renegade-survives"
       },
       "usedCards": [
         "standard:amazing_grace",
+        "standard:archery_attack",
         "standard:axe",
         "standard:blade",
         "standard:chitu",
         "standard:collateral",
-        "standard:crossbow",
-        "standard:dismantlement",
-        "standard:double_swords",
-        "standard:duel",
-        "standard:eight_diagram",
-        "standard:ex_nihilo",
-        "standard:halberd",
-        "standard:jink",
-        "standard:jueying",
-        "standard:nioh_shield",
-        "standard:nullification",
-        "standard:peach",
-        "standard:qinggang_sword",
-        "standard:savage_assault",
-        "standard:slash",
-        "standard:snatch"
-      ],
-      "digest": {
-        "journal": "cb6b7ebaf0eede3ecf43f6ba0c1ab21abd455938bdc4f808f6c62a1cf03815f8",
-        "facts": "67503ccc8e01a7934f51b4738d91819a78d8c471a14615f630f2bdd4dc4287e2",
-        "decisions": "f16ff643119b170716a81eac08e5f9b89d318f4fd9682ca86cf01443316d2f59"
-      }
-    },
-    {
-      "id": "4p-16",
-      "seed": 314,
-      "lineup": [
-        "standard:lvmeng",
-        "standard:diaochan",
-        "standard:zhaoyun",
-        "standard:simayi"
-      ],
-      "entries": 7010,
-      "facts": 1006,
-      "decisions": 78,
-      "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
-        "reason": "role:opponents-eliminated"
-      },
-      "usedCards": [
-        "standard:collateral",
-        "standard:dismantlement",
-        "standard:duel",
-        "standard:eight_diagram",
-        "standard:ex_nihilo",
-        "standard:god_salvation",
-        "standard:halberd",
-        "standard:jink",
-        "standard:jueying",
-        "standard:peach",
-        "standard:qinggang_sword",
-        "standard:savage_assault",
-        "standard:slash",
-        "standard:snatch",
-        "standard:spear",
-        "standard:zhuahuangfeidian"
-      ],
-      "digest": {
-        "journal": "480be7130fe9862932eb606dcc9e7b15eaa148c59f9ceb634682b1e98699ac0f",
-        "facts": "0c24e5653dde7260a2c72e56d18b2e5a36f3dcdde6b3d059b76d8825e6bacd4d",
-        "decisions": "82c7fb55d4b655ed302db78f6d8243f738c2f84f9c8e9560571dcd025badfce8"
-      }
-    },
-    {
-      "id": "4p-17",
-      "seed": 331,
-      "lineup": [
-        "standard:luxun",
-        "standard:zhugeliang",
-        "standard:zhangfei",
-        "standard:guojia"
-      ],
-      "entries": 16664,
-      "facts": 2393,
-      "decisions": 223,
-      "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
-        "reason": "role:opponents-eliminated"
-      },
-      "usedCards": [
-        "standard:amazing_grace",
-        "standard:chitu",
-        "standard:collateral",
-        "standard:crossbow",
-        "standard:dayuan",
         "standard:dilu",
         "standard:dismantlement",
         "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:kylin_bow",
         "standard:nioh_shield",
@@ -857,9 +758,107 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "2e979ff4b5c6b615eab035cf40f9b38d48ea3259957a064fa0526fedd4543bdd",
-        "facts": "fae713244b1b2c9b0d9075bed1a9537ee09c51e0dc8a63ca519f891c7bc0b893",
-        "decisions": "7203eee06d78e8baedc34fcd786be1b8c592d233ff8d71254b797f3ac0b0e065"
+        "journal": "ed4589fac668925e232203733f3d988bca2cae060fd86aaa2cc84835f8cc705c",
+        "facts": "d25b723afe2ef0ab231decdb57b66a4e8b7fce15328af5f22955af04b4e1eda9",
+        "decisions": "d48209aa80ca4e8a008a9293b377d88ef321d15fbae45530c9e7679514a4441e"
+      }
+    },
+    {
+      "id": "4p-16",
+      "seed": 314,
+      "lineup": [
+        "standard:lvmeng",
+        "standard:diaochan",
+        "standard:zhaoyun",
+        "standard:simayi"
+      ],
+      "entries": 9351,
+      "facts": 1359,
+      "decisions": 108,
+      "result": {
+        "winners": [
+          "乙席",
+          "丁席"
+        ],
+        "reason": "role:opponents-eliminated"
+      },
+      "usedCards": [
+        "standard:archery_attack",
+        "standard:collateral",
+        "standard:dayuan",
+        "standard:dismantlement",
+        "standard:double_swords",
+        "standard:duel",
+        "standard:eight_diagram",
+        "standard:ex_nihilo",
+        "standard:god_salvation",
+        "standard:halberd",
+        "standard:indulgence",
+        "standard:jink",
+        "standard:jueying",
+        "standard:peach",
+        "standard:qinggang_sword",
+        "standard:savage_assault",
+        "standard:slash",
+        "standard:snatch",
+        "standard:spear",
+        "standard:zhuahuangfeidian",
+        "standard:zixing"
+      ],
+      "digest": {
+        "journal": "f600197f8e38a2f1ac0063c36b69aba67fdb69e2ff714cfbdb92ecdb88ab363f",
+        "facts": "f2093f2b38d03d0a1e18924a90b65bb803f8d95257261cc8b331355f876f1c22",
+        "decisions": "c42920b945e9c0d951a4de300a66d8771981cb4d546875e19d621d10aac23324"
+      }
+    },
+    {
+      "id": "4p-17",
+      "seed": 331,
+      "lineup": [
+        "standard:luxun",
+        "standard:zhugeliang",
+        "standard:zhangfei",
+        "standard:guojia"
+      ],
+      "entries": 14727,
+      "facts": 2156,
+      "decisions": 195,
+      "result": {
+        "winners": [
+          "甲席",
+          "丙席"
+        ],
+        "reason": "role:opponents-eliminated"
+      },
+      "usedCards": [
+        "standard:archery_attack",
+        "standard:axe",
+        "standard:chitu",
+        "standard:collateral",
+        "standard:dilu",
+        "standard:dismantlement",
+        "standard:duel",
+        "standard:eight_diagram",
+        "standard:ex_nihilo",
+        "standard:god_salvation",
+        "standard:ice_sword",
+        "standard:indulgence",
+        "standard:jink",
+        "standard:kylin_bow",
+        "standard:nioh_shield",
+        "standard:nullification",
+        "standard:peach",
+        "standard:savage_assault",
+        "standard:slash",
+        "standard:snatch",
+        "standard:spear",
+        "standard:zhuahuangfeidian",
+        "standard:zixing"
+      ],
+      "digest": {
+        "journal": "660d3b9e5c99c98c7233f8d8ead6d7e83d3a4c5914f79031e1ea89e2ec343db6",
+        "facts": "cd15074507666c3713d0050b01ac187c7cbdd4f0e4e162d88554ebb16a42e349",
+        "decisions": "873fac23d60b6aebb0f9ffa79fb5c78d3ee75142cb3e10d10dd70f0ceb962279"
       }
     },
     {
@@ -871,9 +870,9 @@
         "standard:ganning",
         "standard:caocao"
       ],
-      "entries": 13690,
-      "facts": 1978,
-      "decisions": 181,
+      "entries": 12988,
+      "facts": 1880,
+      "decisions": 163,
       "result": {
         "winners": [
           "甲席"
@@ -892,8 +891,9 @@
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:halberd",
+        "standard:god_salvation",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:nullification",
@@ -905,9 +905,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "724d3ca69343d27e030207d88dfa7b477b22a3a36aa2093e6cd773635b3a5d4e",
-        "facts": "b5aae8a31750d7d9da3878462d97e001de7fd2913d5980b4a6465a19a2aca754",
-        "decisions": "e91236a88cc75eee42c4ff309566d2fbe4fc04573090f6ec8cc4c8c7550aa84b"
+        "journal": "93571f5fc74c3526c9d2779a3867e57f5b25d1f19cf554da2fb7068ab3202506",
+        "facts": "4eb21fcb8b3a115e95b92899564aa1084cc367e4632e9c29bf6c724cc15c9ab7",
+        "decisions": "0c1964295ebf56f4a17e710853717c4b378d5e4ece965f26b77c58578e099172"
       }
     },
     {
@@ -919,9 +919,9 @@
         "standard:xiahoudun",
         "standard:zhangliao"
       ],
-      "entries": 11839,
-      "facts": 1763,
-      "decisions": 146,
+      "entries": 13173,
+      "facts": 1976,
+      "decisions": 166,
       "result": {
         "winners": [
           "丙席"
@@ -930,6 +930,7 @@
       },
       "usedCards": [
         "standard:axe",
+        "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
         "standard:dilu",
@@ -937,14 +938,15 @@
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:kylin_bow",
         "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
+        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
@@ -952,9 +954,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "46b0748b8ee2840194a18411ff5d5ed9333843a51bfc5c732db096b99ad7de2d",
-        "facts": "119c6330f64416977f22e07145827854797979b052c65aef43f23bad59a54fb6",
-        "decisions": "971fc5bb5dbed2e3db2b9ac106134e91d54be8bc859ba0733b50bbcc8124dc79"
+        "journal": "5c998f5dc07cb28d9de3e0f36dd6cc2f549afcc733548baffbe76e295ca72f53",
+        "facts": "fea8e30cd4e6f8c0be6d8ddea761f769b74ccdf6d5798915a56a2dda385be980",
+        "decisions": "463e72b44934995337b6cdac867bdd02089882b509e5b8ba2dcf1bdec825b551"
       }
     },
     {
@@ -966,9 +968,9 @@
         "standard:xuchu",
         "standard:liubei"
       ],
-      "entries": 19558,
-      "facts": 2897,
-      "decisions": 266,
+      "entries": 8622,
+      "facts": 1257,
+      "decisions": 109,
       "result": {
         "winners": [
           "乙席",
@@ -979,36 +981,29 @@
       "usedCards": [
         "standard:amazing_grace",
         "standard:axe",
+        "standard:blade",
         "standard:chitu",
         "standard:collateral",
-        "standard:crossbow",
-        "standard:dayuan",
-        "standard:dilu",
         "standard:dismantlement",
-        "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
-        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
-        "standard:kylin_bow",
         "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
-        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:spear",
-        "standard:zhuahuangfeidian",
-        "standard:zixing"
+        "standard:spear"
       ],
       "digest": {
-        "journal": "089e778ca0af931f05419e15de4609a4d270f41cf81a4e90441c7a60db4f07fa",
-        "facts": "2178d28294bc22d7b9fb7c5f39d1f298b799bc8253a0d8772dc054994464bbeb",
-        "decisions": "8a8291ece11f58910b0ff95dfa81da4401158abaabfae7c0e967e11708552248"
+        "journal": "c94c9ef2443c30d3316a340d4f5ddad0ea8e34b749e5ab61e3c7970f61861437",
+        "facts": "ff5825253462977cf9f58d25628672fb10b1f8d1bedf0c3c13c1d2ff3a028dfe",
+        "decisions": "bfedd54a4b097e43187dab36a1137b38bedab8d58d978348db30d67618e9bc5b"
       }
     },
     {
@@ -1020,9 +1015,9 @@
         "standard:zhenji",
         "standard:huatuo"
       ],
-      "entries": 63328,
-      "facts": 9434,
-      "decisions": 870,
+      "entries": 13862,
+      "facts": 2017,
+      "decisions": 179,
       "result": {
         "winners": [
           "丁席"
@@ -1032,7 +1027,6 @@
       "usedCards": [
         "standard:amazing_grace",
         "standard:archery_attack",
-        "standard:axe",
         "standard:blade",
         "standard:chitu",
         "standard:collateral",
@@ -1047,10 +1041,10 @@
         "standard:god_salvation",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
-        "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
         "standard:qinggang_sword",
@@ -1062,9 +1056,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "98f24875559cc69aec5498cdf385a1166def5767aaeaabcd8622b2e9d42f0a8d",
-        "facts": "b770dfef2da0fa4da53d64cf86f410f025747b7bdbddfe550888235bacd85b5f",
-        "decisions": "1eabfabc1835d2c1acfa43e1d41d35d77e2a34014ed2d23792dcbb53c136afb2"
+        "journal": "f16dbea775cab00e9caf4b3d52e36ce739b375a7acb1eddca2bf42f5693da7ab",
+        "facts": "1c6eec2f1c2171ea8d70930ea8b090af2d428dd969c4d2960e5098934beb577f",
+        "decisions": "d4b91b71b8f663e7ea0b598a45accb0092209b7d279314c0500d9bf0261fc1f3"
       }
     },
     {
@@ -1076,9 +1070,9 @@
         "standard:simayi",
         "standard:sunquan"
       ],
-      "entries": 12533,
-      "facts": 1849,
-      "decisions": 155,
+      "entries": 16241,
+      "facts": 2418,
+      "decisions": 196,
       "result": {
         "winners": [
           "乙席",
@@ -1087,17 +1081,22 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
+        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:blade",
         "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
+        "standard:dilu",
         "standard:dismantlement",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
+        "standard:god_salvation",
         "standard:halberd",
+        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
@@ -1112,9 +1111,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "5f978ec49802f778677a84f43013ba1a3bc5287585a0f7c3548a4e6f141d13ef",
-        "facts": "45c7ce9bc2cedfedc6baf28d1f6cb6ae1671bf3ed4ba4a174bec7f1510531102",
-        "decisions": "e4597488d53cebfee1b3a46fb185f134f509cfbb465e4b67f2fb81422df12e34"
+        "journal": "f39ee708f78f09fc7ade55eef8190be4e12cfdcfc9600bd32708dc3bc1b04318",
+        "facts": "8d9c74b9241355fc74f62549e9c424fcebfefbeb459a0ec8541163b33aeb9f30",
+        "decisions": "edb7b703c37e142986efe9cbf23da30c20c164281ae8720693892acac5dd8b70"
       }
     },
     {
@@ -1126,9 +1125,9 @@
         "standard:guojia",
         "standard:lvmeng"
       ],
-      "entries": 8010,
-      "facts": 1166,
-      "decisions": 95,
+      "entries": 7691,
+      "facts": 1131,
+      "decisions": 93,
       "result": {
         "winners": [
           "丙席",
@@ -1137,28 +1136,24 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:chitu",
         "standard:crossbow",
         "standard:dilu",
-        "standard:dismantlement",
         "standard:duel",
         "standard:ex_nihilo",
-        "standard:god_salvation",
+        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:nullification",
         "standard:peach",
-        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:spear",
-        "standard:zhuahuangfeidian",
-        "standard:zixing"
+        "standard:spear"
       ],
       "digest": {
-        "journal": "df15d94ab5c1b6212f62ceb2071e9a2dcc7ed9848d9d8dc3580fca0c25f377e3",
-        "facts": "293381630fdec7eccc1ea0baabbb8acb0e8e07d7d07c5da732b8a4316a22f3f7",
-        "decisions": "af047022fad3777c5fa2b0755b8c2531b5e09421f41b1a739dc6e9f8adef1e84"
+        "journal": "cc5ce66a3a2187f444710378915adc21f6a52a31f7a6f1ca34eac16cad937a30",
+        "facts": "da32ce1424ba4b264d207b5bd72aae75301a494facf176c84b9cb03b8daa6035",
+        "decisions": "d7e5016f55732049fe297ede56dd7d3b7c03fe91a3b629d21ee6d191ad7adeaa"
       }
     },
     {
@@ -1170,9 +1165,9 @@
         "standard:caocao",
         "standard:luxun"
       ],
-      "entries": 15464,
-      "facts": 2273,
-      "decisions": 189,
+      "entries": 8928,
+      "facts": 1297,
+      "decisions": 100,
       "result": {
         "winners": [
           "丙席",
@@ -1181,24 +1176,16 @@
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
-        "standard:archery_attack",
         "standard:axe",
         "standard:blade",
-        "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
         "standard:dismantlement",
-        "standard:double_swords",
         "standard:duel",
-        "standard:eight_diagram",
         "standard:ex_nihilo",
-        "standard:god_salvation",
-        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
-        "standard:jueying",
-        "standard:kylin_bow",
         "standard:nullification",
         "standard:peach",
         "standard:savage_assault",
@@ -1209,9 +1196,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "c99c0f3350dc960587e5b906cd57a08535a447d8dc9441e3745ea429684339f7",
-        "facts": "d7cc8d99ca67d17078b4e6e113962173afb9909bc7de212ef60c4002bca3bd80",
-        "decisions": "7e8b38562528ef786a1edd24323b08e94d8406a6b203d4f4162e13fc0bdae1b2"
+        "journal": "0f34f706b7837635125da7fba7e0a696f48d955a5fcfe9b3eabc1859ed367451",
+        "facts": "a06c4c4bd4a32535aab20343ddd1767d912f4633b6b252cfdfe9bef01a189323",
+        "decisions": "93ca7980bd3297c3c9e2866c0db3da452a6b16b5dd23b6191173b5ae1e4f0cb4"
       }
     },
     {
@@ -1223,28 +1210,26 @@
         "standard:zhangliao",
         "standard:huangyueying"
       ],
-      "entries": 9903,
-      "facts": 1395,
-      "decisions": 130,
+      "entries": 8985,
+      "facts": 1256,
+      "decisions": 110,
       "result": {
         "winners": [
-          "甲席",
-          "丁席"
+          "乙席"
         ],
-        "reason": "role:opponents-eliminated"
+        "reason": "role:lord-dead"
       },
       "usedCards": [
         "standard:archery_attack",
         "standard:chitu",
-        "standard:collateral",
         "standard:crossbow",
-        "standard:dilu",
         "standard:dismantlement",
         "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:nioh_shield",
         "standard:peach",
@@ -1256,9 +1241,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "b108e5f31b0f548794899dde3516e0aac2bce3e8e6c47003efd178f405bdb1ad",
-        "facts": "689e66422a0c9f222e2d1841d4026a82962e0ff0823ca15c082a8f4893a93404",
-        "decisions": "b6c1a91d614e4f93130205517d0c414668aef74063a607b7efcd02b00374700d"
+        "journal": "017376c84cf721f58e0a627b612c8423616b76ded56c3055fa90adec52a2f084",
+        "facts": "c21d41d39d32ef53d9cbb612bb19b2c434a78e6e235ef07df40ff09441426787",
+        "decisions": "cd0bcac67dcce2a0f0ad41d2384be674482ae44543572ffb6a838d6d4f1282ac"
       }
     },
     {
@@ -1274,17 +1259,16 @@
         "standard:huangyueying",
         "standard:machao"
       ],
-      "entries": 13942,
-      "facts": 1954,
-      "decisions": 176,
+      "entries": 23120,
+      "facts": 3323,
+      "decisions": 291,
       "result": {
         "winners": [
-          "乙席",
-          "丁席",
-          "己席",
-          "辛席"
+          "丙席",
+          "戊席",
+          "庚席"
         ],
-        "reason": "role:lord-dead"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
         "standard:archery_attack",
@@ -1292,13 +1276,18 @@
         "standard:blade",
         "standard:chitu",
         "standard:collateral",
+        "standard:crossbow",
         "standard:dayuan",
+        "standard:dilu",
         "standard:dismantlement",
+        "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
+        "standard:god_salvation",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:kylin_bow",
         "standard:nioh_shield",
@@ -1308,12 +1297,12 @@
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
-        "standard:zixing"
+        "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "9c668e0d053e9a0c941b557c0fb3c8c79b64e3dfbcf424bfc6951dfd967629c5",
-        "facts": "13c8de1d7fb0497e39329e6b9e75c5eeff57a9418e8f2ad58660cd66e7ee5426",
-        "decisions": "917bf81f52e346b645c956c2df91cd63ba2df7e6a738d3143fbea7c2fedf7e72"
+        "journal": "c106a018f1b5f66ac6bc7051934bf8d417546172e57bc8f455513dc759dde792",
+        "facts": "23c936f15bbda4d0b740f5619d1686ac465b70e30b23b9b187069e9defbf4788",
+        "decisions": "7ae113a6afd66acef7eb55381c7eb5b1cfbf7292a91ee9a318db0514a587da49"
       }
     },
     {
@@ -1329,22 +1318,19 @@
         "standard:zhouyu",
         "standard:liushan"
       ],
-      "entries": 12817,
-      "facts": 1736,
-      "decisions": 147,
+      "entries": 21918,
+      "facts": 3092,
+      "decisions": 311,
       "result": {
         "winners": [
-          "甲席",
-          "丁席",
-          "己席",
-          "辛席"
+          "戊席"
         ],
-        "reason": "role:lord-dead"
+        "reason": "role:renegade-survives"
       },
       "usedCards": [
-        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:axe",
+        "standard:chitu",
         "standard:collateral",
         "standard:crossbow",
         "standard:dilu",
@@ -1354,23 +1340,24 @@
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
+        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
-        "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
-        "standard:qinggang_sword",
         "standard:savage_assault",
         "standard:slash",
         "standard:snatch",
         "standard:spear",
+        "standard:zhuahuangfeidian",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "c404f12f1db4ab6c22ee60e5bc2b4f1ea38bfe81322b243fdd98d5e4dcf044b2",
-        "facts": "dd9542ce2d903e2c7cd9f8d9440ff33baf35dbb0e16badb94ed8315d45cd99fc",
-        "decisions": "5d71872f85697b527cbd09ea8a480f7b9745ac66b07e565fda8e0ad3b5d1a036"
+        "journal": "e91bd644acec6b2c8dc38299d9f865fe9188c9f5755ec5df9a827fedbf56ef3f",
+        "facts": "54113559aef95db67eb178be1f6607f50aa7f4877f30ceb4b7f1927e1df2dd9c",
+        "decisions": "ba4c869d25fa63bd550d838e851f45831e288c084c5000cc93d416ec3e10f0af"
       }
     },
     {
@@ -1386,9 +1373,9 @@
         "standard:guanyu",
         "standard:zhaoyun"
       ],
-      "entries": 17948,
-      "facts": 2516,
-      "decisions": 210,
+      "entries": 14554,
+      "facts": 2034,
+      "decisions": 172,
       "result": {
         "winners": [
           "丙席",
@@ -1399,22 +1386,20 @@
         "reason": "role:lord-dead"
       },
       "usedCards": [
+        "standard:amazing_grace",
         "standard:archery_attack",
-        "standard:blade",
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
-        "standard:dilu",
         "standard:dismantlement",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
-        "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
-        "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
         "standard:qinggang_sword",
@@ -1425,9 +1410,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "8bf994a2f30f9af6dcc85364cf6aed0b6bba1592c6c5888689db5572a285452a",
-        "facts": "4cf38eec83aa42d8d1d616937bf38541409711f04a89ae877fed09d059fccade",
-        "decisions": "1bec92b78ebd34578442f12bb7efec61eb3f8182b381dfe4ecd5f24729fed8c7"
+        "journal": "c05eff56188acd781d52de71360ec6ce465bd372d260db4420024434ec612407",
+        "facts": "c8731d9c39eae36a0f1a122c7ca88c5b28d948e0afecd0cdaf100c54959f571d",
+        "decisions": "99131c957ca64b7ccc9d58583b3c5c53c6033f5bf875c31afb89a7b1f4bbbff0"
       }
     },
     {
@@ -1494,30 +1479,32 @@
         "standard:zhenji",
         "standard:caocao"
       ],
-      "entries": 10563,
-      "facts": 1398,
-      "decisions": 119,
+      "entries": 14813,
+      "facts": 2002,
+      "decisions": 174,
       "result": {
         "winners": [
-          "乙席",
-          "丙席",
-          "己席",
-          "庚席"
+          "甲席",
+          "丁席",
+          "辛席"
         ],
-        "reason": "role:lord-dead"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
         "standard:archery_attack",
         "standard:axe",
+        "standard:collateral",
+        "standard:crossbow",
         "standard:dayuan",
         "standard:dismantlement",
+        "standard:double_swords",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
-        "standard:nioh_shield",
         "standard:nullification",
         "standard:peach",
         "standard:qinggang_sword",
@@ -1525,13 +1512,12 @@
         "standard:slash",
         "standard:snatch",
         "standard:spear",
-        "standard:zhuahuangfeidian",
         "standard:zixing"
       ],
       "digest": {
-        "journal": "003ad858749d2138f81ae7578634ccdef8ebff8b6630a8419ebf30d2be361298",
-        "facts": "e0e1ec0a44bcdb117034e36ded32f79534cff8360c197525a96f5bcb12c7a80b",
-        "decisions": "ef89b7fdb6a4402d236fc63a505e39b6d2e9206f33772a26c19eb706fab85739"
+        "journal": "276762541b50df12299fb83553fc7f8e02c8e2c9d78b03e3ec5553bb10e8acc7",
+        "facts": "8e33e42562356c0da20083b3776636565e5f26fa345ee4f842ee5dcf88da15e5",
+        "decisions": "93286ff9cf62a879dd303c790f94749b0fb10d54ea1e390417a283837113bc1e"
       }
     },
     {
@@ -1547,17 +1533,18 @@
         "standard:zhangliao",
         "standard:sunquan"
       ],
-      "entries": 29896,
-      "facts": 4310,
-      "decisions": 408,
+      "entries": 18447,
+      "facts": 2620,
+      "decisions": 221,
       "result": {
         "winners": [
-          "戊席"
+          "丁席",
+          "庚席",
+          "辛席"
         ],
-        "reason": "role:renegade-survives"
+        "reason": "role:opponents-eliminated"
       },
       "usedCards": [
-        "standard:amazing_grace",
         "standard:archery_attack",
         "standard:axe",
         "standard:blade",
@@ -1565,13 +1552,13 @@
         "standard:collateral",
         "standard:crossbow",
         "standard:dayuan",
-        "standard:dilu",
         "standard:dismantlement",
         "standard:duel",
         "standard:eight_diagram",
         "standard:ex_nihilo",
         "standard:halberd",
         "standard:ice_sword",
+        "standard:indulgence",
         "standard:jink",
         "standard:jueying",
         "standard:kylin_bow",
@@ -1586,9 +1573,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "238e317081de928051a275d4f5ad26bd555f54d473ee5d36907cf0d3af809aca",
-        "facts": "7dc55b644533ce7cc7b35b4d94e6e07709454f029423610a2a3d0f7da855e6de",
-        "decisions": "3f9185103db24d57341e673aca1c50232f212f0807e67d35a643e3621982eb6d"
+        "journal": "b1ff03157f18001ce22144400a1da61dce9a2e332c096641e11e1767181af2a4",
+        "facts": "474b91a8afd868c8edb7ddcb69925ebad03f4eb34bc9dc5c9ff3876ec8fec0fb",
+        "decisions": "c0f9ee4fa0020c07991414c2bc79e567db9fb115d5da4079d1e4ff36770a852e"
       }
     }
   ]
