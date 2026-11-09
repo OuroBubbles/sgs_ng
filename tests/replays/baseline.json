@@ -3,20 +3,12 @@
     {
       "id": "4p-00",
       "seed": 42,
-      "lineup": [
-        "standard:guanyu",
-        "standard:xuchu",
-        "standard:liubei",
-        "standard:lvbu"
-      ],
+      "lineup": ["standard:guanyu", "standard:xuchu", "standard:liubei", "standard:lvbu"],
       "entries": 7999,
       "facts": 1160,
       "decisions": 88,
       "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
+        "winners": ["甲席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -48,19 +40,12 @@
     {
       "id": "4p-01",
       "seed": 59,
-      "lineup": [
-        "standard:huanggai",
-        "standard:zhenji",
-        "standard:huatuo",
-        "standard:daqiao"
-      ],
+      "lineup": ["standard:huanggai", "standard:zhenji", "standard:huatuo", "standard:daqiao"],
       "entries": 6135,
       "facts": 882,
       "decisions": 75,
       "result": {
-        "winners": [
-          "乙席"
-        ],
+        "winners": ["乙席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -99,10 +84,7 @@
       "facts": 1894,
       "decisions": 158,
       "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
+        "winners": ["甲席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -140,20 +122,12 @@
     {
       "id": "4p-03",
       "seed": 93,
-      "lineup": [
-        "standard:zhaoyun",
-        "standard:guojia",
-        "standard:lvmeng",
-        "standard:zhouyu"
-      ],
+      "lineup": ["standard:zhaoyun", "standard:guojia", "standard:lvmeng", "standard:zhouyu"],
       "entries": 8387,
       "facts": 1221,
       "decisions": 113,
       "result": {
-        "winners": [
-          "乙席",
-          "丙席"
-        ],
+        "winners": ["乙席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -185,19 +159,12 @@
     {
       "id": "4p-04",
       "seed": 110,
-      "lineup": [
-        "standard:zhangfei",
-        "standard:caocao",
-        "standard:luxun",
-        "standard:diaochan"
-      ],
+      "lineup": ["standard:zhangfei", "standard:caocao", "standard:luxun", "standard:diaochan"],
       "entries": 9732,
       "facts": 1412,
       "decisions": 113,
       "result": {
-        "winners": [
-          "丁席"
-        ],
+        "winners": ["丁席"],
         "reason": "role:renegade-survives"
       },
       "usedCards": [
@@ -242,10 +209,7 @@
       "facts": 2717,
       "decisions": 255,
       "result": {
-        "winners": [
-          "乙席",
-          "丙席"
-        ],
+        "winners": ["乙席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -282,19 +246,12 @@
     {
       "id": "4p-06",
       "seed": 144,
-      "lineup": [
-        "standard:xiahoudun",
-        "standard:liubei",
-        "standard:lvbu",
-        "standard:liushan"
-      ],
+      "lineup": ["standard:xiahoudun", "standard:liubei", "standard:lvbu", "standard:liushan"],
       "entries": 13922,
       "facts": 2018,
       "decisions": 177,
       "result": {
-        "winners": [
-          "甲席"
-        ],
+        "winners": ["甲席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -332,20 +289,12 @@
     {
       "id": "4p-07",
       "seed": 161,
-      "lineup": [
-        "standard:xuchu",
-        "standard:huatuo",
-        "standard:daqiao",
-        "standard:guanyu"
-      ],
+      "lineup": ["standard:xuchu", "standard:huatuo", "standard:daqiao", "standard:guanyu"],
       "entries": 4531,
       "facts": 660,
       "decisions": 49,
       "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
+        "winners": ["甲席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -371,19 +320,12 @@
     {
       "id": "4p-08",
       "seed": 178,
-      "lineup": [
-        "standard:zhenji",
-        "standard:sunquan",
-        "standard:machao",
-        "standard:huanggai"
-      ],
+      "lineup": ["standard:zhenji", "standard:sunquan", "standard:machao", "standard:huanggai"],
       "entries": 12971,
       "facts": 1891,
       "decisions": 170,
       "result": {
-        "winners": [
-          "甲席"
-        ],
+        "winners": ["甲席"],
         "reason": "role:renegade-survives"
       },
       "usedCards": [
@@ -421,20 +363,12 @@
     {
       "id": "4p-09",
       "seed": 195,
-      "lineup": [
-        "standard:simayi",
-        "standard:lvmeng",
-        "standard:zhouyu",
-        "standard:sunshangxiang"
-      ],
+      "lineup": ["standard:simayi", "standard:lvmeng", "standard:zhouyu", "standard:sunshangxiang"],
       "entries": 11868,
       "facts": 1724,
       "decisions": 177,
       "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
+        "winners": ["甲席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -469,20 +403,12 @@
     {
       "id": "4p-10",
       "seed": 212,
-      "lineup": [
-        "standard:guojia",
-        "standard:luxun",
-        "standard:diaochan",
-        "standard:zhaoyun"
-      ],
+      "lineup": ["standard:guojia", "standard:luxun", "standard:diaochan", "standard:zhaoyun"],
       "entries": 6444,
       "facts": 938,
       "decisions": 74,
       "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
+        "winners": ["乙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -520,10 +446,7 @@
       "facts": 1498,
       "decisions": 131,
       "result": {
-        "winners": [
-          "甲席",
-          "乙席"
-        ],
+        "winners": ["甲席", "乙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -558,20 +481,12 @@
     {
       "id": "4p-12",
       "seed": 246,
-      "lineup": [
-        "standard:zhangliao",
-        "standard:lvbu",
-        "standard:liushan",
-        "standard:ganning"
-      ],
+      "lineup": ["standard:zhangliao", "standard:lvbu", "standard:liushan", "standard:ganning"],
       "entries": 16071,
       "facts": 2323,
       "decisions": 206,
       "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
+        "winners": ["乙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -612,19 +527,12 @@
     {
       "id": "4p-13",
       "seed": 263,
-      "lineup": [
-        "standard:liubei",
-        "standard:daqiao",
-        "standard:guanyu",
-        "standard:xiahoudun"
-      ],
+      "lineup": ["standard:liubei", "standard:daqiao", "standard:guanyu", "standard:xiahoudun"],
       "entries": 26367,
       "facts": 3979,
       "decisions": 327,
       "result": {
-        "winners": [
-          "丁席"
-        ],
+        "winners": ["丁席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -667,19 +575,12 @@
     {
       "id": "4p-14",
       "seed": 280,
-      "lineup": [
-        "standard:huatuo",
-        "standard:machao",
-        "standard:huanggai",
-        "standard:xuchu"
-      ],
+      "lineup": ["standard:huatuo", "standard:machao", "standard:huanggai", "standard:xuchu"],
       "entries": 15310,
       "facts": 2273,
       "decisions": 192,
       "result": {
-        "winners": [
-          "甲席"
-        ],
+        "winners": ["甲席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -724,9 +625,7 @@
       "facts": 1773,
       "decisions": 188,
       "result": {
-        "winners": [
-          "丙席"
-        ],
+        "winners": ["丙席"],
         "reason": "role:renegade-survives"
       },
       "usedCards": [
@@ -766,20 +665,12 @@
     {
       "id": "4p-16",
       "seed": 314,
-      "lineup": [
-        "standard:lvmeng",
-        "standard:diaochan",
-        "standard:zhaoyun",
-        "standard:simayi"
-      ],
+      "lineup": ["standard:lvmeng", "standard:diaochan", "standard:zhaoyun", "standard:simayi"],
       "entries": 9351,
       "facts": 1359,
       "decisions": 108,
       "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
+        "winners": ["乙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -814,20 +705,12 @@
     {
       "id": "4p-17",
       "seed": 331,
-      "lineup": [
-        "standard:luxun",
-        "standard:zhugeliang",
-        "standard:zhangfei",
-        "standard:guojia"
-      ],
+      "lineup": ["standard:luxun", "standard:zhugeliang", "standard:zhangfei", "standard:guojia"],
       "entries": 14727,
       "facts": 2156,
       "decisions": 195,
       "result": {
-        "winners": [
-          "甲席",
-          "丙席"
-        ],
+        "winners": ["甲席", "丙席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -874,9 +757,7 @@
       "facts": 1880,
       "decisions": 163,
       "result": {
-        "winners": [
-          "甲席"
-        ],
+        "winners": ["甲席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -913,19 +794,12 @@
     {
       "id": "4p-19",
       "seed": 365,
-      "lineup": [
-        "standard:lvbu",
-        "standard:guanyu",
-        "standard:xiahoudun",
-        "standard:zhangliao"
-      ],
+      "lineup": ["standard:lvbu", "standard:guanyu", "standard:xiahoudun", "standard:zhangliao"],
       "entries": 13173,
       "facts": 1976,
       "decisions": 166,
       "result": {
-        "winners": [
-          "丙席"
-        ],
+        "winners": ["丙席"],
         "reason": "role:renegade-survives"
       },
       "usedCards": [
@@ -962,20 +836,12 @@
     {
       "id": "4p-20",
       "seed": 382,
-      "lineup": [
-        "standard:daqiao",
-        "standard:huanggai",
-        "standard:xuchu",
-        "standard:liubei"
-      ],
+      "lineup": ["standard:daqiao", "standard:huanggai", "standard:xuchu", "standard:liubei"],
       "entries": 8622,
       "facts": 1257,
       "decisions": 109,
       "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
+        "winners": ["乙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1009,19 +875,12 @@
     {
       "id": "4p-21",
       "seed": 399,
-      "lineup": [
-        "standard:machao",
-        "standard:sunshangxiang",
-        "standard:zhenji",
-        "standard:huatuo"
-      ],
+      "lineup": ["standard:machao", "standard:sunshangxiang", "standard:zhenji", "standard:huatuo"],
       "entries": 13862,
       "facts": 2017,
       "decisions": 179,
       "result": {
-        "winners": [
-          "丁席"
-        ],
+        "winners": ["丁席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -1064,20 +923,12 @@
     {
       "id": "4p-22",
       "seed": 416,
-      "lineup": [
-        "standard:zhouyu",
-        "standard:zhaoyun",
-        "standard:simayi",
-        "standard:sunquan"
-      ],
+      "lineup": ["standard:zhouyu", "standard:zhaoyun", "standard:simayi", "standard:sunquan"],
       "entries": 16241,
       "facts": 2418,
       "decisions": 196,
       "result": {
-        "winners": [
-          "乙席",
-          "丁席"
-        ],
+        "winners": ["乙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1119,20 +970,12 @@
     {
       "id": "4p-23",
       "seed": 433,
-      "lineup": [
-        "standard:diaochan",
-        "standard:zhangfei",
-        "standard:guojia",
-        "standard:lvmeng"
-      ],
+      "lineup": ["standard:diaochan", "standard:zhangfei", "standard:guojia", "standard:lvmeng"],
       "entries": 7691,
       "facts": 1131,
       "decisions": 93,
       "result": {
-        "winners": [
-          "丙席",
-          "丁席"
-        ],
+        "winners": ["丙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1159,20 +1002,12 @@
     {
       "id": "4p-24",
       "seed": 450,
-      "lineup": [
-        "standard:zhugeliang",
-        "standard:ganning",
-        "standard:caocao",
-        "standard:luxun"
-      ],
+      "lineup": ["standard:zhugeliang", "standard:ganning", "standard:caocao", "standard:luxun"],
       "entries": 8928,
       "facts": 1297,
       "decisions": 100,
       "result": {
-        "winners": [
-          "丙席",
-          "丁席"
-        ],
+        "winners": ["丙席", "丁席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1214,9 +1049,7 @@
       "facts": 1256,
       "decisions": 110,
       "result": {
-        "winners": [
-          "乙席"
-        ],
+        "winners": ["乙席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -1263,11 +1096,7 @@
       "facts": 3323,
       "decisions": 291,
       "result": {
-        "winners": [
-          "丙席",
-          "戊席",
-          "庚席"
-        ],
+        "winners": ["丙席", "戊席", "庚席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1322,9 +1151,7 @@
       "facts": 3092,
       "decisions": 311,
       "result": {
-        "winners": [
-          "戊席"
-        ],
+        "winners": ["戊席"],
         "reason": "role:renegade-survives"
       },
       "usedCards": [
@@ -1377,12 +1204,7 @@
       "facts": 2034,
       "decisions": 172,
       "result": {
-        "winners": [
-          "丙席",
-          "丁席",
-          "戊席",
-          "辛席"
-        ],
+        "winners": ["丙席", "丁席", "戊席", "辛席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -1432,12 +1254,7 @@
       "facts": 1185,
       "decisions": 116,
       "result": {
-        "winners": [
-          "丙席",
-          "戊席",
-          "己席",
-          "庚席"
-        ],
+        "winners": ["丙席", "戊席", "己席", "庚席"],
         "reason": "role:lord-dead"
       },
       "usedCards": [
@@ -1483,11 +1300,7 @@
       "facts": 2002,
       "decisions": 174,
       "result": {
-        "winners": [
-          "甲席",
-          "丁席",
-          "辛席"
-        ],
+        "winners": ["甲席", "丁席", "辛席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
@@ -1537,11 +1350,7 @@
       "facts": 2620,
       "decisions": 221,
       "result": {
-        "winners": [
-          "丁席",
-          "庚席",
-          "辛席"
-        ],
+        "winners": ["丁席", "庚席", "辛席"],
         "reason": "role:opponents-eliminated"
       },
       "usedCards": [
