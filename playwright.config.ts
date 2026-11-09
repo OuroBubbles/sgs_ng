@@ -18,5 +18,16 @@ export default defineConfig({
     command: 'pnpm preview',
     url: 'http://127.0.0.1:1420',
     reuseExistingServer: !process.env.CI,
+    // 浏览器验收里 AI 用更浅的决定论预算，单次决策更快；单元测试仍用源码默认。
+    env: {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      ),
+      SGS_AI_MAX_DEPTH: '1',
+      SGS_AI_PLAY_OPTIONS: '12',
+      SGS_AI_BRANCHES: '3',
+    },
   },
 });

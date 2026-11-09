@@ -27,6 +27,7 @@ export type {
   ClientMessage,
   RoomSetup,
   SoloSetup,
+  SoloAiGuide,
   ContentSummary,
   HostCatalog,
   LobbyView,

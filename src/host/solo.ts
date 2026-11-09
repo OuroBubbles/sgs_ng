@@ -6,6 +6,7 @@ import { emptyPreview } from '../protocol';
 import { inspectSelection, selectionInput } from './selection';
 import type { RoleMatch } from './role-match';
 import { AgentDriver } from './ai/driver';
+import { setAiGuide } from './ai/think';
 import { createRoleMatch, defaultContent, practiceContent, seatNames } from './content';
 import type { ClientCommand, CommandResult, ServerMessage, SoloSetup } from '../protocol';
 import { closedReply } from '../protocol';
@@ -313,6 +314,7 @@ export function openSolo(
 ): SoloConnection {
   let session: SoloSession;
   try {
+    setAiGuide(setup.aiGuide ?? null);
     session = new SoloSession(soloMatch(setup), {
       ...(setup.lineup ? { human: seatNames[0]! } : {}),
       ...(aiDelayMs === undefined ? {} : { aiDelayMs }),
@@ -345,6 +347,7 @@ export function openSolo(
     disconnect() {
       closed = true;
       clearTimeout(timer);
+      setAiGuide(null);
       session.dispose();
     },
   };

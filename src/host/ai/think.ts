@@ -37,13 +37,54 @@ export interface Mind {
   readonly lookahead: boolean;
 }
 const LIVE: Mind = { depth: 0, lookahead: true };
-const MAX_DEPTH = 2;
+
+/**
+ * 思考预算旋钮（setAiBudget / 环境变量；单机演武要保持响应）。
+ * - maxDepth：推演层数上限
+ * - playOptions：出牌阶段最多试几个候选
+ * - branches：选目标 / 分支上限
+ * 环境变量：SGS_AI_MAX_DEPTH / SGS_AI_PLAY_OPTIONS / SGS_AI_BRANCHES
+ */
+export interface AiBudget {
+  readonly maxDepth: number;
+  readonly playOptions: number;
+  readonly branches: number;
+}
+const envInt = (name: string, fallback: number) => {
+  const raw = typeof process !== 'undefined' ? process.env[name] : undefined;
+  const n = raw === undefined || raw === '' ? NaN : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+};
+const DEFAULT_BUDGET: AiBudget = {
+  maxDepth: envInt('SGS_AI_MAX_DEPTH', 2),
+  playOptions: envInt('SGS_AI_PLAY_OPTIONS', 40),
+  branches: envInt('SGS_AI_BRANCHES', 6),
+};
+let budget: AiBudget = DEFAULT_BUDGET;
+export function aiBudget(): AiBudget {
+  return budget;
+}
+export function setAiBudget(next: Partial<AiBudget> | null): void {
+  budget = next ? { ...budget, ...next } : DEFAULT_BUDGET;
+}
+
+/** 验收钩子：按提示强制发动/放弃，不进推演。浏览器测试用来固定技能场面。 */
+export interface AiGuide {
+  readonly acceptInvoke?: readonly string[];
+  readonly rejectInvoke?: readonly string[];
+}
+let guide: AiGuide = {};
+export function aiGuide(): AiGuide {
+  return guide;
+}
+export function setAiGuide(next: AiGuide | null): void {
+  guide = next ?? {};
+}
+
 /** 出牌须比“结束出牌”至少好这么多，避免为噪声出牌。 */
 const MARGIN = 0.25;
 /** 留牌价值不超过它的牌可当作可有可无的费用。 */
 const JUNK = 3;
-const PLAY_OPTIONS = 40;
-const BRANCHES = 6;
 
 type Record_ = Record<string, unknown>;
 const object = (value: unknown): Record_ =>
@@ -95,6 +136,11 @@ export async function think(
   inspect: Inspect,
   mind: Mind = LIVE,
 ): Promise<AgentAnswer> {
+  if (request.kind === 'invoke') {
+    const prompt = request.prompt;
+    if (guide.acceptInvoke?.some((needle) => prompt.includes(needle))) return submit(true);
+    if (guide.rejectInvoke?.some((needle) => prompt.includes(needle))) return submit(false);
+  }
   if (request.kind === 'play-action') return play(seat, request, inspect, mind);
   const turn = seat.turn;
   if (
@@ -148,7 +194,9 @@ async function trial(
   const value = (room: Room) => worth(room, seat.rules, actor, seat.stance);
   const quiet: Mind = { depth: mind.depth + 1, lookahead: false };
   const inner: Mind =
-    horizon === 'step' ? quiet : { depth: mind.depth + 1, lookahead: mind.depth + 1 < MAX_DEPTH };
+    horizon === 'step'
+      ? quiet
+      : { depth: mind.depth + 1, lookahead: mind.depth + 1 < budget.maxDepth };
   let base: number | null = null;
   const phases = horizon === 'step' ? (['play'] as const) : seat.turn!.phases;
   const imagined = await resumeTurn(seat, seat.imagine(seed), seed, phases, async (room, next) => {
@@ -211,11 +259,11 @@ async function rollout(
     for (const option of Array.isArray(data.options) ? data.options.map(object) : [])
       if (typeof option.id === 'string' && inspect(option.id)?.valid) add(submit(option.id));
   if (request.kind === 'cards-targets')
-    for (const selection of selections(seat, {}, inspect, BRANCHES)) add(submit(selection));
+    for (const selection of selections(seat, {}, inspect, budget.branches)) add(submit(selection));
   if (request.optional) add(CANCEL);
   if (options.length < 2) return null;
   let best: { readonly answer: AgentAnswer; readonly score: number } | null = null;
-  for (const answer of options.slice(0, BRANCHES + 1)) {
+  for (const answer of options.slice(0, budget.branches + 1)) {
     const score = await trial(seat, request, toReply(answer, request), mind, 'rollout');
     if (score !== null && (!best || score > best.score)) best = { answer, score };
   }
@@ -300,7 +348,7 @@ function selections(
       for (const target of selectable(preview.feedback, 'targets')
         .filter((id) => !targets.includes(id))
         .sort(prefer)
-        .slice(0, BRANCHES))
+        .slice(0, budget.branches))
         visit(cards, [...targets, target]);
   };
   visit([], []);
@@ -331,7 +379,7 @@ function playOptions(seat: Seat, request: DecisionRequest, inspect: Inspect): un
     const offer = object(raw);
     const source = object(offer.choice);
     if (offer.kind === 'active') {
-      for (const selection of selections(seat, source, inspect, BRANCHES))
+      for (const selection of selections(seat, source, inspect, budget.branches))
         options.push({ ...source, ...selection });
       continue;
     }
@@ -358,7 +406,7 @@ function playOptions(seat: Seat, request: DecisionRequest, inspect: Inspect): un
       }
       let found = 0;
       const visit = (targets: readonly string[]) => {
-        if (found >= BRANCHES) return;
+        if (found >= budget.branches) return;
         const preview = inspect({ choice, targets });
         if (!preview) return;
         if (preview.valid) {
@@ -374,7 +422,7 @@ function playOptions(seat: Seat, request: DecisionRequest, inspect: Inspect): un
       visit([]);
     }
   }
-  return options.slice(0, PLAY_OPTIONS);
+  return options.slice(0, budget.playOptions);
 }
 
 // —— 反射 ——
@@ -527,7 +575,7 @@ async function respond(
     const target = String(counter.target);
     // 先推演被反制的效果本身；推不出来时，假定用牌者对自己是好意、对别人是恶意。
     const simulated =
-      mind.lookahead && mind.depth < MAX_DEPTH
+      mind.lookahead && mind.depth < budget.maxDepth
         ? await oracle(seat, request, String(counter.card), actor, target, mind)
         : null;
     const good = simulated

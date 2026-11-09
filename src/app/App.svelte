@@ -461,11 +461,19 @@
     }
     if (!catalog) return;
     // 只发送普通开局草稿；本机主持端装配内容并开局，失败时经协议报回。
+    let aiGuide: SoloSetup['aiGuide'];
+    try {
+      const raw = sessionStorage.getItem('sgs.aiGuide');
+      if (raw) aiGuide = JSON.parse(raw) as SoloSetup['aiGuide'];
+    } catch {
+      aiGuide = undefined;
+    }
     const solo: SoloSetup = {
       seed,
       preset: deckPreset,
       ...(enablePractice ? { practice: true } : {}),
       ...(manualPractice ? { count: playerCount } : { lineup: localLineup }),
+      ...(aiGuide ? { aiGuide } : {}),
     };
     useSession(new RemoteSession(location.href, { solo }));
   }

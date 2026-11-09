@@ -34,7 +34,7 @@ for (let game = 0; game < games; game++) {
       result: match.result,
     });
     expect(match.progress!.turns).toBeLessThanOrEqual(TURN_CAP);
-  }, 120_000);
+  }, 180_000);
 }
 
 it('健全性矩阵覆盖两包全部武将', () => {

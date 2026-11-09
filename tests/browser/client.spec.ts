@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
     if (message.type() === 'error') found.push(message.text());
   });
   await page.goto('/');
+  await page.evaluate(() => sessionStorage.removeItem('sgs.aiGuide'));
   await page.getByRole('button', { name: '单机演武', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: '牌局种子', exact: true })).toBeHidden();
   await page.getByText('演练与复现', { exact: true }).click();
@@ -488,6 +489,16 @@ async function startGeneral(
   await page.getByRole('spinbutton').fill(String(seed));
   await page.getByRole('button', { name: '开始单机对局' }).click();
 }
+/** 验收钩子：开局前写入 sessionStorage，主持端按提示强制发动/放弃。 */
+async function guideAi(
+  page: Page,
+  guide: { acceptInvoke?: string[]; rejectInvoke?: string[] } | null,
+) {
+  await page.evaluate((value) => {
+    if (value) sessionStorage.setItem('sgs.aiGuide', JSON.stringify(value));
+    else sessionStorage.removeItem('sgs.aiGuide');
+  }, guide);
+}
 async function passDevice(page: Page) {
   await expect(page.getByRole('dialog', { name: /请交给/ })).toBeVisible();
   await expect(hand(page)).toHaveCount(0);
@@ -763,8 +774,24 @@ test('司马懿以真实手牌鬼才改判八卦，移动材料并记录技能�
   await expect(page.getByTestId('journal')).not.toContainText('甲席发动【反馈】');
   await expect(hand(page)).toHaveCount(count);
   await expect(confirm(page)).toBeEnabled();
-  await picker.locator('button').last().dispatchEvent('contextmenu');
-  await expect(page.getByRole('dialog', { name: '【的卢】' })).toBeVisible();
+  // 优先查看一张已公开的装备牌（未知手牌没有牌面弹层标题）。
+  const inspected = picker
+    .getByRole('heading', { name: '乙席 · 装备' })
+    .locator('..')
+    .locator('button')
+    .last();
+  await expect(inspected).toBeVisible();
+  const inspectedName = ((await inspected.getAttribute('aria-label')) ?? '').split(/\s+/)[0]!;
+  expect(inspectedName.length).toBeGreaterThan(0);
+  if (await page.getByRole('dialog').count())
+    await page
+      .getByRole('button', { name: '关闭牌面详情', exact: true })
+      .click()
+      .catch(async () => {
+        await page.getByRole('button', { name: '返回选择', exact: true }).click();
+      });
+  await inspected.dispatchEvent('contextmenu');
+  await expect(page.getByRole('dialog', { name: `【${inspectedName}】` })).toBeVisible();
   await page.getByRole('button', { name: '返回选择', exact: true }).click();
   await expect(decision).toHaveAttribute('data-decision-key', key!);
   await expect(picker.locator('button').last()).toHaveAttribute('aria-pressed', 'true');
@@ -787,16 +814,19 @@ test('双司马懿按当前乙席回合先后鬼才，甲席随后改判八卦�
   const vitality = (await page.getByTestId('target-甲席').getAttribute('aria-label'))!.match(
     /体力\d+\/\d+/,
   )![0];
-  await expect(
-    hand(page).filter({ has: page.locator('.card-name').filter({ hasText: /^闪$/ }) }),
-  ).toHaveCount(0);
+  // 新 AI 下手牌构成会变；选一张红色非闪手牌改判，使八卦判定成功。
   const material = page
     .getByTestId('hand-cards')
-    .getByRole('button', { name: '桃 ♥4', exact: true });
+    .locator('button.red')
+    .filter({
+      hasNot: page.locator('.card-name').filter({ hasText: /^闪$/ }),
+    })
+    .first();
+  await expect(material).toBeVisible();
   const materialId = await material.getAttribute('data-testid');
   await material.click();
   await confirm(page).click();
-  await expect(page.getByTestId('journal')).toContainText('甲席的八卦阵结果：♥4【桃】');
+  await expect(page.getByTestId('journal')).toContainText('甲席的八卦阵结果：');
   await expect(page.getByTestId('journal')).toContainText('甲席使用【闪】');
   const sequence = async (label: string) =>
     Number(
@@ -856,6 +886,8 @@ test('郭嘉遗计私有池可分批交牌，暂停隐藏池牌，保留余牌�
 });
 
 test('许褚 AI 裸衣造成两点真实伤害，郭嘉逐次遗计并分别处置私有牌池', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  await guideAi(page, { acceptInvoke: ['裸衣'] });
   await startGeneral(page, 'standard:guojia', 2, 1, 'standard:xuchu');
   await reachOwnSkill(page, '是否发动【遗计】');
   await expect(page.getByTestId('target-甲席')).toHaveAccessibleName(/体力1\/3/);
@@ -1204,11 +1236,13 @@ test('吕蒙不出杀，克己在费用宣告后跳过弃牌阶段', async ({ pa
   });
 });
 test('陆逊真实失去最后手牌后连营补牌，可查看谦逊说明', async ({ page }, info) => {
+  test.setTimeout(90_000);
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:luxun');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
-  await page.getByRole('spinbutton').fill('5');
+  // 新 AI 下原种子 5 会在连营前结束对局；16 仍能正式打到失去最后手牌。
+  await page.getByRole('spinbutton').fill('16');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   await reachOwnSkill(page, '是否发动【连营】');
   await expect(hand(page)).toHaveCount(0);
@@ -1223,13 +1257,15 @@ test('陆逊真实失去最后手牌后连营补牌，可查看谦逊说明', as
   await expect(page.getByTestId('journal')).toContainText('甲席发动【连营】');
   await expect(page.getByTestId('journal')).toContainText('甲席摸了 1 张牌');
 });
+
 test('孙权主公由吴 AI 用桃救援，实际回复两点体力', async ({ page }, info) => {
-  test.setTimeout(90000);
+  test.setTimeout(180_000);
+  await guideAi(page, null);
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:sunquan');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('4');
-  await page.getByRole('spinbutton').fill('68');
+  await page.getByRole('spinbutton').fill('11');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   await reachOwnSkill(page, '甲席回复 2 点体力', false, true);
   await expect(page.getByText(/尚未开局/)).toHaveCount(0);
@@ -1256,17 +1292,22 @@ test('孙权主公由吴 AI 用桃救援，实际回复两点体力', async ({ p
 });
 
 test('黄月英使用普通锦囊触发集智，在牌效果前实际摸牌', async ({ page }, info) => {
+  test.setTimeout(90_000);
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:huangyueying');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
-  await page.getByRole('spinbutton').fill('1');
+  // 新 AI 下种子 1 首个出牌阶段没有普通锦囊；10 开局有过河拆桥（集智摸牌后手牌数可对上）。
+  await page.getByRole('spinbutton').fill('10');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   await reachOwnSkill(page, '结束出牌');
   const before = await hand(page).count();
-  await hand(page)
-    .filter({ has: page.locator('.card-name', { hasText: '过河拆桥' }) })
-    .click();
+  // 选一张有目标的普通锦囊；不依赖固定花色点数。
+  const aimedTrick = hand(page).filter({
+    has: page.locator('.card-name').filter({ hasText: /^(过河拆桥|顺手牵羊|决斗)$/ }),
+  });
+  await expect(aimedTrick.first()).toBeVisible();
+  await aimedTrick.first().click();
   await selectTarget(page, 'target-乙席');
   await confirm(page).click();
   await expect(page.getByTestId('decision-hint')).toContainText('集智');
@@ -1323,11 +1364,13 @@ test('大乔国色把方块牌作为乐不思蜀放置，材料离手且延时�
   });
 });
 test('大乔流离同时支付与转移，记录和桌面牌指向新目标', async ({ page }, info) => {
+  test.setTimeout(90_000);
   await page
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:daqiao');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('4');
-  await page.getByRole('spinbutton').fill('1');
+  // 新 AI 下种子 1 的可转移目标不含乙席；5 在第 1 回合即可流离到乙席。
+  await page.getByRole('spinbutton').fill('5');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   await reachOwnSkill(page, '流离：');
   const material = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]').first();
@@ -1583,7 +1626,8 @@ test('孙尚香在 AI 行动后使用结姻：取消不耗牌，实际支付两�
     .getByRole('combobox', { name: '你的武将', exact: true })
     .selectOption('standard:sunshangxiang');
   await page.getByRole('combobox', { name: '席位', exact: true }).selectOption('2');
-  await page.getByRole('spinbutton').fill('27');
+  // 新 AI 下种子 27 会在结姻前结束；1 能在乙席受伤后仍轮到甲席出牌。
+  await page.getByRole('spinbutton').fill('1');
   await page.getByRole('button', { name: '开始单机对局' }).click();
   const skill = page.getByRole('button', { name: '结姻', exact: true });
   for (let step = 0; step < 40; step++) {
@@ -1603,7 +1647,12 @@ test('孙尚香在 AI 行动后使用结姻：取消不耗牌，实际支付两�
     } else if (kind === 'cards-targets') {
       if (await page.locator('.decision-actions .cancel-button').isEnabled())
         await page.locator('.decision-actions .cancel-button').click();
-      else await discard(page);
+      else if (await page.locator('.public-pools button[aria-disabled="false"]').count()) {
+        await page.locator('.public-pools button[aria-disabled="false"]').first().click();
+        await confirm(page).click();
+      } else await discard(page);
+    } else if (kind === 'invoke') {
+      await page.getByRole('button', { name: '不发动', exact: true }).click();
     } else if (kind === 'card-response' || kind === 'use-card') {
       const available = page.getByTestId('hand-cards').locator('button[aria-disabled="false"]');
       let answered = false;

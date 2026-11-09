@@ -93,10 +93,18 @@ export const defaultRoomSetup: RoomSetup = {
  * 单机开局草稿：本机主持端据此装配一局，连接即对局、断开即结束。
  * 给出阵容时甲席由你执掌、其余为托管 AI；只给人数时为手动多席演练（热坐交接）。
  */
+/** 单机验收钩子：强制托管 AI 对含某提示的发动作答，不进推演。 */
+export type SoloAiGuide = {
+  readonly acceptInvoke?: readonly string[];
+  readonly rejectInvoke?: readonly string[];
+};
+
 export type SoloSetup = {
   readonly practice?: boolean;
   readonly seed: number;
   readonly preset: string;
+  /** 仅验收使用；正式游玩不要传。 */
+  readonly aiGuide?: SoloAiGuide;
 } & (
   | { readonly lineup: readonly string[]; readonly count?: never }
   | { readonly count: number; readonly lineup?: never }

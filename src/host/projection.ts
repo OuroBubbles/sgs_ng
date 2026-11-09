@@ -369,10 +369,19 @@ function publicHistory(
     const voice = skillVoice(actor, skill ?? '', fact.seq);
     if (voice) play({ voice });
     // 技能宣告是各技能自定的数据；作者层总会写入 label，选了角色的技能附带公开目标。
-    // 交牌、移牌等后果由各自的事实另行叙述，这里不按技能 ID 拼专用文案。
+    // 不按技能 ID 拼专用文案。若本次支付把牌交到别人手牌（pay: give），从变更里读出交牌叙述。
     const declared = declaration as { readonly label?: string; readonly targets?: unknown };
     const targets = Array.isArray(declared.targets) ? declared.targets.map(String) : [];
-    return `${actor}发动【${declared.label || '技能'}】${targets.length ? `，目标 ${targets.join('、')}` : ''}`;
+    const handoffs = fact.data.changes.flatMap((change) =>
+      change.kind === 'move' && change.to.endsWith(':hand') && !change.to.startsWith(`${actor}:`)
+        ? [change]
+        : [],
+    );
+    const given =
+      handoffs.length === 0
+        ? ''
+        : `。${actor}将 ${handoffs.reduce((n, move) => n + move.cards.length, 0)} 张牌交给 ${handoffs[0]!.to.slice(0, -':hand'.length)}`;
+    return `${actor}发动【${declared.label || '技能'}】${targets.length ? `，目标 ${targets.join('、')}` : ''}${given}`;
   });
   on(
     Discard.limited,

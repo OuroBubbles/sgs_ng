@@ -9,10 +9,18 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invali
 const setup = process.env.SGS_ROOM
   ? (JSON.parse(process.env.SGS_ROOM) as RoomSetup)
   : { ...defaultRoomSetup, seed: Number(process.env.SGS_SEED ?? defaultRoomSetup.seed) };
+const aiDelayRaw = process.env.SGS_AI_DELAY_MS;
+const aiDelayMs =
+  aiDelayRaw === undefined || aiDelayRaw === ''
+    ? undefined
+    : Number.isFinite(Number(aiDelayRaw))
+      ? Math.max(0, Math.floor(Number(aiDelayRaw)))
+      : undefined;
 const server = createGameServer(
   createRoomOptions({ ...setup, practice: setup.practice ?? process.env.SGS_PRACTICE === '1' }),
   {
     staticRoot: resolve('dist'),
+    ...(aiDelayMs === undefined ? {} : { aiDelayMs }),
   },
 );
 const boundPort = await server.listen(port, host);
