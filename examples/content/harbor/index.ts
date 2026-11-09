@@ -1,16 +1,19 @@
-import type { ContentDefinition } from '../../../src/content/catalog';
 import {
+  card,
   cardDef,
+  deckOf,
   defineEvent,
   timing,
   defineQuery,
   draw,
+  general,
   rulesOf,
   skill,
   on,
   Use,
 } from '../../../src/sdk';
-import type { Card, CardDefinition } from '../../../src/sdk';
+import type { ContentDefinition } from '../../../src/sdk';
+import wusheng from '../../../src/content/standard/skills/wusheng';
 import portrait from './guest.jpg';
 
 export interface ProvisionResult {
@@ -29,11 +32,11 @@ export function provisionBy(event: ProvisionResult, owner: string): boolean {
 }
 
 /** 普通源码模块：通过普通 import 共享实际规则对象。 */
-const provision: CardDefinition = {
+const provision = card({
   id: 'harbor:provision',
+  type: 'trick',
   label: '备航',
   description: '对自己使用，摸两张牌。可以被无懈可击。渡客使用时可先发动潮声摸一张牌。',
-  type: 'trick',
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
@@ -47,8 +50,8 @@ const provision: CardDefinition = {
       );
     },
   },
-};
-const tide = skill(
+});
+export const tide = skill(
   'harbor:tide',
   '潮声',
   '当你使用锦囊牌时，你可以摸一张牌。',
@@ -66,39 +69,20 @@ const tide = skill(
 );
 export default {
   cards: [provision],
-  skills: [tide],
-  generals: [
-    {
-      id: 'harbor:guest',
-      name: '渡客',
-      kingdom: '群',
-      gender: 'male',
-      maxHp: 4,
-      skills: ['harbor:tide', 'standard:wusheng'],
-    },
-  ],
+  generals: [general('harbor:guest', '渡客', '群', 4, [tide, wusheng])],
   generalViews: [{ id: 'harbor:guest', portrait }],
   decks: [
     {
       id: 'harbor:crossing',
       label: '渡口演练（40 张）',
-      create() {
-        const names = [
-          ...Array<string>(8).fill(provision.id),
-          ...Array<string>(12).fill('standard:slash'),
-          ...Array<string>(8).fill('standard:jink'),
-          ...Array<string>(4).fill('standard:peach'),
-          ...Array<string>(4).fill('standard:duel'),
-          ...Array<string>(4).fill('standard:ex_nihilo'),
-        ];
-        const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
-        return names.map((name, i) => ({
-          id: `harbor-card-${i + 1}`,
-          name,
-          suit: suits[i % 4]!,
-          rank: (i % 13) + 1,
-        }));
-      },
+      create: deckOf('harbor-card', [
+        [provision.id, 8],
+        ['standard:slash', 12],
+        ['standard:jink', 8],
+        ['standard:peach', 4],
+        ['standard:duel', 4],
+        ['standard:ex_nihilo', 4],
+      ]),
     },
   ],
 } satisfies ContentDefinition;

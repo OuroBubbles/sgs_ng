@@ -43,6 +43,27 @@ export interface DeckDefinition {
   create(): readonly Card[];
 }
 
+const suits: readonly Card['suit'][] = ['spade', 'heart', 'club', 'diamond'];
+
+/**
+ * 按 [牌名, 张数] 依次展开一副练习牌：ID 为 `${prefix}-序号`，点数 1–13 循环；
+ * 花色默认黑桃、红桃、梅花、方块轮转，也可按序号指定。
+ */
+export function deckOf(
+  prefix: string,
+  counts: readonly (readonly [string, number])[],
+  suit = (index: number): Card['suit'] => suits[index % 4]!,
+): () => readonly Card[] {
+  return () =>
+    counts
+      .flatMap(([name, count]) => Array<string>(count).fill(name))
+      .map((name, index) => ({
+        id: `${prefix}-${index + 1}`,
+        name,
+        suit: suit(index),
+        rank: (index % 13) + 1,
+      }));
+}
 /** 普通源码内容：直接组合定义，不要求包名、版本、依赖清单或命名空间。 */
 export interface ContentDefinition {
   readonly cards?: readonly CardDefinition[];

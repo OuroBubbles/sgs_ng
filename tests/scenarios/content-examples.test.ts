@@ -64,8 +64,9 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
 });
 
 it('真实备航和潮声经跨模块查询多摸一张，完成窗口触发墨韵回复，状态可由事实重建', async () => {
-  expect(gallery.skills[0]!.triggers[0]!.window).toBe(Provision.finished);
-  expect(gallery.skills[0]!.modifiers[0]!.query).toBe(tideDrawBonus);
+  const ink = gallery.generals[0]!.abilities[2]!;
+  expect(ink.triggers?.[0]?.window).toBe(Provision.finished);
+  expect(ink.modifiers?.[0]?.query).toBe(tideDrawBonus);
   const content = createContent(standard, harbor, gallery);
   const match = createRoleMatch({
     seed: 2,

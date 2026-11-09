@@ -340,7 +340,7 @@ export {
   takeExtraTurn,
 } from '../rules/turn/extra';
 export type { ExtraTurn, ExtraTurnRequest } from '../rules/turn/extra';
-export { card, createContent } from '../content/catalog';
+export { card, createContent, deckOf } from '../content/catalog';
 export type {
   AuthoredCard,
   ContentDefinition,
