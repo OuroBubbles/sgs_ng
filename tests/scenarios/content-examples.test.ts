@@ -3,7 +3,7 @@ import definition from '../../examples/content/study';
 import harbor, { Provision, tideDrawBonus } from '../../examples/content/harbor';
 import gallery from '../../examples/content/gallery';
 import { standard } from '../fixtures/standard';
-import { createContent, damage, Cards, Cost } from '../../src/sdk';
+import { createContent, damage, Cards, Cost, useCard } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
 import { card, cardGame } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -39,7 +39,7 @@ it('普通源码示例并使用宿主摸牌与宣告，拒绝不发动，已宣�
       run: (ctx) => game.skills.revoke(ctx, 'a', 'study', source),
     });
     const running = game.room.run('guide-trick', (ctx) =>
-      game.book.use(ctx, {
+      useCard(ctx, {
         actor: 'a',
         choice: { kind: 'physical', card: 'trick' },
         targets: ['a'],
@@ -84,7 +84,7 @@ it('真实备航和潮声经跨模块查询多摸一张，完成窗口触发墨�
     .cards.find((id) => match.room.world.card(id).name === 'harbor:provision')!;
   expect(card).toBeTruthy();
   const running = match.room.run('provision', (ctx) =>
-    match.book.use(ctx, {
+    useCard(ctx, {
       actor: '甲席',
       choice: { kind: 'physical', card },
       targets: ['甲席'],

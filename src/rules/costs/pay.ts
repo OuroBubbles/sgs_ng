@@ -1,13 +1,12 @@
+import { canDiscard } from '../cards/discard';
 import type { CardMove, Change, WorldReader, Zone } from '../../core/model/state';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
-import { rulesOf } from '../skills/skills';
 import { readState, stateChange, useCount } from '../state/state';
 import { isGameOver } from '../game/end';
-import type { CardBook } from '../cards/book';
 import { Cards } from '../cards/move';
 import { defineEvent, timing } from '../../core/runtime/event';
 import type { Timing } from '../../core/runtime/event';
@@ -96,7 +95,7 @@ export function payDiscard(
       readonly cards: readonly string[];
     },
 ): Promise<PaymentResult> {
-  return performPayment(ctx, spec, rulesOf(ctx));
+  return performPayment(ctx, spec, true);
 }
 
 /** 两个公开入口各自约束配置形状，实际检查、提交与后效只有一份实现。 */
@@ -107,7 +106,7 @@ function performPayment(
       readonly cards?: readonly string[];
       readonly to?: string;
     },
-  discardBook?: CardBook,
+  discard = false,
 ): Promise<PaymentResult> {
   // 同一次支付的来源与原因固定；资格、权限、流程因果和收据共用这份身份。
   const { skill, actor: specifiedActor, reason } = spec;
@@ -117,7 +116,7 @@ function performPayment(
     (child) => {
       const intent = spec.intent;
       if (isGameOver(child.world)) return { kind: 'unavailable', reason: 'Game has finished.' };
-      const to = discardBook ? 'discard' : spec.to;
+      const to = discard ? 'discard' : spec.to;
       if ((specifiedActor === undefined) === (skill === undefined))
         throw new Error('Payment requires exactly one actor or skill source.');
       const limit = spec.limit;
@@ -137,14 +136,9 @@ function performPayment(
       // 权限检查与实际移动使用同一份材料，查询回调不能替换本次费用。
       const ids = child.query(() => immutable(materials ?? []));
       if (
-        (discardBook || spec.legal) &&
+        (discard || spec.legal) &&
         !child.query(() => {
-          if (
-            discardBook &&
-            !ids.every((card) =>
-              discardBook.canDiscard(child, { actor, owner: actor, card, reason }),
-            )
-          )
+          if (discard && !ids.every((card) => canDiscard(child, { actor, card, reason })))
             return false;
           return spec.legal ? spec.legal(child) : true;
         })

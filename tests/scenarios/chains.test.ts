@@ -16,12 +16,13 @@ import {
   equipmentCard,
   equipmentEffectiveFor,
   on,
-  CardBook,
   SkillBook,
   resolveAttack,
   Chain,
   Damage,
   Dying,
+  buildCard,
+  useCard,
 } from '../../src/sdk';
 import type { Context, DamageInput, DamageResult, CardDefinition } from '../../src/sdk';
 import { card, cardGame, settled, die } from '../fixtures/cards';
@@ -399,11 +400,11 @@ async function grantFire(game: Game) {
     game.skills.grant(ctx, { owner: 'a', skill: flame.id, source: grantSource }),
   );
 }
-function fireSlash(game: Game, ctx: Context) {
+function fireSlash(ctx: Context) {
   const instance = ctx.world.snapshot.skills.find(
     (skill) => skill.owner === 'a' && skill.skill === flame.id,
   )!.id;
-  return game.book.use(ctx, {
+  return useCard(ctx, {
     actor: 'a',
     choice: { kind: 'viewAs', instance, recipe: 'fire', materials: ['spark'] },
     targets: ['b'],
@@ -451,11 +452,11 @@ it('真实转换火杀的裸衣只在直接伤害增伤，传播不再次叠加'
     game.skills.grant(ctx, { owner: 'a', skill: 'standard:luoyi', source: grantSource }),
   );
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['draw', 'play'],
       body: async (at, phase) => {
-        if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
-        expect((await fireSlash(game, at)).kind).toBe('used');
+        if (phase.kind === 'draw') return defaultPhaseBody(at, phase);
+        expect((await fireSlash(at)).kind).toBe('used');
       },
     }),
   );
@@ -473,7 +474,7 @@ it.each(['kylin_bow', 'ice_sword'])('真实火杀的 %s 不因传播对其他角
   });
   await grantFire(game);
   await link(game, ['b', 'c']);
-  const running = game.room.run('fire', (ctx) => fireSlash(game, ctx));
+  const running = game.room.run('fire', (ctx) => fireSlash(ctx));
   expect(await answerOptional(game, running)).toEqual([]);
   expect(results(game).map((result) => result.amount)).toEqual([1, 1]);
   expect(game.room.world.position('horse')).toBe('c:equipment');
@@ -522,7 +523,7 @@ it('青釭剑的原效果忽略防具不传给连环角色，每个目标按自�
       draft.adjust(1, 'plus');
     },
   });
-  await game.room.run('fire', (ctx) => fireSlash(game, ctx));
+  await game.room.run('fire', (ctx) => fireSlash(ctx));
   expect(results(game).map((result) => result.amount)).toEqual([2, 1, 2]);
   expect(results(game)[1]!.input.card!.target).toBe('b');
   expect(results(game)[1]!.input.to).toBe('c');
@@ -536,7 +537,7 @@ it('传播保留原牌材料关联，曹操仍可奸雄取得处理区材料且�
   await game.room.run('jianxiong', (ctx) =>
     game.skills.grant(ctx, { owner: 'c', skill: 'standard:jianxiong', source: grantSource }),
   );
-  const running = game.room.run('fire', (ctx) => fireSlash(game, ctx));
+  const running = game.room.run('fire', (ctx) => fireSlash(ctx));
   expect(await answerOptional(game, running, ['standard:jianxiong'])).toEqual([
     'standard:jianxiong',
   ]);
@@ -566,7 +567,7 @@ it('作者包种子 4 自然起手缚阵与引焰，两次真实用牌造成连�
     ] as const) {
       expect(
         (
-          await match.book.use(ctx, {
+          await useCard(ctx, {
             actor: '甲席',
             choice: { kind: 'physical', card: id },
             targets,
@@ -633,12 +634,8 @@ it.each(['workshop:ice', '', '  '])(
   '具名属性 %j 在定义与转换牌面中统一校验，错误不支付材料',
   async (nature) => {
     const definition = { id: 'probe:nature', label: '属性牌', type: 'basic' as const, nature };
-    if (!nature.trim())
-      expect(() => new CardBook([definition], new SkillBook())).toThrow('nonempty string');
-    else
-      expect(new CardBook([definition], new SkillBook()).definition(definition.id).nature).toBe(
-        nature,
-      );
+    if (!nature.trim()) expect(() => new SkillBook([], [definition])).toThrow('nonempty string');
+    else expect(new SkillBook([], [definition]).cards.get(definition.id)?.nature).toBe(nature);
     const conversion = defineSkill({
       id: 'probe:nature',
       name: '属性转换',
@@ -661,7 +658,7 @@ it.each(['workshop:ice', '', '  '])(
         skill: conversion.id,
         source: grantSource,
       });
-      const built = game.book.build(
+      const built = buildCard(
         ctx,
         'a',
         { kind: 'viewAs', instance: change.after!.id, recipe: 'nature', materials: ['slash1'] },
@@ -685,11 +682,10 @@ it('自定义属性攻击复用完整闪/突破流程，仅用普通伤害函数
     use: {
       count: { min: 1, max: 1 },
       target: () => true,
-      resolve: async (ctx, { effect, book }) => {
+      resolve: async (ctx, { effect }) => {
         await resolveAttack(
           ctx,
           effect,
-          book,
           { name: 'standard:jink', purpose: 'response' },
           (at, hit) =>
             damage(at, {
@@ -710,7 +706,7 @@ it('自定义属性攻击复用完整闪/突破流程，仅用普通伤害函数
   });
   await link(game, ['b', 'c']);
   await game.room.run('ice', (ctx) =>
-    game.book.use(ctx, {
+    useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'ice' },
       targets: ['b'],

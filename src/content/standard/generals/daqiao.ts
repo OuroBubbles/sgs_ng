@@ -4,12 +4,13 @@ import {
   general,
   HE,
   ownedCards,
-  rulesOf,
   select,
   selection,
   skill,
   on,
   Target,
+  attackRange,
+  distance,
 } from '../../../sdk';
 import type {
   CardEffect,
@@ -32,10 +33,9 @@ export const guose = skill(
 );
 
 function redirects(ctx: Context, self: SkillHandle, use: UsePlanView, effect: CardEffect) {
-  const rules = rulesOf(ctx);
   const cards = () =>
     ownedCards(ctx.world, self.owner, HE).filter((card) =>
-      canDiscard(ctx, self.owner, card, self.skill),
+      canDiscard(ctx, { actor: self.owner, card, reason: self.skill }),
     );
   const targets = () =>
     ctx.world.snapshot.players
@@ -56,7 +56,7 @@ function redirects(ctx: Context, self: SkillHandle, use: UsePlanView, effect: Ca
     return (
       effect.state === 'targeting' &&
       use.canReplaceTarget(ctx, effect.effectId, target, { ignoreDistance: true }) &&
-      rules.distance(ctx, self.owner, target, probe) <= rules.attackRange(ctx, self.owner, probe)
+      distance(ctx, self.owner, target, probe) <= attackRange(ctx, self.owner, probe)
     );
   };
   const canComplete = (choice: JointChoice) =>

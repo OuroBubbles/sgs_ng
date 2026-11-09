@@ -1,3 +1,14 @@
+import {
+  buildCard,
+  cardDef,
+  cardOffers,
+  face,
+  hasCardOffers,
+  useCard,
+  validateUse,
+  cardQueries,
+  modify,
+} from '../../src/sdk';
 import { expect, it } from 'vitest';
 import { defineSkill, viewAs, ownedCards, Use, Resolve, Damage } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -48,14 +59,14 @@ it('动态转换数量在菜单、存在性与构牌入口读取时校验，错�
         },
       };
       if (entry === 'offers')
-        expect(game.book.offers(ctx, 'a', 'use', ['standard:slash'])).toMatchObject([
+        expect(cardOffers(ctx, 'a', 'use', ['standard:slash'])).toMatchObject([
           { label: '动态数量', count: { min: 1, max: 1 } },
         ]);
       else if (entry === 'has-offers')
-        expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
+        expect(hasCardOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
       else
         expect(
-          game.book.build(
+          buildCard(
             ctx,
             'a',
             {
@@ -75,10 +86,10 @@ it('动态转换数量在菜单、存在性与构牌入口读取时校验，错�
     count = { min: 1, max: 0 };
     await expect(
       game.room.run(entry, (ctx) => {
-        if (entry === 'offers') game.book.offers(ctx, 'a', 'use');
-        else if (entry === 'has-offers') game.book.hasOffers(ctx, 'a', 'use', ['standard:slash']);
+        if (entry === 'offers') cardOffers(ctx, 'a', 'use');
+        else if (entry === 'has-offers') hasCardOffers(ctx, 'a', 'use', ['standard:slash']);
         else
-          game.book.build(
+          buildCard(
             ctx,
             'a',
             { kind: 'viewAs', instance, recipe: 'convert', materials: ['fee'] },
@@ -104,23 +115,23 @@ it('存在性与菜单共用候选，过滤可提前停止，仍须独立验证�
     await game.skills.grant(ctx, { owner: 'a', skill: wusheng.id, source });
     for (const purpose of ['use', 'response', { kind: 'effect' }] as const) {
       for (const names of [undefined, ['standard:slash'], ['standard:jink'], ['standard:peach']])
-        expect(game.book.hasOffers(ctx, 'a', purpose, names)).toBe(
-          game.book.offers(ctx, 'a', purpose, names).length > 0,
+        expect(hasCardOffers(ctx, 'a', purpose, names)).toBe(
+          cardOffers(ctx, 'a', purpose, names).length > 0,
         );
     }
     let visited = 0;
     expect(
-      game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], () => {
+      hasCardOffers(ctx, 'a', 'response', ['standard:jink'], () => {
         visited++;
         return true;
       }),
     ).toBe(true);
     expect(visited).toBe(1);
-    expect(game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'], () => false)).toBe(false);
+    expect(hasCardOffers(ctx, 'a', 'response', ['standard:jink'], () => false)).toBe(false);
     const instance = game.room.world.snapshot.skills[0]!.id;
-    expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
+    expect(hasCardOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(true);
     expect(
-      game.book.validateUse(ctx, {
+      validateUse(ctx, {
         actor: 'a',
         choice: { kind: 'viewAs', instance, recipe: 'red-slash', materials: ['red'] },
         targets: ['c'],
@@ -128,8 +139,8 @@ it('存在性与菜单共用候选，过滤可提前停止，仍须独立验证�
       }).ok,
     ).toBe(false);
     await game.skills.revoke(ctx, 'a', wusheng.id, source);
-    expect(game.book.hasOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(false);
-    expect(game.book.hasOffers(ctx, 'a', 'response', ['standard:jink'])).toBe(true);
+    expect(hasCardOffers(ctx, 'a', 'use', ['standard:slash'])).toBe(false);
+    expect(hasCardOffers(ctx, 'a', 'response', ['standard:jink'])).toBe(true);
   });
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -238,8 +249,8 @@ it('零材料固定配方直接使用声明，空手仍能完成用牌且不创�
   );
   const instance = game.room.world.snapshot.skills[0]?.id ?? '';
   await game.room.run('offers', (ctx) => {
-    expect(game.book.hasOffers(ctx, 'a', 'use')).toBe(true);
-    expect(game.book.offers(ctx, 'a', 'use')).toMatchObject([
+    expect(hasCardOffers(ctx, 'a', 'use')).toBe(true);
+    expect(cardOffers(ctx, 'a', 'use')).toMatchObject([
       {
         kind: 'viewAs',
         label: 'zero slash',
@@ -249,7 +260,7 @@ it('零材料固定配方直接使用声明，空手仍能完成用牌且不创�
       },
     ]);
     expect(
-      game.book.validateUse(ctx, {
+      validateUse(ctx, {
         ...slash,
         choice: { kind: 'viewAs', instance, recipe: 'slash', materials: ['invented'] },
       }).ok,
@@ -275,9 +286,9 @@ it('自定义转换可同步拒绝或直接返回用牌 Promise，原方法与�
     make = { name: 'standard:slash' };
     #reason = 'probe:conditional-use';
 
-    use(ctx: Context, { self, intent, book }: ViewAsUseInput): UseResult | Promise<UseResult> {
+    use(ctx: Context, { self, intent }: ViewAsUseInput): UseResult | Promise<UseResult> {
       if (!ready) return { kind: 'unavailable', reason: this.#reason };
-      return book.use(ctx, {
+      return useCard(ctx, {
         ...intent,
         actor: self.owner,
         choice: { kind: 'generated', face: this.make, materials: [], reason: this.#reason },
@@ -381,12 +392,12 @@ it('同一配方按使用与打出切换牌名、材料和数量，最终校验�
       viewAs({
         id: 'duel-slash',
         label: '变式',
-        names: (_ctx, { book, purpose }) => [
-          book.definition(purpose === 'use' ? 'standard:duel' : 'standard:slash').id,
+        names: (ctx, { purpose }) => [
+          cardDef(ctx, purpose === 'use' ? 'standard:duel' : 'standard:slash').id,
         ],
-        materials: (ctx, { self, book, purpose }) =>
+        materials: (ctx, { self, purpose }) =>
           ownedCards(ctx.world, self.owner).filter(
-            (id) => book.face(ctx, id).color === (purpose === 'use' ? 'red' : 'black'),
+            (id) => face(ctx, id).color === (purpose === 'use' ? 'red' : 'black'),
           ),
         count: (_ctx, { purpose }) => ({ min: purpose === 'use' ? 1 : 2, max: 2 }),
         make: (_ctx, { purpose }) => ({
@@ -409,20 +420,18 @@ it('同一配方按使用与打出切换牌名、材料和数量，最终校验�
   const choice = { kind: 'viewAs', instance, recipe: 'duel-slash' } as const;
   await game.room.run('preview', (ctx) => {
     const offers = (purpose: 'use' | 'response') =>
-      game.book.offers(ctx, 'a', purpose).filter((offer) => offer.skill === adaptive.id);
+      cardOffers(ctx, 'a', purpose).filter((offer) => offer.skill === adaptive.id);
     expect(offers('use')).toMatchObject([
       { names: ['standard:duel'], materials: ['red'], count: { min: 1, max: 2 } },
     ]);
     expect(offers('response')).toMatchObject([
       { names: ['standard:slash'], materials: ['black1', 'black2'], count: { min: 2, max: 2 } },
     ]);
-    expect(game.book.build(ctx, 'a', { ...choice, materials: ['black1'] }, 'response').ok).toBe(
+    expect(buildCard(ctx, 'a', { ...choice, materials: ['black1'] }, 'response').ok).toBe(false);
+    expect(buildCard(ctx, 'a', { ...choice, materials: ['red'] }, 'response').ok).toBe(false);
+    expect(buildCard(ctx, 'a', { ...choice, materials: ['black1', 'black2'] }, 'use').ok).toBe(
       false,
     );
-    expect(game.book.build(ctx, 'a', { ...choice, materials: ['red'] }, 'response').ok).toBe(false);
-    expect(
-      game.book.build(ctx, 'a', { ...choice, materials: ['black1', 'black2'] }, 'use').ok,
-    ).toBe(false);
   });
   expect(
     await use(game, { ...slash, targets: ['c'], choice: { ...choice, materials: ['red'] } }),
@@ -469,7 +478,12 @@ it('重复材料、错误参数、未知配方与错误拥有者均不支付', a
 it('统一禁止规则也约束转换牌，失效后不能使用旧配方候选', async () => {
   const game = cardGame({
     skills: [wusheng],
-    policy: { prohibitUse: (_ctx, _actor, card) => card.name === 'standard:slash' },
+    rules: [
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { card } }) => card.name === 'standard:slash',
+      ),
+    ],
   });
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'a', skill: wusheng.id, source }),
@@ -556,7 +570,7 @@ it('处理区材料可被子用牌借走，子结算结束后父善后不会重�
     run: async (ctx, hit) => {
       const material = hit.input.card?.card.materials[0];
       if (!material) throw new Error('Missing material.');
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         actor: 'b',
         choice: {
           kind: 'generated',
@@ -595,7 +609,7 @@ it('具名查询和计划修改均受纯查询守卫约束', async () => {
 });
 
 it('目标在轮到前死亡则跳过，不再启动其效果', async () => {
-  const game = cardGame({ policy: { attackRange: () => 3 } });
+  const game = cardGame({ rules: [modify(cardQueries.attackRange, () => 3)] });
   const started: string[] = [];
   game.room.on(Use.declared, {
     id: 'extra',

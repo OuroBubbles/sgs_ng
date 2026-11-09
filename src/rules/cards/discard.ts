@@ -1,4 +1,6 @@
-import { rulesOf } from '../skills/skills';
+import { queryRule } from '../skills/skills';
+import { isGameOver } from '../game/end';
+import { prohibitDiscard } from './queries';
 import type { Card, CardMove, Zone, Change } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
@@ -33,7 +35,7 @@ export interface DiscardQuery extends DiscardRequest {
   readonly materials: readonly string[];
 }
 
-/** 统一解释实时位置与牌面。是否允许由 CardBook 查询；这里没有可写实体或展示选项 ID。 */
+/** 统一解释实时位置与牌面；这里没有可写实体或展示选项 ID。 */
 export function discardSubject(ctx: Context, request: DiscardRequest): DiscardQuery | null {
   const identity = {
     actor: request.actor,
@@ -57,6 +59,22 @@ export function discardSubject(ctx: Context, request: DiscardRequest): DiscardQu
   return immutable({ ...identity, area: zone.kind, face: card, materials: [card.id] });
 }
 
+/** 能否弃置：牌须仍在所有者区域，且没有技能禁止；owner 省略时为弃置自己的牌。 */
+export function canDiscard(
+  ctx: Context,
+  input: Omit<DiscardRequest, 'owner'> & { readonly owner?: string },
+): boolean {
+  return ctx.query(() => {
+    const request = { ...input, owner: input.owner ?? input.actor };
+    if (!request.reason || isGameOver(ctx.world)) return false;
+    // 权限不替代发动资格；已宣告效果是否在来源死亡后继续，由其普通流程明确决定。
+    ctx.world.player(request.actor);
+    ctx.world.player(request.owner);
+    const subject = discardSubject(ctx, request);
+    return subject !== null && !queryRule(ctx, prohibitDiscard, subject, false);
+  });
+}
+
 export interface DiscardResult {
   readonly kind: 'discarded' | 'unavailable';
   readonly subjects: readonly string[];
@@ -68,14 +86,13 @@ export function discardCards(
   ctx: Context,
   request: Omit<DiscardRequest, 'card'> & { readonly cards: readonly string[] },
 ): Promise<DiscardResult> {
-  const book = rulesOf(ctx);
   const input = immutable(request);
   return ctx.flow('discard', async (child) => {
     const unavailable: DiscardResult = { kind: 'unavailable', subjects: input.cards, cards: [] };
     if (
       !input.cards.length ||
       new Set(input.cards).size !== input.cards.length ||
-      input.cards.some((card) => !book.canDiscard(child, { ...input, card }))
+      input.cards.some((card) => !canDiscard(child, { ...input, card }))
     )
       return unavailable;
     const moves: CardMove[] = [];

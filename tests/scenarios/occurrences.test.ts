@@ -730,7 +730,7 @@ it('零张阶段摸牌先发动英姿后，裸衣在同一窗口变为合法，�
   await grant(game, 'standard:yingzi');
   await grant(game, 'standard:luoyi');
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['draw'],
       body: async (at, phase) => {
         await draw(at, { player: 'a', count: 0, reason: 'test:zero-draw', phase });
@@ -763,7 +763,7 @@ it.each(['观星', '洛神'])(
     });
     await grant(game, 'standard:guanxing');
     await grant(game, 'standard:luoshen');
-    const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+    const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
     await order(game.room, first);
     await answer(game.room, true);
     if (first === '观星') {

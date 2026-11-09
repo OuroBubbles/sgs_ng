@@ -5,7 +5,7 @@ import type { ChoiceCount } from '../../core/decisions/count';
 import type { Context } from '../../core/runtime/room';
 import type { Lifetime } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
-import type { CardBook, UseResult } from './book';
+import type { UseResult } from './use';
 import type { UsePlanView } from './plan';
 import type { EquipmentDefinition } from './equipment';
 import type { DelayedRules } from './delayed';
@@ -67,10 +67,9 @@ export type CardChoice =
       readonly origin?: { readonly actor: string; readonly card: SemanticCard };
     };
 
-/** 转换的显式输入；目录始终是本局实例，用途在预览与最终构牌时保持一致。 */
+/** 转换的显式输入；用途在预览与最终构牌时保持一致。 */
 export interface ViewAsInput {
   readonly self: SkillHandle;
-  readonly book: CardBook;
   readonly purpose: Purpose;
 }
 export interface ViewAsMakeInput extends ViewAsInput {
@@ -254,10 +253,9 @@ export interface UseSnapshot {
     readonly fromEffectId: string | null;
   }[];
 }
-/** 卡牌回调显式接收本局目录，纯查询与可等待后效共用具名输入约定。 */
+/** 卡牌回调的具名输入；规则操作经 ctx 取得本局目录。 */
 export interface CardUseInput {
   readonly request: UseRequest;
-  readonly book: CardBook;
 }
 export interface CardTargetInput extends CardUseInput {
   readonly target: string;
@@ -265,15 +263,12 @@ export interface CardTargetInput extends CardUseInput {
 export interface CardFixedTargetsInput {
   readonly actor: string;
   readonly card: SemanticCard;
-  readonly book: CardBook;
 }
 export interface CardEffectInput {
   readonly effect: CardEffect;
-  readonly book: CardBook;
 }
 export interface CardExecuteInput {
   readonly use: UsePlanView;
-  readonly book: CardBook;
   readonly resolveTargets: ResolveTargets;
 }
 
@@ -311,27 +306,6 @@ export interface CardDefinition {
   readonly equipment?: EquipmentDefinition;
   readonly delayed?: DelayedRules;
   readonly use?: UseRules;
-}
-/** 纯同步基础策略；建局固定方法与原接收者，缺省项使用标准策略。 */
-export interface CardPolicy {
-  readonly distance: (ctx: Context, from: string, to: string, base: number) => number;
-  readonly handLimit: (ctx: Context, actor: string, base: number) => number;
-  readonly attackRange: (ctx: Context, actor: string, card: SemanticCard) => number;
-  readonly prohibitUse: (ctx: Context, actor: string, card: SemanticCard) => boolean;
-  readonly prohibitResponse: (ctx: Context, actor: string, card: SemanticCard) => boolean;
-  readonly prohibitTarget: (
-    ctx: Context,
-    actor: string,
-    target: string,
-    card: SemanticCard,
-  ) => boolean;
-  readonly usage: (ctx: Context, request: UseRequest, base: number) => number | null;
-  readonly responseTimes: (
-    ctx: Context,
-    effect: EffectRef,
-    responder: string,
-    name: string,
-  ) => number;
 }
 export function ownedCards(
   world: WorldReader,

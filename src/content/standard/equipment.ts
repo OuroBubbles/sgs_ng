@@ -1,5 +1,5 @@
-import { equipment, modify, cardQueries, ownedCards } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
+import { equipment, modify, cardQueries, ownedCards } from '../../sdk';
 import { eightDiagram, qinggangSword, niohShield } from './armor';
 import { advancedWeapons } from './weapons';
 import { remainingSwords } from './swords';

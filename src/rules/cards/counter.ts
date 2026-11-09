@@ -1,12 +1,12 @@
+import { Resolve, askUse } from './use';
+import { cardDef } from '../skills/skills';
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
-import type { CardBook } from './book';
 import { effectReference, useReference } from './types';
 import type { CounterOpportunity, CounterSubject, EffectRef, CardUseRef } from './types';
 import type { UsePlanView } from './plan';
 import { withLifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
-import { Resolve } from './book';
 import { defineEvent, timing } from '../../core/runtime/event';
 
 export interface CounterResult {
@@ -35,11 +35,7 @@ export const Counter = defineEvent('counter', {
 });
 
 /** 一个机会对应一个具体效果或用牌。每张反制牌在自身用牌本体中嵌套下一机会，材料不提前离场。 */
-export function contestCounter(
-  ctx: Context,
-  book: CardBook,
-  request: CounterRequest,
-): Promise<CounterResult> {
+export function contestCounter(ctx: Context, request: CounterRequest): Promise<CounterResult> {
   return withLifetime(ctx, 'counter', async (child, lifetime) => {
     const subject = immutable(request.subject);
     const root = effectReference(request.root);
@@ -89,15 +85,15 @@ export function contestCounter(
         break;
       }
       if (!child.world.player(actor).alive) continue;
-      const used = await book.askUse(child, {
+      const used = await askUse(child, {
         actor,
         names: allowedNames,
         targets: [],
         timing: { kind: 'counter', opportunity },
         prompt:
           subject.kind === 'effect'
-            ? `是否反制【${book.definition(root.card.name).label}】对 ${root.target} 的效果？`
-            : `是否反制 ${subject.use.actor} 的【${book.definition(subject.use.card.name).label}】？`,
+            ? `是否反制【${cardDef(ctx, root.card.name).label}】对 ${root.target} 的效果？`
+            : `是否反制 ${subject.use.actor} 的【${cardDef(ctx, subject.use.card.name).label}】？`,
       });
 
       if (used.kind !== 'used') continue;
@@ -126,15 +122,11 @@ export function contestCounter(
   });
 }
 /** 反制牌本体也开放反制；只返回自己是否生效，不直接改写上层的控制句柄。 */
-export async function resolveCounter(
-  ctx: Context,
-  use: UsePlanView,
-  book: CardBook,
-): Promise<CounterOutcome> {
+export async function resolveCounter(ctx: Context, use: UsePlanView): Promise<CounterOutcome> {
   if (use.timing.kind !== 'counter')
     throw new Error('Counter card requires an active opportunity.');
   const opportunity = use.timing.opportunity;
-  const reply = await contestCounter(ctx, book, {
+  const reply = await contestCounter(ctx, {
     depth: opportunity.depth + 1,
     subject: { kind: 'use', use: useReference(use) },
     root: opportunity.root,
@@ -150,7 +142,6 @@ export async function resolveCounter(
 }
 export function installCounterspells(
   room: Room,
-  book: CardBook,
   names: readonly string[] = ['standard:nullification'],
 ): () => void {
   const counterNames = immutable(names);
@@ -160,12 +151,12 @@ export function installCounterspells(
     group: 'counter',
     eligible: (ctx, { effect, use, available }) =>
       available(ctx) &&
-      book.definition(effect.card.name).counterable === true &&
+      cardDef(ctx, effect.card.name).counterable === true &&
       counterNames.some((name) => !effect.prohibitedCounters?.includes(name)) &&
-      (!book.definition(effect.card.name).delayed || use.stage === 'delayed'),
+      (!cardDef(ctx, effect.card.name).delayed || use.stage === 'delayed'),
     async run(ctx, { effect, available }) {
       const root = effectReference(effect);
-      const result = await contestCounter(ctx, book, {
+      const result = await contestCounter(ctx, {
         subject: { kind: 'effect', effect: root },
         root,
         names: counterNames,

@@ -1,4 +1,6 @@
-import { rulesOf } from '../skills/skills';
+import { face } from './face';
+import { canDiscard } from './discard';
+import { cardDef } from '../skills/skills';
 import { JointSelection } from '../../core/decisions/selection';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
@@ -29,7 +31,6 @@ export type ChosenOwnedCard =
 
 /** 隐藏手牌只给本次选择的 opaque 选项；公开区显示牌名，最终再次验证持有区域。 */
 export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise<ChosenOwnedCard> {
-  const book = rulesOf(ctx);
   return ctx.flow('chooseOwnedCard', async (child) => {
     const input = immutable(request);
     if (
@@ -86,7 +87,7 @@ export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise
             .filter(
               (item) =>
                 !input.discard ||
-                book.canDiscard(child, {
+                canDiscard(child, {
                   actor: input.actor,
                   owner: input.target,
                   card: item.card,
@@ -98,12 +99,12 @@ export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise
       cards: () =>
         available().map((item, i) => {
           const zone = child.world.zone(item.from);
-          const card = visible(item.from) ? (item.delayed ?? book.face(child, item.card)) : null;
+          const card = visible(item.from) ? (item.delayed ?? face(child, item.card)) : null;
           return {
             id: item.id,
             label: !card
               ? `${zone.kind === 'hand' ? '未知手牌' : '未知牌'} ${i + 1}`
-              : `${book.definition(card.name).label} · ${card.suit} ${card.rank}`,
+              : `${cardDef(ctx, card.name).label} · ${card.suit} ${card.rank}`,
           };
         }),
       cardCount: { min: 1, max: 1 },
@@ -118,7 +119,7 @@ export function chooseOwnedCard(ctx: Context, request: OwnedCardChoice): Promise
         reason: input.reason,
         target: input.target,
         ownedCards: available().map((item) => {
-          const card = visible(item.from) ? (item.delayed ?? book.face(child, item.card)) : null;
+          const card = visible(item.from) ? (item.delayed ?? face(child, item.card)) : null;
           return {
             id: item.id,
             area: child.world.zone(item.from).kind,

@@ -230,6 +230,22 @@ class TargetEffect implements CardEffect {
     });
   }
 }
+export interface UsePlanInit {
+  readonly id: string;
+  readonly actor: string;
+  readonly card: SemanticCard;
+  readonly processing: string;
+  readonly timing: UseTiming;
+  readonly targets: readonly string[];
+  readonly ctx: Context;
+  readonly lifetime: Lifetime;
+  /** 追加/转移目标的合法性；原目标的合法性已由用牌验证。 */
+  readonly accepts: (ctx: Context, target: string, options?: TargetOptions) => boolean;
+  readonly stage?: 'use' | 'delayed';
+  readonly effectPrefix?: string;
+  readonly parameters?: unknown;
+  readonly prohibitedCounters?: readonly string[];
+}
 /** 宣告改写通过 Change 提交，能与费用合并；封口效果不能改写。 */
 export class UsePlan implements UsePlanView {
   #handles = new Map<string, TargetEffect>();
@@ -237,25 +253,33 @@ export class UsePlan implements UsePlanView {
   #open = true;
   #outcome: unknown = null;
   #retained: UseDeclaration;
-  constructor(
-    readonly id: string,
-    readonly actor: string,
-    readonly card: SemanticCard,
-    readonly processing: string,
-    readonly timing: UseTiming,
-    targets: readonly string[],
-    private readonly ctx: Context,
-    private readonly lifetime: Lifetime,
-    private readonly acceptsTarget: (
-      ctx: Context,
-      target: string,
-      options?: TargetOptions,
-    ) => boolean,
-    readonly stage: 'use' | 'delayed' = 'use',
-    private readonly effectPrefix: string = id,
-    readonly parameters: unknown = null,
-    readonly prohibitedCounters: readonly string[] = [],
-  ) {
+  readonly id: string;
+  readonly actor: string;
+  readonly card: SemanticCard;
+  readonly processing: string;
+  readonly timing: UseTiming;
+  readonly stage: 'use' | 'delayed';
+  readonly parameters: unknown;
+  readonly prohibitedCounters: readonly string[];
+  private readonly ctx: Context;
+  private readonly lifetime: Lifetime;
+  private readonly acceptsTarget: UsePlanInit['accepts'];
+  private readonly effectPrefix: string;
+  constructor(init: UsePlanInit) {
+    const { id, actor, targets, ctx } = init;
+    const effectPrefix = init.effectPrefix ?? id;
+    this.id = id;
+    this.actor = actor;
+    this.card = init.card;
+    this.processing = init.processing;
+    this.timing = init.timing;
+    this.stage = init.stage ?? 'use';
+    this.parameters = init.parameters ?? null;
+    this.prohibitedCounters = init.prohibitedCounters ?? [];
+    this.ctx = ctx;
+    this.lifetime = init.lifetime;
+    this.acceptsTarget = init.accepts;
+    this.effectPrefix = effectPrefix;
     const actionOrder = ctx.actionOrder(actor);
     const orderedTargets = [...targets].sort(
       (a, b) => actionOrder.indexOf(a) - actionOrder.indexOf(b),

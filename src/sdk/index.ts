@@ -45,6 +45,8 @@ export {
   skillLost,
   blockSkill,
   rulesOf,
+  queryRule,
+  cardDef,
 } from '../rules/skills/skills';
 export type {
   SkillDefinition,
@@ -70,10 +72,7 @@ export {
   HE,
   alive,
   others,
-  face,
-  cardDef,
   cardLabel,
-  canDiscard,
   discardable,
   wounded,
   isMale,
@@ -155,7 +154,7 @@ export type {
 } from '../rules/costs/pay';
 export { moveCards, declared } from '../rules/cards/move';
 export type { MoveResult, MoveDeclaration, Declared } from '../rules/cards/move';
-export { discardCards } from '../rules/cards/discard';
+export { discardCards, canDiscard } from '../rules/cards/discard';
 export type { DiscardRequest, DiscardQuery, DiscardResult } from '../rules/cards/discard';
 export { withProcessing } from '../rules/cards/processing';
 export type { Processing, ProcessingCleanup } from '../rules/cards/processing';
@@ -187,16 +186,41 @@ export type {
 } from '../rules/combat/recover';
 export { cardActivities } from '../rules/cards/activity';
 export type { CardActivity, CardActivityPhase } from '../rules/cards/activity';
-export { CardBook } from '../rules/cards/book';
+export { face } from '../rules/cards/face';
+export {
+  defineCard,
+  buildCard,
+  physicalCard,
+  parseCardChoice,
+  cardOffers,
+  hasCardOffers,
+} from '../rules/cards/card';
+export type { CardOffer } from '../rules/cards/card';
+export {
+  useCard,
+  validateUse,
+  inspectUse,
+  useSelection,
+  askUse,
+  resolveDelayed,
+  Use,
+  Target,
+  Resolve,
+} from '../rules/cards/use';
+export type { UseResult, UseOfferRequest, AskedUseResult, UseFeedback } from '../rules/cards/use';
+export {
+  distance,
+  withinDistance,
+  attackRange,
+  handLimit,
+  responseTimes,
+  isTargetProhibited,
+  isResponseProhibited,
+  targetCount,
+} from '../rules/cards/rule';
+export { respond, useResponse } from '../rules/cards/response';
+export type { ResponseResult } from '../rules/cards/response';
 export type { CardResponse, ResponseSubject } from '../rules/cards/played';
-export type {
-  UseResult,
-  ResponseResult,
-  CardOffer,
-  UseOfferRequest,
-  AskedUseResult,
-  UseFeedback,
-} from '../rules/cards/book';
 export {
   ownedCards,
   victimOf,
@@ -228,7 +252,6 @@ export type {
   EffectRef,
   ResponseBlock,
   UseSnapshot,
-  CardPolicy,
   CounterOpportunity,
   CounterSubject,
   CardUseRef,
@@ -346,9 +369,6 @@ export { Chain } from '../rules/combat/chain';
 export { Shield } from '../rules/combat/shield';
 export { Attack } from '../rules/combat/attack';
 export { Hp } from '../rules/combat/recover';
-export { Use } from '../rules/cards/book';
-export { Target } from '../rules/cards/book';
-export { Resolve } from '../rules/cards/book';
 export { Counter } from '../rules/cards/counter';
 export { Judgment } from '../rules/cards/judge';
 export { Phase } from '../rules/turn/turn';

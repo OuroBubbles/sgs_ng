@@ -10,6 +10,9 @@ import {
   moveCards,
   withLifetime,
   Use,
+  useCard,
+  useSelection,
+  validateUse,
 } from '../../src/sdk';
 import type { CardOffer, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -51,7 +54,7 @@ function killPlayer(game: Game, target: string) {
 it('同一草稿提交持械者与出杀目标；锦囊只结算持械者，随后完整使用杀', async () => {
   const game = create(1);
   const running = game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => playPhase(at, phase, game.book)),
+    runPhase(ctx, 'a', 'play', (at, phase) => playPhase(at, phase)),
   );
   const request = await nextRequest(game.room);
   expect(request).toMatchObject({
@@ -92,7 +95,7 @@ it('取消附属选择不支付、不开放反制，且没有遗留处理区', a
   const game = create();
   const running = game.room.run('selection', async (ctx) => {
     const { actor, choice, timing } = intent();
-    return ctx.ask(game.book.useSelection(ctx, { actor, choice, timing }));
+    return ctx.ask(useSelection(ctx, { actor, choice, timing }));
   });
   const request = await nextRequest(game.room);
   expect(game.room.decisions.cancel(request.id, request.token).kind).toBe('accepted');
@@ -134,10 +137,13 @@ it('受害者可以是借刀者；禁止锦囊指定受害者不冒充禁止指�
   const game = cardGame({
     hands: { a: [card('borrow', 'collateral')], b: [card('slash', 'slash')] },
     equipment: { b: [card('weapon', 'crossbow')] },
-    policy: {
-      prohibitTarget: (_ctx, _actor, target, face) =>
-        face.name === 'standard:collateral' && target === 'a',
-    },
+    rules: [
+      modify(
+        cardQueries.prohibitTarget,
+        (_ctx, { input: { target, card: face } }) =>
+          face.name === 'standard:collateral' && target === 'a',
+      ),
+    ],
   });
   const running = use(game, intent({ victim: 'a' }));
   await answer(game, { kind: 'physical', card: 'slash' }, 'use-card');
@@ -148,15 +154,19 @@ it('受害者可以是借刀者；禁止锦囊指定受害者不冒充禁止指�
 
 it('没有任何合法杀目标或持武器者被禁止时，借刀不可用', async () => {
   for (const prohibitTarget of [
-    (_ctx: unknown, _from: string, _to: string, face: { name: string }) =>
-      face.name === 'standard:slash',
-    (_ctx: unknown, _from: string, to: string, face: { name: string }) =>
-      face.name === 'standard:collateral' && to === 'b',
+    modify(
+      cardQueries.prohibitTarget,
+      (_ctx, { input: { card } }) => card.name === 'standard:slash',
+    ),
+    modify(
+      cardQueries.prohibitTarget,
+      (_ctx, { input: { target, card } }) => card.name === 'standard:collateral' && target === 'b',
+    ),
   ]) {
     const game = cardGame({
       hands: { a: [card('borrow', 'collateral')] },
       equipment: { b: [card('weapon', 'crossbow')] },
-      policy: { prohibitTarget },
+      rules: [prohibitTarget],
     });
     expect(await use(game, intent())).toMatchObject({
       value: { kind: 'unavailable' },
@@ -220,11 +230,12 @@ it('借刀额外用杀不受出牌阶段限次影响，也不消耗新的阶段�
         targets: ['c'],
         timing: { kind: 'play', owner: 'b', phase },
       } as const;
-      await game.book.use(at, play);
-      await game.book.use(at, intent());
-      expect(
-        game.book.validateUse(at, { ...play, choice: { kind: 'physical', card: 's2' } }),
-      ).toMatchObject({ ok: false, reason: 'Usage limit reached.' });
+      await useCard(at, play);
+      await useCard(at, intent());
+      expect(validateUse(at, { ...play, choice: { kind: 'physical', card: 's2' } })).toMatchObject({
+        ok: false,
+        reason: 'Usage limit reached.',
+      });
     }),
   );
   await answer(game, { kind: 'physical', card: 's1' }, 'use-card');
@@ -242,7 +253,7 @@ it.each([false, true])('拒绝用杀时只取结算当前的武器：替换 %s',
     owner: null,
     eligible: (_ctx, use) => use.card.name === 'standard:collateral',
     async run(ctx) {
-      if (replace) await equip(ctx, game.book, { card: 'new', owner: 'b', from: 'b:hand' });
+      if (replace) await equip(ctx, { card: 'new', owner: 'b', from: 'b:hand' });
       else
         await moveCards(
           ctx,
@@ -282,7 +293,7 @@ it('无懈只反制持武器者上的借刀效果，不向附属目标再开一�
     hands: { a: [card('borrow', 'collateral')], c: [card('n', 'nullification')] },
     equipment: { b: [card('weapon', 'crossbow')] },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const running = use(game, intent());
   await answer(game, { kind: 'physical', card: 'n' }, 'use-card');
   const result = await running;
@@ -336,14 +347,14 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
       mode === 'additional'
         ? game.room.run('use', (ctx) => {
             const { actor, choice, timing } = intent();
-            const selection = game.book.useSelection(ctx, { actor, choice, timing });
+            const selection = useSelection(ctx, { actor, choice, timing });
             const selected = selection.validate({ cards: [], targets: ['b', 'd', 'c'] });
             expect(selected).toEqual({
               ok: true,
               value: { targets: ['b', 'd'], parameters: { victim: 'c' } },
             });
             if (!selected.ok) throw new Error(selected.reason);
-            return game.book.use(ctx, { actor, choice, timing, ...selected.value });
+            return useCard(ctx, { actor, choice, timing, ...selected.value });
           })
         : use(game, intent());
     await answer(game, { kind: 'physical', card: mode === 'replace' ? 'd0' : 'b0' }, 'use-card');

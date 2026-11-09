@@ -23,6 +23,7 @@ import {
   Judgment,
   Damage,
   Cost,
+  useCard,
 } from '../../src/sdk';
 import type { Context, PhaseView } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
@@ -188,13 +189,11 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
     eligible: (_ctx, paid) => paid.skill === 'standard:luoyi' && !nested,
     async run(ctx) {
       nested = true;
-      expect(game.book.effects.instances(ctx.world, luoyiAftereffect)).toHaveLength(1);
+      expect(game.skills.effects.instances(ctx.world, luoyiAftereffect)).toHaveLength(1);
       await draw(ctx, { player: 'a', count: 2, reason: 'draw-phase' });
     },
   });
-  const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', { phases: ['draw'] }),
-  );
+  const running = game.room.run('turn', (ctx) => runTurn(ctx, 'a', { phases: ['draw'] }));
   await answer(game, true);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['one', 'two', 'three']);
@@ -203,7 +202,7 @@ it('裸衣只减少显式阶段摸牌，内嵌同原因摸牌不继承阶段；�
     { count: 2, input: { count: 2 } },
     { count: 1, input: { phase: { kind: 'draw' } } },
   ]);
-  expect(game.book.effects.instances(game.room.world, luoyiAftereffect)).toHaveLength(0);
+  expect(game.skills.effects.instances(game.room.world, luoyiAftereffect)).toHaveLength(0);
   expect(JSON.stringify(results)).not.toContain('lifetime');
   settled(game);
 });
@@ -217,9 +216,9 @@ it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失�
   });
   await grant(game, 'standard:luoyi');
   const body = async (ctx: Context, phase: PhaseView) => {
-    if (phase.kind === 'draw') return defaultPhaseBody(ctx, phase, game.book);
+    if (phase.kind === 'draw') return defaultPhaseBody(ctx, phase);
     await game.skills.revoke(ctx, 'a', 'standard:luoyi', source);
-    await game.book.use(ctx, {
+    await useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 's1' },
       targets: ['b'],
@@ -228,7 +227,7 @@ it('裸衣少摸后杀增伤，失去技能仍增伤，回合结束自动消失�
     await damage(ctx, { from: 'a', to: 'c', amount: 1, nature: 'normal' });
   };
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', { phases: ['draw', 'play'], body }),
+    runTurn(ctx, 'a', { phases: ['draw', 'play'], body }),
   );
   await answer(game, true);
   await running;
@@ -253,11 +252,11 @@ it('决斗目标打回伤害仍是实际来源，但不是其本人使用的决�
   });
   await grant(game, 'standard:luoyi');
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['draw', 'play'],
       body: async (at, phase) => {
-        if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
-        await game.book.use(at, {
+        if (phase.kind === 'draw') return defaultPhaseBody(at, phase);
+        await useCard(at, {
           actor: 'b',
           choice: { kind: 'physical', card: 'duel' },
           targets: ['a'],
@@ -290,12 +289,12 @@ it.each(['physical', 'generated'] as const)(
     });
     await grant(game, 'standard:luoyi');
     const running = game.room.run('turn', (ctx) =>
-      runTurn(ctx, game.book, 'a', {
+      runTurn(ctx, 'a', {
         phases: ['draw', 'play'],
         async body(at, phase) {
-          if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
+          if (phase.kind === 'draw') return defaultPhaseBody(at, phase);
           await game.skills.revoke(at, 'a', 'standard:luoyi', source);
-          await game.book.use(at, {
+          await useCard(at, {
             actor: 'a',
             choice:
               kind === 'physical'
@@ -340,23 +339,23 @@ it('嵌套回合暂停外层裸衣，重复摸牌不叠加；开窗后撤销状�
     owner: null,
     eligible: () => suppress,
     async run(ctx) {
-      for (const bonus of game.book.effects.instances(ctx.world, luoyiAftereffect))
-        await game.book.effects.end(ctx, bonus.id, 'test:bonus-cancelled');
+      for (const bonus of game.skills.effects.instances(ctx.world, luoyiAftereffect))
+        await game.skills.effects.end(ctx, bonus.id, 'test:bonus-cancelled');
     },
   });
   const slash = (ctx: Context, id: string, target = 'b') =>
-    game.book.use(ctx, {
+    useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: id },
       targets: [target],
       timing: { kind: 'effect' },
     });
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['draw', 'draw', 'play'],
       body: async (at, phase) => {
-        if (phase.kind === 'draw') return defaultPhaseBody(at, phase, game.book);
-        await runTurn(at, game.book, 'c', {
+        if (phase.kind === 'draw') return defaultPhaseBody(at, phase);
+        await runTurn(at, 'c', {
           phases: ['play'],
           body: async (child) => {
             await slash(child, 'nested');
@@ -386,9 +385,9 @@ it('拒绝裸衣保留两张摸牌；零摸牌不询问，独立阶段不虚构�
     });
     await grant(game, 'standard:luoyi');
     const running = game.room.run('turn', async (ctx) => {
-      if (branch === 'standalone') await runPhase(ctx, game.book, 'a', 'draw');
+      if (branch === 'standalone') await runPhase(ctx, 'a', 'draw');
       else
-        await runTurn(ctx, game.book, 'a', {
+        await runTurn(ctx, 'a', {
           phases: ['draw'],
           body:
             branch === 'zero'
@@ -421,7 +420,7 @@ it('洛神连续黑牌归手、红牌弃置，不发摸牌窗口；一次宣告�
       drawn++;
     },
   });
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   const continuation = await nextRequest(game.room);
   expect(continuation.data).toMatchObject({
@@ -451,7 +450,7 @@ it('洛神可主动停止或完全拒绝，空牌堆也会正常结束', async (
       draw: branch === 'empty' ? [] : [card('first', 'slash'), card('second', 'jink')],
     });
     await grant(game, 'standard:luoshen');
-    const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+    const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
     await answer(game, branch !== 'decline');
     if (branch === 'stop') await answer(game, false);
     await running;
@@ -476,7 +475,7 @@ it.each([true, false])('洛神按最终改判颜色取牌，不沿用首次公�
       await judgment.replace(ctx, { card: 'replacement', from: 'c:hand', reason: 'test' });
     },
   });
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   if (black) await answer(game, false);
   await running;
@@ -506,7 +505,7 @@ it('洛神判定后已被别人取走的黑牌不会抢回；失去技能也不�
       await game.skills.revoke(ctx, 'a', 'standard:luoshen', source);
     },
   });
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   await answer(game, true);
   await answer(game, true);
@@ -535,7 +534,7 @@ it('洛神回调只处理自己的判定，嵌套同原因判定不被错误取�
       await judge(ctx, { player: 'a', reason: 'standard:luoshen', match: () => true });
     },
   });
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   await answer(game, false);
   await running;
@@ -564,7 +563,7 @@ it('判定后目标死亡时，洛神不取得牌也不再询问', async () => {
       });
     },
   });
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   await running;
   expect(game.room.world.player('a').alive).toBe(false);
@@ -610,7 +609,7 @@ it('倾国可用黑色手牌响应闪，拒绝红牌、装备和他人的牌，�
   settled(game);
 });
 
-it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得最终 CardBook', () => {
+it('技能目录在装配期原子注册，挂接后禁止追加；工厂取得最终目录', () => {
   const definition = defineSkill({ id: 'test:one', name: '甲', triggers: [] });
   const skills = new SkillBook([definition]);
   const other = defineSkill({ id: 'test:other', name: '乙', triggers: [] });
@@ -638,14 +637,14 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
     if (branch === 'wrong-owner') {
       await expect(
         game.room.run('phase', (ctx) =>
-          runPhase(ctx, game.book, 'a', 'draw', async (at, phase) => {
+          runPhase(ctx, 'a', 'draw', async (at, phase) => {
             await draw(at, { player: 'b', count: 1, reason: 'test', phase });
           }),
         ),
       ).rejects.toThrow(/does not belong/);
     } else if (branch === 'closed') {
       await game.room.run('phase', (ctx) =>
-        runPhase(ctx, game.book, 'a', 'draw', (_at, phase) => {
+        runPhase(ctx, 'a', 'draw', (_at, phase) => {
           saved = phase;
         }),
       );
@@ -657,7 +656,7 @@ it.each(['wrong-owner', 'closed', 'foreign-world'] as const)(
     } else {
       const other = cardGame();
       await game.room.run('phase', (ctx) =>
-        runPhase(ctx, game.book, 'a', 'draw', async (_at, phase) => {
+        runPhase(ctx, 'a', 'draw', async (_at, phase) => {
           await expect(
             other.room.run('foreign', (at) =>
               draw(at, { player: 'a', count: 1, reason: 'test', phase }),

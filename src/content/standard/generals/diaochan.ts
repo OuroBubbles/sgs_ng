@@ -1,3 +1,4 @@
+import type { ActiveInput, Context, JointChoice, UseIntent } from '../../../sdk';
 import {
   action,
   alive,
@@ -8,13 +9,13 @@ import {
   isGameOver,
   isMale,
   ownedCards,
-  rulesOf,
   selection,
   skill,
   on,
   Phase,
+  useCard,
+  validateUse,
 } from '../../../sdk';
-import type { ActiveInput, Context, JointChoice, UseIntent } from '../../../sdk';
 
 const duel = (from: string, to: string): UseIntent => ({
   actor: from,
@@ -33,7 +34,7 @@ const duel = (from: string, to: string): UseIntent => ({
 function pairs(ctx: Context, { self, phase }: ActiveInput) {
   const cards = () =>
     ownedCards(ctx.world, self.owner, HE).filter((card) =>
-      canDiscard(ctx, self.owner, card, self.skill),
+      canDiscard(ctx, { actor: self.owner, card, reason: self.skill }),
     );
   const targets = () =>
     alive(ctx, self.owner) && !phase.turn?.ended && !isGameOver(ctx.world)
@@ -42,7 +43,7 @@ function pairs(ctx: Context, { self, phase }: ActiveInput) {
           .map((p) => p.id)
       : [];
   const valid = (first: string, second: string) =>
-    first !== second && rulesOf(ctx).validateUse(ctx, duel(second, first)).ok;
+    first !== second && validateUse(ctx, duel(second, first)).ok;
   const canComplete = ({ targets: [first, second] }: JointChoice) =>
     cards().length > 0 &&
     (first === undefined ? targets() : [first]).some((a) =>
@@ -71,7 +72,7 @@ export const lijian = skill(
     selection: pairs,
     cards: { count: 1, areas: HE },
     pay: 'discard',
-    effect: (ctx, { targets: [first, second] }) => rulesOf(ctx).use(ctx, duel(second!, first!)),
+    effect: (ctx, { targets: [first, second] }) => useCard(ctx, duel(second!, first!)),
   }),
   {
     ai: {

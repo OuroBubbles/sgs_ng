@@ -1,10 +1,12 @@
+import { resolveDelayed } from './use';
+import { cardDef } from '../skills/skills';
+import { isTargetProhibited } from './rule';
 import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import type { PhaseView } from '../turn/turn';
 import { defineState, stateChange } from '../state/state';
 import { isGameOver } from '../game/end';
-import type { CardBook } from './book';
 import type {
   CardDefinition,
   CardEffect,
@@ -41,7 +43,6 @@ export const Delayed = defineEvent('delayed', {
 /** 判定阶段的具名输入；正常生效保留可操作效果，取消后效使用已封口快照。 */
 export interface DelayedInput<Effect extends EffectRef = CardEffect> {
   readonly effect: Effect;
-  readonly book: CardBook;
   readonly phase: PhaseView;
 }
 export interface DelayedRules {
@@ -87,33 +88,26 @@ export function delayedCards(
     });
 }
 
-export function canPlaceDelayed(
-  ctx: Context,
-  book: CardBook,
-  source: CardUseRef,
-  owner: string,
-): boolean {
+export function canPlaceDelayed(ctx: Context, source: CardUseRef, owner: string): boolean {
   return ctx.query(
     () =>
       ctx.world.player(owner).alive &&
       !isGameOver(ctx.world) &&
-      !book.isTargetProhibited(ctx, source.actor, owner, source.card) &&
+      !isTargetProhibited(ctx, source.actor, owner, source.card) &&
       !delayedCards(ctx.world, owner).some((entry) => entry.source.card.name === source.card.name),
   );
 }
 
 export function placeDelayed(
   ctx: Context,
-  book: CardBook,
   source: CardUseRef,
   owner: string,
 ): Promise<'placed' | 'unavailable'> {
   const input = immutable(source);
   return ctx.flow('delayed.place', async (child) => {
-    if (!book.definition(input.card.name).delayed)
-      throw new Error('Card has no delayed definition.');
+    if (!cardDef(ctx, input.card.name).delayed) throw new Error('Card has no delayed definition.');
     if (
-      !canPlaceDelayed(child, book, input, owner) ||
+      !canPlaceDelayed(child, input, owner) ||
       input.card.materials.some((id) => child.world.position(id) !== input.processing)
     )
       return 'unavailable';
@@ -208,25 +202,21 @@ export function delayedCard(
         ),
       canUse: (_ctx, { request }) =>
         request.targets.length === 1 ? null : 'Delayed card requires a target.',
-      async resolve(ctx, { effect, book }) {
-        await placeDelayed(ctx, book, source(effect), effect.target);
+      async resolve(ctx, { effect }) {
+        await placeDelayed(ctx, source(effect), effect.target);
       },
     },
   };
 }
 
 /** 判定阶段只处理开始时已有的实例，后置者先结算；移入的新实例留待下次判定阶段。 */
-export async function resolveJudgmentPhase(
-  ctx: Context,
-  phase: PhaseView,
-  book: CardBook,
-): Promise<void> {
+export async function resolveJudgmentPhase(ctx: Context, phase: PhaseView): Promise<void> {
   const pending = [...delayedCards(ctx.world, phase.owner)].reverse();
   for (const snapshot of pending) {
     if (!ctx.world.player(phase.owner).alive || phase.turn?.ended || isGameOver(ctx.world)) break;
     const entry = delayedCards(ctx.world, phase.owner).find((entry) => entry.id === snapshot.id);
     if (!entry) continue;
-    const rules = book.definition(entry.source.card.name).delayed;
+    const rules = cardDef(ctx, entry.source.card.name).delayed;
     if (!rules) throw new Error('Placed card lost its delayed definition.');
     await withProcessing(ctx, [], async (at, processing) => {
       await moveCards(
@@ -243,16 +233,16 @@ export async function resolveJudgmentPhase(
         },
       );
 
-      const result = await book.resolveDelayed(
+      const result = await resolveDelayed(
         at,
         { ...entry.source, processing: processing.zone },
         phase.owner,
-        (child, { effect }) => rules.resolve(child, { effect, book, phase }),
+        (child, { effect }) => rules.resolve(child, { effect, phase }),
       );
 
       for (const effect of result.effects)
         if (effect.state === 'cancelled' && rules.cancelled)
-          await rules.cancelled(at, { effect, book, phase });
+          await rules.cancelled(at, { effect, phase });
     });
   }
 }

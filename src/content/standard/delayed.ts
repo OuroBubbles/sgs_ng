@@ -1,5 +1,5 @@
-import { delayedCard, placeDelayed, canPlaceDelayed, judge, damage, isGameOver } from '../../sdk';
 import type { CardUseRef, Context, EffectRef, DelayedInput } from '../../sdk';
+import { delayedCard, placeDelayed, canPlaceDelayed, judge, damage, isGameOver } from '../../sdk';
 
 function reference(effect: EffectRef): CardUseRef {
   return {
@@ -10,17 +10,14 @@ function reference(effect: EffectRef): CardUseRef {
   };
 }
 
-async function passLightning(
-  ctx: Context,
-  { effect, book }: DelayedInput<EffectRef>,
-): Promise<void> {
+async function passLightning(ctx: Context, { effect }: DelayedInput<EffectRef>): Promise<void> {
   const players = ctx.world.snapshot.players.map((player) => player.id);
   const index = players.indexOf(effect.target);
   const source = reference(effect);
   for (const owner of [...players.slice(index + 1), ...players.slice(0, index + 1)]) {
     if (!ctx.world.player(owner).alive) continue;
-    if (!canPlaceDelayed(ctx, book, source, owner)) continue;
-    const placed = await placeDelayed(ctx, book, source, owner);
+    if (!canPlaceDelayed(ctx, source, owner)) continue;
+    const placed = await placeDelayed(ctx, source, owner);
 
     if (placed === 'placed') return;
   }

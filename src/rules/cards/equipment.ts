@@ -1,3 +1,4 @@
+import { cardDef } from '../skills/skills';
 import type { Card, WorldReader, Zone } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
@@ -7,7 +8,6 @@ import { modify } from '../skills/query';
 import { attackRange } from './queries';
 import { moveCards, Cards, declared } from './move';
 import type { MoveResult } from './move';
-import type { CardBook } from './book';
 import type { CardDefinition, EffectRef } from './types';
 import { isGameOver } from '../game/end';
 import { defineEvent } from '../../core/runtime/event';
@@ -70,13 +70,12 @@ export function equippedCards(world: WorldReader, owner: string): readonly strin
 }
 
 export function equipmentInSlot(
-  world: WorldReader,
-  book: CardBook,
+  ctx: Pick<Context, 'world'>,
   owner: string,
   slot: EquipmentSlot,
 ): readonly string[] {
-  return equippedCards(world, owner).filter(
-    (id) => book.definition(world.card(id).name).equipment?.slot === slot,
+  return equippedCards(ctx.world, owner).filter(
+    (id) => cardDef(ctx, ctx.world.card(id).name).equipment?.slot === slot,
   );
 }
 
@@ -92,7 +91,6 @@ export type EquipResult =
 /** 替换在同一次移动中提交。后效看见新装备与旧装备离场，不存在两把同槽武器的中间态。 */
 export function equip(
   ctx: Context,
-  book: CardBook,
   input: {
     readonly card: string;
     readonly owner: string;
@@ -101,7 +99,7 @@ export function equip(
 ): Promise<EquipResult> {
   const request = immutable(input);
   return ctx.flow('equipment.equip', async (child) => {
-    const definition = book.definition(child.world.card(request.card).name).equipment;
+    const definition = cardDef(ctx, child.world.card(request.card).name).equipment;
     if (!definition) throw new Error('Card has no equipment definition.');
     if (
       !child.world.player(request.owner).alive ||
@@ -115,7 +113,7 @@ export function equip(
     if (zones.length !== 1) throw new Error('Equipment requires one owned equipment zone.');
     const destination = zones[0]!;
     if (request.from === destination.id) return { kind: 'unchanged' };
-    const replaced = equipmentInSlot(child.world, book, request.owner, definition.slot);
+    const replaced = equipmentInSlot(child, request.owner, definition.slot);
     const result = immutable({
       kind: 'equipped' as const,
       card: request.card,
@@ -175,9 +173,9 @@ export function equipmentCard(
         ctx.world.card(request.card.materials[0]!).name === id
           ? null
           : 'Equipment requires one matching physical card.',
-      async resolve(ctx, { effect, book }) {
+      async resolve(ctx, { effect }) {
         const card = effect.card.materials[0]!;
-        await equip(ctx, book, {
+        await equip(ctx, {
           card,
           owner: effect.target,
           from: effect.processing,

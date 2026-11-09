@@ -52,7 +52,7 @@ function create(name: string, counters = 2) {
     },
     skills: [ban],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   return game;
 }
 
@@ -249,7 +249,7 @@ it('普通作者 canResolve 闭包没有修改 World，也能关闭嵌套反制�
       },
     ],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   game.room.on(Counter.opening, {
     id: 'change-author-predicate',
     owner: null,
@@ -283,14 +283,12 @@ it('延时牌后续生效使用本次 resolver 的资格，不错误套回放置
     },
     definitions: [{ ...delayed, use: { ...delayed.use!, canResolve: () => placementAllowed } }],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await use(game, intent(delayed.id));
   placementAllowed = false;
   const { asked } = await drain(
     game,
-    game.room.run('judgment-phase', (ctx) =>
-      runPhase(ctx, game.book, 'b', 'judge', defaultPhaseBody),
-    ),
+    game.room.run('judgment-phase', (ctx) => runPhase(ctx, 'b', 'judge', defaultPhaseBody)),
   );
   expect(asked).toEqual(['c']);
   expect(game.room.history.facts(Counter.finished).at(-1)!.data.detail).toMatchObject({

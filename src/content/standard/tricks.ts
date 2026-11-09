@@ -1,3 +1,4 @@
+import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
 import {
   JointSelection,
   recover,
@@ -11,8 +12,10 @@ import {
   CardEvent,
   takeCard,
   obtain,
+  isTargetProhibited,
+  withinDistance,
+  cardDef,
 } from '../../sdk';
-import type { CardDefinition, Context, CardEffect, CardFixedTargetsInput } from '../../sdk';
 
 const otherLiving = (ctx: Context, { actor }: CardFixedTargetsInput) =>
   ctx.world.snapshot.players
@@ -55,8 +58,8 @@ export const trickCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       fixedTargets: otherLiving,
       target: (_ctx, { request, target }) => target !== request.actor,
-      resolve: (ctx, { effect, book }) =>
-        resolveAttack(ctx, effect, book, { name: 'standard:slash', purpose: 'response' }),
+      resolve: (ctx, { effect }) =>
+        resolveAttack(ctx, effect, { name: 'standard:slash', purpose: 'response' }),
     },
   },
   {
@@ -68,8 +71,8 @@ export const trickCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       fixedTargets: otherLiving,
       target: (_ctx, { request, target }) => target !== request.actor,
-      resolve: (ctx, { effect, book }) =>
-        resolveAttack(ctx, effect, book, { name: 'standard:jink', purpose: 'response' }),
+      resolve: (ctx, { effect }) =>
+        resolveAttack(ctx, effect, { name: 'standard:jink', purpose: 'response' }),
     },
   },
   {
@@ -107,10 +110,10 @@ export const trickCards: readonly CardDefinition[] = [
     counterable: true,
     use: {
       count: { min: 1, max: 1 },
-      target: (ctx, { request, target, book }) =>
+      target: (ctx, { request, target }) =>
         target !== request.actor &&
         hasCards(ctx, target) &&
-        book.withinDistance(ctx, request, target, 1),
+        withinDistance(ctx, request, target, 1),
       canResolve: (ctx, { effect }) =>
         ctx.world.player(effect.actor).alive && hasCards(ctx, effect.target),
       resolve: (ctx, { effect }) => takeOrDiscard(ctx, effect, true),
@@ -125,7 +128,7 @@ export const trickCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       fixedTargets: allLiving,
       target: () => true,
-      async execute(ctx, { use, book, resolveTargets }) {
+      async execute(ctx, { use, resolveTargets }) {
         await withRevealedCards(
           ctx,
           {
@@ -134,7 +137,7 @@ export const trickCards: readonly CardDefinition[] = [
               (effect) =>
                 effect.state === 'ready' &&
                 ctx.world.player(effect.target).alive &&
-                !book.isTargetProhibited(ctx, use.actor, effect.target, use.card),
+                !isTargetProhibited(ctx, use.actor, effect.target, use.card),
             ).length,
             reason: 'standard:amazing_grace',
           },
@@ -144,7 +147,7 @@ export const trickCards: readonly CardDefinition[] = [
                 cards: () =>
                   pool.remaining().map((id) => ({
                     id,
-                    label: `${book.definition(child.world.card(id).name).label} · ${child.world.card(id).suit} ${child.world.card(id).rank}`,
+                    label: `${cardDef(ctx, child.world.card(id).name).label} · ${child.world.card(id).suit} ${child.world.card(id).rank}`,
                   })),
                 cardCount: { min: 1, max: 1 },
               });

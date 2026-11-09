@@ -1,6 +1,7 @@
+import { responseTimes } from '../cards/rule';
+import { respond, useResponse } from '../cards/response';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import type { CardBook } from '../cards/book';
 import type { EffectRef, Purpose } from '../cards/types';
 import { effectReference } from '../cards/types';
 import type { ResponseResult } from '../cards/response';
@@ -46,7 +47,6 @@ const defaultDamage: AttackDamage = (ctx, effect) =>
 export async function resolveAttack(
   ctx: Context,
   target: EffectRef,
-  book: CardBook,
   response: { readonly name: string; readonly purpose: Purpose },
   deal: AttackDamage = defaultDamage,
 ): Promise<void> {
@@ -54,12 +54,12 @@ export async function resolveAttack(
   await ctx.flow('attack', async (at) => {
     const responses: Answered[] = [];
     const live = () => at.world.player(effect.target).alive && !isGameOver(at.world);
-    const count = book.responseTimes(at, effect, effect.target, response.name);
+    const count = responseTimes(at, effect, effect.target, response.name);
     let defended = count > 0;
     for (let i = 0; i < count && live(); i++) {
       const answer = await (response.purpose === 'use'
-        ? book.useResponse(at, effect.target, [response.name], effect)
-        : book.respond(at, effect.target, [response.name], effect));
+        ? useResponse(at, effect.target, [response.name], effect)
+        : respond(at, effect.target, [response.name], effect));
       if (!isResponseSatisfied(answer)) {
         defended = false;
         break;

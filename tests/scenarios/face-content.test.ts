@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
-import { judge } from '../../src/sdk';
+import { judge, useCard } from '../../src/sdk';
 import { observeAgent } from '../../src/host/agent-observation';
 import { projectMatch } from '../../src/host/projection';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -54,7 +54,7 @@ it('自然种子 2 的牌面演练：本人牌面红桃、他人印刷黑桃，�
       )!.self;
     expect(
       (
-        await match.book.use(ctx, {
+        await useCard(ctx, {
           actor: '甲席',
           choice: {
             kind: 'viewAs',

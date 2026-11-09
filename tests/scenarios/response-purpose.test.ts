@@ -10,6 +10,11 @@ import {
   Use,
   Response,
   Cost,
+  cardQueries,
+  modify,
+  cardOffers,
+  useCard,
+  validateUse,
 } from '../../src/sdk';
 import type { UseTiming } from '../../src/sdk';
 import { standardGeneralSkills } from '../fixtures/standard';
@@ -27,11 +32,17 @@ const attack = (name = 'slash') => ({
 function create(name = 'slash', prohibitResponse = false, prohibitUse = false) {
   return cardGame({
     hands: { a: [card('attack', name)], b: [card('dodge', 'jink')] },
-    policy: {
-      prohibitResponse: (_ctx, _actor, semantic) =>
-        prohibitResponse && semantic.name === 'standard:jink',
-      prohibitUse: (_ctx, _actor, semantic) => prohibitUse && semantic.name === 'standard:jink',
-    },
+    rules: [
+      modify(
+        cardQueries.prohibitResponse,
+        (_ctx, { input: { card: semantic } }) =>
+          prohibitResponse && semantic.name === 'standard:jink',
+      ),
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { card: semantic } }) => prohibitUse && semantic.name === 'standard:jink',
+      ),
+    ],
   });
 }
 async function dodge(game: ReturnType<typeof create>, running: Promise<unknown>) {
@@ -96,7 +107,12 @@ it('禁止使用闪时杀无法被本人闪抵消，实体与未开启的八卦�
     hands: { a: [card('attack', 'slash')], b: [card('dodge', 'jink')] },
     equipment: { b: [card('armor', 'eight_diagram')] },
     draw: [card('red', 'peach', 'heart')],
-    policy: { prohibitUse: (_ctx, _actor, semantic) => semantic.name === 'standard:jink' },
+    rules: [
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { card: semantic } }) => semantic.name === 'standard:jink',
+      ),
+    ],
   });
   await use(game, attack());
   expect(game.room.world.player('b').hp).toBe(3);
@@ -110,7 +126,7 @@ it('禁止打出闪时万箭齐发未获得响应，普通闪与八卦均不绕�
     hands: { a: [card('attack', 'archery_attack')], b: [card('dodge', 'jink')] },
     equipment: { b: [card('armor', 'eight_diagram')] },
     draw: [card('red', 'peach', 'heart')],
-    policy: { prohibitResponse: () => true },
+    rules: [modify(cardQueries.prohibitResponse, () => true)],
   });
   await use(game, attack('archery_attack'));
   expect(game.room.world.player('b').hp).toBe(3);
@@ -126,7 +142,7 @@ it.each(['effect', 'play'] as const)(
       if (kind === 'effect') {
         expect(
           (
-            await game.book.use(ctx, {
+            await useCard(ctx, {
               actor: 'b',
               choice: { kind: 'physical', card: 'dodge' },
               targets: [],
@@ -135,10 +151,10 @@ it.each(['effect', 'play'] as const)(
           ).kind,
         ).toBe('unavailable');
       } else {
-        await runPhase(ctx, game.book, 'b', 'play', async (at, phase) => {
+        await runPhase(ctx, 'b', 'play', async (at, phase) => {
           expect(
             (
-              await game.book.use(at, {
+              await useCard(at, {
                 actor: 'b',
                 choice: { kind: 'physical', card: 'dodge' },
                 targets: [],
@@ -164,7 +180,7 @@ it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 
     run(ctx, plan) {
       timing = plan.timing;
       expect(
-        game.book.validateUse(ctx, {
+        validateUse(ctx, {
           actor: 'c',
           choice: {
             kind: 'generated',
@@ -183,7 +199,7 @@ it('响应使用资格只属于指定角色和活跃请求，关闭后或其他 
     await room.run('stale', async (ctx) => {
       expect(
         (
-          await game.book.use(ctx, {
+          await useCard(ctx, {
             actor: 'b',
             choice: {
               kind: 'generated',
@@ -274,10 +290,10 @@ it.each(['slash', 'archery_attack'])(
 it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种活动', async () => {
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] },
-    policy: {
-      prohibitResponse: (_ctx, actor) => actor === 'b',
-      prohibitUse: (_ctx, actor) => actor === 'c',
-    },
+    rules: [
+      modify(cardQueries.prohibitResponse, (_ctx, { input: { actor } }) => actor === 'b'),
+      modify(cardQueries.prohibitUse, (_ctx, { input: { actor } }) => actor === 'c'),
+    ],
   });
   game.room.on(Response.requested, {
     id: 'delegate',
@@ -296,7 +312,7 @@ it('委托时主公禁止打出与队友禁止使用不会误伤正确的两种�
 it('实际代打者禁止打出时委托失败，主公仍可自行使用闪', async () => {
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], b: [card('dodge', 'jink')], c: [card('other', 'jink')] },
-    policy: { prohibitResponse: (_ctx, actor) => actor === 'c' },
+    rules: [modify(cardQueries.prohibitResponse, (_ctx, { input: { actor } }) => actor === 'c')],
   });
   game.room.on(Response.requested, {
     id: 'delegate',
@@ -318,10 +334,13 @@ it.each(['prohibit', 'take', 'death'] as const)(
     let prohibited = false;
     const game = cardGame({
       hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] },
-      policy: {
-        prohibitUse: (_ctx, actor, card) =>
-          prohibited && actor === 'b' && card.name === 'standard:jink',
-      },
+      rules: [
+        modify(
+          cardQueries.prohibitUse,
+          (_ctx, { input: { actor, card } }) =>
+            prohibited && actor === 'b' && card.name === 'standard:jink',
+        ),
+      ],
     });
     game.room.on(Response.requested, {
       id: 'delegate',
@@ -399,7 +418,7 @@ it('本人取消使用闪不支付，杀正常命中且请求关闭', async () =
 it('连续两闪各有独立使用身份、完成和处理区，不合并为一次使用或打出', async () => {
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], b: [card('dodge', 'jink'), card('second', 'jink')] },
-    policy: { responseTimes: () => 2 },
+    rules: [modify(cardQueries.responseCount, () => 2)],
   });
   const running = use(game, attack());
   const first = await nextRequest(game.room);
@@ -455,7 +474,12 @@ it('主公禁止使用闪时不诱导护驾供牌或收取发动费用', async (
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] },
     skills: standardGeneralSkills,
-    policy: { prohibitUse: (_ctx, actor, card) => actor === 'b' && card.name === 'standard:jink' },
+    rules: [
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { actor, card } }) => actor === 'b' && card.name === 'standard:jink',
+      ),
+    ],
   });
   await grant(game, 'b', 'standard:hujia');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'c', '魏'));
@@ -488,8 +512,8 @@ it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不�
   });
   await grant(game, 'b', recipe.id);
   await game.room.run('timing', (ctx) =>
-    runPhase(ctx, game.book, 'b', 'play', (at, phase) => {
-      const offers = game.book.offers(at, 'b', phase.playTiming());
+    runPhase(ctx, 'b', 'play', (at, phase) => {
+      const offers = cardOffers(at, 'b', phase.playTiming());
       expect(offers).toHaveLength(1);
       expect(offers[0]!.names).toEqual(['standard:slash']);
     }),
@@ -497,7 +521,7 @@ it('出牌候选按真实时机过滤实体与多名称配方，闪和无懈不�
   await game.room.run('revoke', (ctx) =>
     game.skills.revoke(ctx, 'b', recipe.id, { kind: 'general', id: 'probe' }),
   );
-  await game.room.run('no-playable', (ctx) => runPhase(ctx, game.book, 'b', 'play'));
+  await game.room.run('no-playable', (ctx) => runPhase(ctx, 'b', 'play'));
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);
   settled(game);
 });
@@ -506,10 +530,13 @@ it('护驾已发动后主公被禁止使用闪，供牌前再次检查并保留�
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], c: [card('dodge', 'jink')] },
     skills: standardGeneralSkills,
-    policy: {
-      prohibitUse: (_ctx, actor, card) =>
-        prohibited && actor === 'b' && card.name === 'standard:jink',
-    },
+    rules: [
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { actor, card } }) =>
+          prohibited && actor === 'b' && card.name === 'standard:jink',
+      ),
+    ],
   });
   await grant(game, 'b', 'standard:hujia');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'c', '魏'));

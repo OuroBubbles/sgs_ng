@@ -1,8 +1,8 @@
+import { defineCard } from '../rules/cards/card';
 import type { Card } from '../core/model/state';
 import type { CardKind } from '../protocol';
 import { immutable } from '../core/model/value';
-import { CardBook, defineCard } from '../rules/cards/book';
-import type { CardDefinition, CardPolicy } from '../rules/cards/types';
+import type { CardDefinition } from '../rules/cards/types';
 import { GeneralBook, defineGeneral } from '../rules/characters/general';
 import type { GeneralDefinition } from '../rules/characters/general';
 import { SkillBook, defineSkill } from '../rules/skills/skills';
@@ -81,9 +81,8 @@ export interface ContentCatalog {
   readonly decks: readonly Pick<DeckDefinition, 'id' | 'label'>[];
   readonly cardViews: Readonly<Record<string, CardPresentation>>;
   readonly generalViews: Readonly<Record<string, GeneralPresentation>>;
-  /** 定义可共享；每局目录独立，工厂取得本局实际使用的 CardBook。 */
-  createBooks(policy?: Partial<CardPolicy>): {
-    readonly book: CardBook;
+  /** 定义可共享；每局目录独立，工厂取得本局实际使用的规则目录。 */
+  createBooks(): {
     readonly skills: SkillBook;
     readonly generals: GeneralBook;
   };
@@ -184,12 +183,10 @@ export function createContent(...definitions: readonly ContentDefinition[]): Con
     decks: immutable(decks.map(({ id, label }) => ({ id, label }))),
     cardViews: immutable(Object.fromEntries(cardEntries.map((view) => [view.id, view]))),
     generalViews: immutable(Object.fromEntries(generalEntries.map((view) => [view.id, view]))),
-    createBooks(policy?: Partial<CardPolicy>) {
-      const registry = new SkillBook();
-      const book = new CardBook(cards, registry, policy);
-      book.effects.register(effects);
-      registry.register(skills);
-      return { book, skills: registry, generals: new GeneralBook(generals, registry) };
+    createBooks() {
+      const registry = new SkillBook(skills, cards);
+      registry.effects.register(effects);
+      return { skills: registry, generals: new GeneralBook(generals, registry) };
     },
     createDeck(id: string) {
       const entry = decks.find((deck) => deck.id === id);

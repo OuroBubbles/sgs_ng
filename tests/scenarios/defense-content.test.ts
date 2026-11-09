@@ -2,7 +2,7 @@ import { playMatch } from '../fixtures/match';
 import { expect, it } from 'vitest';
 import { createRoleMatch } from '../../src/host/content';
 import { practiceContent } from '../../src/host/content';
-import { shieldOf } from '../../src/sdk';
+import { shieldOf, useCard } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { observeAgent } from '../../src/host/agent-observation';
 import { projectMatch } from '../../src/host/projection';
@@ -31,7 +31,7 @@ it('种子 4 自然起手凝障/缚阵/引焰，真实用牌后护盾吸收传�
       expect(ctx.world.position(id)).toBe('甲席:hand');
       expect(
         (
-          await match.book.use(ctx, {
+          await useCard(ctx, {
             actor: '甲席',
             choice: { kind: 'physical', card: id },
             targets,
@@ -72,7 +72,7 @@ it.each([false, true])('演武代受真实选择、支付、材料关联与善�
   });
   await match.prepare();
   const running = match.room.run('relay', (ctx) =>
-    match.book.use(ctx, {
+    useCard(ctx, {
       actor: '甲席',
       choice: { kind: 'physical', card: 'defense-card-19' },
       targets: ['乙席'],

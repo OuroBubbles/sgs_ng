@@ -12,6 +12,8 @@ import {
   Attack,
   Damage,
   Cost,
+  inspectUse,
+  validateUse,
 } from '../../src/sdk';
 import type { CardChoice, CardOffer, DefenseDraft, UseIntent } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -126,7 +128,7 @@ it('防御结果在全部闪满足后才开放；部分成功不会激活贯石�
       b: [card('j', 'jink')],
     },
     equipment: { a: [card('weapon', 'axe')] },
-    policy: { responseTimes: () => 2 },
+    rules: [modify(cardQueries.responseCount, () => 2)],
   });
   const running = use(game, strike());
   await answer(game, { kind: 'physical', card: 'j' }, 'card-response');
@@ -239,10 +241,10 @@ it.each([false, true])('青龙忽略变化后的距离，但仍受目标禁令�
       b: [card('j', 'jink')],
     },
     equipment: { a: [card('weapon', 'blade')] },
-    policy: {
-      distance: (_ctx, _from, _to, base) => base + (changed ? 50 : 0),
-      prohibitTarget: () => changed && prohibited,
-    },
+    rules: [
+      modify(cardQueries.distanceCorrection, () => (changed ? 50 : 0)),
+      modify(cardQueries.prohibitTarget, () => changed && prohibited),
+    ],
   });
   game.room.on(Use.finished, {
     id: 'change',
@@ -258,7 +260,7 @@ it.each([false, true])('青龙忽略变化后的距离，但仍受目标禁令�
   await running;
   expect(game.room.world.player('b').hp).toBe(prohibited ? 4 : 3);
   await game.room.run('normal', (ctx) => {
-    expect(game.book.validateUse(ctx, strike({ kind: 'physical', card: 's2' })).ok).toBe(false);
+    expect(validateUse(ctx, strike({ kind: 'physical', card: 's2' })).ok).toBe(false);
   });
 });
 
@@ -324,8 +326,8 @@ it('方天最后手牌杀的目标数量与最终验证一致，支付后不丢�
     equipment: { a: [card('weapon', 'halberd')] },
   });
   await game.room.run('preview', (ctx) => {
-    expect(game.book.inspectUse(ctx, strike()).targetCount).toEqual({ min: 1, max: 3 });
-    expect(game.book.inspectUse(ctx, strike(undefined, ['b', 'c', 'd'])).complete).toBe(true);
+    expect(inspectUse(ctx, strike()).targetCount).toEqual({ min: 1, max: 3 });
+    expect(inspectUse(ctx, strike(undefined, ['b', 'c', 'd'])).complete).toBe(true);
   });
   await use(game, strike(undefined, ['b', 'c', 'd']));
   for (const id of ['b', 'c', 'd']) expect(game.room.world.player(id).hp).toBe(3);
@@ -358,19 +360,18 @@ it('方天支持多材料用尽手牌；武器作材料或来源失效则不提�
     materials: ['x', 'y'],
   };
   await game.room.run('queries', async (ctx) => {
-    expect(game.book.inspectUse(ctx, strike(choice)).targetCount.max).toBe(3);
+    expect(inspectUse(ctx, strike(choice)).targetCount.max).toBe(3);
     expect(
-      game.book.inspectUse(ctx, strike({ ...choice, materials: ['x', 'y', 'weapon'] })).targetCount
-        .max,
+      inspectUse(ctx, strike({ ...choice, materials: ['x', 'y', 'weapon'] })).targetCount.max,
     ).toBe(1);
     const self = game.skills
       .bindings(ctx.world)
       .find(({ self }) => self.origin?.id === 'weapon')!.self;
     await withLifetime(ctx, 'block', (at, lifetime) => {
       blockSkill(at, self, lifetime);
-      expect(game.book.inspectUse(at, strike(choice)).targetCount.max).toBe(1);
+      expect(inspectUse(at, strike(choice)).targetCount.max).toBe(1);
     });
-    expect(game.book.inspectUse(ctx, strike(choice)).targetCount.max).toBe(3);
+    expect(inspectUse(ctx, strike(choice)).targetCount.max).toBe(3);
   });
   await use(game, strike(choice, ['b', 'c', 'd']));
   expect(game.room.world.player('c').hp).toBe(3);
@@ -400,10 +401,11 @@ it('额外目标查询按加法组合，不改变自动目标牌的手动选择�
       face: { name: 'standard:slash' },
       materials: ownedCards(ctx.world, 'a'),
     };
-    expect(game.book.inspectUse(ctx, strike(all)).targetCount.max).toBe(4);
-    expect(
-      game.book.inspectUse(ctx, strike({ kind: 'physical', card: 'aoe' }, [])).targetCount,
-    ).toEqual({ min: 0, max: 0 });
+    expect(inspectUse(ctx, strike(all)).targetCount.max).toBe(4);
+    expect(inspectUse(ctx, strike({ kind: 'physical', card: 'aoe' }, [])).targetCount).toEqual({
+      min: 0,
+      max: 0,
+    });
   });
 });
 

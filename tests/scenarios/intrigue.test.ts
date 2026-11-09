@@ -39,6 +39,9 @@ import {
   Damage,
   Cost,
   Phase,
+  distance,
+  respond,
+  validateUse,
 } from '../../src/sdk';
 import type { CardEffect, Context, PhaseView, UseIntent, CardDefinition } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
@@ -56,10 +59,10 @@ const physical = (id: string, actor = 'a', targets = ['b']): UseIntent => ({
   timing: { kind: 'effect' },
 });
 const samples = () => Array.from({ length: 8 }, (_, i) => card('draw' + i, 'peach', 'heart'));
-async function activateSkill(ctx: Context, game: Game, phase: PhaseView, name: string) {
-  const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === 'standard:' + name);
+async function activateSkill(ctx: Context, phase: PhaseView, name: string) {
+  const offer = activeOffers(ctx, phase).find((o) => o.skill === 'standard:' + name);
   expect(offer).toBeDefined();
-  await activate(ctx, game.book, phase, {
+  await activate(ctx, phase, {
     instance: offer!.choice.instance,
     action: offer!.choice.action,
   });
@@ -70,8 +73,8 @@ const playSkill = (
   after?: (ctx: Context, phase: PhaseView) => void | Promise<void>,
 ) =>
   game.room.run('play', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await activateSkill(at, game, phase, name);
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await activateSkill(at, phase, name);
       await after?.(at, phase);
     }),
   );
@@ -171,10 +174,10 @@ it('马术只修正来源到其他人的距离，与坐骑叠加且不重复授�
   await grant(game, 'standard:mashu');
   await grant(game, 'standard:mashu');
   await game.room.run('inspect', (ctx) => {
-    expect(game.book.distance(ctx, 'a', 'c')).toBe(1);
-    expect(game.book.distance(ctx, 'c', 'a')).toBe(2);
-    expect(game.book.distance(ctx, 'a', 'a')).toBe(0);
-    expect(game.book.distance(ctx, 'a', 'b')).toBe(1);
+    expect(distance(ctx, 'a', 'c')).toBe(1);
+    expect(distance(ctx, 'c', 'a')).toBe(2);
+    expect(distance(ctx, 'a', 'a')).toBe(0);
+    expect(distance(ctx, 'a', 'b')).toBe(1);
   });
   settled(game);
 });
@@ -228,7 +231,7 @@ it('铁骑分别判定多目标，红色禁响应优先于无双的最低次数'
       c: [card('c1', 'jink'), card('c2', 'jink')],
     },
     draw: [card('red', 'peach', 'heart'), card('black', 'peach')],
-    policy: { attackRange: () => 3 },
+    rules: [modify(cardQueries.attackRange, () => 3)],
   });
   await grant(game, 'standard:tieqi');
   await grant(game, 'standard:wushuang');
@@ -297,7 +300,7 @@ it('效果禁响应连直接 respond 也不可绕过，八卦/护驾窗口均不
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'author:block');
-      expect(await game.book.respond(ctx, 'b', ['standard:jink'], effect)).toMatchObject({
+      expect(await respond(ctx, 'b', ['standard:jink'], effect)).toMatchObject({
         kind: 'unavailable',
       });
     },
@@ -334,7 +337,7 @@ it('响应禁令拒绝纯查询和封口后修改，快照保留原因', async (
 it.each([true, false])('英姿接受=%s，只修改这次阶段摸牌', async (accepted) => {
   const game = generalGame({ draw: samples() });
   await grant(game, 'standard:yingzi');
-  const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
+  const running = game.room.run('draw', (ctx) => runPhase(ctx, 'a', 'draw'));
   await answer(game, accepted);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(accepted ? 3 : 2);
@@ -344,7 +347,7 @@ it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
   const game = generalGame({ draw: samples() });
   await grant(game, 'standard:yingzi');
   await game.room.run('draw', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'draw', async (at) => {
+    runPhase(ctx, 'a', 'draw', async (at) => {
       await draw(at, { player: 'a', count: 1, reason: 'author:nested' });
     }),
   );
@@ -355,7 +358,7 @@ it('英姿不把阶段中的普通技能摸牌当作阶段摸牌', async () => {
 it.each([true, false])('闭月接受=%s，结束阶段正常收束', async (accepted) => {
   const game = generalGame({ draw: samples() });
   await grant(game, 'standard:biyue');
-  const running = game.room.run('finish', (ctx) => runPhase(ctx, game.book, 'a', 'finish'));
+  const running = game.room.run('finish', (ctx) => runPhase(ctx, 'a', 'finish'));
   await answer(game, accepted);
   await running;
   expect(ownedCards(game.room.world, 'a')).toHaveLength(accepted ? 1 : 0);
@@ -383,7 +386,7 @@ it('跳过结束阶段不发动闭月，已接受后失去技能仍摸牌', asyn
           await game.skills.revoke(ctx, 'a', 'standard:biyue', source);
         },
       });
-    const running = game.room.run('finish', (ctx) => runPhase(ctx, game.book, 'a', 'finish'));
+    const running = game.room.run('finish', (ctx) => runPhase(ctx, 'a', 'finish'));
     if (!skip) await answer(game, true);
     await running;
     expect(ownedCards(game.room.world, 'a')).toHaveLength(skip ? 0 : 1);
@@ -407,9 +410,7 @@ it.each(['spade', 'heart', 'club', 'diamond'])(
       },
     });
     const running = playSkill(game, 'fanjian', (ctx, phase) => {
-      expect(activeOffers(ctx, game.book, phase).some((o) => o.skill === 'standard:fanjian')).toBe(
-        false,
-      );
+      expect(activeOffers(ctx, phase).some((o) => o.skill === 'standard:fanjian')).toBe(false);
     });
     await answer(game, { cards: [], targets: ['b'] }, 'cards-targets');
     await answer(game, guess, 'choose-option');
@@ -443,9 +444,7 @@ it('反间取消不消耗次数，空手或只有装备时不能发动', async (
   const game = generalGame({ hands: { a: [card('gift', 'jink')] } });
   await grant(game, 'standard:fanjian');
   const running = playSkill(game, 'fanjian', (ctx, phase) => {
-    expect(activeOffers(ctx, game.book, phase).some((o) => o.skill === 'standard:fanjian')).toBe(
-      true,
-    );
+    expect(activeOffers(ctx, phase).some((o) => o.skill === 'standard:fanjian')).toBe(true);
   });
   await cancel(game);
   await running;
@@ -454,10 +453,8 @@ it('反间取消不消耗次数，空手或只有装备时不能发动', async (
     moveCards(ctx, [{ cards: ['gift'], from: 'a:hand', to: 'discard', place: 'bottom' }], 'test'),
   );
   await game.room.run('empty', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
-      expect(activeOffers(at, game.book, phase).some((o) => o.skill === 'standard:fanjian')).toBe(
-        false,
-      );
+    runPhase(ctx, 'a', 'play', (at, phase) => {
+      expect(activeOffers(at, phase).some((o) => o.skill === 'standard:fanjian')).toBe(false);
     }),
   );
   settled(game);
@@ -549,9 +546,9 @@ it('反间支付后手牌被取走，不生成假牌或多问一次花色，次�
       [{ cards: ['gift'], from: 'c:hand', to: 'a:hand', place: 'bottom' }],
       'restore',
     );
-    expect(
-      activeOffers(ctx, game.book, phase).some((offer) => offer.skill === 'standard:fanjian'),
-    ).toBe(false);
+    expect(activeOffers(ctx, phase).some((offer) => offer.skill === 'standard:fanjian')).toBe(
+      false,
+    );
   });
   await answer(game, { cards: [], targets: ['b'] }, 'cards-targets');
   await running;
@@ -566,7 +563,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
   });
   await genders(game);
   await grant(game, 'standard:lijian');
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   let counters = 0;
   game.room.on(Counter.opening, {
     id: 'trace',
@@ -577,9 +574,7 @@ it.each(['hand', 'equipment'])('离间弃 %s，后选角色使用完整零材料
     },
   });
   const running = playSkill(game, 'lijian', (ctx, phase) => {
-    expect(activeOffers(ctx, game.book, phase).some((o) => o.skill === 'standard:lijian')).toBe(
-      false,
-    );
+    expect(activeOffers(ctx, phase).some((o) => o.skill === 'standard:lijian')).toBe(false);
   });
   await answer(game, { cards: ['fee'], targets: ['b', 'c'] }, 'cards-targets');
   await running;
@@ -601,18 +596,21 @@ it('离间按有序目标验证禁止使用与目标禁令，不接受女性、�
   let blocked = true;
   const game = generalGame({
     hands: { a: [card('fee', 'jink')] },
-    policy: {
-      prohibitTarget: (_ctx, actor, target, semantic) =>
-        semantic.name === 'standard:duel' && (blocked || (actor === 'c' && target === 'b')),
-    },
+    rules: [
+      modify(
+        cardQueries.prohibitTarget,
+        (_ctx, { input: { actor, target, card: semantic } }) =>
+          semantic.name === 'standard:duel' && (blocked || (actor === 'c' && target === 'b')),
+      ),
+    ],
   });
   await genders(game);
   await grant(game, 'standard:lijian');
   await game.room.run('no-valid-pair', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
-      expect(
-        activeOffers(at, game.book, phase).some((offer) => offer.skill === 'standard:lijian'),
-      ).toBe(false);
+    runPhase(ctx, 'a', 'play', (at, phase) => {
+      expect(activeOffers(at, phase).some((offer) => offer.skill === 'standard:lijian')).toBe(
+        false,
+      );
     }),
   );
   blocked = false;
@@ -640,17 +638,15 @@ it('离间取消不计次、同阶段只支付一次，下一阶段重新可用'
   await genders(game);
   await grant(game, 'standard:lijian');
   const cancelled = playSkill(game, 'lijian', (ctx, phase) => {
-    expect(
-      activeOffers(ctx, game.book, phase).some((offer) => offer.skill === 'standard:lijian'),
-    ).toBe(true);
+    expect(activeOffers(ctx, phase).some((offer) => offer.skill === 'standard:lijian')).toBe(true);
   });
   await cancel(game);
   await cancelled;
   for (const id of ['fee1', 'fee2']) {
     const running = playSkill(game, 'lijian', (ctx, phase) => {
-      expect(
-        activeOffers(ctx, game.book, phase).some((offer) => offer.skill === 'standard:lijian'),
-      ).toBe(false);
+      expect(activeOffers(ctx, phase).some((offer) => offer.skill === 'standard:lijian')).toBe(
+        false,
+      );
     });
     await answer(game, { cards: [id], targets: ['b', 'c'] }, 'cards-targets');
     await running;
@@ -688,11 +684,9 @@ it('反间的目标界面只收到暗选项，交牌后才公开牌面与准确�
     await match.skills.grant(ctx, { owner: 'a', skill: 'standard:fanjian', source });
   });
   const running = match.room.run('play', (ctx) =>
-    runPhase(ctx, match.book, 'a', 'play', async (at, phase) => {
-      const offer = activeOffers(at, match.book, phase).find(
-        (o) => o.skill === 'standard:fanjian',
-      )!;
-      await activate(at, match.book, phase, {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      const offer = activeOffers(at, phase).find((o) => o.skill === 'standard:fanjian')!;
+      await activate(at, phase, {
         instance: offer.choice.instance,
         action: offer.choice.action,
       });
@@ -721,9 +715,9 @@ it('单次反制禁令随持久延时牌保存到后续生效，不依赖原计�
     hands: { a: [card('delay', 'indulgence')], b: [card('null', 'nullification')] },
     draw: [card('judgment', 'peach', 'heart')],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await use(game, { ...physical('delay'), prohibitedCounters: ['standard:nullification'] });
-  await game.room.run('judgment', (ctx) => runPhase(ctx, game.book, 'b', 'judge'));
+  await game.room.run('judgment', (ctx) => runPhase(ctx, 'b', 'judge'));
   expect(game.room.world.position('null')).toBe('b:hand');
   expect(game.room.decisions.pending).toEqual([]);
   settled(game);
@@ -791,7 +785,7 @@ it('本次用牌的反制禁令复制输入，不影响之后的普通决斗', a
   const game = generalGame({
     hands: { a: [card('duel', 'duel')], b: [card('null', 'nullification')] },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const prohibitedCounters = ['standard:nullification'];
   const first = use(game, {
     actor: 'a',
@@ -818,7 +812,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
       count: { min: 0, max: 0 },
       target: () => false,
       canUse: (_ctx, { request }) => (request.timing.kind === 'counter' ? null : 'Counter only'),
-      execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
+      execute: (ctx, { use }) => resolveCounter(ctx, use),
     },
   };
   const game = generalGame({
@@ -828,7 +822,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
     },
     definitions: [custom],
   });
-  installCounterspells(game.room, game.book, ['standard:nullification', custom.id]);
+  installCounterspells(game.room, ['standard:nullification', custom.id]);
   game.room.on(Counter.opening, {
     id: 'counter-purpose',
     owner: null,
@@ -836,7 +830,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
     run(ctx, opportunity) {
       const timing = { kind: 'counter', opportunity } as const;
       expect(
-        game.book.validateUse(ctx, {
+        validateUse(ctx, {
           actor: 'a',
           targets: ['b'],
           timing,
@@ -849,7 +843,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
         }).ok,
       ).toBe(false);
       expect(
-        game.book.validateUse(ctx, {
+        validateUse(ctx, {
           actor: 'a',
           targets: [],
           timing,
@@ -857,7 +851,7 @@ it('禁止无懈仍可由作者的其他反制牌响应，反制其本身时恢�
         }).ok,
       ).toBe(false);
       expect(
-        game.book.validateUse(ctx, {
+        validateUse(ctx, {
           actor: 'b',
           targets: [],
           timing,

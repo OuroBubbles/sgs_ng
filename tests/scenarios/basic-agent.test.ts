@@ -7,7 +7,7 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { standardCards } from '../../src/content/standard/cards';
-import { chooseOwnedCard, moveCards, Use } from '../../src/sdk';
+import { chooseOwnedCard, moveCards, Use, askUse, useCard } from '../../src/sdk';
 import { nextRequest } from '../fixtures/room';
 import type { Card, FlowResult } from '../../src/sdk';
 import { card } from '../fixtures/cards';
@@ -188,7 +188,7 @@ it('救援按本人身份与公开主公判断：不救敌方，保留的桃通�
         null,
       );
       const ask = (dying: string) =>
-        match.book.askUse(ctx, {
+        askUse(ctx, {
           actor: 'c',
           names: ['standard:peach'],
           targets: [dying],
@@ -230,7 +230,7 @@ it('连续三层无懈使用公开根效果和深度决策，支付三张牌并�
     match.room.run(
       'duel',
       async (ctx) =>
-        await match.book.use(ctx, {
+        await useCard(ctx, {
           actor: 'b',
           choice: { kind: 'physical', card: 'duel' },
           targets: ['a'],

@@ -1,4 +1,4 @@
-import { rulesOf } from '../skills/skills';
+import { face } from './face';
 import type { Card, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
@@ -7,7 +7,6 @@ import { assertLifetime, withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
 import type { SemanticCard } from './types';
-import type { CardBook } from './book';
 import type { CardColor } from './types';
 import { withProcessing } from './processing';
 import { reshuffle } from './draw';
@@ -102,7 +101,6 @@ const currentCard = defineState<JudgmentCard | null>(
 
 /** 判定牌面和材料位置分离：牌被获得不抹掉结果，改判则原子替换牌面与持有材料。 */
 export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentResult> {
-  const book = rulesOf(ctx);
   const input = immutable({ player: request.player, reason: request.reason });
   const match = request.match;
   const onResult = request.onResult;
@@ -123,7 +121,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
         get card() {
           if (sealed) return sealed.card;
           const current = readState(at.world, currentCard, target);
-          return current ? book.face(at, current.id, input.player) : null;
+          return current ? face(at, current.id, input.player) : null;
         },
         replace: (child: Context, replacement: RetrialInput) =>
           replaceJudgment(child, control, replacement, {
@@ -131,7 +129,6 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
             world: at.world,
             target,
             open: () => open,
-            book,
           }),
       });
       if (live()) {
@@ -140,7 +137,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
         }
         const id = live() ? at.world.zone('draw').cards[0] : undefined;
         if (id) {
-          const card = book.face(at, id, input.player);
+          const card = face(at, id, input.player);
           await moveCards(
             at,
             [{ cards: [id], from: 'draw', to: processing.zone, place: 'bottom' }],
@@ -196,7 +193,6 @@ async function replaceJudgment(
       readonly lifetime: Lifetime;
     };
     readonly open: () => boolean;
-    readonly book: CardBook;
   },
 ): Promise<'replaced' | 'unavailable'> {
   const input = immutable({
@@ -228,7 +224,7 @@ async function replaceJudgment(
     )
       return 'unavailable';
     const previous = judgment.card;
-    const card = control.book.face(child, input.card, judgment.player);
+    const card = face(child, input.card, judgment.player);
     const displaced =
       previous && child.world.position(previous.id) === judgment.processing ? [previous.id] : [];
     const invocation: PaymentReceipt | null = skill

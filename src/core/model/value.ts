@@ -52,3 +52,20 @@ export function immutable<T>(value: T): DeepReadonly<T> {
 
   return copy(value) as DeepReadonly<T>;
 }
+
+/** 纯数据的深相等：值为 undefined 的键视同缺省，与 JSON 快照一致；不比较键顺序。 */
+export function equal(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = (value: object) =>
+    Object.keys(value).filter((key) => (value as Record<string, unknown>)[key] !== undefined);
+  const left = keys(a);
+  const right = keys(b);
+  return (
+    left.length === right.length &&
+    left.every((key) =>
+      equal((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  );
+}

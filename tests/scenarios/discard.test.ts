@@ -17,6 +17,7 @@ import {
   moveCards,
   Cards,
   Cost,
+  canDiscard,
 } from '../../src/sdk';
 import type { DiscardQuery, PaymentReceipt, UsageLimit } from '../../src/sdk';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
@@ -73,18 +74,18 @@ it('弃置查询包含操作者/持有者/原因/区域/牌面，否决不可被
   const instance = await grant(game);
   await game.room.run('query', async (ctx) => {
     const input = { actor: 'b', owner: 'b', card: 'guarded', reason: 'fee' };
-    expect(game.book.canDiscard(ctx, input)).toBe(false);
-    expect(game.book.canDiscard(ctx, { ...input, actor: 'a' })).toBe(true);
-    expect(game.book.canDiscard(ctx, { ...input, reason: 'other' })).toBe(true);
-    expect(game.book.canDiscard(ctx, { ...input, owner: 'a' })).toBe(false);
-    expect(game.book.canDiscard(ctx, { ...input, card: 'missing' })).toBe(false);
+    expect(canDiscard(ctx, input)).toBe(false);
+    expect(canDiscard(ctx, { ...input, actor: 'a' })).toBe(true);
+    expect(canDiscard(ctx, { ...input, reason: 'other' })).toBe(true);
+    expect(canDiscard(ctx, { ...input, owner: 'a' })).toBe(false);
+    expect(canDiscard(ctx, { ...input, card: 'missing' })).toBe(false);
     await withLifetime(ctx, 'silence', (at, lifetime) => {
       blockSkill(at, instance, lifetime);
-      expect(game.book.canDiscard(at, input)).toBe(true);
+      expect(canDiscard(at, input)).toBe(true);
     });
-    expect(game.book.canDiscard(ctx, input)).toBe(false);
+    expect(canDiscard(ctx, input)).toBe(false);
     await game.skills.revoke(ctx, 'b', skill.id, source);
-    expect(game.book.canDiscard(ctx, input)).toBe(true);
+    expect(canDiscard(ctx, input)).toBe(true);
   });
 });
 
@@ -227,7 +228,7 @@ for (const free of [0, 1]) {
     await game.room.run('hp', (ctx) =>
       ctx.commit(testTiming('fixture'), [{ kind: 'vitality', player: 'a', hp: 1 }], null),
     );
-    const running = game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
+    const running = game.room.run('discard', (ctx) => runPhase(ctx, 'a', 'discard'));
     if (free) {
       const request = await nextRequest(game.room);
       expect(request.prompt).toBe('弃置 1 张手牌');
@@ -255,7 +256,7 @@ it('结姻的候选和支付使用同一弃置权限，不能提交受保护手�
     setGender(ctx, 'b', 'male');
     ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'b', hp: 2 }], null);
   });
-  const running = game.room.run('play', (ctx) => runPhase(ctx, game.book, 'a', 'play', playPhase));
+  const running = game.room.run('play', (ctx) => runPhase(ctx, 'a', 'play', playPhase));
   const request = await nextRequest(game.room);
   expect(request.kind).toBe('play-action');
   const input = { instance: instance, action: 'discard-heal', cards: ['f1', 'f2'], targets: ['b'] };
@@ -347,18 +348,18 @@ for (const count of [0, 2]) {
       const input = { actor: 'a', owner: 'b', cards: [entry.id], reason: 'effect' };
       expect(await discardCards(ctx, input)).toMatchObject({ kind: 'unavailable' });
       if (count) {
-        expect(
-          game.book.canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm0', reason: 'effect' }),
-        ).toBe(false);
+        expect(canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm0', reason: 'effect' })).toBe(
+          false,
+        );
         // 捕获移牌事实已提交、附件善后尚未执行的瞬间，剩余材料仍归逻辑延时牌管理。
         ctx.commit(
           testTiming('fixture-before-attachment-cleanup'),
           [{ kind: 'move', cards: ['m0'], from: entry.id, to: 'discard', place: 'bottom' }],
           null,
         );
-        expect(
-          game.book.canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm1', reason: 'effect' }),
-        ).toBe(false);
+        expect(canDiscard(ctx, { actor: 'a', owner: 'b', card: 'm1', reason: 'effect' })).toBe(
+          false,
+        );
       }
       const remaining = delayedCards(ctx.world, 'b', true)[0]!.cards;
       await game.skills.revoke(ctx, 'b', 'test:protection', source);

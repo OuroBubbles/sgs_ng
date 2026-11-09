@@ -11,7 +11,9 @@ import type { QueryType, SkillModifier } from './query';
 import type { ActiveSkill } from './active';
 import { EffectBook } from '../effects/effects';
 import type { EffectDefinition } from '../effects/effects';
-import type { CardBook } from '../cards/book';
+import type { CardDefinition } from '../cards/types';
+import { defineCard } from '../cards/card';
+import { equipmentAbilities } from '../cards/equipment';
 import { Death } from '../combat/life-events';
 import type { PaymentReceipt } from '../costs/pay';
 
@@ -188,21 +190,38 @@ function checkSnapshots(value: unknown): void {
   if (!Array.isArray(value)) throw new Error('Skill snapshots must be an array.');
 }
 
-// 每局挂接时登记 World → 规则目录；作者代码由 ctx 取得 CardBook，不再写 (book) => skill 工厂。
+// 每局挂接时登记 World → 规则目录；规则函数与作者代码都由 ctx 取得，不再传递目录对象。
 const attachedBooks = new WeakMap<WorldReader, SkillBook>();
 
-/** 当前对局的牌目录。只能在已挂接规则目录的 Room 中调用。 */
-export function rulesOf(ctx: Pick<Context, 'world'>): CardBook {
-  const cards = attachedBooks.get(ctx.world)?.cards;
-  if (!cards) throw new Error('No CardBook is attached to this room.');
-  return cards;
+/** 当前对局的规则目录（技能、牌定义、独立效果）。只能在已挂接目录的 Room 中调用。 */
+export function rulesOf(ctx: Pick<Context, 'world'>): SkillBook {
+  const book = attachedBooks.get(ctx.world);
+  if (!book) throw new Error('No rule catalog is attached to this room.');
+  return book;
 }
 
-/** 不可变定义可共享；授予/失效/次数在 World，Provider 登记仅留在执行侧。 */
+/** 按当前目录合并一个查询的全部贡献。 */
+export function queryRule<Input, Value>(
+  ctx: Context,
+  query: QueryType<Input, Value>,
+  input: Input,
+  base: Value,
+): Value {
+  return rulesOf(ctx).query(ctx, query, input, base);
+}
+
+/** 牌名对应的定义；未知牌名报错。 */
+export function cardDef(ctx: Pick<Context, 'world'>, name: string): CardDefinition {
+  const definition = rulesOf(ctx).cards.get(name);
+  if (!definition) throw new Error(`Unknown card definition: ${name}`);
+  return definition;
+}
+
+/** 每局的规则目录：不可变定义可共享；授予/失效/次数在 World，Provider 登记仅留在执行侧。 */
 export class SkillBook implements TriggerSource {
   readonly effects = new EffectBook();
-  /** 由 CardBook 构造时回填；同一 SkillBook 只服务一个牌目录。 */
-  cards: CardBook | null = null;
+  /** 本局牌定义（牌名 → 定义）；装备牌的能力由同一目录派生。 */
+  readonly cards: ReadonlyMap<string, CardDefinition>;
   readonly #definitions = new Map<string, SkillDefinition>();
   // 只共享不可变实例的身份描述；有效性仍逐次读取传入的 World。
   readonly #bindingsByInstance = new WeakMap<SkillInstance, DefinedBinding>();
@@ -212,12 +231,16 @@ export class SkillBook implements TriggerSource {
   #snapshots = new Map<object, (payload: unknown) => readonly SkillInstance[]>();
   #sealed = false;
 
-  constructor(definitions: readonly SkillDefinition[] = []) {
+  constructor(definitions: readonly SkillDefinition[] = [], cards: readonly CardDefinition[] = []) {
+    const prepared = cards.map(defineCard);
+    this.cards = new Map(prepared.map((card) => [card.id, card]));
+    if (this.cards.size !== prepared.length) throw new Error('Duplicate or empty card definition.');
     this.register(definitions);
     this.registerSnapshots(Skill.changed, (change) => (change.before ? [change.before] : []));
     this.registerSnapshots(Lifetime.ended, (ended) => ended.skillsBefore);
     this.registerSnapshots(Death.buried, (event) => event.burial.skillsBefore);
     this.registerSnapshots(Death.finished, (event) => event.burial.skillsBefore);
+    this.addProvider(equipmentAbilities(prepared));
   }
 
   /** 装配期声明窗口中的历史来源。只有该窗口收集候选，不进入当前能力目录。 */
@@ -230,7 +253,7 @@ export class SkillBook implements TriggerSource {
     this.#snapshots.set(window, (payload) => read(payload as T));
   }
 
-  /** 装配期允许先建立牌目录，再注入需要 CardBook 的普通技能工厂；挂接后目录固定。 */
+  /** 装配期可追加技能定义；挂接后目录固定。 */
   register(definitions: readonly SkillDefinition[]): void {
     if (this.#sealed) throw new Error('Skill definitions are sealed after attachment.');
     const prepared = definitions.map(defineSkill);
@@ -267,18 +290,19 @@ export class SkillBook implements TriggerSource {
       throw error;
     }
     const registration = {};
-    const detach = () => {
+    // 关闭只停止结算；终局房间仍可只读投影牌面，故仅显式卸载时才移除目录查找。
+    const detach = (closing: boolean) => {
       removeSource();
       removeEffects();
       cancelCleanup();
       if (this.#attachments.get(room.world) === registration) this.#attachments.delete(room.world);
-      if (attachedBooks.get(room.world) === this) attachedBooks.delete(room.world);
+      if (!closing && attachedBooks.get(room.world) === this) attachedBooks.delete(room.world);
     };
-    const cancelCleanup = room.onClose(detach);
+    const cancelCleanup = room.onClose(() => detach(true));
     this.#attachments.set(room.world, registration);
     attachedBooks.set(room.world, this);
     this.#sealed = true;
-    return detach;
+    return () => detach(false);
   }
 
   /** 装配期可省略 Context；运行期安装/卸载必须属于本目录唯一挂接的 Room。 */

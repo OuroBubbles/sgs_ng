@@ -20,6 +20,9 @@ import {
   Response,
   Damage,
   Cost,
+  buildCard,
+  isResponseProhibited,
+  physicalCard,
 } from '../../src/sdk';
 import type { Context } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -90,10 +93,8 @@ it('鬼才可打出没有普通响应定义的桃；材料、旧牌、牌面与�
     },
   });
   await game.room.run('ordinary-response', (ctx) => {
-    expect(game.book.build(ctx, 'a', { kind: 'physical', card: 'new' }, 'response').ok).toBe(false);
-    expect(game.book.isResponseProhibited(ctx, 'a', game.book.physicalCard(ctx, 'new'))).toBe(
-      false,
-    );
+    expect(buildCard(ctx, 'a', { kind: 'physical', card: 'new' }, 'response').ok).toBe(false);
+    expect(isResponseProhibited(ctx, 'a', physicalCard(ctx, 'new'))).toBe(false);
   });
   const running = game.room.run('judge', (ctx) =>
     judge(ctx, {
@@ -446,7 +447,7 @@ it('天妒与洛神共享一次判定，不重复取得同一张牌，结果仍�
   const game = generalGame({ draw: [card('top', 'slash'), card('next', 'jink')] });
   await grant(game, tiandu.id);
   await grant(game, 'standard:luoshen');
-  const running = game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  const running = game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await answer(game, true);
   await answer(game, true);
   await answer(game, false);

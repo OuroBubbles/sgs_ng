@@ -1,6 +1,5 @@
-import { expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
-  CardBook,
   SkillBook,
   judge,
   withCardSupply,
@@ -15,6 +14,8 @@ import {
   Response,
   Dying,
   Cost,
+  useCard,
+  validateUse,
 } from '../../src/sdk';
 import type { Context, EffectRef, ResponseResult, Timing, SkillDefinition } from '../../src/sdk';
 import { Room } from '../../src/core/runtime/room';
@@ -253,9 +254,9 @@ it('救援 b 时，受伤的 a 不能把这次桃改用于自己；合法救援�
         targets: ['a'],
         timing: { kind: 'rescue', dying: event.player },
       } as const;
-      expect(game.book.validateUse(ctx, intent).ok).toBe(false);
+      expect(validateUse(ctx, intent).ok).toBe(false);
       expect(ctx.world.position('peach')).toBe('a:hand');
-      const rescued = await game.book.use(ctx, { ...intent, targets: [event.player] });
+      const rescued = await useCard(ctx, { ...intent, targets: [event.player] });
 
       expect(rescued.kind).toBe('used');
     },
@@ -269,26 +270,27 @@ it('救援 b 时，受伤的 a 不能把这次桃改用于自己；合法救援�
 });
 
 /** 可信规则扩展可中止响应子流程；牌 resolver 不能把它当作玩家拒绝。 */
-class InterruptedResponseBook extends CardBook {
-  #requests = 0;
-  readonly actors: string[] = [];
-  constructor(
-    skills: SkillBook,
-    readonly interruptAt: number,
-  ) {
-    super(standardCards, skills);
-  }
-  override respond(ctx: Context, actor: string, names: readonly string[], target: EffectRef) {
-    this.#requests++;
-    this.actors.push(actor);
-    return this.#requests === this.interruptAt
-      ? ctx.flow<ResponseResult>('probe:interrupted-response', (at) =>
-          at.abort('author:response-interrupted'),
-        )
-      : super.respond(ctx, actor, names, target);
-  }
-}
+const interruption = vi.hoisted(() => ({ at: 0, actors: [] as string[] }));
+vi.mock('../../src/rules/cards/response', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/rules/cards/response')>();
+  return {
+    ...original,
+    respond(ctx: Context, actor: string, names: readonly string[], target: EffectRef) {
+      interruption.actors.push(actor);
+      return interruption.actors.length === interruption.at
+        ? ctx.flow<ResponseResult>('probe:interrupted-response', (at) =>
+            at.abort('author:response-interrupted'),
+          )
+        : original.respond(ctx, actor, names, target);
+    },
+  };
+});
+beforeEach(() => {
+  interruption.at = 0;
+  interruption.actors = [];
+});
 function interruptedDuel(interruptAt: number, definitions: readonly SkillDefinition[] = []) {
+  interruption.at = interruptAt;
   const seed = worldSeed();
   const initial = {
     ...seed,
@@ -298,16 +300,15 @@ function interruptedDuel(interruptAt: number, definitions: readonly SkillDefinit
     })),
   };
   const room = new Room({ id: 'duel-interruption', seed: 42, world: initial });
-  const skills = new SkillBook(definitions);
-  const book = new InterruptedResponseBook(skills, interruptAt);
+  const skills = new SkillBook(definitions, standardCards);
   skills.attach(room);
-  return { room, skills, book, initial };
+  return { room, skills, initial, actors: interruption.actors };
 }
 for (const interruptAt of [1, 2]) {
   it(`决斗第 ${interruptAt} 次响应局部中止：不伪造响应失败伤害，已提交打出不撤销`, async () => {
-    const { room, book, initial } = interruptedDuel(interruptAt);
+    const { room, initial } = interruptedDuel(interruptAt);
     const running = room.run('use', (ctx) =>
-      book.use(ctx, {
+      useCard(ctx, {
         actor: 'a',
         choice: { kind: 'physical', card: 'a1' },
         targets: ['b'],
@@ -335,12 +336,12 @@ for (const interruptAt of [1, 2]) {
 }
 
 it('无双决斗要求 b 连续两杀：第二张流程中止不变成失败，第一张已打出保留', async () => {
-  const { room, book, skills, initial } = interruptedDuel(2, [wushuang]);
+  const { room, skills, initial, actors } = interruptedDuel(2, [wushuang]);
   await room.run('grant', (ctx) =>
     skills.grant(ctx, { owner: 'a', skill: wushuang.id, source: { kind: 'general', id: 'probe' } }),
   );
   const running = room.run('use', (ctx) =>
-    book.use(ctx, {
+    useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'a1' },
       targets: ['b'],
@@ -352,7 +353,7 @@ it('无双决斗要求 b 连续两杀：第二张流程中止不变成失败，�
     kind: 'resolved',
     value: { use: { effects: [{ state: 'aborted' }] } },
   });
-  expect(book.actors).toEqual(['b', 'b']);
+  expect(actors).toEqual(['b', 'b']);
   expect(room.world.player('b').hp).toBe(4);
   expect(room.world.position('b1')).toBe('discard');
   expect(room.history.facts(CardEvent.responded)).toHaveLength(1);
@@ -370,12 +371,12 @@ it('多目标决斗只中止当前 b 效果，后续 c 的真实未提供响应�
       ),
     ],
   });
-  const { room, book, skills, initial } = interruptedDuel(1, [extra]);
+  const { room, skills, initial } = interruptedDuel(1, [extra]);
   await room.run('grant', (ctx) =>
     skills.grant(ctx, { owner: 'a', skill: extra.id, source: { kind: 'general', id: 'probe' } }),
   );
   const result = await room.run('use', (ctx) =>
-    book.use(ctx, {
+    useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'a1' },
       targets: ['b', 'c'],
@@ -426,7 +427,7 @@ for (const hasSlash of [false, true]) {
 
 it('救援桃仍可治疗濒死的自己，救援装配使用的是真实用牌而非打出', async () => {
   const game = cardGame({ hands: { a: [], b: [card('self-peach', 'peach', 'heart')] } });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   const running = game.room.run('dying', (ctx) =>
     loseHp(ctx, { player: 'b', amount: 4, reason: 'probe' }),
   );

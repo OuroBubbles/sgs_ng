@@ -1,3 +1,4 @@
+import type { CardDefinition, Context, DefenseDraft, SkillHandle } from '../../sdk';
 import {
   cardQueries,
   equipment,
@@ -8,7 +9,6 @@ import {
   discardCards,
   on,
   ownedCards,
-  rulesOf,
   Attack,
   Damage,
   defineEvent,
@@ -17,8 +17,9 @@ import {
   selection,
   discardable,
   HE,
+  askUse,
+  canDiscard,
 } from '../../sdk';
-import type { CardDefinition, Context, DefenseDraft, SkillHandle } from '../../sdk';
 
 export const Weapon = defineEvent('weapon', {
   followUp: timing<
@@ -62,7 +63,7 @@ const blade = equipment(
   on(Attack.defended, {
     when: slashDefended,
     async effect(ctx, draft, self) {
-      const used = await rulesOf(ctx).askUse(ctx, {
+      const used = await askUse(ctx, {
         actor: self.owner,
         names: ['standard:slash'],
         targets: [draft.effect.target],
@@ -168,10 +169,10 @@ export const advancedWeapons: readonly CardDefinition[] = [blade, axe, halberd, 
 
 function horses(ctx: Context, actor: string, target: string): readonly string[] {
   return [
-    ...equipmentInSlot(ctx.world, rulesOf(ctx), target, 'offensive-horse'),
-    ...equipmentInSlot(ctx.world, rulesOf(ctx), target, 'defensive-horse'),
+    ...equipmentInSlot(ctx, target, 'offensive-horse'),
+    ...equipmentInSlot(ctx, target, 'defensive-horse'),
   ].filter((card) =>
-    rulesOf(ctx).canDiscard(ctx, {
+    canDiscard(ctx, {
       actor,
       owner: target,
       card,

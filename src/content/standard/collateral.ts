@@ -1,5 +1,13 @@
-import { declared, defineEvent, equipmentInSlot, obtain, victimOf } from '../../sdk';
 import type { CardDefinition } from '../../sdk';
+import {
+  askUse,
+  validateUse,
+  declared,
+  defineEvent,
+  equipmentInSlot,
+  obtain,
+  victimOf,
+} from '../../sdk';
 
 export const Collateral = defineEvent('collateral', {
   weaponTaken: declared<{
@@ -17,11 +25,11 @@ export const collateral: CardDefinition = {
   counterable: true,
   use: {
     count: { min: 1, max: 1 },
-    target: (ctx, { request, target, book }) =>
+    target: (ctx, { request, target }) =>
       target !== request.actor &&
-      equipmentInSlot(ctx.world, book, target, 'weapon').length > 0 &&
+      equipmentInSlot(ctx, target, 'weapon').length > 0 &&
       // 只探测结构上的杀目标，不要求此刻持有杀；不能借用即将作为借刀材料离场的武器/坐骑。
-      book.validateUse(ctx, {
+      validateUse(ctx, {
         actor: target,
         choice: {
           kind: 'generated',
@@ -33,10 +41,10 @@ export const collateral: CardDefinition = {
         timing: { kind: 'effect' },
       }).ok,
     victim: { prompt: '借刀杀人：先选持械者，最后选出杀目标' },
-    async execute(ctx, { use, book, resolveTargets }) {
+    async execute(ctx, { use, resolveTargets }) {
       const victim = victimOf(use);
       await resolveTargets(ctx, async (at, { effect }) => {
-        const result = await book.askUse(at, {
+        const result = await askUse(at, {
           actor: effect.target,
           names: ['standard:slash'],
           targets: [victim],
@@ -46,7 +54,7 @@ export const collateral: CardDefinition = {
 
         if (result.kind === 'used' || !at.world.player(effect.target).alive) return;
         // 取结算此刻的武器；旧武器可能已经离场，新武器也可能来自更早的后效。
-        const weapons = equipmentInSlot(at.world, book, effect.target, 'weapon');
+        const weapons = equipmentInSlot(at, effect.target, 'weapon');
         await obtain(at, effect.actor, weapons, 'standard:collateral', {
           kind: Collateral.weaponTaken,
           data: { actor: effect.actor, holder: effect.target, victim, cards: weapons },

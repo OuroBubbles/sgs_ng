@@ -28,6 +28,9 @@ import {
   judge,
   Hp,
   Cost,
+  inspectUse,
+  useCard,
+  validateUse,
 } from '../../src/sdk';
 import type { Context, PhaseView, RecoveryDraft } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
@@ -48,10 +51,10 @@ async function wound(game: Game, hp = 1, player = 'a') {
     ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
   );
 }
-async function zhiheng(ctx: Context, game: Game, phase: PhaseView) {
-  const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === 'standard:zhiheng')!;
+async function zhiheng(ctx: Context, phase: PhaseView) {
+  const offer = activeOffers(ctx, phase).find((o) => o.skill === 'standard:zhiheng')!;
   expect(offer).toBeDefined();
-  await activate(ctx, game.book, phase, {
+  await activate(ctx, phase, {
     instance: offer.choice.instance,
     action: offer.choice.action,
   });
@@ -63,7 +66,7 @@ const startKeji = (
   body: (ctx: Context, phase: PhaseView) => void | Promise<void> = () => {},
 ) =>
   game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'play') await body(at, phase);
@@ -146,7 +149,7 @@ it.each(['wu', 'shu', 'self', 'changed'] as const)(
       hands: { [kind === 'self' ? 'a' : 'b']: [card('peach', 'peach', 'heart')] },
     });
     await grant(game, 'standard:jiuyuan');
-    installRescue(game.room, game.book);
+    installRescue(game.room);
     await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'b', kind === 'shu' ? '蜀' : '吴'));
     if (kind === 'changed') await game.room.run('change', (ctx) => setKingdom(ctx, 'b', '蜀'));
     const running = game.room.run('dying', (ctx) =>
@@ -181,11 +184,9 @@ it('制衡手牌/装备同批弃置，后效后按实际费用数量摸牌，一
   });
   await grant(game, 'standard:zhiheng');
   const running = game.room.run('play', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await zhiheng(at, game, phase);
-      expect(activeOffers(at, game.book, phase).some((o) => o.skill === 'standard:zhiheng')).toBe(
-        false,
-      );
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await zhiheng(at, phase);
+      expect(activeOffers(at, phase).some((o) => o.skill === 'standard:zhiheng')).toBe(false);
     }),
   );
   await answer(game, { cards: ['one', 'two', 'gear'], targets: [] }, 'cards-targets');
@@ -214,9 +215,9 @@ it('制衡取消不计次数，禁止弃置牌不可作为费用', async () => {
   await grant(game, 'standard:zhiheng');
   await grant(game, lock.id);
   const running = game.room.run('play', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await zhiheng(at, game, phase);
-      await zhiheng(at, game, phase);
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await zhiheng(at, phase);
+      await zhiheng(at, phase);
     }),
   );
   const r = await nextRequest(game.room);
@@ -239,7 +240,7 @@ it.each(['lost', 'dead'] as const)('制衡支付后失去技能仍摸牌，死�
     },
   });
   const running = game.room.run('play', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => zhiheng(at, game, phase)),
+    runPhase(ctx, 'a', 'play', (at, phase) => zhiheng(at, phase)),
   );
   await answer(game, { cards: ['fee'], targets: [] }, 'cards-targets');
   await running;
@@ -276,7 +277,7 @@ it('克己可以拒绝；独立弃牌阶段无本回合出牌记录也可发动'
   await answer(game, false);
   await first;
   expect(game.room.history.facts(testTiming('test.discard-body'))).toHaveLength(1);
-  const second = game.room.run('discard', (ctx) => runPhase(ctx, game.book, 'a', 'discard'));
+  const second = game.room.run('discard', (ctx) => runPhase(ctx, 'a', 'discard'));
   await answer(game, true);
   await second;
   expect(game.room.history.facts(Phase.skipped)).toHaveLength(1);
@@ -293,7 +294,7 @@ it.each(['physical', 'converted', 'before-grant'] as const)(
       const instance = game.skills
         .bindings(ctx.world)
         .find((b) => b.self.skill === 'standard:wusheng')?.self.id;
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         actor: 'a',
         choice:
           kind === 'converted'
@@ -336,13 +337,13 @@ it('其他阶段打出的杀、他人在本人出牌阶段使用杀不妨碍克�
   await grant(game, 'standard:keji');
   await grant(game, 'standard:guicai');
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['judge', 'play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'judge')
           await judge(at, { player: 'b', reason: 'test', match: () => true });
         else if (phase.kind === 'play')
-          await game.book.use(at, {
+          await useCard(at, {
             actor: 'b',
             choice: { kind: 'physical', card: 'other' },
             targets: ['c'],
@@ -362,11 +363,11 @@ it('重复出牌阶段的使用记录都属于本回合，不能只查看最后�
   await grant(game, 'standard:keji');
   let index = 0;
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play', 'play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'play' && index++ === 0)
-          await game.book.use(at, {
+          await useCard(at, {
             actor: 'a',
             choice: { kind: 'physical', card: 'hit' },
             targets: ['b'],
@@ -391,13 +392,12 @@ it.each(['snatch', 'indulgence'] as const)(
         targets: ['a'],
         timing: { kind: 'effect' as const },
       };
-      expect(game.book.validateUse(ctx, intent).ok).toBe(false);
+      expect(validateUse(ctx, intent).ok).toBe(false);
       expect(
-        game.book.inspectUse(ctx, { ...intent, targets: [] }).targets.find((t) => t.id === 'a')
-          ?.selectable,
+        inspectUse(ctx, { ...intent, targets: [] }).targets.find((t) => t.id === 'a')?.selectable,
       ).toBe(false);
       await game.skills.revoke(ctx, 'a', 'standard:qianxun', source);
-      expect(game.book.validateUse(ctx, intent).ok).toBe(true);
+      expect(validateUse(ctx, intent).ok).toBe(true);
     });
   },
 );
@@ -517,7 +517,7 @@ it('克己识别出牌阶段决斗中的本人普通打出杀', async () => {
   });
   await grant(game, 'standard:keji');
   const running = startKeji(game, async (ctx, phase) => {
-    await game.book.use(ctx, {
+    await useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'duel' },
       targets: ['b'],
@@ -538,7 +538,7 @@ it('普通移走杀不算使用或打出，前一回合的杀也不阻止本回�
   const game = generalGame({ hands: { a: [card('old', 'slash'), card('discarded', 'slash')] } });
   await grant(game, 'standard:keji');
   await startKeji(game, async (ctx, phase) => {
-    await game.book.use(ctx, {
+    await useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'old' },
       targets: ['b'],
@@ -578,7 +578,7 @@ it('救援同样识别急救转换的桃，并保留真实使用者', async () =
   await grant(game, 'standard:jiuyuan');
   await grant(game, 'standard:jijiu', 'b');
   await game.room.run('kingdom', (ctx) => setKingdom(ctx, 'b', '吴'));
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   const running = game.room.run('dying', (ctx) =>
     loseHp(ctx, { player: 'a', amount: 4, reason: 'test' }),
   );

@@ -12,6 +12,7 @@ import {
   Use,
   Target,
   Resolve,
+  useCard,
 } from '../../src/sdk';
 import type { CardEffect, Context, UseIntent, UsePlanView } from '../../src/sdk';
 import { standardGeneralSkills } from '../fixtures/standard';
@@ -256,7 +257,7 @@ it('真实无懈取消决斗后，停止效果启动后组但保留完整反制�
   const game = cardGame({
     hands: { a: [card('duel', 'duel')], c: [card('counter', 'nullification')] },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const after = vi.fn();
   game.room.on(Resolve.starting, {
     id: 'after-counter',
@@ -373,7 +374,7 @@ it('内层杀的目标窗口令外层目标死亡，只收束外层而不打断�
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         ...slash,
         actor: 'c',
         choice: { kind: 'physical', card: 'inner' },

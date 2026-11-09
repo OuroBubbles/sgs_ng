@@ -10,6 +10,9 @@ import {
   Target,
   Resolve,
   Cards,
+  cardQueries,
+  modify,
+  useCard,
 } from '../../src/sdk';
 import type { CardDefinition } from '../../src/sdk';
 import { card, cardGame, use, die } from '../fixtures/cards';
@@ -43,7 +46,7 @@ it.each(['savage_assault', 'archery_attack'])(
     const response = name === 'savage_assault' ? 'slash' : 'jink';
     const game = cardGame({
       hands: { a: [card(name, name)], b: [card('answer', response)], c: [], d: [] },
-      policy: { prohibitTarget: (_ctx, _from, target) => target === 'c' },
+      rules: [modify(cardQueries.prohibitTarget, (_ctx, { input: { target } }) => target === 'c')],
     });
     expect(await use(game, { ...automatic(name), targets: ['b'] })).toMatchObject({
       value: { kind: 'unavailable' },
@@ -72,7 +75,7 @@ it('无懈只取消南蛮当前目标，之后的目标继续响应或受伤', a
       d: [],
     },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const running = use(game, automatic('aoe'));
   let request = await nextRequest(game.room);
   expect(request.player).toBe('b');
@@ -122,7 +125,7 @@ it('桃园保留全部目标，未受伤者在效果前跳过，不提前消费�
   const game = cardGame({
     hands: { a: [card('heal', 'god_salvation')], b: [], c: [card('n', 'nullification')], d: [] },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await game.room.run('wounded', (ctx) => {
     ctx.commit(
       testTiming('wounded'),
@@ -157,7 +160,7 @@ it('五谷共享公开牌池，某目标被无懈后不取牌；余牌与用牌�
     hands: { a: [card('grace', 'amazing_grace')], b: [card('n', 'nullification')], c: [], d: [] },
     draw: ['x', 'y', 'z', 'w'].map((id) => card(id, 'slash')),
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const running = use(game, automatic('grace'));
   let request = await nextRequest(game.room);
   game.room.decisions.cancel(request.id, request.token); // 不反制 a。
@@ -207,7 +210,7 @@ it('嵌套五谷的两个共享牌池由各自闭包拥有，内层不覆盖外�
       pools.push(pool.zone);
       if (nested) return;
       nested = true;
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         actor: 'b',
         choice: {
           kind: 'generated',
@@ -474,7 +477,7 @@ it('作者转换可借用五谷公开牌池材料反制当前目标，两个处�
     draw: ['x', 'y', 'z', 'w'].map((id) => card(id, 'slash')),
     skills: [skill],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'b', skill: skill.id, source: { kind: 'general', id: 'b' } }),
   );

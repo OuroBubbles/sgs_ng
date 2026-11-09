@@ -1,3 +1,4 @@
+import type { CardChoice } from '../../sdk';
 import {
   equipment,
   equipmentEffectiveFor,
@@ -8,7 +9,6 @@ import {
   Response,
   Equipment,
 } from '../../sdk';
-import type { CardChoice } from '../../sdk';
 
 const jink: CardChoice = {
   kind: 'generated',

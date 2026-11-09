@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { finishGame, kill, pay, loseHp, recover, Death, Hp } from '../../src/sdk';
+import { finishGame, kill, pay, loseHp, recover, Death, Hp, useCard } from '../../src/sdk';
 import type { Context, DeathDraft, RecoveryDraft } from '../../src/sdk';
 import { card, cardGame, use, conserved } from '../fixtures/cards';
 import { CardEvent } from '../../src/sdk';
@@ -320,7 +320,7 @@ it('真正濒死在死亡前由已宣告桃救回，后续死亡费用不执行�
     async run(ctx) {
       expect(
         (
-          await game.book.use(ctx, {
+          await useCard(ctx, {
             actor: 'a',
             choice: { kind: 'physical', card: 'peach' },
             targets: ['b'],

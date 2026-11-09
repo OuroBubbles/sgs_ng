@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { standardGeneralSkills } from '../fixtures/standard';
-import { loseHp, runPhase } from '../../src/sdk';
+import { loseHp, runPhase, buildCard, useCard, validateUse } from '../../src/sdk';
 import type { CardChoice } from '../../src/sdk';
 import { card, cardGame, use } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
@@ -115,12 +115,7 @@ for (const input of recipes) {
       const before = ctx.world.snapshot;
       const facts = ctx.history.facts();
       const build = (materials: readonly string[], purpose: 'use' | 'response' = 'use') =>
-        game.book.build(
-          ctx,
-          'a',
-          { kind: 'viewAs', instance, recipe: input.recipe, materials },
-          purpose,
-        );
+        buildCard(ctx, 'a', { kind: 'viewAs', instance, recipe: input.recipe, materials }, purpose);
       expect(build(['one'])).toMatchObject({
         ok: true,
         value: { name: `standard:${input.name}`, suit: input.suit, rank: 9, materials: ['one'] },
@@ -145,7 +140,7 @@ for (const input of recipes) {
     await game.room.run('inspect-equipment', (ctx) => {
       const instance = ctx.world.snapshot.skills[0]!.id;
       expect(
-        game.book.build(
+        buildCard(
           ctx,
           'a',
           {
@@ -188,19 +183,19 @@ it.each(['wusheng', 'paoxiao'] as const)(
         ? { kind: 'viewAs', instance, recipe: 'red-slash', materials: [id] }
         : { kind: 'physical', card: id };
     const running = game.room.run('play', (ctx) =>
-      runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+      runPhase(ctx, 'a', 'play', async (at, phase) => {
         const intent = {
           actor: 'a',
           choice: choice('first'),
           targets: ['b'],
           timing: phase.playTiming(),
         };
-        expect(game.book.validateUse(at, { ...intent, targets: ['c'] }).ok).toBe(false);
-        expect(game.book.validateUse(at, { ...intent, targets: ['a'] }).ok).toBe(false);
-        expect((await game.book.use(at, intent)).kind).toBe('used');
+        expect(validateUse(at, { ...intent, targets: ['c'] }).ok).toBe(false);
+        expect(validateUse(at, { ...intent, targets: ['a'] }).ok).toBe(false);
+        expect((await useCard(at, intent)).kind).toBe('used');
         const second = { ...intent, choice: choice('second') };
-        expect(game.book.validateUse(at, second).ok).toBe(skill === 'paoxiao');
-        if (skill === 'paoxiao') expect((await game.book.use(at, second)).kind).toBe('used');
+        expect(validateUse(at, second).ok).toBe(skill === 'paoxiao');
+        if (skill === 'paoxiao') expect((await useCard(at, second)).kind).toBe('used');
       }),
     );
     const response = await nextRequest(game.room);

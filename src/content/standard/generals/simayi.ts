@@ -1,3 +1,4 @@
+import type { Context, SkillHandle } from '../../../sdk';
 import {
   alive,
   chooseOwnedCard,
@@ -6,7 +7,6 @@ import {
   HE,
   isGameOver,
   ownedCards,
-  rulesOf,
   select,
   selection,
   skill,
@@ -14,8 +14,9 @@ import {
   on,
   Judgment,
   Damage,
+  isResponseProhibited,
+  physicalCard,
 } from '../../../sdk';
-import type { Context, SkillHandle } from '../../../sdk';
 
 function retrialCards(ctx: Context, self: SkillHandle, judgment: Judgment): readonly string[] {
   if (
@@ -25,9 +26,8 @@ function retrialCards(ctx: Context, self: SkillHandle, judgment: Judgment): read
     isGameOver(ctx.world)
   )
     return [];
-  const rules = rulesOf(ctx);
   return ownedCards(ctx.world, self.owner).filter(
-    (id) => !rules.isResponseProhibited(ctx, self.owner, rules.physicalCard(ctx, id)),
+    (id) => !isResponseProhibited(ctx, self.owner, physicalCard(ctx, id)),
   );
 }
 
@@ -70,7 +70,7 @@ export const guicai = skill(
         reason: self.skill,
         skill: self,
         legal: picked.valid,
-        response: rulesOf(ctx).physicalCard(ctx, card),
+        response: physicalCard(ctx, card),
       });
     },
   }),

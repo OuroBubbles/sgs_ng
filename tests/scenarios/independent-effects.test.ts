@@ -16,6 +16,7 @@ import {
   EffectBook,
   Cost,
   Effect,
+  handLimit,
 } from '../../src/sdk';
 import type {
   EffectHandle,
@@ -73,7 +74,7 @@ function create(
   });
   return {
     ...game,
-    effects: game.book.effects,
+    effects: game.skills.effects,
     definition,
     ended,
     fired,
@@ -109,26 +110,26 @@ it.each(['prepare', 'add', 'update'] as const)(
       let record: EffectRecord<Data>;
       if (mode === 'update') {
         const initial = { amount: 0 };
-        const before = await game.book.effects.add(ctx, definition, {
+        const before = await game.skills.effects.add(ctx, definition, {
           owner: 'a',
           origin: initial,
           data: initial,
         });
-        record = (await game.book.effects.update(ctx, before.id, data))!;
+        record = (await game.skills.effects.update(ctx, before.id, data))!;
         expect(record.origin).toBe(before.origin);
       } else {
         const input = { owner: 'a', origin: data, data };
         if (mode === 'prepare') {
-          const prepared = await game.book.effects.prepare(ctx, definition, input);
+          const prepared = await game.skills.effects.prepare(ctx, definition, input);
           ctx.commit(testTiming('snapshot.prepared'), prepared.changes, prepared.record);
           record = prepared.record;
-        } else record = await game.book.effects.add(ctx, definition, input);
+        } else record = await game.skills.effects.add(ctx, definition, input);
         expect(record.origin).toBe(record.data);
       }
       expect(reads).toBe(1);
       expect(record.data.amount).toBe(1);
       expect(
-        game.book.effects.instances(ctx.world, definition).find((item) => item.id === record.id)
+        game.skills.effects.instances(ctx.world, definition).find((item) => item.id === record.id)
           ?.data,
       ).toBe(record.data);
       expect(reads).toBe(1);
@@ -356,7 +357,7 @@ it('全局实例与角色实例按本局行动序调度，不把原来源当作�
   });
   const records = game.effects.instances(game.room.world);
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       body: async (at) => {
         await at.window(tick, null);
@@ -385,7 +386,7 @@ it('已宣告效果不依赖原技能继续持有或有效', async () => {
       skill: sourceSkill.id,
       source: { kind: 'general', id: 'probe' },
     });
-    await game.book.effects.add(ctx, independent, {
+    await game.skills.effects.add(ctx, independent, {
       owner: 'b',
       origin: { skill: sourceSkill.id, actor: 'a' },
       data: { amount: 4 },
@@ -723,10 +724,10 @@ it('真实守约跨回合与来源死亡：修改上限、仅减一次伤害、�
     effects: [covenant],
   });
   await game.room.run('a-turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play'],
       async body(at) {
-        await game.book.effects.add(at, covenant, {
+        await game.skills.effects.add(at, covenant, {
           owner: 'b',
           origin: { actor: 'a', skill: 'probe:creator' },
           data: { target: 'b', remaining: 1 },
@@ -735,21 +736,19 @@ it('真实守约跨回合与来源死亡：修改上限、仅减一次伤害、�
     }),
   );
   await game.room.run('source-death', (ctx) => die(ctx, 'a'));
-  expect(game.room.inspect((ctx) => game.book.handLimit(ctx, 'b'))).toBe(5);
+  expect(game.room.inspect((ctx) => handLimit(ctx, 'b'))).toBe(5);
   await game.room.run('first-hit', async (ctx) => {
     expect((await damage(ctx, { from: 'c', to: 'b', amount: 2, nature: 'normal' })).hpLoss).toBe(1);
   });
   await game.room.run('second-hit', async (ctx) => {
     expect((await damage(ctx, { from: 'c', to: 'b', amount: 2, nature: 'normal' })).hpLoss).toBe(2);
   });
-  expect(game.book.effects.instances(game.room.world, covenant)[0]!.data.remaining).toBe(0);
-  expect(game.room.inspect((ctx) => game.book.handLimit(ctx, 'b'))).toBe(2);
-  await game.room.run('b-turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', { phases: ['finish'], body: () => {} }),
-  );
-  expect(game.book.effects.instances(game.room.world)).toEqual([]);
+  expect(game.skills.effects.instances(game.room.world, covenant)[0]!.data.remaining).toBe(0);
+  expect(game.room.inspect((ctx) => handLimit(ctx, 'b'))).toBe(2);
+  await game.room.run('b-turn', (ctx) => runTurn(ctx, 'b', { phases: ['finish'], body: () => {} }));
+  expect(game.skills.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.position('reward')).toBe('b:hand');
-  expect(game.room.inspect((ctx) => game.book.handLimit(ctx, 'b'))).toBe(1);
+  expect(game.room.inspect((ctx) => handLimit(ctx, 'b'))).toBe(1);
   expect(game.room.history.facts(Effect.ended)).toHaveLength(1);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   expect(game.room.decisions.pending).toEqual([]);
@@ -760,10 +759,10 @@ it('守约受益者死亡按普通死亡时点撤销，已死来源与死者归�
     effects: [covenant],
   });
   await game.room.run('add', (ctx) =>
-    game.book.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
+    game.skills.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
   );
   await game.room.run('death', (ctx) => die(ctx, 'b'));
-  expect(game.book.effects.instances(game.room.world)).toEqual([]);
+  expect(game.skills.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.position('reward')).toBe('draw');
   expect(game.room.history.facts(Effect.ended)[0]?.data.detail).toMatchObject({
     reason: 'covenant:target-died',

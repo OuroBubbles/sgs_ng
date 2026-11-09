@@ -4,8 +4,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const markers = [
-  ['CardBook', 'src/rules/cards/book.ts'],
-  ['Unknown card definition', 'src/rules/cards/book.ts'],
+  ['Unknown card definition', 'src/rules/skills/skills.ts'],
+  ['Ability source is no longer available', 'src/rules/cards/use.ts'],
   ['Unknown skill definition', 'src/rules/skills/skills.ts'],
   ['Seed must be a nonzero uint32', 'src/core/runtime/random.ts'],
   ['Unawaited child operation', 'src/core/runtime/room.ts'],

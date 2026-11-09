@@ -14,6 +14,7 @@ import {
   Lifetime,
   Phase,
   Turn,
+  useCard,
 } from '../../src/sdk';
 import type { CardActivity, Context, PhaseView } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -34,10 +35,10 @@ async function create(hand = [card('hit', 'slash')]) {
   );
   return game;
 }
-async function slash(game: Game, ctx: Context, phase?: PhaseView, id = 'hit') {
+async function slash(ctx: Context, phase?: PhaseView, id = 'hit') {
   expect(
     (
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         actor: 'a',
         choice: { kind: 'physical', card: id },
         targets: ['b'],
@@ -48,7 +49,7 @@ async function slash(game: Game, ctx: Context, phase?: PhaseView, id = 'hit') {
 }
 function outer(game: Game, body: (ctx: Context, phase: PhaseView) => Promise<void>) {
   return game.room.run('outer-turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play', 'discard'],
       async body(at, phase) {
         if (phase.kind === 'play') await body(at, phase);
@@ -120,10 +121,10 @@ async function complete(
 it.each(['a', 'b'])('外层克己不计入嵌套 %s 的额外回合中的真实杀，因果祖先仍保留', async (owner) => {
   const game = await create();
   const running = outer(game, async (ctx) => {
-    await runTurn(ctx, game.book, owner, {
+    await runTurn(ctx, owner, {
       phases: ['play'],
       origin: extra,
-      body: (at, phase) => slash(game, at, owner === 'a' ? phase : undefined),
+      body: (at, phase) => slash(at, owner === 'a' ? phase : undefined),
     });
   });
   await complete(game, running, 1);
@@ -135,7 +136,7 @@ it('出牌阶段开始前由规则使用的杀不计入该出牌阶段，之后�
     id: 'pre-phase-slash',
     owner: null,
     eligible: (_ctx, phase) => phase.kind === 'play',
-    run: (ctx) => slash(game, ctx),
+    run: (ctx) => slash(ctx),
   });
   await complete(
     game,
@@ -149,7 +150,7 @@ it('外层出牌阶段内嵌的判定阶段中用杀，不算实际出牌阶段�
   await complete(
     game,
     outer(game, async (ctx) => {
-      await runPhase(ctx, game.book, 'a', 'judge', (at) => slash(game, at));
+      await runPhase(ctx, 'a', 'judge', (at) => slash(at));
     }),
     1,
   );
@@ -161,7 +162,7 @@ it('出牌阶段生存期已结束后的后效用杀，不再计入已关闭的�
     id: 'after-phase-slash',
     owner: null,
     eligible: (_ctx, ended) => ended.kind === 'play',
-    run: (ctx) => slash(game, ctx),
+    run: (ctx) => slash(ctx),
   });
   await complete(
     game,
@@ -176,12 +177,12 @@ it('空嵌套回合的开始效果用杀，不借尚在因果路径中的外层�
     id: 'nested-start-slash',
     owner: null,
     eligible: (_ctx, turn) => turn.origin.kind === 'extra',
-    run: (ctx) => slash(game, ctx),
+    run: (ctx) => slash(ctx),
   });
   await complete(
     game,
     outer(game, async (ctx) => {
-      await runTurn(ctx, game.book, 'a', { phases: [], origin: extra });
+      await runTurn(ctx, 'a', { phases: [], origin: extra });
     }),
     1,
   );
@@ -197,7 +198,7 @@ it('本回合实际出牌阶段使用杀仍禁止克己，关闭阶段不会倒�
     outer(game, async (ctx, phase) => {
       turnId = phase.turn!.id;
       phaseId = phase.id;
-      await slash(game, ctx, phase);
+      await slash(ctx, phase);
       during = cardActivities(ctx.history.facts());
     }),
     0,
@@ -226,7 +227,7 @@ it.each([false, true])('普通响应的实际回合/阶段来自打出时点，�
   const duel = async (ctx: Context, phase: PhaseView) => {
     responseTurn = phase.turn!.id;
     responsePhase = phase.id;
-    await game.book.use(ctx, {
+    await useCard(ctx, {
       actor: 'b',
       choice: { kind: 'physical', card: 'duel' },
       targets: ['a'],
@@ -236,8 +237,7 @@ it.each([false, true])('普通响应的实际回合/阶段来自打出时点，�
   await complete(
     game,
     outer(game, async (ctx, phase) => {
-      if (nested)
-        await runTurn(ctx, game.book, 'a', { phases: ['play'], origin: extra, body: duel });
+      if (nested) await runTurn(ctx, 'a', { phases: ['play'], origin: extra, body: duel });
       else await duel(ctx, phase);
     }),
     Number(nested),
@@ -272,7 +272,7 @@ it('嵌套判定阶段中鬼才打出的杀归属实际判定阶段，不漏打�
   await complete(
     game,
     outer(game, async (ctx) => {
-      await runPhase(ctx, game.book, 'a', 'judge', async (at, phase) => {
+      await runPhase(ctx, 'a', 'judge', async (at, phase) => {
         phaseId = phase.id;
         await judge(at, { player: 'b', reason: 'probe', match: () => true });
       });
@@ -295,7 +295,7 @@ it('窄因果作用域查询仍保留外部祖先的回合/阶段归属，纯事
     outer(game, async (ctx, phase) => {
       await ctx.flow('author:ordinary-child', async (child) => {
         activityScope = child.scope.id;
-        await slash(game, child, phase);
+        await slash(child, phase);
         initial = cardActivities(child.history.facts(), activityScope);
       });
     }),
@@ -313,9 +313,9 @@ it('独立阶段有阶段身份但不伪造回合；独立根用牌两个归属�
   const game = cardGame({ hands: { a: [card('first', 'slash'), card('second', 'slash')] } });
   let phaseId = '';
   await game.room.run('independent-phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
       phaseId = phase.id;
-      await game.book.use(at, {
+      await useCard(at, {
         actor: 'a',
         choice: { kind: 'physical', card: 'first' },
         targets: ['b'],
@@ -324,7 +324,7 @@ it('独立阶段有阶段身份但不伪造回合；独立根用牌两个归属�
     }),
   );
   await game.room.run('independent-use', (ctx) =>
-    game.book.use(ctx, {
+    useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: 'second' },
       targets: ['b'],
@@ -349,16 +349,16 @@ it('嵌套回合返回后恢复外层实际出牌阶段，之后真正使用杀�
     outer(game, async (ctx, phase) => {
       outerTurn = phase.turn!.id;
       outerPhase = phase.id;
-      await runTurn(ctx, game.book, 'a', {
+      await runTurn(ctx, 'a', {
         phases: ['play'],
         origin: extra,
         async body(at, nested) {
           innerTurn = nested.turn!.id;
           innerPhase = nested.id;
-          await slash(game, at, nested);
+          await slash(at, nested);
         },
       });
-      await slash(game, ctx, phase, 'outer');
+      await slash(ctx, phase, 'outer');
     }),
     0,
   );
@@ -382,12 +382,11 @@ it('同一回合嵌套的真实出牌阶段仍属于本回合，不能误排除�
       turnId = phase.turn!.id;
       await runPhase(
         ctx,
-        game.book,
         'a',
         'play',
         async (at, nested) => {
           phaseId = nested.id;
-          await slash(game, at, nested);
+          await slash(at, nested);
         },
         phase.turn,
       );
@@ -406,14 +405,14 @@ it('内层阶段开始前的用牌不穿透到暂停的外层出牌阶段', asyn
     id: 'inner-before',
     owner: null,
     eligible: (_ctx, phase) => phase.kind === 'draw',
-    run: (ctx) => slash(game, ctx),
+    run: (ctx) => slash(ctx),
   });
   let turnId = '';
   await complete(
     game,
     outer(game, async (ctx, phase) => {
       turnId = phase.turn!.id;
-      await runPhase(ctx, game.book, 'a', 'draw', () => {});
+      await runPhase(ctx, 'a', 'draw', () => {});
     }),
     1,
   );
@@ -429,7 +428,7 @@ it.each(['play', 'turn'])('普通 Flow 即使命名为 %s，也不伪装成新�
     outer(game, async (ctx, phase) => {
       turnId = phase.turn!.id;
       phaseId = phase.id;
-      await ctx.flow(kind, (child) => slash(game, child, phase));
+      await ctx.flow(kind, (child) => slash(child, phase));
     }),
     0,
   );
@@ -449,14 +448,14 @@ it('嵌套回合生存期结束后的后效不穿透到外层回合/阶段，因
     eligible: (_ctx, ended) => ended.kind === 'turn' && !once,
     async run(ctx) {
       once = true;
-      await slash(game, ctx);
+      await slash(ctx);
     },
   });
   await complete(
     game,
     outer(game, async (ctx, phase) => {
       outerId = phase.turn!.id;
-      await runTurn(ctx, game.book, 'a', { phases: [], origin: extra });
+      await runTurn(ctx, 'a', { phases: [], origin: extra });
     }),
     1,
   );

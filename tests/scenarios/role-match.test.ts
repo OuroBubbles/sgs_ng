@@ -144,9 +144,9 @@ it('救援从当前回合角色起按座次，未轮到的人不先救', async (
   const game = cardGame({
     hands: { a: [card('a', 'peach')], b: [card('b', 'peach')], d: [card('d', 'peach')] },
   });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'd', {
+    runTurn(ctx, 'd', {
       body: async (at, phase) => {
         if (phase.kind === 'prepare') {
           await damage(at, { from: null, to: 'b', amount: 4, nature: 'normal' });

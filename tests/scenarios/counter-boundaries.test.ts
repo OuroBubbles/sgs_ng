@@ -8,6 +8,7 @@ import {
   Use,
   Resolve,
   Counter,
+  useCard,
 } from '../../src/sdk';
 import type { CardEffect, Context, CounterResult, EffectRef } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -50,7 +51,7 @@ function create() {
       c: [card('counter', 'nullification'), card('cost', 'peach')],
     },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   return game;
 }
 
@@ -178,7 +179,7 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
   const game = cardGame({
     hands: { a: [card('duel', 'duel')], c: [card('inner', 'duel')] },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const later: string[] = [];
   game.room.on(Counter.opening, {
     id: 'a-nested-use',
@@ -186,7 +187,7 @@ it('内层用牌令外层反制目标死亡，只收束外层候选，内层仍�
     eligible: (_ctx, opportunity) => opportunity.root.target === 'b',
     async run(ctx) {
       expect(
-        await game.book.use(ctx, {
+        await useCard(ctx, {
           ...intent,
           actor: 'c',
           choice: { kind: 'physical', card: 'inner' },
@@ -243,7 +244,7 @@ it('候选局部中止不等于取消反制机会，后续候选和正常决斗�
 
 it('反制完成是已封口公共事实，完成后效终局不重写结果或吞掉后续完成候选', async () => {
   const game = cardGame({ hands: { a: [card('duel', 'duel')] } });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   game.room.on(Counter.finished, {
     id: 'a-finish-game',
     owner: null,
@@ -303,7 +304,7 @@ it('没有 World 修改的相关性闭包也持续收束同窗候选', async () 
   });
   game.room.on(Counter.opening, { id: 'z-later', owner: null, eligible: () => true, run: later });
   await game.room.run('counter', async (ctx) => {
-    expect(await contestCounter(ctx, game.book, input)).toMatchObject({
+    expect(await contestCounter(ctx, input)).toMatchObject({
       kind: 'unavailable',
       by: null,
     });
@@ -327,7 +328,7 @@ it('反制机会在普通后效中检查相关性也拒绝异步结果，不提�
   });
   await expect(
     game.room.run('counter', (ctx) =>
-      contestCounter(ctx, game.book, {
+      contestCounter(ctx, {
         root,
         subject: { kind: 'effect', effect: root },
         relevant(): boolean {
@@ -393,7 +394,7 @@ it('最后询问席位的反制在准备中失效，未支付时也不误报未�
             relevant = false;
             return { ok: true, value: null };
           },
-          execute: (ctx, { use: plan, book }) => resolveCounter(ctx, plan, book),
+          execute: (ctx, { use: plan }) => resolveCounter(ctx, plan),
         },
       },
     ],
@@ -417,7 +418,7 @@ it('最后询问席位的反制在准备中失效，未支付时也不误报未�
   const running = game.room.run(
     'counter',
     async (ctx) =>
-      await contestCounter(ctx, game.book, {
+      await contestCounter(ctx, {
         root,
         subject: { kind: 'effect', effect: root },
         relevant: () => relevant,

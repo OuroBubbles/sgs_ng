@@ -17,6 +17,9 @@ import {
   Cost,
   Phase,
   Turn,
+  cardQueries,
+  modify,
+  useCard,
 } from '../../src/sdk';
 import type { UseIntent, Context, DelayedInput } from '../../src/sdk';
 import { card, cardGame, use, die } from '../fixtures/cards';
@@ -35,9 +38,9 @@ const play = (id: string, actor = 'a', targets: readonly string[] = ['b']): UseI
 });
 const turn = (game: ReturnType<typeof cardGame>, owner: string) =>
   game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, owner, {
-      body: async (at, phase, book) => {
-        if (phase.kind === 'judge') await defaultPhaseBody(at, phase, book);
+    runTurn(ctx, owner, {
+      body: async (at, phase) => {
+        if (phase.kind === 'judge') await defaultPhaseBody(at, phase);
       },
     }),
   );
@@ -55,7 +58,7 @@ it('延时牌使用只安装，不提前判定或反制；同名牌不能重复�
     },
     draw: [card('top', 'slash')],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   expect(await use(game, play('delay'))).toMatchObject({ value: { kind: 'used' } });
   expect(delayedCards(game.room.world, 'b')).toHaveLength(1);
   expect(game.room.history.facts(Counter.finished)).toHaveLength(0);
@@ -110,7 +113,7 @@ it('延时牌到生效时才进入反制，乐不思蜀被无懈后不判定也�
     hands: { a: [card('delay', 'indulgence')], b: [card('counter', 'nullification')] },
     draw: [card('top', 'slash')],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await use(game, play('delay'));
   const running = turn(game, 'b');
   const request = await nextRequest(game.room);
@@ -137,7 +140,7 @@ it('闪电被无懈后仍向下传递，不能当成普通锦囊直接丢弃', a
     hands: { a: [card('lightning', 'lightning')], b: [card('counter', 'nullification')] },
     draw: [card('top', 'slash')],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await use(game, play('lightning', 'a', []));
   const running = turn(game, 'a');
   const request = await nextRequest(game.room);
@@ -151,7 +154,12 @@ it('闪电传递跳过重复与禁止目标，回到自己也不会在同一判�
   const game = cardGame({
     hands: { a: [card('first', 'lightning')], b: [card('occupied', 'lightning')] },
     draw: [card('miss', 'jink', 'heart')],
-    policy: { prohibitTarget: (_ctx, _actor, target) => target === 'c' || target === 'd' },
+    rules: [
+      modify(
+        cardQueries.prohibitTarget,
+        (_ctx, { input: { target } }) => target === 'c' || target === 'd',
+      ),
+    ],
   });
   await use(game, play('first', 'a', []));
   await use(game, play('occupied', 'b', []));
@@ -184,7 +192,7 @@ it('判定区后放先结算，只快照已有实例，新安装的牌留到下�
     label: '后放',
     async resolve(ctx) {
       order.push('second');
-      await game.book.use(ctx, {
+      await useCard(ctx, {
         actor: 'a',
         choice: { kind: 'generated', face: { name: third.id }, materials: [], reason: 'new' },
         targets: ['b'],
@@ -346,10 +354,10 @@ it('skipNext 消耗下一次对应阶段，额外同名阶段之后不会重复�
     },
   });
   const result = await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
-      body: async (at, phase, book) => {
+    runTurn(ctx, 'a', {
+      body: async (at, phase) => {
         if (phase.kind === 'prepare')
-          expect(await runPhase(at, book, 'a', 'play', () => {}, phase.turn)).toMatchObject({
+          expect(await runPhase(at, 'a', 'play', () => {}, phase.turn)).toMatchObject({
             exit: 'skipped',
           });
       },
@@ -433,9 +441,8 @@ it('延时牌定义快照配置，不被调用者之后修改的目标模式影�
     self = false;
     #amount = 1;
 
-    resolve(_ctx: Context, { effect, book, phase }: DelayedInput) {
+    resolve(_ctx: Context, { effect, phase }: DelayedInput) {
       expect(effect.target).toBe('b');
-      expect(book).toBe(game.book);
       expect(phase.kind).toBe('judge');
       resolved += this.#amount;
     }

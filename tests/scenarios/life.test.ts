@@ -20,6 +20,8 @@ import {
   Dying,
   Death,
   Hp,
+  cardQueries,
+  modify,
 } from '../../src/sdk';
 import type { DeathDraft, DyingResult } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
@@ -34,7 +36,7 @@ const hit = { from: 'a', to: 'b', amount: 4, nature: 'normal' } as const;
 
 it('濒死救援在受伤后之前完整结算；桃产生 card.used 而不是 card.responded', async () => {
   const game = cardGame({ hands: { a: [card('p', 'peach', 'heart')], b: [] } });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   const order: string[] = [];
   game.room.on(Hp.recovered, {
     id: 'heal',
@@ -97,7 +99,7 @@ it('负体力允许同一救援者连续用桃，放弃后按座次交给下一�
       d: [card('d1', 'peach')],
     },
   });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   const running = game.room.run('hit', (ctx) => damage(ctx, { ...hit, amount: 6 }));
   let request = await nextRequest(game.room);
   expect(request.player).toBe('b');
@@ -131,7 +133,7 @@ it('救援能使用作者转换配方，并统一检查用牌禁止', async () =
     ],
   });
   const game = cardGame({ hands: { a: [card('j', 'jink')], b: [] }, skills: [medicine] });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, {
       owner: 'a',
@@ -153,9 +155,9 @@ it('救援能使用作者转换配方，并统一检查用牌禁止', async () =
   expect(game.room.world.position('j')).toBe('discard');
   const prohibited = cardGame({
     hands: { a: [card('p', 'peach')], b: [] },
-    policy: { prohibitUse: () => true },
+    rules: [modify(cardQueries.prohibitUse, () => true)],
   });
-  installRescue(prohibited.room, prohibited.book);
+  installRescue(prohibited.room);
   await prohibited.room.run('hit', (ctx) => damage(ctx, hit));
   expect(prohibited.room.world.player('b').alive).toBe(false);
   expect(prohibited.room.world.position('p')).toBe('a:hand');
@@ -348,7 +350,7 @@ it('已宣告牌的来源死亡不会移走处理材料或取消已产生效果'
 
 it('濒死中确定终局后不再求桃/死亡/伤害后效，仍完整收束用牌处理区', async () => {
   const game = cardGame({ hands: { a: [card('s', 'slash')], b: [] } });
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   installRoleMode(game.room);
   await game.room.run('setup', (ctx) => {
     ctx.commit(testTiming('setup'), [{ kind: 'vitality', player: 'b', hp: 1 }], null);

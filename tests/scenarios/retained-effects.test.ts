@@ -24,6 +24,9 @@ import {
   Death,
   Lifetime,
   Skill,
+  buildCard,
+  handLimit,
+  useCard,
 } from '../../src/sdk';
 import type { Context, SkillHandle, PhaseView } from '../../src/sdk';
 import type { SkillInstance } from '../../src/core/model/state';
@@ -210,7 +213,7 @@ it('同一后效的子流程可支付真实手牌费用，外层/其他 Room 与
       'loss',
     );
     expect(captured.active(ctx)).toBe(false);
-    await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' });
+    await equip(ctx, { card: 'armor', owner: 'a', from: 'discard' });
     expect(captured.active(ctx)).toBe(false);
     expect(game.skills.binding(ctx.world, captured.id)!.self.active(ctx)).toBe(true);
     expect(
@@ -582,10 +585,8 @@ it('自定义窗口显式提供技能快照；目录不读取任意历史，登�
   const game = cardGame({
     skills: [legacy],
     setup: (book) => {
-      book.skills.registerSnapshots(window, (event) => event.before);
-      expect(() => book.skills.registerSnapshots(window, (event) => event.before)).toThrow(
-        'Duplicate',
-      );
+      book.registerSnapshots(window, (event) => event.before);
+      expect(() => book.registerSnapshots(window, (event) => event.before)).toThrow('Duplicate');
     },
   });
   expect(() => game.skills.registerSnapshots(window, () => [])).toThrow('sealed');
@@ -623,7 +624,7 @@ it.each(['invalid-array', 'conflicting-owner'] as const)(
     const game = cardGame({
       skills: [legacy],
       setup: (book) => {
-        book.skills.registerSnapshots(window, (event) =>
+        book.registerSnapshots(window, (event) =>
           kind === 'invalid-array'
             ? (undefined as unknown as readonly SkillInstance[])
             : event.before.map((skill) => ({ ...skill, owner: 'b' })),
@@ -662,7 +663,7 @@ it('同一历史身份重复出现在自定义快照中，不复制发动次数'
   const game = cardGame({
     skills: [legacy],
     setup: (book) => {
-      book.skills.registerSnapshots(window, (event) => [...event.before, ...event.before]);
+      book.registerSnapshots(window, (event) => [...event.before, ...event.before]);
     },
   });
   const running = game.room.run('event', async (ctx) => {
@@ -706,10 +707,10 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
           when: (ctx, event, self) => equipmentLost(ctx.world, event, self),
           async effect(ctx, _event, self) {
             expect(self.active(ctx)).toBe(true);
-            expect(game.book.handLimit(ctx, 'a')).toBe(4);
-            expect(activeOffers(ctx, game.book, phase)).toHaveLength(0);
+            expect(handLimit(ctx, 'a')).toBe(4);
+            expect(activeOffers(ctx, phase)).toHaveLength(0);
             expect(
-              game.book.build(
+              buildCard(
                 ctx,
                 'a',
                 {
@@ -733,10 +734,10 @@ it('历史来源的支付资格不恢复转换、查询修正或主动技能', a
     definitions: [armor],
   });
   const running = game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, current) => {
+    runPhase(ctx, 'a', 'play', async (at, current) => {
       phase = current;
-      expect(game.book.handLimit(at, 'a')).toBe(6);
-      expect(activeOffers(at, game.book, current)).toHaveLength(1);
+      expect(handLimit(at, 'a')).toBe(6);
+      expect(activeOffers(at, current)).toHaveLength(1);
       await moveCards(
         at,
         [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
@@ -779,7 +780,7 @@ it('普通 class 提供的来源保留 this 与原型方法，不依赖对象展
   const game = cardGame({
     skills: [],
     setup: (book) => {
-      book.skills.addProvider({ collect: () => [{ self: new Source(), definition }] });
+      book.addProvider({ collect: () => [{ self: new Source(), definition }] });
     },
   });
   const running = game.room.run('event', (ctx) => ctx.window(window, null));
@@ -806,7 +807,7 @@ it.each([false, true])('作者包用真实发牌的遗玉/八卦替换，是否�
     for (const card of ['relic-card-2', 'relic-card-14'])
       expect(
         (
-          await match.book.use(ctx, {
+          await useCard(ctx, {
             actor: '甲席',
             choice: { kind: 'physical', card },
             targets: [],

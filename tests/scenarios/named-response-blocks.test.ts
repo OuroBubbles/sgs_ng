@@ -10,6 +10,8 @@ import {
   Use,
   Resolve,
   Response,
+  respond,
+  responseTimes,
 } from '../../src/sdk';
 import { qingguo } from '../../src/content/standard/generals/zhenji';
 import type { CardEffect } from '../../src/sdk';
@@ -52,9 +54,11 @@ it('只禁闪时混合请求仅开放杀，真实打出与原杀受伤分别成�
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'probe:only-jink', ['standard:jink']);
-      expect(
-        await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect),
-      ).toMatchObject({ kind: 'responded', actor: 'b', card: { name: 'standard:slash' } });
+      expect(await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).toMatchObject({
+        kind: 'responded',
+        actor: 'b',
+        card: { name: 'standard:slash' },
+      });
     },
   });
   expect(await use(game, attack)).toMatchObject({
@@ -100,12 +104,8 @@ it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另�
     owner: null,
     eligible: () => true,
     async run(ctx, { effect }) {
-      expect((await game.book.respond(ctx, 'b', ['standard:slash'], effect)).kind).toBe(
-        'responded',
-      );
-      expect((await game.book.respond(ctx, 'b', ['standard:jink'], effect)).kind).toBe(
-        'unavailable',
-      );
+      expect((await respond(ctx, 'b', ['standard:slash'], effect)).kind).toBe('responded');
+      expect((await respond(ctx, 'b', ['standard:jink'], effect)).kind).toBe('unavailable');
     },
   });
   const running = use(game, attack);
@@ -122,7 +122,11 @@ it('红判铁骑只禁止本次效果的闪，不拦截作者在同效果下另�
 it('响应次数按实际请求牌名查询，禁闪不把杀次数归零，政策可区分名称', async () => {
   const game = cardGame({
     hands: { a: [card('attack', 'slash')] },
-    policy: { responseTimes: (_ctx, _effect, _actor, name) => (name === 'standard:slash' ? 2 : 1) },
+    rules: [
+      modify(cardQueries.responseCount, (_ctx, { input: { name } }) =>
+        name === 'standard:slash' ? 2 : 1,
+      ),
+    ],
   });
   game.room.on(Resolve.starting, {
     id: 'count',
@@ -130,9 +134,9 @@ it('响应次数按实际请求牌名查询，禁闪不把杀次数归零，政�
     eligible: () => true,
     run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'probe:only-jink', ['standard:jink']);
-      expect(game.book.responseTimes(ctx, effect, 'b', 'standard:jink')).toBe(0);
-      expect(game.book.responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(2);
-      expect(game.book.responseTimes(ctx, effect, 'c', 'standard:jink')).toBe(1);
+      expect(responseTimes(ctx, effect, 'b', 'standard:jink')).toBe(0);
+      expect(responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(2);
+      expect(responseTimes(ctx, effect, 'c', 'standard:jink')).toBe(1);
     },
   });
   await use(game, attack);
@@ -149,9 +153,7 @@ it('一次真实供牌完成便关闭待决供牌窗口，后续候选不能再�
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
-      expect((await game.book.respond(ctx, 'b', ['standard:slash'], effect)).kind).toBe(
-        'responded',
-      );
+      expect((await respond(ctx, 'b', ['standard:slash'], effect)).kind).toBe('responded');
     },
   });
   game.room.on(Response.requested, {
@@ -190,9 +192,9 @@ it('混合请求的菜单和最终回复仅允许未被禁用的牌，八卦不�
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
-      expect(
-        (await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind,
-      ).toBe('responded');
+      expect((await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind).toBe(
+        'responded',
+      );
     },
   });
   const running = use(game, attack);
@@ -253,7 +255,7 @@ it('具名禁令按语义响应牌判断，倾国不能把被禁闪伪装成未�
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
-      await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect);
+      await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect);
     },
   });
   await use(game, attack);
@@ -297,7 +299,7 @@ it('委托不能扩展已过滤的名称，禁令归属仍是受益者，实际�
       effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
       // c 不能为自己响应此效果，并不等于 c 被禁止替 b 打出牌。
       effect.blockResponses(ctx, 'c', 'c-cannot-answer', ['standard:slash']);
-      await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect);
+      await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect);
     },
   });
   await use(game, attack);
@@ -360,7 +362,7 @@ it('实际代打者的禁止打出查询仍生效，委托失败后原请求继�
     eligible: () => true,
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'no-jink', ['standard:jink']);
-      await game.book.respond(ctx, 'b', ['standard:slash'], effect);
+      await respond(ctx, 'b', ['standard:slash'], effect);
     },
   });
   await use(game, attack);
@@ -391,11 +393,11 @@ it.each([undefined, null] as const)(
       eligible: () => true,
       async run(ctx, { effect }) {
         effect.blockResponses(ctx, 'b', 'all', names);
-        expect(
-          (await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind,
-        ).toBe('unavailable');
+        expect((await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind).toBe(
+          'unavailable',
+        );
         for (const name of ['standard:jink', 'standard:slash'])
-          expect(game.book.responseTimes(ctx, effect, 'b', name)).toBe(0);
+          expect(responseTimes(ctx, effect, 'b', name)).toBe(0);
       },
     });
     expect(await use(game, attack)).toMatchObject({
@@ -411,12 +413,12 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
   let collections = 0;
   const game = cardGame({
     hands: { a: [card('attack', 'slash')] },
-    policy: {
-      responseTimes: () => {
+    rules: [
+      modify(cardQueries.responseCount, () => {
         counts++;
         return 1;
-      },
-    },
+      }),
+    ],
   });
   game.room.addTriggerSource({
     collect(type) {
@@ -440,9 +442,9 @@ it('多个具名禁令取并集，均被禁止时不询问、不收集供牌来�
     async run(ctx, { effect }) {
       effect.blockResponses(ctx, 'b', 'first', ['standard:jink']);
       effect.blockResponses(ctx, 'b', 'second', ['standard:slash']);
-      expect(
-        (await game.book.respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind,
-      ).toBe('unavailable');
+      expect((await respond(ctx, 'b', ['standard:jink', 'standard:slash'], effect)).kind).toBe(
+        'unavailable',
+      );
     },
   });
   await use(game, attack);
@@ -510,7 +512,7 @@ it('具名列表在宣告时复制并冻结，纯查询/封口后不能改写，
 it('禁令只属于指定效果与响应角色，多目标的另一人仍可正常打闪', async () => {
   const game = cardGame({
     hands: { a: [card('attack', 'slash')], b: [card('bj', 'jink')], c: [card('cj', 'jink')] },
-    policy: { attackRange: () => 3 },
+    rules: [modify(cardQueries.attackRange, () => 3)],
   });
   game.room.on(Use.declared, {
     id: 'extra-target',
@@ -570,11 +572,11 @@ it('纯查询修正可按响应牌名计算次数，具名禁止仍优先于追�
     eligible: () => true,
     run(ctx, { effect }) {
       effect.requireResponses(ctx, 'b', 2, 'minimum');
-      expect(ctx.query(() => game.book.responseTimes(ctx, effect, 'b', 'standard:jink'))).toBe(2);
-      expect(game.book.responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(3);
+      expect(ctx.query(() => responseTimes(ctx, effect, 'b', 'standard:jink'))).toBe(2);
+      expect(responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(3);
       effect.blockResponses(ctx, 'b', 'only-jink', ['standard:jink']);
-      expect(game.book.responseTimes(ctx, effect, 'b', 'standard:jink')).toBe(0);
-      expect(game.book.responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(3);
+      expect(responseTimes(ctx, effect, 'b', 'standard:jink')).toBe(0);
+      expect(responseTimes(ctx, effect, 'b', 'standard:slash')).toBe(3);
     },
   });
   await use(game, attack);

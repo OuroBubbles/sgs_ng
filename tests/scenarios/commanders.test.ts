@@ -27,6 +27,8 @@ import {
   Damage,
   Cost,
   Phase,
+  respond,
+  useCard,
 } from '../../src/sdk';
 import type { PhaseView, UseIntent } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
@@ -158,7 +160,7 @@ it('替代默认阶段体仍完整开放开始/结束窗口，与跳阶段不同
     },
   });
   const result = await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['draw', 'draw'],
       body(ctx, phase) {
         events.push('body');
@@ -193,7 +195,7 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
       );
     },
   });
-  await game.room.run('phase', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+  await game.room.run('phase', (ctx) => runPhase(ctx, 'a', 'prepare'));
   await game.room.run('closed', (ctx) =>
     expect(() => retained.replace(ctx, 'closed')).toThrow(/Lifetime/),
   );
@@ -205,9 +207,9 @@ it('阶段替代句柄拒绝外局、局外上下文与关闭后的使用；跳�
       phase.skip(ctx, 'skip');
     },
   });
-  expect(await game.room.run('skip', (ctx) => runPhase(ctx, game.book, 'a', 'draw'))).toMatchObject(
-    { value: { exit: 'skipped', phase: { replaced: false } } },
-  );
+  expect(await game.room.run('skip', (ctx) => runPhase(ctx, 'a', 'draw'))).toMatchObject({
+    value: { exit: 'skipped', phase: { replaced: false } },
+  });
 });
 
 it('奸雄按一次伤害发动一次，移动后效已能看到取得事实；实牌不再被用牌清理弃置', async () => {
@@ -293,7 +295,7 @@ it('奸雄不从另一处理区追回材料，即使另一处理区尚未清理'
   await game.room.run('outer', (ctx) =>
     withProcessing(ctx, [], async (at, pool) => {
       elsewhere = pool.zone;
-      await game.book.use(at, slash());
+      await useCard(at, slash());
     }),
   );
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(0);
@@ -398,10 +400,10 @@ it('护驾按当前回合角色起算的行动顺序委托，不固定从曹操�
   await grant(game, 'standard:hujia', 'c');
   await factions(game, { a: '吴', b: '魏', c: '魏', d: '魏' });
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play'],
       async body(at) {
-        await game.book.use(at, slash('a', 'c'));
+        await useCard(at, slash('a', 'c'));
       },
     }),
   );
@@ -431,7 +433,7 @@ it('原请求允许杀或闪时，护驾委托仍只允许闪，不能误用供�
     owner: null,
     eligible: () => true,
     async run(ctx, { effect }) {
-      const result = await game.book.respond(ctx, 'a', ['standard:slash', 'standard:jink'], effect);
+      const result = await respond(ctx, 'a', ['standard:slash', 'standard:jink'], effect);
       expect(result).toMatchObject({
         kind: 'responded',
         actor: 'c',
@@ -512,7 +514,12 @@ it.each(['provider', 'beneficiary'] as const)(
   async (kind) => {
     const game = generalGame({
       hands: { b: [card('hit', 'slash')], c: [card('j', 'jink')] },
-      policy: { prohibitResponse: (_ctx, actor) => actor === (kind === 'provider' ? 'c' : 'a') },
+      rules: [
+        modify(
+          cardQueries.prohibitResponse,
+          (_ctx, { input: { actor } }) => actor === (kind === 'provider' ? 'c' : 'a'),
+        ),
+      ],
     });
     await grant(game, 'standard:hujia');
     await factions(game);
@@ -607,7 +614,7 @@ it('突袭选一至两名手牌目标，实际结算按座次，暗选不暴露�
       ).toBe(true);
     },
   });
-  const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
+  const running = game.room.run('draw', (ctx) => runPhase(ctx, 'a', 'draw'));
   const request = await nextRequest(game.room);
   for (const targets of [[], ['a'], ['b', 'b'], ['b', 'c', 'd']])
     expect(game.room.decisions.preview(request.id, { cards: [], targets })?.valid).toBe(false);
@@ -632,7 +639,7 @@ it.each(['cancel', 'empty'] as const)('突袭取消或无合法目标，正常�
     draw: [card('draw1', 'jink'), card('draw2', 'slash')],
   });
   await grant(game, 'standard:tuxi');
-  const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
+  const running = game.room.run('draw', (ctx) => runPhase(ctx, 'a', 'draw'));
   if (kind === 'cancel') await cancel(game);
   await running;
   expect(game.room.world.zone('a:hand').cards).toEqual(['draw1', 'draw2']);
@@ -662,7 +669,7 @@ it.each(['lost', 'empty', 'dead-target', 'dead-source'] as const)(
         if (kind === 'dead-source') await kill(ctx, { ...death, player: 'a' });
       },
     });
-    const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
+    const running = game.room.run('draw', (ctx) => runPhase(ctx, 'a', 'draw'));
     await answer(game, { cards: [], targets: ['b', 'c'] }, 'cards-targets');
     if (kind === 'lost') await takeHidden(game, 'b');
     if (kind !== 'dead-source') await takeHidden(game, 'c');
@@ -686,7 +693,7 @@ it('取牌不混用弃牌权限；无手牌而只有装备的角色不是突袭�
   });
   await grant(game, 'standard:tuxi');
   await grant(game, lock.id, 'b');
-  const running = game.room.run('draw', (ctx) => runPhase(ctx, game.book, 'a', 'draw'));
+  const running = game.room.run('draw', (ctx) => runPhase(ctx, 'a', 'draw'));
   const request = await nextRequest(game.room);
   expect(game.room.decisions.preview(request.id, { cards: [], targets: ['c'] })?.valid).toBe(false);
   await answer(game, { cards: [], targets: ['b'] }, 'cards-targets');

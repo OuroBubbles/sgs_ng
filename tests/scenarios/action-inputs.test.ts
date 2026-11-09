@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { damage, draw, Cards, Damage } from '../../src/sdk';
+import { damage, draw, Cards, Damage, buildCard, respond } from '../../src/sdk';
 import { card, cardGame } from '../fixtures/cards';
 import { choose, nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
@@ -60,7 +60,7 @@ it('响应请求冻结匹配牌名和关联 ID，不追踪调用方后续修改'
   const game = cardGame({ hands: { b: [card('jink', 'jink')] } });
   const names = ['standard:jink'];
   const built = await game.room.run('build', (ctx) =>
-    game.book.build(ctx, 'a', { kind: 'physical', card: 'slash1' }, 'use'),
+    buildCard(ctx, 'a', { kind: 'physical', card: 'slash1' }, 'use'),
   );
   if (built.kind !== 'resolved' || !built.value.ok) throw new Error('Missing card.');
   const ref = {
@@ -71,7 +71,7 @@ it('响应请求冻结匹配牌名和关联 ID，不追踪调用方后续修改'
     card: built.value.value,
     processing: 'custom-processing',
   };
-  const running = game.room.run('respond', (ctx) => game.book.respond(ctx, 'b', names, ref));
+  const running = game.room.run('respond', (ctx) => respond(ctx, 'b', names, ref));
   const request = await nextRequest(game.room);
   names.splice(0);
   ref.useId = 'changed';

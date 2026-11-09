@@ -1,3 +1,4 @@
+import type { CardDefinition, Context, DamageDraft, SkillHandle, SkillDefinition } from '../../sdk';
 import {
   changeShield,
   isDirectDamage,
@@ -5,11 +6,10 @@ import {
   on,
   ownedCards,
   payDiscard,
-  rulesOf,
   Damage,
   Skill,
+  canDiscard,
 } from '../../sdk';
-import type { CardDefinition, Context, DamageDraft, SkillHandle, SkillDefinition } from '../../sdk';
 
 export const ward: CardDefinition = {
   id: 'workshop:ward',
@@ -29,7 +29,7 @@ function selection(ctx: Context, draft: DamageDraft, self: SkillHandle) {
     cards: () =>
       ownedCards(ctx.world, self.owner, ['hand'])
         .filter((card) =>
-          rulesOf(ctx).canDiscard(ctx, {
+          canDiscard(ctx, {
             actor: self.owner,
             owner: self.owner,
             card,

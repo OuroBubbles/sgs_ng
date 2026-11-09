@@ -1,3 +1,12 @@
+import {
+  attackRange,
+  cardOffers,
+  distance,
+  handLimit,
+  respond,
+  useCard,
+  validateUse,
+} from '../../src/sdk';
 import { expect, it } from 'vitest';
 import {
   defineSkill,
@@ -13,7 +22,6 @@ import {
   defineQuery,
   cardQueries,
   pay,
-  CardBook,
   SkillBook,
   Cards,
   Cost,
@@ -81,8 +89,8 @@ it('装备自动以自己为目标，同槽替换一次提交，移牌后效立�
     run(ctx) {
       expect(ctx.world.position('old')).toBe('discard');
       expect(game.room.history.facts(Equipment.equipped)).toHaveLength(1);
-      expect(equipmentInSlot(ctx.world, game.book, 'a', 'weapon')).toEqual(['new']);
-      observations.push(game.book.attackRange(ctx, 'a', semantic));
+      expect(equipmentInSlot(ctx, 'a', 'weapon')).toEqual(['new']);
+      observations.push(attackRange(ctx, 'a', semantic));
     },
   });
   expect(await use(game, { ...install('new'), targets: ['a'] })).toMatchObject({
@@ -106,19 +114,17 @@ it('普通移牌转移装备后，能力跟随实体与持有者，不需要安�
     equipment: { a: [card('weapon', 'spear')] },
   });
   await game.room.run('transfer', async (ctx) => {
-    const old = game.book.offers(ctx, 'a', 'use').find((offer) => offer.label === '丈八蛇矛')!;
+    const old = cardOffers(ctx, 'a', 'use').find((offer) => offer.label === '丈八蛇矛')!;
     expect(old).toBeDefined();
-    await equip(ctx, game.book, { card: 'weapon', owner: 'b', from: 'a:equipment' });
-    expect(game.book.offers(ctx, 'a', 'use').some((offer) => offer.label === '丈八蛇矛')).toBe(
-      false,
-    );
+    await equip(ctx, { card: 'weapon', owner: 'b', from: 'a:equipment' });
+    expect(cardOffers(ctx, 'a', 'use').some((offer) => offer.label === '丈八蛇矛')).toBe(false);
     expect(
-      game.book.offers(ctx, 'b', 'response').find((offer) => offer.label === '丈八蛇矛')?.count,
+      cardOffers(ctx, 'b', 'response').find((offer) => offer.label === '丈八蛇矛')?.count,
     ).toEqual({ min: 2, max: 2 });
-    expect(game.book.attackRange(ctx, 'a', semantic)).toBe(1);
-    expect(game.book.attackRange(ctx, 'b', semantic)).toBe(3);
+    expect(attackRange(ctx, 'a', semantic)).toBe(1);
+    expect(attackRange(ctx, 'b', semantic)).toBe(3);
     expect(
-      game.book.validateUse(ctx, {
+      validateUse(ctx, {
         actor: 'a',
         choice: transform(old, ['a1', 'a2']),
         targets: ['b'],
@@ -137,7 +143,7 @@ it('诸葛连弩允许阶段内连续用杀，卸下立即恢复已累计的次�
     withLifetime(ctx, 'play', async (at, phase) => {
       for (const id of ['s1', 's2'])
         expect(
-          await game.book.use(at, {
+          await useCard(at, {
             ...install(id),
             targets: ['b'],
             timing: { kind: 'play', owner: 'a', phase },
@@ -149,7 +155,7 @@ it('诸葛连弩允许阶段内连续用杀，卸下立即恢复已累计的次�
         'remove',
       );
       expect(
-        game.book.validateUse(at, {
+        validateUse(at, {
           ...install('s3'),
           targets: ['b'],
           timing: { kind: 'play', owner: 'a', phase },
@@ -173,19 +179,17 @@ it.each(['spear', 'chitu'])('以红色 %s 作杀材料时，不能继续借用�
       skill: wusheng.id,
       source: { kind: 'general', id: 'guan-yu' },
     });
-    const offer = game.book.offers(ctx, 'a', 'use').find((offer) => offer.label === '武圣')!;
+    const offer = cardOffers(ctx, 'a', 'use').find((offer) => offer.label === '武圣')!;
     const choice = {
       kind: 'viewAs' as const,
       ...offer.choice,
       materials: ['weapon'],
     } as UseIntent['choice'];
     expect(
-      game.book.validateUse(ctx, { actor: 'a', choice, targets: ['c'], timing: { kind: 'effect' } })
-        .ok,
+      validateUse(ctx, { actor: 'a', choice, targets: ['c'], timing: { kind: 'effect' } }).ok,
     ).toBe(false);
     expect(
-      game.book.validateUse(ctx, { actor: 'a', choice, targets: ['b'], timing: { kind: 'effect' } })
-        .ok,
+      validateUse(ctx, { actor: 'a', choice, targets: ['b'], timing: { kind: 'effect' } }).ok,
     ).toBe(true);
   });
 });
@@ -203,19 +207,19 @@ it('把连弩当第二张杀的材料，不能借用即将失去的无限次数'
       source: { kind: 'general', id: 'guan-yu' },
     });
     await withLifetime(ctx, 'play', async (at, phase) => {
-      await game.book.use(at, {
+      await useCard(at, {
         ...install('s1'),
         targets: ['b'],
         timing: { kind: 'play', owner: 'a', phase },
       });
-      const offer = game.book.offers(at, 'a', 'use').find((offer) => offer.label === '武圣')!;
+      const offer = cardOffers(at, 'a', 'use').find((offer) => offer.label === '武圣')!;
       const choice = {
         kind: 'viewAs' as const,
         ...offer.choice,
         materials: ['weapon'],
       } as UseIntent['choice'];
       expect(
-        game.book.validateUse(at, {
+        validateUse(at, {
           actor: 'a',
           choice,
           targets: ['b'],
@@ -233,14 +237,14 @@ it('正负马按来源相加，两个马槽独立替换，距离至少为一且�
     equipment: { a: [card('off', 'chitu'), card('def', 'dilu')], c: [card('other', 'jueying')] },
   });
   await game.room.run('distance', async (ctx) => {
-    expect(game.book.distance(ctx, 'a', 'c')).toBe(2);
-    expect(game.book.distance(ctx, 'a', 'b')).toBe(1);
-    expect(game.book.distance(ctx, 'b', 'a')).toBe(2);
-    expect(game.book.distance(ctx, 'a', 'a')).toBe(0);
-    await game.book.use(ctx, install('new'));
+    expect(distance(ctx, 'a', 'c')).toBe(2);
+    expect(distance(ctx, 'a', 'b')).toBe(1);
+    expect(distance(ctx, 'b', 'a')).toBe(2);
+    expect(distance(ctx, 'a', 'a')).toBe(0);
+    await useCard(ctx, install('new'));
     expect(ctx.world.position('off')).toBe('discard');
-    expect(equipmentInSlot(ctx.world, game.book, 'a', 'defensive-horse')).toEqual(['def']);
-    expect(equipmentInSlot(ctx.world, game.book, 'a', 'offensive-horse')).toEqual(['new']);
+    expect(equipmentInSlot(ctx, 'a', 'defensive-horse')).toEqual(['def']);
+    expect(equipmentInSlot(ctx, 'a', 'offensive-horse')).toEqual(['new']);
   });
 });
 
@@ -255,8 +259,8 @@ it.each([
     equipment: { a: [card('weapon', 'spear')] },
   });
   await game.room.run('spear', async (ctx) => {
-    const offer = game.book.offers(ctx, 'a', 'use').find((offer) => offer.label === '丈八蛇矛')!;
-    const result = await game.book.use(ctx, {
+    const offer = cardOffers(ctx, 'a', 'use').find((offer) => offer.label === '丈八蛇矛')!;
+    const result = await useCard(ctx, {
       actor: 'a',
       choice: { kind: 'viewAs', ...offer.choice, materials: ['x', 'y'] } as UseIntent['choice'],
       targets: ['c'],
@@ -284,15 +288,15 @@ it('丈八复用同一响应管线，装备失效后转换与范围一起关闭�
       .find(({ self }) => self.origin?.id === 'weapon')!.self;
     await withLifetime(ctx, 'turn', (at, lifetime) => {
       blockSkill(at, self, lifetime);
-      expect(game.book.offers(at, 'a', 'response')).toEqual([
+      expect(cardOffers(at, 'a', 'response')).toEqual([
         expect.objectContaining({ kind: 'physical', label: '闪' }),
       ]);
-      expect(game.book.attackRange(at, 'a', semantic)).toBe(1);
+      expect(attackRange(at, 'a', semantic)).toBe(1);
     });
-    expect(game.book.attackRange(ctx, 'a', semantic)).toBe(3);
+    expect(attackRange(ctx, 'a', semantic)).toBe(3);
   });
   const running = game.room.run('respond', (ctx) =>
-    game.book.respond(ctx, 'a', ['standard:slash'], {
+    respond(ctx, 'a', ['standard:slash'], {
       useId: 'duel',
       effectId: 'duel:b',
       actor: 'b',
@@ -363,7 +367,7 @@ it('离场能力从移动前快照补入，支付材料后也触发，普通手�
       'lost',
     );
     expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(1);
-    await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'a:hand' });
+    await equip(ctx, { card: 'armor', owner: 'a', from: 'a:hand' });
   });
   // 普通费用接口同样经 cardsMoved；无需装备专用卸载函数。
   await game.room.run('pay', (ctx) =>
@@ -418,13 +422,13 @@ it('新装备在移牌后效中被取走，装备事实仍在真实安装的提�
     eligible: (_ctx, moved) => moved.moves.some((move) => move.to === 'a:equipment'),
     async run(ctx) {
       expect(game.room.history.facts(Equipment.equipped)).toHaveLength(1);
-      expect(game.book.attackRange(ctx, 'a', semantic)).toBe(3);
+      expect(attackRange(ctx, 'a', semantic)).toBe(3);
       await moveCards(
         ctx,
         [{ cards: ['weapon'], from: 'a:equipment', to: 'b:hand', place: 'bottom' }],
         'take',
       );
-      expect(game.book.attackRange(ctx, 'a', semantic)).toBe(1);
+      expect(attackRange(ctx, 'a', semantic)).toBe(1);
     },
   });
   expect(await use(game, install('weapon'))).toMatchObject({ value: { kind: 'used' } });
@@ -455,7 +459,7 @@ it('已失效装备的离场候选不能绕过失效；到期重新装回后可�
       );
       expect(game.room.history.facts(testTiming('probe:equipment-lost'))).toHaveLength(0);
     });
-    await equip(ctx, game.book, { card: 'armor', owner: 'a', from: 'discard' });
+    await equip(ctx, { card: 'armor', owner: 'a', from: 'discard' });
     await moveCards(
       ctx,
       [{ cards: ['armor'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
@@ -522,7 +526,7 @@ it('技能与装备共同贡献纯查询，预览不提交；写操作会被查�
         skill: impure.id,
         source: { kind: 'general', id: 'g' },
       });
-      broken.book.handLimit(ctx, 'a');
+      handLimit(ctx, 'a');
     }),
   ).rejects.toThrow('Pure queries cannot perform rule operations.');
 });
@@ -541,7 +545,7 @@ it('禁止目标查询阻止装备使用，不能以过滤成零目标的方式�
       skill: skill.id,
       source: { kind: 'general', id: 'g' },
     });
-    expect(game.book.validateUse(ctx, install('weapon')).ok).toBe(false);
+    expect(validateUse(ctx, install('weapon')).ok).toBe(false);
     expect(ctx.world.position('weapon')).toBe('a:hand');
   });
 });
@@ -552,8 +556,7 @@ it('重建和替换快照后，装备能力按当前实体与持有者派生', a
   });
   await use(game, install('weapon'));
   const restored = new World(rebuildWorld(game.initial, game.room.history.facts()));
-  const skills = new SkillBook([]);
-  new CardBook(standardCards, skills);
+  const skills = new SkillBook([], standardCards);
   expect(skills.bindings(restored.reader).map(({ definition }) => definition.name)).toEqual([
     '丈八蛇矛',
   ]);

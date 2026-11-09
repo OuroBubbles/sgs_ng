@@ -15,6 +15,8 @@ import {
   moveCards,
   generalOf,
   roleOf,
+  useCard,
+  validateUse,
 } from '../../src/sdk';
 import { createRoleMatch } from '../../src/host/content';
 import { CardEvent } from '../../src/sdk';
@@ -90,19 +92,19 @@ it('龙胆不绕过杀的距离与阶段次数，失去技能后旧配方立即�
   });
   const instance = (await grant(game, longdan.id)).id;
   await game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
       const intent = {
         actor: 'a',
         choice: { kind: 'viewAs', instance, recipe: 'jink-slash', materials: ['j1'] },
         targets: ['b'],
         timing: phase.playTiming(),
       } as const;
-      expect(game.book.validateUse(at, { ...intent, targets: ['c'] }).ok).toBe(false);
-      await game.book.use(at, intent);
+      expect(validateUse(at, { ...intent, targets: ['c'] }).ok).toBe(false);
+      await useCard(at, intent);
       const next = { ...intent, choice: { ...intent.choice, materials: ['j2'] } };
-      expect(game.book.validateUse(at, next).ok).toBe(false);
+      expect(validateUse(at, next).ok).toBe(false);
       await game.skills.revoke(at, 'a', longdan.id, source);
-      expect(game.book.validateUse(at, { ...next, timing: { kind: 'effect' } }).ok).toBe(false);
+      expect(validateUse(at, { ...next, timing: { kind: 'effect' } }).ok).toBe(false);
     }),
   );
   expect(game.room.world.position('j2')).toBe('a:hand');
@@ -115,9 +117,9 @@ it('咆哮允许连续用杀但仍累计次数，失去后恢复已累计的上�
   });
   await grant(game, paoxiao.id);
   await game.room.run('phases', async (ctx) => {
-    await runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    await runPhase(ctx, 'a', 'play', async (at, phase) => {
       for (const id of ['s1', 's2']) {
-        const used = await game.book.use(at, {
+        const used = await useCard(at, {
           actor: 'a',
           choice: { kind: 'physical', card: id },
           targets: ['b'],
@@ -127,7 +129,7 @@ it('咆哮允许连续用杀但仍累计次数，失去后恢复已累计的上�
       }
       await game.skills.revoke(at, 'a', paoxiao.id, source);
       expect(
-        game.book.validateUse(at, {
+        validateUse(at, {
           actor: 'a',
           choice: { kind: 'physical', card: 's3' },
           targets: ['b'],
@@ -135,9 +137,9 @@ it('咆哮允许连续用杀但仍累计次数，失去后恢复已累计的上�
         }).ok,
       ).toBe(false);
     });
-    await runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    await runPhase(ctx, 'a', 'play', async (at, phase) => {
       expect(
-        await game.book.use(at, {
+        await useCard(at, {
           actor: 'a',
           choice: { kind: 'physical', card: 's3' },
           targets: ['b'],
@@ -204,15 +206,14 @@ it('奇袭拒绝红色牌和已交出的旧材料，不复制一次选择时的�
       targets: ['b'],
       timing: { kind: 'effect' },
     } as const;
-    expect(game.book.validateUse(ctx, intent).ok).toBe(false);
+    expect(validateUse(ctx, intent).ok).toBe(false);
     await moveCards(
       ctx,
       [{ cards: ['black'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],
       'give',
     );
     expect(
-      game.book.validateUse(ctx, { ...intent, choice: { ...intent.choice, materials: ['black'] } })
-        .ok,
+      validateUse(ctx, { ...intent, choice: { ...intent.choice, materials: ['black'] } }).ok,
     ).toBe(false);
   });
   expect(game.room.history.facts(CardEvent.used)).toEqual([]);

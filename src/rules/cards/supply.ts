@@ -1,9 +1,10 @@
+import { buildCard, cardOffers, hasCardOffers, parseCardChoice } from './card';
+import { cardDef } from '../skills/skills';
 import { rulesOf } from '../skills/skills';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { pay } from '../costs/pay';
 import { isGameOver } from '../game/end';
-import { parseCardChoice } from './book';
 import { withProcessing } from './processing';
 import type { CardChoice, SemanticCard } from './types';
 import { Response } from './response';
@@ -35,7 +36,6 @@ export function withCardSupply<T>(
   input: CardSupplyInput,
   body: (ctx: Context, supply: SuppliedCard) => T | Promise<T>,
 ): Promise<SupplyResult<T>> {
-  const book = rulesOf(ctx);
   const isAvailable = input.available?.bind(input);
   const { actor, beneficiary, names, reason } = immutable({
     actor: input.actor,
@@ -57,21 +57,21 @@ export function withCardSupply<T>(
     const valid = (at: Context, choice: CardChoice) =>
       at.query(() => {
         if (!live(at)) return false;
-        const built = book.build(at, actor, choice, 'response');
+        const built = buildCard(at, actor, choice, 'response');
         return built.ok && names.includes(built.value.name);
       });
     const answer = await child.ask<CardChoice>({
       player: actor,
       kind: 'card-response',
-      prompt: `请为 ${beneficiary} 打出${names.map((name) => book.definition(name).label).join('/')}（${reason}）`,
+      prompt: `请为 ${beneficiary} 打出${names.map((name) => cardDef(ctx, name).label).join('/')}（${reason}）`,
       optional: true,
       describe: () => ({
         names,
         beneficiary,
         reason,
-        offers: book.offers(child, actor, 'response', names),
+        offers: cardOffers(child, actor, 'response', names),
       }),
-      available: () => live(child) && book.hasOffers(child, actor, 'response', names),
+      available: () => live(child) && hasCardOffers(child, actor, 'response', names),
       validate: (value) => {
         const parsed = parseCardChoice(value);
         return !parsed.ok
@@ -83,7 +83,7 @@ export function withCardSupply<T>(
     });
     if (answer.kind !== 'chosen')
       return { kind: answer.kind === 'unavailable' ? 'unavailable' : 'declined' };
-    const built = book.build(child, actor, answer.value, 'response');
+    const built = buildCard(child, actor, answer.value, 'response');
     if (!built.ok || !valid(child, answer.value)) return { kind: 'unavailable' };
     const card = built.value;
     const origins = new Map(card.materials.map((id) => [id, child.world.position(id)]));
@@ -94,11 +94,11 @@ export function withCardSupply<T>(
         to: processing.zone,
         reason,
         ...(card.source?.kind === 'viewAs'
-          ? { skill: book.skills.binding(at.world, card.source.instance)!.self }
+          ? { skill: rulesOf(ctx).binding(at.world, card.source.instance)!.self }
           : { actor }),
         materialAllowed: (_ctx, id, zone) => origins.get(id) === zone.id,
         legal: (latest) => {
-          const current = book.build(latest, actor, answer.value, 'response');
+          const current = buildCard(latest, actor, answer.value, 'response');
           return (
             live(latest) &&
             current.ok &&

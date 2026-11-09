@@ -32,7 +32,7 @@ function setup(create: (self: EffectHandle<Balance>) => EffectBehavior) {
   });
   async function run() {
     await game.room.run('capacity', async (ctx) => {
-      const record = await game.book.effects.add(ctx, effect, { owner: 'b', data: { count: 1 } });
+      const record = await game.skills.effects.add(ctx, effect, { owner: 'b', data: { count: 1 } });
       ctx.defer(
         game.room.on(redeem, {
           id: 'accumulate',
@@ -40,13 +40,13 @@ function setup(create: (self: EffectHandle<Balance>) => EffectBehavior) {
           group: 'before',
           eligible: () => true,
           async run(at) {
-            await game.book.effects.update(at, record.id, { count: 8 });
+            await game.skills.effects.update(at, record.id, { count: 8 });
           },
         }),
       );
       await ctx.window(redeem, null);
     });
-    expect(game.book.effects.instances(game.room.world)).toEqual([]);
+    expect(game.skills.effects.instances(game.room.world)).toEqual([]);
     expect(game.room.decisions.pending).toEqual([]);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   }

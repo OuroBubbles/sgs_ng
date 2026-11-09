@@ -3,7 +3,7 @@ import { Room } from '../../src/core/runtime/room';
 import { cardSeed } from '../fixtures/cards';
 import { standard } from '../fixtures/standard';
 import { covenant } from '../../examples/effects/covenant';
-import { createContent, EffectBook } from '../../src/sdk';
+import { createContent, EffectBook, handLimit } from '../../src/sdk';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 
 function create(content: ReturnType<typeof createContent>) {
@@ -20,13 +20,13 @@ it('共用目录隔离两局效果，列表固定后真实创建、查询与重�
   effects.length = 0;
   const left = create(content);
   const right = create(content);
-  expect(left.book.effects).not.toBe(right.book.effects);
+  expect(left.skills.effects).not.toBe(right.skills.effects);
   await left.room.run('create', (ctx) =>
-    left.book.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
+    left.skills.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
   );
-  expect(left.room.inspect((ctx) => left.book.handLimit(ctx, 'b'))).toBe(5);
-  expect(right.room.inspect((ctx) => right.book.handLimit(ctx, 'b'))).toBe(4);
-  expect(right.book.effects.instances(right.room.world)).toEqual([]);
+  expect(left.room.inspect((ctx) => handLimit(ctx, 'b'))).toBe(5);
+  expect(right.room.inspect((ctx) => handLimit(ctx, 'b'))).toBe(4);
+  expect(right.skills.effects.instances(right.room.world)).toEqual([]);
   for (const game of [left, right]) {
     expect(game.room.world.snapshot.skills).toEqual([]);
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
@@ -39,10 +39,10 @@ it('未选择的效果定义不泄漏定义，未知声明拒绝整次提交', a
   const game = create(createContent(standard));
   await expect(
     game.room.run('missing', (ctx) =>
-      game.book.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
+      game.skills.effects.add(ctx, covenant, { owner: 'b', data: { target: 'b', remaining: 1 } }),
     ),
   ).rejects.toThrow('Unknown effect');
-  expect(game.book.effects.instances(game.room.world)).toEqual([]);
+  expect(game.skills.effects.instances(game.room.world)).toEqual([]);
   expect(game.room.world.snapshot.states).toEqual([]);
 });
 

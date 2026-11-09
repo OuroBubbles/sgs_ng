@@ -12,6 +12,9 @@ import {
   pay,
   runPhase,
   SkillBook,
+  buildCard,
+  cardOffers,
+  handLimit,
 } from '../../src/sdk';
 import type { Context, SkillDefinition, SkillHandle, SkillProvider } from '../../src/sdk';
 import type { TriggerSource } from '../../src/core/runtime/event';
@@ -227,7 +230,7 @@ it('中途安装的新 Provider 立即参与当前查询，但触发候选从下
               ctx,
             );
           }
-          expect(game.book.handLimit(ctx, 'a')).toBe(5);
+          expect(handLimit(ctx, 'a')).toBe(5);
         },
       }),
     ],
@@ -359,7 +362,7 @@ it('来源卸载立即移除查询/转换/主动入口，重新登记只产生�
   const provider: SkillProvider = { collect: () => [{ self: source, definition }] };
   const game = cardGame();
   await game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
       const remove = game.skills.addProvider(provider, at);
       await at.window(window, null);
       const old = game.skills.binding(at.world, source.id)!.self;
@@ -369,23 +372,23 @@ it('来源卸载立即移除查询/转换/主动入口，重新登记只产生�
         recipe: 'slash',
         materials: ['slash1'],
       };
-      expect(game.book.handLimit(at, 'a')).toBe(6);
-      expect(activeOffers(at, game.book, phase)).toMatchObject([{ label: source.name }]);
-      expect(game.book.offers(at, 'a', 'use')).toContainEqual(
+      expect(handLimit(at, 'a')).toBe(6);
+      expect(activeOffers(at, phase)).toMatchObject([{ label: source.name }]);
+      expect(cardOffers(at, 'a', 'use')).toContainEqual(
         expect.objectContaining({ kind: 'viewAs', label: source.name }),
       );
-      expect(game.book.build(at, 'a', choice, 'use').ok).toBe(true);
+      expect(buildCard(at, 'a', choice, 'use').ok).toBe(true);
       remove(at);
-      expect(game.book.handLimit(at, 'a')).toBe(4);
-      expect(activeOffers(at, game.book, phase)).toEqual([]);
-      expect(game.book.build(at, 'a', choice, 'use').ok).toBe(false);
+      expect(handLimit(at, 'a')).toBe(4);
+      expect(activeOffers(at, phase)).toEqual([]);
+      expect(buildCard(at, 'a', choice, 'use').ok).toBe(false);
       expect(old.active(at)).toBe(false);
       expect(old.active(at)).toBe(false);
       const removeNew = game.skills.addProvider(provider, at);
       remove(at);
       expect(old.active(at)).toBe(false);
       expect(game.skills.binding(at.world, source.id)!.self.active(at)).toBe(true);
-      expect(game.book.handLimit(at, 'a')).toBe(6);
+      expect(handLimit(at, 'a')).toBe(6);
       removeNew(at);
     }),
   );
@@ -571,7 +574,7 @@ it('Provider 的 class 来源保留原型方法和原登记谓词，不恢复作
     const first = game.skills.binding(ctx.world, source.id)!;
     expect(first.definition).toBe(definition);
     expect(
-      game.book.build(
+      buildCard(
         ctx,
         'a',
         { kind: 'viewAs', instance: source.id, recipe: 'virtual', materials: [] },

@@ -2,7 +2,6 @@ import { expect, it } from 'vitest';
 import {
   cardQueries,
   defineSkill,
-  rulesOf,
   modify,
   moveCards,
   judge,
@@ -13,6 +12,10 @@ import {
   Judgment,
   Response,
   Cost,
+  buildCard,
+  cardOffers,
+  face,
+  useCard,
 } from '../../src/sdk';
 import type { CardFaceChange, SkillDefinition, Context } from '../../src/sdk';
 import { wusheng } from '../../src/content/standard/generals/guanyu';
@@ -65,12 +68,12 @@ it('映绯统一当前手牌与装备面；印刷牌、他人手牌、公开牌�
   });
   await grant(game, vermilion.id);
   game.room.inspect((ctx) => {
-    expect(game.book.face(ctx, 'own')).toMatchObject({ suit: 'heart', color: 'red' });
-    expect(game.book.face(ctx, 'equip')).toMatchObject({ suit: 'heart', color: 'red' });
-    expect(game.book.face(ctx, 'other').suit).toBe('spade');
-    expect(game.book.face(ctx, 'top').suit).toBe('spade');
-    expect(game.book.face(ctx, 'top', 'a').suit).toBe('heart');
-    expect(game.book.face(ctx, 'top', 'b').suit).toBe('spade');
+    expect(face(ctx, 'own')).toMatchObject({ suit: 'heart', color: 'red' });
+    expect(face(ctx, 'equip')).toMatchObject({ suit: 'heart', color: 'red' });
+    expect(face(ctx, 'other').suit).toBe('spade');
+    expect(face(ctx, 'top').suit).toBe('spade');
+    expect(face(ctx, 'top', 'a').suit).toBe('heart');
+    expect(face(ctx, 'top', 'b').suit).toBe('spade');
   });
   expect(game.room.world.card('own').suit).toBe('spade');
   settled(game);
@@ -86,9 +89,9 @@ it('牌转交后按新持有者查询，失去技能立即恢复原牌面，不�
       [{ cards: ['own'], from: 'a:hand', to: 'b:hand', place: 'bottom' }],
       'give',
     );
-    expect(game.book.face(ctx, 'own').color).toBe('red');
+    expect(face(ctx, 'own').color).toBe('red');
     await game.skills.revoke(ctx, 'b', vermilion.id, source);
-    expect(game.book.face(ctx, 'own').color).toBe('black');
+    expect(face(ctx, 'own').color).toBe('black');
     expect(ctx.world.card('own').suit).toBe('spade');
   });
   settled(game);
@@ -101,10 +104,10 @@ it.each([wusheng, jijiu])(
     await grant(game, vermilion.id);
     await grant(game, skill.id);
     game.room.inspect((ctx) => {
-      const offer = game.book.offers(ctx, 'a', 'use').find((entry) => entry.kind === 'viewAs');
+      const offer = cardOffers(ctx, 'a', 'use').find((entry) => entry.kind === 'viewAs');
       expect(offer?.materials).toEqual(['material']);
       if (!offer || !('instance' in offer.choice)) throw new Error('Missing recipe.');
-      const built = game.book.build(
+      const built = buildCard(
         ctx,
         'a',
         { kind: 'viewAs', ...offer.choice, materials: ['material'] },
@@ -122,9 +125,9 @@ it.each([qingguo, qixi])('过滤后的黑桃不再提供 $name 的黑色配方',
   await grant(game, skill.id);
   game.room.inspect((ctx) =>
     expect(
-      game.book
-        .offers(ctx, 'a', skill === qingguo ? 'response' : 'use')
-        .filter((offer) => offer.kind === 'viewAs'),
+      cardOffers(ctx, 'a', skill === qingguo ? 'response' : 'use').filter(
+        (offer) => offer.kind === 'viewAs',
+      ),
     ).toEqual([]),
   );
   settled(game);
@@ -142,16 +145,14 @@ it('无花色与颜色独立：显式红色黑桃可武圣，转换继承红色�
       .bindings(ctx.world)
       .find((entry) => entry.self.skill === wusheng.id)!.self;
     expect(
-      game.book.build(
+      buildCard(
         ctx,
         'a',
         { kind: 'viewAs', instance: self.id, recipe: 'red-slash', materials: ['material'] },
         'use',
       ),
     ).toMatchObject({ ok: true, value: { suit: 'spade', color: 'red' } });
-    expect(game.book.offers(ctx, 'a', 'response').some((offer) => offer.label === '倾国')).toBe(
-      false,
-    );
+    expect(cardOffers(ctx, 'a', 'response').some((offer) => offer.label === '倾国')).toBe(false);
   });
   settled(game);
 });
@@ -165,16 +166,15 @@ it('过滤花色供国色，过滤名称供实体杀与龙胆，仍走正式牌�
   });
   for (const id of [diamond.id, rename.id, guose.id, longdan.id]) await grant(game, id);
   game.room.inspect((ctx) => {
-    expect(game.book.build(ctx, 'a', { kind: 'physical', card: 'material' }, 'use')).toMatchObject({
+    expect(buildCard(ctx, 'a', { kind: 'physical', card: 'material' }, 'use')).toMatchObject({
       ok: true,
       value: { name: 'standard:slash', suit: 'diamond', color: 'red' },
     });
+    expect(cardOffers(ctx, 'a', 'use').find((offer) => offer.label === '国色')?.materials).toEqual([
+      'material',
+    ]);
     expect(
-      game.book.offers(ctx, 'a', 'use').find((offer) => offer.label === '国色')?.materials,
-    ).toEqual(['material']);
-    expect(
-      game.book.offers(ctx, 'a', 'response').find((offer) => offer.label === '龙胆 · 闪')
-        ?.materials,
+      cardOffers(ctx, 'a', 'response').find((offer) => offer.label === '龙胆 · 闪')?.materials,
     ).toEqual(['material']);
   });
   expect(
@@ -203,7 +203,7 @@ it('已宣告红色杀在费用后失去映绯仍绕过仁王盾，快照不从�
     eligible: (_ctx, paid) => paid.cards.includes('s'),
     async run(ctx) {
       await game.skills.revoke(ctx, 'a', vermilion.id, source);
-      expect(game.book.face(ctx, 's').color).toBe('black');
+      expect(face(ctx, 's').color).toBe('black');
     },
   });
   await use(game, {
@@ -267,7 +267,7 @@ it('判定结束后失去过滤或将牌交给他人，不改变封口结果；�
         'take',
       );
       expect(result.card?.suit).toBe('heart');
-      expect(game.book.face(ctx, 'top').suit).toBe('spade');
+      expect(face(ctx, 'top').suit).toBe('spade');
     },
   });
   await game.room.run('judge', async (ctx) =>
@@ -331,7 +331,7 @@ it.each([false, true])('字段组合与同值贡献不依赖授予顺序：rever
   const game = cardGame({ skills: defs });
   for (const def of reverse ? defs.slice().reverse() : defs) await grant(game, def.id);
   game.room.inspect((ctx) =>
-    expect(game.book.face(ctx, 'slash1')).toMatchObject({ suit: 'heart', rank: 13, color: 'red' }),
+    expect(face(ctx, 'slash1')).toMatchObject({ suit: 'heart', rank: 13, color: 'red' }),
   );
   settled(game);
 });
@@ -340,7 +340,7 @@ it.each([false, true])('同字段冲突明确报错，不靠登记顺序静默�
   const defs = [filter('probe:heart', { suit: 'heart' }), filter('probe:club', { suit: 'club' })];
   const game = cardGame({ skills: defs });
   for (const def of reverse ? defs.slice().reverse() : defs) await grant(game, def.id);
-  expect(() => game.room.inspect((ctx) => game.book.face(ctx, 'slash1'))).toThrow(
+  expect(() => game.room.inspect((ctx) => face(ctx, 'slash1'))).toThrow(
     'Conflicting card face field: suit',
   );
   expect(game.room.world.card('slash1').suit).toBe('spade');
@@ -359,7 +359,7 @@ it.each([
   const game = cardGame({ skills: [filter('probe:bad', change as CardFaceChange)] });
   await grant(game, 'probe:bad');
   const before = game.room.history.entries.length;
-  expect(() => game.room.inspect((ctx) => game.book.face(ctx, 'slash1'))).toThrow(
+  expect(() => game.room.inspect((ctx) => face(ctx, 'slash1'))).toThrow(
     'Invalid card face contribution',
   );
   expect(game.room.history.entries).toHaveLength(before);
@@ -383,7 +383,7 @@ it('查询贡献不能借助捕获的运行上下文提交、随机或注册后�
   await grant(game, bad.id);
   await game.room.run('query', (ctx) => {
     captured = ctx;
-    expect(() => game.book.face(ctx, 'slash1')).toThrow('Pure queries');
+    expect(() => face(ctx, 'slash1')).toThrow('Pure queries');
   });
   expect(game.room.history.facts(testTiming('bad'))).toHaveLength(0);
   settled(game);
@@ -422,7 +422,7 @@ it('递归牌面查询明确诊断，退出后不残留求值标记；不同实�
         modifiers: [
           modify(cardQueries.cardFace, (ctx, { input }) => {
             if (input.card.id !== 'slash1') return undefined;
-            const other = rulesOf(ctx).face(ctx, recursive ? 'slash1' : 'peach');
+            const other = face(ctx, recursive ? 'slash1' : 'peach');
             return { suit: other.suit };
           }),
         ],
@@ -430,11 +430,11 @@ it('递归牌面查询明确诊断，退出后不残留求值标记；不同实�
     ],
   });
   await grant(game, 'probe:recursive');
-  expect(() => game.room.inspect((ctx) => game.book.face(ctx, 'slash1'))).toThrow(
+  expect(() => game.room.inspect((ctx) => face(ctx, 'slash1'))).toThrow(
     'Recursive card face query',
   );
   recursive = false;
-  game.room.inspect((ctx) => expect(game.book.face(ctx, 'slash1').suit).toBe('heart'));
+  game.room.inspect((ctx) => expect(face(ctx, 'slash1').suit).toBe('heart'));
   settled(game);
 });
 
@@ -443,9 +443,9 @@ it('反间按接收后的当前花色比较：未过滤黑桃交给映绯角色�
   await grant(game, fanjian.id);
   await grant(game, vermilion.id, 'b');
   const running = game.room.run('fanjian', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      const offer = activeOffers(at, game.book, phase)[0]!;
-      await activate(at, game.book, phase, {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      const offer = activeOffers(at, phase)[0]!;
+      await activate(at, phase, {
         instance: offer.choice.instance,
         action: offer.choice.action,
       });
@@ -604,7 +604,7 @@ it('桌面用牌快照与日志不因失去过滤而改变，手中余牌即时�
   await match.prepare();
   const id = match.room.world.zone('a:hand').cards[0]!;
   await match.room.run('use', async (ctx) => {
-    await match.book.use(ctx, {
+    await useCard(ctx, {
       actor: 'a',
       choice: { kind: 'physical', card: id },
       targets: ['b'],

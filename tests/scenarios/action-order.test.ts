@@ -19,6 +19,7 @@ import {
   Target,
   Judgment,
   Response,
+  useCard,
 } from '../../src/sdk';
 import type { Context, Timing, ActionAnchor, CardDefinition, UsePlanView } from '../../src/sdk';
 import { RoleMatch } from '../../src/host/role-match';
@@ -281,7 +282,7 @@ it('标准模式：活动 b 回合优先于 c 主体，回合结束后恢复 c �
   const seen: string[] = [];
   observe(game.room, probe, seen, (owner, name) => `${name}:${owner}`);
   await game.room.run('host', async (ctx) => {
-    await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => fire(at, 'turn') });
+    await runTurn(ctx, 'b', { phases: ['play'], body: (at) => fire(at, 'turn') });
     await fire(ctx, 'outside');
   });
   expect(seen).toEqual([
@@ -302,7 +303,7 @@ it('标准活动回合内，作者显式指定 d 起点仍可覆盖默认 b 政�
   const seen: string[] = [];
   observe(game.room, probe, seen);
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
         await at.window(probe, '', { subject: 'c', anchor: 'd' });
@@ -318,11 +319,11 @@ for (const abortInner of [false, true]) {
     const seen: string[] = [];
     observe(game.room, probe, seen, (owner, name) => `${name}:${owner}`);
     await game.room.run('host', (ctx) =>
-      runTurn(ctx, game.book, 'b', {
+      runTurn(ctx, 'b', {
         phases: ['play'],
         async body(at) {
           await fire(at, 'before');
-          await runTurn(at, game.book, 'd', {
+          await runTurn(at, 'd', {
             phases: ['play'],
             async body(inner) {
               await fire(inner, 'inner');
@@ -356,7 +357,7 @@ it('额外回合由真实 d 拥有者决定行动序，不继承正常轮转或�
   const seen: string[] = [];
   observe(game.room, probe, seen);
   await game.room.run('extra', (ctx) =>
-    runTurn(ctx, game.book, 'd', {
+    runTurn(ctx, 'd', {
       origin: { kind: 'extra', id: 'probe:extra', reason: 'probe' },
       phases: ['play'],
       body: (at) => fire(at, ''),
@@ -370,7 +371,7 @@ it('当前回合角色死亡后保留其席位起点，其他角色按后续座�
   const seen: string[] = [];
   observe(game.room, probe, seen);
   await game.room.run('death', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
         await kill(at, { player: 'b', killer: null, cause: death, reason: 'rule' });
@@ -402,7 +403,7 @@ it('孤立阶段不冒充回合，重建事实里的旧回合 ID 也不冒充当
       ],
       {},
     );
-    await runPhase(ctx, game.book, 'a', 'play', (at) => fire(at, ''));
+    await runPhase(ctx, 'a', 'play', (at) => fire(at, ''));
   });
   expect(seen).toEqual(['c', 'd', 'a', 'b']);
 });
@@ -422,7 +423,7 @@ for (const custom of [false, true]) {
     const seen: string[] = [];
     observe(match.room, probe, seen);
     await match.room.run('turn', (ctx) =>
-      runTurn(ctx, match.book, 'b', { phases: ['play'], body: (at) => fire(at, '', 'd') }),
+      runTurn(ctx, 'b', { phases: ['play'], body: (at) => fire(at, '', 'd') }),
     );
     expect(seen).toEqual(custom ? ['c', 'd', 'a', 'b'] : ['b', 'c', 'd', 'a']);
   });
@@ -471,10 +472,10 @@ it('b 回合由 d 用多目标牌：四层遍历与实际生效按模式排序�
       },
     });
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = await game.book.use(at, orderIntent(['a', 'd', 'c']));
+        const result = await useCard(at, orderIntent(['a', 'd', 'c']));
         expect(result).toMatchObject({
           kind: 'used',
           use: {
@@ -522,10 +523,10 @@ it('确认中追加更早的 b 身份：按冻结行动序补齐时点，不重�
       },
     });
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
-        await game.book.use(at, orderIntent(['c']));
+        await useCard(at, orderIntent(['c']));
       },
     }),
   );
@@ -560,16 +561,16 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     ...orderCard,
     use: {
       ...orderCard.use!,
-      async resolve(ctx, { effect, book }) {
+      async resolve(ctx, { effect }) {
         resolved.push(`outer:${effect.target}`);
         if (effect.target !== 'c') return;
-        await runTurn(ctx, book, 'a', {
+        await runTurn(ctx, 'a', {
           phases: ['play'],
           async body(at) {
             expect(outer!.actionOrder).toEqual(['b', 'c', 'd', 'a']);
             outer!.addTarget(at, 'b', 'probe');
             const intent = orderIntent(['c', 'b']);
-            const result = await book.use(at, {
+            const result = await useCard(at, {
               ...intent,
               choice: { ...intent.choice, face: { name: innerCard.id } },
             });
@@ -592,10 +593,10 @@ it('嵌套 a 回合创建新牌序；向外层牌追加目标仍使用外层 b �
     },
   });
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
-        await game.book.use(at, orderIntent(['a', 'c']));
+        await useCard(at, orderIntent(['a', 'c']));
       },
     }),
   );
@@ -609,10 +610,10 @@ it('b 回合由 a 用杀、c 实际使用闪：使用完成按 b 排序，实际
   const seen: string[] = [];
   observe(game.room, Use.finished, seen);
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
-        await game.book.use(at, {
+        await useCard(at, {
           actor: 'a',
           choice: { kind: 'physical', card: 's' },
           targets: ['c'],
@@ -652,7 +653,7 @@ it('b 回合 c 为 d 鬼才：判定结束与打出完成都按 b 排序，两�
   observe(game.room, Response.finished, responses);
   observe(game.room, Judgment.finished, judgments);
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
         const result = await judge(at, {
@@ -691,12 +692,12 @@ for (const custom of [false, true]) {
       draw: [card('draw1', 'slash'), card('draw2', 'slash')],
       ...(custom ? { actionAnchor: () => 'c' } : {}),
     });
-    installCounterspells(game.room, game.book);
+    installCounterspells(game.room);
     const running = game.room.run('turn', (ctx) =>
-      runTurn(ctx, game.book, 'b', {
+      runTurn(ctx, 'b', {
         phases: ['play'],
         async body(at) {
-          await game.book.use(at, {
+          await useCard(at, {
             actor: 'a',
             choice: { kind: 'physical', card: 'trick' },
             targets: ['a'],
@@ -722,9 +723,9 @@ for (const custom of [false, true]) {
       hands: { a: [], b: [card('pb', 'peach', 'heart')], c: [card('pc', 'peach', 'heart')] },
       ...(custom ? { actionAnchor: () => 'c' } : {}),
     });
-    installRescue(game.room, game.book);
+    installRescue(game.room);
     const running = game.room.run('turn', (ctx) =>
-      runTurn(ctx, game.book, 'b', {
+      runTurn(ctx, 'b', {
         phases: ['play'],
         async body(at) {
           await loseHp(at, { player: 'a', amount: 4, reason: 'probe' });
@@ -759,10 +760,10 @@ for (const custom of [false, true]) {
       await game.skills.grant(ctx, { owner: 'a', skill: hujia.id, source });
     });
     const running = game.room.run('turn', (ctx) =>
-      runTurn(ctx, game.book, 'b', {
+      runTurn(ctx, 'b', {
         phases: ['play'],
         async body(at) {
-          await game.book.use(at, {
+          await useCard(at, {
             actor: 'c',
             choice: { kind: 'physical', card: 's' },
             targets: ['a'],
@@ -804,10 +805,10 @@ for (const custom of [false, true]) {
       (entry) => entry.skill === jijiang.id,
     )!.id;
     const running = game.room.run('turn', (ctx) =>
-      runTurn(ctx, game.book, 'b', {
+      runTurn(ctx, 'b', {
         phases: ['play'],
         async body(at) {
-          const result = await game.book.use(at, {
+          const result = await useCard(at, {
             actor: 'a',
             choice: { kind: 'viewAs', instance, recipe: 'ask-slash', materials: [] },
             targets: ['c'],
@@ -892,10 +893,10 @@ it('真实五谷在 b 回合由 d 使用：共享牌池按 b、c、d、a 依次�
     draw: [1, 2, 3, 4].map((i) => card(`pool${i}`, 'slash')),
   });
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'b', {
+    runTurn(ctx, 'b', {
       phases: ['play'],
       async body(at) {
-        const result = await game.book.use(at, {
+        const result = await useCard(at, {
           actor: 'd',
           choice: { kind: 'physical', card: 'grace' },
           targets: [],

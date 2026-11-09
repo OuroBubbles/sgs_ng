@@ -600,7 +600,7 @@ it('延时牌放置经过四层，后续判定生效使用新效果身份且不�
     },
   });
   await use(game, { ...slash(['b']), choice: { kind: 'physical', card: 'delay' } });
-  await game.room.run('judge', (ctx) => runPhase(ctx, game.book, 'b', 'judge', defaultPhaseBody));
+  await game.room.run('judge', (ctx) => runPhase(ctx, 'b', 'judge', defaultPhaseBody));
   expect(starts).toEqual([
     { stage: 'use', state: 'ready', targetStage: 'confirmed' },
     { stage: 'delayed', state: 'ready', targetStage: null },

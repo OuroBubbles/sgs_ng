@@ -1,9 +1,12 @@
+import { useSelection } from '../cards/use';
+import { cardOffers, hasCardOffers, parseCardChoice } from '../cards/card';
+import { handLimit } from '../cards/rule';
+import { canDiscard } from '../cards/discard';
+import { useCard } from '../cards/use';
 import { JointSelection } from '../../core/decisions/selection';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Change } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
-import { parseCardChoice } from '../cards/book';
-import type { CardBook } from '../cards/book';
 import { draw } from '../cards/draw';
 import { resolveJudgmentPhase } from '../cards/delayed';
 import { ownedCards } from '../cards/types';
@@ -87,7 +90,7 @@ export interface TurnResult {
   readonly phases: readonly PhaseResult[];
 }
 /** 等待阶段体完成；阶段结果仍由阶段流程产生。 */
-export type PhaseBody = (ctx: Context, phase: PhaseView, book: CardBook) => unknown;
+export type PhaseBody = (ctx: Context, phase: PhaseView) => unknown;
 const currentPhases = new WeakMap<Context['world'], PhaseView>();
 /** 只返回当前 World、当前祖先路径内仍存活的阶段；嵌套阶段返回最内层。 */
 export function currentPhase(ctx: Context): PhaseView | null {
@@ -268,12 +271,12 @@ class PhaseControl implements PhaseView {
 }
 
 /** 主动用牌的主持侧决策；回复不携带 actor、timing 或 generated 指令。 */
-export async function playPhase(ctx: Context, phase: PhaseView, book: CardBook): Promise<void> {
+export async function playPhase(ctx: Context, phase: PhaseView): Promise<void> {
   const timing = phase.playTiming();
   while (ctx.world.player(phase.owner).alive && !phase.turn?.ended && !isGameOver(ctx.world)) {
     const describe = () => ({
       phase: phase.snapshot(),
-      offers: [...book.offers(ctx, phase.owner, timing), ...activeOffers(ctx, book, phase)],
+      offers: [...cardOffers(ctx, phase.owner, timing), ...activeOffers(ctx, phase)],
       targets: ctx.world.snapshot.players
         .filter((player) => player.alive)
         .map((player) => ({ id: player.id, hp: player.hp })),
@@ -291,33 +294,31 @@ export async function playPhase(ctx: Context, phase: PhaseView, book: CardBook):
       prompt: '使用牌、发动技能，或结束出牌阶段',
       describe,
       optional: true,
-      available: () =>
-        book.hasOffers(ctx, phase.owner, timing) || activeAvailable(ctx, book, phase),
+      available: () => hasCardOffers(ctx, phase.owner, timing) || activeAvailable(ctx, phase),
       feedback: (input) => {
         if (isRecord(input) && 'instance' in input) {
-          return inspectActive(ctx, book, phase, input);
+          return inspectActive(ctx, phase, input);
         }
         if (!isRecord(input) || !isStringArray(input.targets)) return null;
         const choice = parseCardChoice(input.choice);
         return choice.ok
-          ? book
-              .useSelection(ctx, {
-                actor: phase.owner,
-                choice: choice.value,
-                timing,
-              })
-              .feedback?.({ cards: [], targets: input.targets })
+          ? useSelection(ctx, { actor: phase.owner, choice: choice.value, timing }).feedback?.({
+              cards: [],
+              targets: input.targets,
+            })
           : null;
       },
       validate: (input) => {
-        if (isRecord(input) && 'instance' in input) return validateActive(ctx, book, phase, input);
+        if (isRecord(input) && 'instance' in input) return validateActive(ctx, phase, input);
         if (!isRecord(input) || !isStringArray(input.targets))
           return { ok: false, reason: 'Expected card choice and targets.' };
         const choice = parseCardChoice(input.choice);
         if (!choice.ok) return choice;
-        const selected = book
-          .useSelection(ctx, { actor: phase.owner, choice: choice.value, timing })
-          .validate({ cards: [], targets: input.targets });
+        const selected = useSelection(ctx, {
+          actor: phase.owner,
+          choice: choice.value,
+          timing,
+        }).validate({ cards: [], targets: input.targets });
         return selected.ok
           ? { ok: true, value: { choice: choice.value, ...selected.value } }
           : selected;
@@ -325,11 +326,11 @@ export async function playPhase(ctx: Context, phase: PhaseView, book: CardBook):
     });
     if (answer.kind !== 'chosen') break;
     if ('instance' in answer.value) {
-      await activate(ctx, book, phase, answer.value);
+      await activate(ctx, phase, answer.value);
 
       continue;
     }
-    await book.use(ctx, {
+    await useCard(ctx, {
       actor: phase.owner,
       choice: answer.value.choice,
       targets: answer.value.targets,
@@ -340,25 +341,21 @@ export async function playPhase(ctx: Context, phase: PhaseView, book: CardBook):
 }
 
 /** 默认阶段体：判定区结算、摸牌、主动用牌和弃牌各自复用规则管线。 */
-export async function defaultPhaseBody(
-  ctx: Context,
-  phase: PhaseView,
-  book: CardBook,
-): Promise<void> {
+export async function defaultPhaseBody(ctx: Context, phase: PhaseView): Promise<void> {
   switch (phase.kind) {
     case 'draw':
       await draw(ctx, { player: phase.owner, count: 2, reason: 'draw-phase', phase });
       break;
     case 'play':
-      await playPhase(ctx, phase, book);
+      await playPhase(ctx, phase);
       break;
     case 'discard': {
       const cards = ownedCards(ctx.world, phase.owner);
-      const excess = Math.max(0, cards.length - book.handLimit(ctx, phase.owner));
+      const excess = Math.max(0, cards.length - handLimit(ctx, phase.owner));
       if (!excess) break;
       const selectable = () =>
         ownedCards(ctx.world, phase.owner).filter((card) =>
-          book.canDiscard(ctx, {
+          canDiscard(ctx, {
             actor: phase.owner,
             owner: phase.owner,
             card,
@@ -390,14 +387,13 @@ export async function defaultPhaseBody(
     case 'finish':
       break;
     case 'judge':
-      await resolveJudgmentPhase(ctx, phase, book);
+      await resolveJudgmentPhase(ctx, phase);
       break;
   }
 }
 
 export function runPhase(
   ctx: Context,
-  book: CardBook,
   owner: string,
   kind: PhaseKind,
   body: PhaseBody = defaultPhaseBody,
@@ -477,7 +473,7 @@ export function runPhase(
           !turn?.ended &&
           !isGameOver(child.world)
         )
-          await body(child, phase, book);
+          await body(child, phase);
         await child.window(Phase.ending, phase, { subject: owner });
         return {
           phase: phase.snapshot(),
@@ -497,7 +493,6 @@ export function runPhase(
 
 export function runTurn(
   ctx: Context,
-  book: CardBook,
   owner: string,
   options: TurnOptions = {},
 ): Promise<TurnResult> {
@@ -557,7 +552,7 @@ export function runTurn(
         const results: PhaseResult[] = [];
         for (const kind of phases) {
           if (turn.ended || !child.world.player(owner).alive || isGameOver(child.world)) break;
-          const phase = await runPhase(child, book, owner, kind, body, turn);
+          const phase = await runPhase(child, owner, kind, body, turn);
 
           results.push(phase);
         }

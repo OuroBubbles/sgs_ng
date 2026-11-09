@@ -1,3 +1,4 @@
+import type { SkillDefinition } from '../../sdk';
 import {
   ArrangementSelection,
   invoke,
@@ -5,11 +6,11 @@ import {
   moveCards,
   on,
   withPrivateTopCards,
-  rulesOf,
   Phase,
   Cards,
+  face,
+  cardDef,
 } from '../../sdk';
-import type { SkillDefinition } from '../../sdk';
 
 /** 角色额度与逐牌接收条件，复用分组模型；分配一次提交，不逐个打开送牌菜单。 */
 export const allotment = {
@@ -32,7 +33,7 @@ export const allotment = {
                 live()
                   ? pool.remaining().map((id) => ({
                       id,
-                      label: rulesOf(at).definition(rulesOf(at).face(at, id).name).label,
+                      label: cardDef(at, face(at, id).name).label,
                     }))
                   : [],
               groups: () =>
@@ -54,7 +55,7 @@ export const allotment = {
                   : [],
               canPlace: (item, target) =>
                 target === self.owner ||
-                rulesOf(at).face(at, item).color !== 'red' ||
+                face(at, item).color !== 'red' ||
                 at.world.player(target).hp < at.world.player(target).maxHp,
             });
             if (!live() || !pool.remaining().length) return;

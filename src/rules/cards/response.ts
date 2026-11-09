@@ -1,4 +1,4 @@
-import { immutable } from '../../core/model/value';
+import { equal, immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { withLifetime } from '../scopes/lifetime';
 import type { CardResponse } from './played';
@@ -13,8 +13,12 @@ import type {
   UseSnapshot,
   ResponseUseOpportunity,
 } from './types';
-import { parseCardChoice } from './book';
-import type { CardBook } from './book';
+import { cardDef } from '../skills/skills';
+import { pay } from '../costs/pay';
+import { buildCard, cardOffers, hasCardOffers, parseCardChoice } from './card';
+import { CardEvent } from './move';
+import { withProcessing } from './processing';
+import { abilityHandle, useCard, validateUse } from './use';
 import { defineEvent, timing } from '../../core/runtime/event';
 
 export type ResponseResult =
@@ -73,12 +77,6 @@ export type ResponseConsumer = (
   response: Extract<ResponseResult, { kind: 'responded' }>,
   available: (ctx: Context) => boolean,
 ) => Promise<ResponseResult>;
-type CommitResponse = (
-  ctx: Context,
-  input: ResponseIntent,
-  available: (ctx: Context) => boolean,
-  consume?: ResponseConsumer,
-) => Promise<ResponseResult>;
 interface ParentResponse {
   readonly id: string;
   readonly beneficiary: string;
@@ -104,14 +102,12 @@ export const Response = defineEvent('response', {
   requestFinished: timing<unknown>(),
 });
 
-/** 响应机会只拥有待决请求；使用、打出、材料交接由 CardBook 原有领域管线执行。 */
-export function requestResponse(
+/** 响应机会只拥有待决请求；使用、打出、材料交接由原有用牌/支付管线执行。 */
+function requestResponse(
   ctx: Context,
-  book: CardBook,
   actor: string,
   requestedNames: readonly string[],
   target: EffectRef,
-  commit: CommitResponse,
   parent?: ParentResponse,
   purpose: Purpose = 'response',
   consume?: ResponseConsumer,
@@ -138,11 +134,11 @@ export function requestResponse(
     const canProvide = (at: Context, choice: CardChoice) =>
       at.query(() => {
         if (!available(at)) return false;
-        const card = book.build(at, actor, choice, purpose);
+        const card = buildCard(at, actor, choice, purpose);
         if (!card.ok || !names.includes(card.value.name)) return false;
         return (
           purpose === 'response' ||
-          book.validateUse(at, {
+          validateUse(at, {
             actor,
             choice,
             targets: [],
@@ -177,7 +173,7 @@ export function requestResponse(
           if (!canProvide(provider, selected)) return { kind: 'unavailable' };
           busy = true;
           try {
-            const result = await commit(
+            const result = await answerChoice(
               provider,
               {
                 actor,
@@ -232,7 +228,7 @@ export function requestResponse(
                         materials: card.materials,
                         origin: { actor: response.actor, card },
                       };
-                      const result = await commit(
+                      const result = await answerChoice(
                         handoff,
                         {
                           actor,
@@ -252,11 +248,9 @@ export function requestResponse(
                 : consume;
             const result = await requestResponse(
               delegation,
-              book,
               provider,
               delegatedNames,
               to,
-              commit,
               {
                 id: lifetime.id,
                 beneficiary,
@@ -298,7 +292,7 @@ export function requestResponse(
     };
     const offerPurpose =
       purpose === 'use' ? { kind: 'response' as const, opportunity: useOpportunity } : 'response';
-    const offers = () => book.offers(child, actor, offerPurpose, names);
+    const offers = () => cardOffers(child, actor, offerPurpose, names);
     child.commit(Response.requested, [], snapshot);
     if (available(child))
       await child.window(Response.requested, opportunity, { subject: actor, active: pending });
@@ -309,7 +303,7 @@ export function requestResponse(
       const answer = await child.ask<CardChoice>({
         player: actor,
         kind: 'card-response',
-        prompt: `请${actor === beneficiary ? '' : `为 ${beneficiary} `}${purpose === 'use' ? '使用' : '打出'}${names.map((name) => book.definition(name).label).join('/')}`,
+        prompt: `请${actor === beneficiary ? '' : `为 ${beneficiary} `}${purpose === 'use' ? '使用' : '打出'}${names.map((name) => cardDef(child, name).label).join('/')}`,
         describe: () => ({
           to: { useId: to.useId, effectId: to.effectId },
           names,
@@ -318,7 +312,7 @@ export function requestResponse(
           offers: offers(),
         }),
         optional: true,
-        available: () => available(child) && book.hasOffers(child, actor, offerPurpose, names),
+        available: () => available(child) && hasCardOffers(child, actor, offerPurpose, names),
         validate: (input) => {
           const parsed = parseCardChoice(input);
           return !parsed.ok
@@ -338,5 +332,125 @@ export function requestResponse(
     }
     child.commit(Response.requestFinished, [], { ...snapshot, result });
     return immutable(result);
+  });
+}
+
+export function respond(
+  ctx: Context,
+  actor: string,
+  requestedNames: readonly string[],
+  target: EffectRef,
+): Promise<ResponseResult> {
+  return requestResponse(ctx, actor, requestedNames, target);
+}
+
+/** 响应一个效果时使用牌；技能供牌者实际打出，原请求者使用，材料在回调内交接。 */
+export function useResponse(
+  ctx: Context,
+  actor: string,
+  names: readonly string[],
+  target: EffectRef,
+): Promise<ResponseResult> {
+  return requestResponse(ctx, actor, names, target, undefined, 'use');
+}
+
+function answerChoice(
+  ctx: Context,
+  input: ResponseIntent,
+  available: (ctx: Context) => boolean,
+  consume?: ResponseConsumer,
+): Promise<ResponseResult> {
+  if (input.purpose === 'response') return respondChoice(ctx, input, available, consume);
+  return ctx.flow<ResponseResult>('response.use', async (at) => {
+    const opportunity = Object.freeze({
+      ...input.opportunity,
+      available: (current: Context) =>
+        current.query(() => input.opportunity.available(current) && available(current)),
+    });
+    const result = await useCard(at, {
+      actor: input.actor,
+      choice: input.choice,
+      targets: [],
+      timing: { kind: 'response', opportunity },
+    });
+    return result.kind === 'used'
+      ? {
+          kind: 'used',
+          id: result.use.id,
+          actor: result.use.actor,
+          card: result.use.card,
+          use: result.use,
+        }
+      : { kind: 'unavailable' };
+  });
+}
+
+function respondChoice(
+  ctx: Context,
+  input: ResponseIntent,
+  available: (ctx: Context) => boolean,
+  consume?: ResponseConsumer,
+): Promise<ResponseResult> {
+  return ctx.flow('response.card', async (child) => {
+    const { actor, names, to, choice } = input;
+    const built = buildCard(child, actor, choice, 'response');
+    if (!child.query(() => available(child)) || !built.ok || !names.includes(built.value.name))
+      return { kind: 'unavailable' };
+    const card = built.value;
+    const id = child.cause.flowId;
+    const origins = new Map(
+      card.materials.map((material) => [material, child.world.position(material)]),
+    );
+    const processed = await withProcessing<ResponseResult>(child, [], async (body, processing) => {
+      const paid = await pay(body, {
+        cards: card.materials,
+        to: processing.zone,
+        reason: id,
+        factKind: CardEvent.responded,
+        ...(card.source?.kind === 'viewAs'
+          ? { skill: abilityHandle(body, card.source.instance) }
+          : { actor }),
+        materialAllowed: (_pay, material, zone) => origins.get(material) === zone.id,
+        legal: (atPay) => {
+          const current = buildCard(atPay, actor, choice, 'response');
+          return (
+            atPay.query(() => available(atPay)) &&
+            current.ok &&
+            names.includes(current.value.name) &&
+            equal(current.value, card)
+          );
+        },
+        declaration: {
+          responseId: id,
+          processing: processing.zone,
+          request: input.request,
+          beneficiary: input.beneficiary,
+          to: { useId: to.useId, effectId: to.effectId },
+          card,
+        },
+      });
+
+      if (paid.kind !== 'paid') return { kind: 'unavailable' };
+      await body.window(
+        Response.finished,
+        immutable({ id, actor, card, subject: { kind: 'effect', effect: to } }),
+        { subject: actor },
+      );
+      const response = { kind: 'responded', id, actor, card } as const;
+      if (!consume) return response;
+      const consumed = await consume(
+        body,
+        response,
+        (at) =>
+          at.query(() => available(at)) &&
+          processing.lifetime.active &&
+          at.cause.scopePath.includes(processing.lifetime.id) &&
+          card.materials.every((material) => at.world.position(material) === processing.zone),
+      );
+
+      return consumed;
+    });
+
+    return processed;
   });
 }

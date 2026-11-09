@@ -16,8 +16,10 @@ import type { MoveDeclaration, MoveResult } from './cards/move';
 import { ownedCards } from './cards/types';
 import type { ViewAs, ViewAsInput } from './cards/types';
 import type { PhysicalCardFace } from './cards/face';
+import { face } from './cards/face';
+import { canDiscard } from './cards/discard';
 import { payDiscard, used } from './costs/pay';
-import { rulesOf } from './skills/skills';
+import { cardDef } from './skills/skills';
 import type { SkillDefinition, SkillHandle, SkillTrigger } from './skills/skills';
 import type { SkillModifier } from './skills/query';
 import { equipmentCard } from './cards/equipment';
@@ -48,21 +50,14 @@ export const alive = (ctx: Context, player: string): boolean => ctx.world.player
 /** 本局行动顺序中除 owner 外的席位（含已阵亡者，由调用者筛选）。 */
 export const others = (ctx: Context, owner: string): readonly string[] =>
   ctx.actionOrder(owner).filter((id) => id !== owner);
-/** 当前牌面（含锁定视为）。 */
-export const face = (ctx: Context, card: string, judgmentPlayer?: string) =>
-  rulesOf(ctx).face(ctx, card, judgmentPlayer);
-/** 牌名（如 standard:slash）对应的定义。 */
-export const cardDef = (ctx: Context, name: string) => rulesOf(ctx).definition(name);
 /** 实体牌的印刷名。 */
 export const cardLabel = (ctx: Context, card: string): string =>
-  rulesOf(ctx).definition(ctx.world.card(card).name).label;
+  cardDef(ctx, ctx.world.card(card).name).label;
 const handOf = (ctx: Context, player: string): string =>
   ctx.world.snapshot.zones.find((zone) => zone.owner === player && zone.kind === 'hand')!.id;
-export const canDiscard = (ctx: Context, actor: string, card: string, reason: string) =>
-  rulesOf(ctx).canDiscard(ctx, { actor, owner: actor, card, reason });
 /** actor 自己可以弃置的牌。 */
 export const discardable = (ctx: Context, actor: string, reason: string, areas: Areas = ['hand']) =>
-  ownedCards(ctx.world, actor, areas).filter((card) => canDiscard(ctx, actor, card, reason));
+  ownedCards(ctx.world, actor, areas).filter((card) => canDiscard(ctx, { actor, card, reason }));
 
 export const wounded = (ctx: Context, player: string): boolean => {
   const seat = ctx.world.player(player);
@@ -299,7 +294,8 @@ export function action(spec: ActionSpec): ActiveSkill {
                 ? ownedCards(ctx.world, self.owner, cards.areas ?? ['hand'])
                     .filter(
                       (card) =>
-                        (!discardOnly || canDiscard(ctx, self.owner, card, self.skill)) &&
+                        (!discardOnly ||
+                          canDiscard(ctx, { actor: self.owner, card, reason: self.skill })) &&
                         (cards.filter?.(ctx, card, input) ?? true),
                     )
                     .map((card) => ({ id: card, label: ctx.world.card(card).name }))
@@ -341,7 +337,6 @@ export function action(spec: ActionSpec): ActiveSkill {
       const args: ActionContext = {
         self,
         phase,
-        book: input.book,
         cards: choice.cards,
         targets: choice.targets,
       };

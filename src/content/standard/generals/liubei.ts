@@ -10,7 +10,6 @@ import {
   peers,
   readState,
   recover,
-  rulesOf,
   setState,
   skill,
   stateChange,
@@ -18,6 +17,8 @@ import {
   declare,
   withCardSupply,
   Response,
+  useCard,
+  validateUse,
 } from '../../../sdk';
 import type {
   CardChoice,
@@ -136,9 +137,8 @@ export const jijiang = skill(
     make: { name: 'standard:slash' },
     use: (ctx, { self, intent }) =>
       ctx.flow('jijiang.use', async (at) => {
-        const rules = rulesOf(at);
         const probe: UseIntent = { ...intent, choice: probeChoice };
-        const live = (current: Context) => rules.validateUse(current, probe).ok;
+        const live = (current: Context) => validateUse(current, probe).ok;
         // 选择此配方并提交目标已经表示发动；不再追加一次是否发动的询问。
         if (!(await declare(at, self, { legal: () => live(at) })))
           return { kind: 'unavailable', reason: 'Jijiang was not invoked.' };
@@ -155,7 +155,7 @@ export const jijiang = skill(
               available: live,
             },
             (useAt, supply) =>
-              rules.use(useAt, {
+              useCard(useAt, {
                 ...intent,
                 choice: providedChoice(supply.card, actor, self.skill),
               }),

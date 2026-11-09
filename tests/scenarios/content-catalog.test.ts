@@ -1,7 +1,7 @@
 import { testTiming } from '../fixtures/timing';
 import { expect, it } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
-import { defineSkill, rulesOf, on, moveCards, loseHp, createContent } from '../../src/sdk';
+import { defineSkill, rulesOf, on, moveCards, loseHp, createContent, useCard } from '../../src/sdk';
 import type { SkillDefinition } from '../../src/sdk';
 import { createRoleMatch, defaultContent, practiceContent } from '../../src/host/content';
 import { cardView } from '../../src/host/projection';
@@ -49,7 +49,7 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
   );
   const first = catalog.createBooks();
   const second = catalog.createBooks();
-  expect(first.book).not.toBe(second.book);
+  expect(first.skills).not.toBe(second.skills);
   expect(first.skills.definition('study').triggers![0]!.window).toBe(window);
   const match = new RoleMatch({
     id: 'plain',
@@ -61,7 +61,7 @@ it('普通源码直接组合无命名空间的定义，保留时点身份、本�
       { id: 'b', general: 'scholar' },
     ],
   });
-  match.room.inspect((ctx) => expect(rulesOf(ctx)).toBe(match.book));
+  match.room.inspect((ctx) => expect(rulesOf(ctx)).toBe(match.skills));
   await match.prepare();
   const hp = match.room.world.player('a').hp;
   await match.room.run('plain', (ctx) => ctx.window(window, { player: 'a' }));
@@ -78,9 +78,9 @@ it('内置源码显式组合标准与演武牌、武将和牌组，不自动发�
   const first = content.createBooks();
   const second = content.createBooks();
   expect(first.skills.definition('standard:luoyi').name).toBe('裸衣');
-  expect(second.book.effects).not.toBe(first.book.effects);
-  for (const { book } of [first, second])
-    expect(() => book.effects.register([luoyiAftereffect])).toThrow(/Duplicate effect/);
+  expect(second.skills.effects).not.toBe(first.skills.effects);
+  for (const { skills } of [first, second])
+    expect(() => skills.effects.register([luoyiAftereffect])).toThrow(/Duplicate effect/);
   expect(defaultContent.cards).toHaveLength(32);
   expect(defaultContent.generals).toHaveLength(25);
   expect(defaultContent.createDeck('standard:identity')).toHaveLength(108);
@@ -106,7 +106,7 @@ it('声明列表在组合时固定，每局目录独立且技能经 rulesOf 读�
   const one = content.createBooks();
   const two = content.createBooks();
   expect(one.skills.definition('plain').name).toBe('普通技能');
-  expect(two.book).not.toBe(one.book);
+  expect(two.skills).not.toBe(one.skills);
   expect(two.skills).not.toBe(one.skills);
 });
 
@@ -151,12 +151,12 @@ it('普通定义与预装配目录共用牌组和效果装配，单机入口无�
       content,
     });
     await match.room.run('effect', (ctx) =>
-      match.book.effects.add(ctx, luoyiAftereffect, {
+      match.skills.effects.add(ctx, luoyiAftereffect, {
         owner: 'a',
         data: { actor: 'a', turn: 'probe' },
       }),
     );
-    expect(match.book.effects.instances(match.room.world, luoyiAftereffect)[0]?.data).toEqual({
+    expect(match.skills.effects.instances(match.room.world, luoyiAftereffect)[0]?.data).toEqual({
       actor: 'a',
       turn: 'probe',
     });
@@ -238,7 +238,7 @@ for (const branch of ['draw', 'recover'] as const) {
     const before = match.room.world.zone('甲席:hand').cards.length;
     const hp = match.room.world.player('甲席').hp;
     const running = match.room.run('test-use', (ctx) =>
-      match.book.use(ctx, {
+      useCard(ctx, {
         actor: '甲席',
         choice: { kind: 'physical', card: id },
         targets: ['甲席'],
@@ -295,7 +295,7 @@ it('混合内容的闻策也能响应标准锦囊，工厂未捕获另一套规�
     ),
   );
   const running = match.room.run('use', (ctx) =>
-    match.book.use(ctx, {
+    useCard(ctx, {
       actor: '甲席',
       choice: { kind: 'physical', card: id },
       targets: ['甲席'],

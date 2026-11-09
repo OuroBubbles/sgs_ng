@@ -29,8 +29,7 @@ async function grant(game: Game) {
     game.skills.grant(ctx, { owner: 'a', skill: 'workshop:allotment', source }),
   );
 }
-const prepare = (game: Game) =>
-  game.room.run('prepare', (ctx) => runPhase(ctx, game.book, 'a', 'prepare'));
+const prepare = (game: Game) => game.room.run('prepare', (ctx) => runPhase(ctx, 'a', 'prepare'));
 function replay(game: Game) {
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
   expect(game.room.world.snapshot.zones.some((zone) => zone.kind === 'processing')).toBe(false);

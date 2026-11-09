@@ -1,5 +1,15 @@
 import type { CardDefinition } from '../../sdk';
-import { damage, recover, draw, resolveCounter, resolveAttack } from '../../sdk';
+import {
+  attackRange,
+  responseTimes,
+  withinDistance,
+  respond,
+  damage,
+  recover,
+  draw,
+  resolveCounter,
+  resolveAttack,
+} from '../../sdk';
 import { trickCards } from './tricks';
 import { standardEquipment } from './equipment';
 import { standardDelayed } from './delayed';
@@ -15,7 +25,7 @@ export const standardCards: readonly CardDefinition[] = [
       count: { min: 0, max: 0 },
       target: () => false,
       timings: ['counter'],
-      execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
+      execute: (ctx, { use }) => resolveCounter(ctx, use),
     },
   },
   {
@@ -38,16 +48,11 @@ export const standardCards: readonly CardDefinition[] = [
     use: {
       count: { min: 1, max: 1 },
       usage: { key: 'slash', max: 1 },
-      target: (ctx, { request, target, book }) =>
+      target: (ctx, { request, target }) =>
         target !== request.actor &&
-        book.withinDistance(
-          ctx,
-          request,
-          target,
-          book.attackRange(ctx, request.actor, request.card),
-        ),
-      resolve: (ctx, { effect, book }) =>
-        resolveAttack(ctx, effect, book, { name: 'standard:jink', purpose: 'use' }),
+        withinDistance(ctx, request, target, attackRange(ctx, request.actor, request.card)),
+      resolve: (ctx, { effect }) =>
+        resolveAttack(ctx, effect, { name: 'standard:jink', purpose: 'use' }),
     },
   },
   {
@@ -92,14 +97,14 @@ export const standardCards: readonly CardDefinition[] = [
     use: {
       count: { min: 1, max: 1 },
       target: (_ctx, { request, target }) => target !== request.actor,
-      async resolve(ctx, { effect, book }) {
+      async resolve(ctx, { effect }) {
         let responder = effect.target;
         let opponent = effect.actor;
         while (ctx.world.player(responder).alive && ctx.world.player(opponent).alive) {
-          const count = book.responseTimes(ctx, effect, responder, 'standard:slash');
+          const count = responseTimes(ctx, effect, responder, 'standard:slash');
           let answered = count > 0;
           for (let i = 0; i < count; i++) {
-            const response = await book.respond(ctx, responder, ['standard:slash'], effect);
+            const response = await respond(ctx, responder, ['standard:slash'], effect);
             if (response.kind !== 'responded') {
               answered = false;
               break;

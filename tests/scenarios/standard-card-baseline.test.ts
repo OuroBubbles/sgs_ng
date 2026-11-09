@@ -8,6 +8,10 @@ import {
   moveCards,
   runPhase,
   withLifetime,
+  cardOffers,
+  attackRange,
+  buildCard,
+  distance,
 } from '../../src/sdk';
 import type { SemanticCard, UseIntent } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
@@ -45,14 +49,14 @@ it.each([
   expect(await use(game, physical('horse'))).toMatchObject({ value: { kind: 'used' } });
   await game.room.run('distance', async (ctx) => {
     const slot = defensive ? 'defensive-horse' : 'offensive-horse';
-    expect(equipmentInSlot(ctx.world, game.book, 'a', slot)).toEqual(['horse']);
-    const distances = () => [game.book.distance(ctx, 'a', 'c'), game.book.distance(ctx, 'c', 'a')];
+    expect(equipmentInSlot(ctx, 'a', slot)).toEqual(['horse']);
+    const distances = () => [distance(ctx, 'a', 'c'), distance(ctx, 'c', 'a')];
     expect(distances()).toEqual(defensive ? [2, 3] : [1, 2]);
-    expect(game.book.distance(ctx, 'a', 'b')).toBe(1);
-    expect(game.book.distance(ctx, 'a', 'a')).toBe(0);
+    expect(distance(ctx, 'a', 'b')).toBe(1);
+    expect(distance(ctx, 'a', 'a')).toBe(0);
     const asMaterial = { ...slash, materials: ['horse'] };
-    expect(game.book.distance(ctx, 'a', 'c', asMaterial)).toBe(2);
-    expect(game.book.distance(ctx, 'c', 'a', asMaterial)).toBe(2);
+    expect(distance(ctx, 'a', 'c', asMaterial)).toBe(2);
+    expect(distance(ctx, 'c', 'a', asMaterial)).toBe(2);
     const self = game.skills
       .bindings(ctx.world)
       .find(({ self }) => self.origin?.id === 'horse')!.self;
@@ -85,22 +89,22 @@ it.each([
   const game = cardGame({ hands: { a: [card('weapon', name)] } });
   expect(await use(game, physical('weapon'))).toMatchObject({ value: { kind: 'used' } });
   await game.room.run('range', async (ctx) => {
-    expect(game.book.attackRange(ctx, 'a', slash)).toBe(range);
-    expect(game.book.attackRange(ctx, 'b', slash)).toBe(1);
-    expect(game.book.attackRange(ctx, 'a', { ...slash, materials: ['weapon'] })).toBe(1);
+    expect(attackRange(ctx, 'a', slash)).toBe(range);
+    expect(attackRange(ctx, 'b', slash)).toBe(1);
+    expect(attackRange(ctx, 'a', { ...slash, materials: ['weapon'] })).toBe(1);
     const self = game.skills
       .bindings(ctx.world)
       .find(({ self }) => self.origin?.id === 'weapon')!.self;
     await withLifetime(ctx, 'turn', (at, lifetime) => {
       blockSkill(at, self, lifetime);
-      expect(game.book.attackRange(at, 'a', slash)).toBe(1);
+      expect(attackRange(at, 'a', slash)).toBe(1);
     });
-    expect(game.book.attackRange(ctx, 'a', slash)).toBe(range);
-    expect(
-      await equip(ctx, game.book, { card: 'weapon', owner: 'b', from: 'a:equipment' }),
-    ).toMatchObject({ kind: 'equipped' });
-    expect(game.book.attackRange(ctx, 'a', slash)).toBe(1);
-    expect(game.book.attackRange(ctx, 'b', slash)).toBe(range);
+    expect(attackRange(ctx, 'a', slash)).toBe(range);
+    expect(await equip(ctx, { card: 'weapon', owner: 'b', from: 'a:equipment' })).toMatchObject({
+      kind: 'equipped',
+    });
+    expect(attackRange(ctx, 'a', slash)).toBe(1);
+    expect(attackRange(ctx, 'b', slash)).toBe(range);
   });
   settled(game);
 });
@@ -116,14 +120,12 @@ it.each(['use', 'response'] as const)(
       equipment: { a: [card('spear', 'spear'), card('equipped', 'eight_diagram')] },
     });
     await game.room.run('recipe', async (ctx) => {
-      const offer = game.book
-        .offers(ctx, 'a', purpose)
-        .find((offer) => offer.label === '丈八蛇矛')!;
+      const offer = cardOffers(ctx, 'a', purpose).find((offer) => offer.label === '丈八蛇矛')!;
       expect(offer.kind).toBe('viewAs');
       const choice = offer.choice;
       if (!('instance' in choice)) throw new Error('Missing spear recipe.');
       const build = (materials: readonly string[]) =>
-        game.book.build(
+        buildCard(
           ctx,
           'a',
           {
@@ -172,15 +174,15 @@ it.each(['eight_diagram', 'nioh_shield'] as const)(
     });
     expect(game.room.world.position('armor')).toBe('a:hand');
     expect(await use(game, physical('armor'))).toMatchObject({ value: { kind: 'used' } });
-    expect(equipmentInSlot(game.room.world, game.book, 'a', 'armor')).toEqual(['armor']);
+    expect(equipmentInSlot(game.room, 'a', 'armor')).toEqual(['armor']);
     await game.room.run('transfer', async (ctx) => {
-      await equip(ctx, game.book, { card: 'armor', owner: 'b', from: 'a:equipment' });
+      await equip(ctx, { card: 'armor', owner: 'b', from: 'a:equipment' });
       const bindings = game.skills
         .bindings(ctx.world)
         .filter(({ self }) => self.origin?.id === 'armor');
       expect(bindings.map(({ self }) => self.owner)).toEqual(['b']);
-      expect(equipmentInSlot(ctx.world, game.book, 'a', 'armor')).toEqual([]);
-      expect(equipmentInSlot(ctx.world, game.book, 'b', 'armor')).toEqual(['armor']);
+      expect(equipmentInSlot(ctx, 'a', 'armor')).toEqual([]);
+      expect(equipmentInSlot(ctx, 'b', 'armor')).toEqual(['armor']);
     });
     settled(game);
   },
@@ -195,7 +197,7 @@ it.each(['heart', 'diamond', 'club'] as const)(
     });
     await use(game, physical('lightning'));
     const original = delayedCards(game.room.world, 'a')[0]!.source;
-    await game.room.run('judge', (ctx) => runPhase(ctx, game.book, 'a', 'judge'));
+    await game.room.run('judge', (ctx) => runPhase(ctx, 'a', 'judge'));
     expect(game.room.world.player('a').hp).toBe(4);
     expect(game.room.history.facts(Damage.dealt)).toEqual([]);
     expect(delayedCards(game.room.world, 'a')).toEqual([]);
@@ -261,7 +263,7 @@ it.each([1, 2])(
       },
       draw: [card('one', 'slash'), card('two', 'jink')],
     });
-    installCounterspells(game.room, game.book);
+    installCounterspells(game.room);
     const running = use(game, physical('spell', ['a']));
     for (const material of ['first', 'second'].slice(0, depth)) {
       const request = await nextRequest(game.room);

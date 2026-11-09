@@ -29,6 +29,10 @@ import {
   Cards,
   Response,
   Cost,
+  buildCard,
+  cardOffers,
+  useCard,
+  validateUse,
 } from '../../src/sdk';
 import type { Context, PhaseView, CardChoice, SuppliedCard, UseResult } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
@@ -49,18 +53,18 @@ async function wound(game: Game, player = 'a', hp = 2) {
     ctx.commit(testTiming('test.hp'), [{ kind: 'vitality', player, hp }], null),
   );
 }
-async function act(ctx: Context, game: Game, phase: PhaseView, skill: string) {
-  const offer = activeOffers(ctx, game.book, phase).find((o) => o.skill === skill)!;
+async function act(ctx: Context, phase: PhaseView, skill: string) {
+  const offer = activeOffers(ctx, phase).find((o) => o.skill === skill)!;
   expect(offer).toBeDefined();
-  await activate(ctx, game.book, phase, {
+  await activate(ctx, phase, {
     instance: offer.choice.instance,
     action: offer.choice.action,
   });
 }
 function startActive(game: Game, skill: string, count = 1) {
   return game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      for (let i = 0; i < count; i++) await act(at, game, phase, skill);
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      for (let i = 0; i < count; i++) await act(at, phase, skill);
     }),
   );
 }
@@ -84,8 +88,8 @@ function startJijiang(
   after?: (ctx: Context, phase: PhaseView, result: UseResult) => void | Promise<void>,
 ) {
   return game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      const result = await game.book.use(at, {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      const result = await useCard(at, {
         actor: 'a',
         choice: jijiangChoice(game),
         targets: ['b'],
@@ -101,10 +105,10 @@ it('currentPhase 只返回局内当前祖先阶段，嵌套和规则中止后恢
   const game = generalGame();
   const foreign = generalGame();
   await game.room.run('outer', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, outer) => {
+    runPhase(ctx, 'a', 'play', async (at, outer) => {
       expect(currentPhase(at)).toBe(outer);
       await foreign.room.run('foreign', (ctx) => expect(currentPhase(ctx)).toBeNull());
-      await runPhase(at, game.book, 'b', 'draw', (inner, phase) => {
+      await runPhase(at, 'b', 'draw', (inner, phase) => {
         expect(currentPhase(inner)).toBe(phase);
         inner.abort('stop inner');
       });
@@ -147,10 +151,10 @@ it('仁德满体力跨过两张也消耗首次门槛，随后受伤再给牌不�
   });
   await grant(game, 'standard:rende');
   const running = game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await act(at, game, phase, 'standard:rende');
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await act(at, phase, 'standard:rende');
       at.commit(testTiming('test.hp'), [{ kind: 'vitality', player: 'a', hp: 2 }], null);
-      await act(at, game, phase, 'standard:rende');
+      await act(at, phase, 'standard:rende');
     }),
   );
   await answer(game, { cards: ['one', 'two'], targets: ['b'] }, 'cards-targets');
@@ -197,10 +201,10 @@ it('仁德计数不因支付后失去并重获技能重置，重复出牌阶段�
     },
   });
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play', 'play'],
       async body(at, phase) {
-        await act(at, game, phase, 'standard:rende');
+        await act(at, phase, 'standard:rende');
       },
     }),
   );
@@ -244,12 +248,10 @@ it('青囊可以治疗自己，取消不占次数，成功后本阶段不能再�
   await grant(game, 'standard:qingnang');
   await wound(game);
   const running = game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await act(at, game, phase, 'standard:qingnang');
-      await act(at, game, phase, 'standard:qingnang');
-      expect(activeOffers(at, game.book, phase).some((o) => o.skill === 'standard:qingnang')).toBe(
-        false,
-      );
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await act(at, phase, 'standard:qingnang');
+      await act(at, phase, 'standard:qingnang');
+      expect(activeOffers(at, phase).some((o) => o.skill === 'standard:qingnang')).toBe(false);
     }),
   );
   await cancel(game);
@@ -264,9 +266,7 @@ it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动�
   await grant(game, 'standard:qingnang');
   await wound(game);
   await game.room.run('no-hand', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) =>
-      expect(activeOffers(at, game.book, phase)).toEqual([]),
-    ),
+    runPhase(ctx, 'a', 'play', (at, phase) => expect(activeOffers(at, phase)).toEqual([])),
   );
   const lock = defineSkill({
     id: 'test:lock',
@@ -282,9 +282,7 @@ it('青囊只弃手牌且受弃置权限约束，无受伤目标时不显示动�
   await grant(blocked, lock.id);
   await wound(blocked);
   await blocked.room.run('blocked', (ctx) =>
-    runPhase(ctx, blocked.book, 'a', 'play', (at, phase) =>
-      expect(activeOffers(at, blocked.book, phase)).toEqual([]),
-    ),
+    runPhase(ctx, 'a', 'play', (at, phase) => expect(activeOffers(at, phase)).toEqual([])),
   );
 });
 it.each(['lost', 'source-dead', 'target-dead'] as const)(
@@ -319,10 +317,10 @@ it.each(['hand', 'equipment'] as const)(
       equipment: area === 'equipment' ? { a: [red] } : {},
     });
     await grant(game, 'standard:jijiu');
-    installRescue(game.room, game.book);
+    installRescue(game.room);
     await game.room.run('response-check', (ctx) =>
       expect(
-        game.book.build(
+        buildCard(
           ctx,
           'a',
           {
@@ -356,15 +354,15 @@ it.each(['hand', 'equipment'] as const)(
 it.each(['normal', 'extra'] as const)('急救在本人%s回合不可用，不能用红牌救别人', async (kind) => {
   const game = generalGame({ hands: { a: [card('red', 'slash', 'heart')] } });
   await grant(game, 'standard:jijiu');
-  installRescue(game.room, game.book);
+  installRescue(game.room);
   await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['prepare'],
       ...(kind === 'extra'
         ? { origin: { kind: 'extra' as const, id: 'extra', reason: 'test' } }
         : {}),
       async body(at) {
-        expect(game.book.offers(at, 'a', 'use', ['standard:peach'])).toEqual([]);
+        expect(cardOffers(at, 'a', 'use', ['standard:peach'])).toEqual([]);
         await loseHp(at, { player: 'b', amount: 4, reason: 'test' });
       },
     }),
@@ -377,7 +375,7 @@ it('急救不能选择黑色材料，回合外仍完整检查使用桃禁令', a
   const self = await grant(game, 'standard:jijiu');
   await game.room.run('black', (ctx) =>
     expect(
-      game.book.build(
+      buildCard(
         ctx,
         'a',
         { kind: 'viewAs', instance: self.id, recipe: 'red-peach', materials: ['black'] },
@@ -387,12 +385,12 @@ it('急救不能选择黑色材料，回合外仍完整检查使用桃禁令', a
   );
   const blocked = generalGame({
     hands: { a: [card('red', 'slash', 'heart')] },
-    policy: { prohibitUse: () => true },
+    rules: [modify(cardQueries.prohibitUse, () => true)],
   });
   const skill = await grant(blocked, 'standard:jijiu');
   await blocked.room.run('blocked', (ctx) =>
     expect(
-      blocked.book.build(
+      buildCard(
         ctx,
         'a',
         { kind: 'viewAs', instance: skill.id, recipe: 'red-peach', materials: ['red'] },
@@ -435,7 +433,7 @@ it('激将由蜀角色打出、刘备使用：两种归属各一次，实际材�
       },
     });
     expect(
-      game.book.validateUse(ctx, {
+      validateUse(ctx, {
         actor: 'a',
         choice: {
           kind: 'generated',
@@ -510,20 +508,20 @@ it('激将失败不消耗用杀次数，本阶段隐藏该用牌配方；下一�
   const { game } = await setupJijiang();
   let phaseNumber = 0;
   const running = game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play', 'play'],
       async body(at, phase) {
         phaseNumber++;
         if (phaseNumber === 1) {
-          const result = await game.book.use(at, {
+          const result = await useCard(at, {
             actor: 'a',
             choice: jijiangChoice(game),
             targets: ['b'],
             timing: phase.playTiming(),
           });
           expect(result).toMatchObject({ kind: 'unavailable' });
-          expect(game.book.offers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(false);
-        } else expect(game.book.offers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(true);
+          expect(cardOffers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(false);
+        } else expect(cardOffers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(true);
       },
     }),
   );
@@ -556,9 +554,12 @@ it('激将普通打出请求走已有委托，不伪造刘备第二次用牌或�
 it('激将以实际供牌牌面重新检查目标禁令，失败不宣告刘备用牌、不追回供牌费用', async () => {
   const { game } = await setupJijiang({
     hands: { c: [card('red', 'slash', 'heart')] },
-    policy: {
-      prohibitTarget: (_ctx, actor, _target, card) => actor === 'a' && card.suit === 'heart',
-    },
+    rules: [
+      modify(
+        cardQueries.prohibitTarget,
+        (_ctx, { input: { actor, card } }) => actor === 'a' && card.suit === 'heart',
+      ),
+    ],
   });
   const running = startJijiang(game, (_ctx, _phase, result) =>
     expect(result.kind).toBe('unavailable'),
@@ -627,10 +628,12 @@ it.each(['response', 'use'] as const)(
   async (kind) => {
     const { game } = await setupJijiang({
       hands: { c: [card('donor', 'slash')] },
-      policy:
-        kind === 'response'
-          ? { prohibitResponse: (_ctx, actor) => actor === 'c' }
-          : { prohibitUse: (_ctx, actor) => actor === 'c' },
+      rules: [
+        modify(
+          kind === 'response' ? cardQueries.prohibitResponse : cardQueries.prohibitUse,
+          (_ctx, { input: { actor } }) => actor === 'c',
+        ),
+      ],
     });
     const running = startJijiang(game);
     if (kind === 'use') await answer(game, { kind: 'physical', card: 'donor' }, 'card-response');
@@ -688,14 +691,14 @@ it('本人出牌阶段激将打出失败后仍可自己响应，但本阶段不�
     hands: { a: [card('duel', 'duel'), card('own', 'slash')], b: [card('first', 'slash')] },
   });
   const running = game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      await game.book.use(at, {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      await useCard(at, {
         actor: 'a',
         choice: { kind: 'physical', card: 'duel' },
         targets: ['b'],
         timing: phase.playTiming(),
       });
-      expect(game.book.offers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(false);
+      expect(cardOffers(at, 'a', 'use').some((o) => o.label === '激将')).toBe(false);
     }),
   );
   await answer(game, { kind: 'physical', card: 'first' }, 'card-response');

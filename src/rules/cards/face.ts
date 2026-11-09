@@ -2,7 +2,7 @@ import type { Card } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { defineQuery } from '../skills/query';
-import type { SkillBook } from '../skills/skills';
+import { queryRule } from '../skills/skills';
 import { colorOfSuit } from './types';
 import type { CardColor } from './types';
 
@@ -52,13 +52,27 @@ export const cardFace = defineQuery<CardFaceRequest, CardFaceChange>('card.face'
   return immutable({ ...left, ...patch });
 });
 
-/** 当前牌面是纯投影，实体牌和位置不变；提交宣告时由调用者保存返回值快照。 */
-export function physicalCardFace(
-  ctx: Context,
-  skills: SkillBook,
-  id: string,
-  judgmentPlayer?: string,
-): PhysicalCardFace {
+const active = new WeakMap<Context['world'], Set<string>>();
+
+/**
+ * 实体牌的当前牌面（含锁定视为）；判定显式指定被判定者，不借用改判供牌者的过滤。
+ * 当前牌面是纯投影，实体牌和位置不变；提交宣告时由调用者保存返回值快照。
+ */
+export function face(ctx: Context, id: string, judgmentPlayer?: string): PhysicalCardFace {
+  const key = JSON.stringify([id, judgmentPlayer ?? null]);
+  const running = active.get(ctx.world) ?? new Set<string>();
+  if (running.has(key)) throw new Error('Recursive card face query; read the printed input card.');
+  active.set(ctx.world, running);
+  running.add(key);
+  try {
+    return project(ctx, id, judgmentPlayer);
+  } finally {
+    running.delete(key);
+    if (!running.size) active.delete(ctx.world);
+  }
+}
+
+function project(ctx: Context, id: string, judgmentPlayer?: string): PhysicalCardFace {
   return ctx.query(() => {
     const card = ctx.world.card(id);
     const zone = ctx.world.zone(ctx.world.position(id));
@@ -68,7 +82,7 @@ export function physicalCardFace(
       player: judgmentPlayer ?? (['hand', 'equipment'].includes(zone.kind) ? zone.owner : null),
       judgment: judgmentPlayer !== undefined,
     });
-    const change = skills.query(ctx, cardFace, input, {});
+    const change = queryRule(ctx, cardFace, input, {});
     const suit = change.suit ?? card.suit;
     const result = immutable({
       id,

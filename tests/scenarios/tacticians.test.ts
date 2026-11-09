@@ -21,6 +21,10 @@ import {
   Target,
   Resolve,
   Cost,
+  distance,
+  useCard,
+  validateUse,
+  withinDistance,
 } from '../../src/sdk';
 import type { UseIntent, CardEffect, UsePlanView } from '../../src/sdk';
 import { generalGame } from '../fixtures/generals';
@@ -128,7 +132,7 @@ it('真实无懈可击也是普通锦囊，集智摸牌发生在反制生效前'
     hands: { a: [card('duel', 'duel')], b: [card('null', 'nullification')] },
     draw: [card('drawn', 'jink')],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   await grant(game, 'standard:jizhi', 'b');
   const running = use(game, physical('duel'));
   await answer(game, { kind: 'physical', card: 'null' }, 'use-card');
@@ -144,9 +148,9 @@ it('奇才只豁免锦囊距离，不改变真实距离或杀的范围', async (
   });
   await grant(game, 'standard:qicai');
   await game.room.run('inspect', (ctx) => {
-    expect(game.book.distance(ctx, 'a', 'c')).toBe(2);
-    expect(game.book.validateUse(ctx, physical('trick', 'a', ['c'])).ok).toBe(true);
-    expect(game.book.validateUse(ctx, physical('slash', 'a', ['c'])).ok).toBe(false);
+    expect(distance(ctx, 'a', 'c')).toBe(2);
+    expect(validateUse(ctx, physical('trick', 'a', ['c'])).ok).toBe(true);
+    expect(validateUse(ctx, physical('slash', 'a', ['c'])).ok).toBe(false);
   });
   settled(game);
 });
@@ -161,8 +165,8 @@ it('作者新建锦囊只需声明类别，集智和奇才无需增补牌名表'
         label: '作者锦囊',
         use: {
           count: { min: 1, max: 1 },
-          target: (ctx, { request, target, book }) =>
-            target !== request.actor && book.withinDistance(ctx, request, target, 1),
+          target: (ctx, { request, target }) =>
+            target !== request.actor && withinDistance(ctx, request, target, 1),
           resolve: () => {},
         },
       },
@@ -197,8 +201,8 @@ it('奇才不绕过目标禁令、空区域和同名延时牌限制', async () =
   await grant(game, 'standard:qicai');
   await grant(game, ban.id);
   await game.room.run('inspect', (ctx) => {
-    expect(game.book.validateUse(ctx, physical('trick', 'a', ['c'])).ok).toBe(false);
-    expect(game.book.validateUse(ctx, physical('trick', 'a', ['b'])).ok).toBe(false);
+    expect(validateUse(ctx, physical('trick', 'a', ['c'])).ok).toBe(false);
+    expect(validateUse(ctx, physical('trick', 'a', ['b'])).ok).toBe(false);
   });
   await use(game, physical('delay'));
   expect(await use(game, physical('delay2'))).toMatchObject({ value: { kind: 'unavailable' } });
@@ -235,14 +239,14 @@ it('无双的声明在技能失去后保留，但没有响应机会时不强开�
   for (const forbidden of [false, true]) {
     const game = generalGame({
       hands: { a: [card('slash', 'slash')], b: [card('j1', 'jink'), card('j2', 'jink')] },
-      ...(forbidden ? { policy: { responseTimes: () => 0 } } : {}),
     });
     await grant(game, 'standard:wushuang');
     game.room.on(Resolve.starting, {
       id: 'lose',
       owner: null,
       eligible: () => true,
-      async run(ctx) {
+      async run(ctx, { effect }) {
+        if (forbidden) effect.blockResponses(ctx, 'b', 'test:forbidden');
         await game.skills.revoke(ctx, 'a', 'standard:wushuang', source);
       },
     });
@@ -403,7 +407,10 @@ it.each(['weapon', 'horse'])(
 );
 it('流离不能给本人、出杀者、被禁止或已在本次杀内的目标', async () => {
   const game = liuliGame({
-    policy: { attackRange: () => 3, prohibitTarget: (_ctx, _actor, target) => target === 'd' },
+    rules: [
+      modify(cardQueries.attackRange, () => 3),
+      modify(cardQueries.prohibitTarget, (_ctx, { input: { target } }) => target === 'd'),
+    ],
   });
   await grant(game, 'standard:liuli', 'b');
   game.room.on(Use.declared, {
@@ -567,7 +574,7 @@ it.each(['redirect', 'cancel'])('公开用牌目标 %s 与原宣告日志分别�
         check();
       },
     });
-  const running = match.room.run('use', (ctx) => match.book.use(ctx, physical('slash')));
+  const running = match.room.run('use', (ctx) => useCard(ctx, physical('slash')));
   if (kind === 'redirect') {
     const r = await nextRequest(match.room);
     expect(

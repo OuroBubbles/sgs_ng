@@ -1,3 +1,6 @@
+import { face } from '../rules/cards/face';
+import { Use } from '../rules/cards/use';
+import { cardDef } from '../rules/skills/skills';
 import type { WorldReader } from '../core/model/state';
 import type { HistoryReader } from '../core/history/journal';
 import type { DecisionRequest } from '../core/decisions/hub';
@@ -49,7 +52,6 @@ import { Turn, Phase } from '../rules/turn/turn';
 import { Game } from '../rules/game/end';
 import { Delayed } from '../rules/cards/delayed';
 import { Judgment } from '../rules/cards/judge';
-import { Use } from '../rules/cards/book';
 import { Counter } from '../rules/cards/counter';
 import { Collateral } from '../content/standard/collateral';
 import { Weapon } from '../content/standard/weapons';
@@ -99,10 +101,10 @@ export function candidates(value: unknown): readonly CandidateView[] {
     : [];
 }
 type Face = Pick<Card, 'name' | 'suit' | 'rank'> & { readonly color?: string };
-function face(match: RoleMatch, id: string, card: Face): CardView {
+function presentCard(match: RoleMatch, id: string, card: Face): CardView {
   const { name, rank } = card;
   const presentation = match.content?.cardViews[name];
-  const definition = match.book.definition(name);
+  const definition = cardDef(match.room, name);
   return {
     id,
     name: definition.label,
@@ -124,16 +126,16 @@ function face(match: RoleMatch, id: string, card: Face): CardView {
   };
 }
 export function cardView(match: RoleMatch, id: string): CardView {
-  return face(
+  return presentCard(
     match,
     id,
-    match.room.inspect((ctx) => match.book.face(ctx, id)),
+    match.room.inspect((ctx) => face(ctx, id)),
   );
 }
 
 /** 只有实体 ID 的旧事实按印刷牌识别；不拿当前持有者的过滤改写过去的日志。 */
 function printedCardView(match: RoleMatch, id: string): CardView {
-  return face(match, id, match.room.world.card(id));
+  return presentCard(match, id, match.room.world.card(id));
 }
 
 function decisionView(match: RoleMatch, request: DecisionRequest): DecisionView {
@@ -211,7 +213,7 @@ function decisionView(match: RoleMatch, request: DecisionRequest): DecisionView 
           group.cards.push({
             id: candidate.id,
             label: candidate.label,
-            face: item.face === null ? null : face(match, candidate.id, item.face as Face),
+            face: item.face === null ? null : presentCard(match, candidate.id, item.face as Face),
           });
         }
       const cardGroups: readonly CardChoiceGroupView[] = [...groups.values()];
@@ -315,7 +317,7 @@ function publicHistory(
     useDeclarations(world).map((use) => [use.id, targetsOf(use.effects, use.edits)]),
   );
   const cardName = (id: string) => `【${printedCardView(match, id).name}】`;
-  const label = (card: { readonly name: string }) => match.book.definition(card.name).label;
+  const label = (card: { readonly name: string }) => cardDef(match.room, card.name).label;
   const processing = (zone: string) => world.snapshot.zones.some((item) => item.id === zone);
   type Narrator = (fact: Fact, play: (audio: LogView['audio']) => void) => string;
   const narrate = new Map<string, Narrator>();
@@ -333,7 +335,7 @@ function publicHistory(
       );
   };
   on([CardEvent.used, CardEvent.responded], ({ actor, declaration }, fact, play) => {
-    const card = face(match, `action:${fact.seq}`, declaration.card);
+    const card = presentCard(match, `action:${fact.seq}`, declaration.card);
     const source = declaration.card.source;
     const voice =
       skillVoice(actor, source?.kind === 'viewAs' ? source.skill : '', fact.seq) ??
@@ -382,7 +384,7 @@ function publicHistory(
       return match.skills.definition(id).name;
     } catch {
       // 装备技能以 `${牌}-ability` 为 ID，名称即牌名。
-      return match.book.definition(id.replace(/-ability$/, '')).label;
+      return cardDef(match.room, id.replace(/-ability$/, '')).label;
     }
   };
   on(Discard.committed, ({ declaration: d }) => {
@@ -465,7 +467,7 @@ function publicHistory(
   on(Cards.revealed, (d) => `公开展示 ${d.cards.length} 张牌`);
   on(Delayed.placed, ({ declaration: d }) => `${d.owner}的判定区置入【${label(d.source.card)}】`);
   on(Delayed.resolving, ({ declaration: d }, fact) => {
-    const card = face(match, `action:${fact.seq}`, d.entry.source.card);
+    const card = presentCard(match, `action:${fact.seq}`, d.entry.source.card);
     const actor = d.entry.owner;
     actions.push({
       seq: fact.seq,
@@ -479,7 +481,7 @@ function publicHistory(
   });
   on(Judgment.finished, (d, fact) => {
     if (d.card === null) return;
-    const card = face(match, `action:${fact.seq}`, d.card);
+    const card = presentCard(match, `action:${fact.seq}`, d.card);
     actions.push({
       seq: fact.seq,
       actor: d.player,
@@ -488,7 +490,7 @@ function publicHistory(
       kind: 'judgment',
       processing: processing(d.processing),
     });
-    return `${d.player}的${match.content?.cardViews[d.reason] ? match.book.definition(d.reason).label : '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
+    return `${d.player}的${match.content?.cardViews[d.reason] ? cardDef(match.room, d.reason).label : '判定'}结果：${card.suit}${card.rank}【${card.name}】`;
   });
   on(Judgment.cardObtained, ({ declaration: d }) => `${d.player}获得判定牌${cardName(d.card)}`);
   on(
@@ -496,7 +498,7 @@ function publicHistory(
     ({ declaration: d }) => `${d.actor}获得造成伤害的材料牌${d.cards.map(cardName).join('')}`,
   );
   on(Judgment.replaced, ({ declaration: d }, fact) => {
-    const card = face(match, `action:${fact.seq}`, d.card);
+    const card = presentCard(match, `action:${fact.seq}`, d.card);
     const invoked = d.invocation;
     const label = invoked ? (invoked.declaration as { readonly label?: string }).label : '';
     return `${invoked ? `${invoked.actor}发动【${label ?? ''}】，` : ''}${d.player}的判定牌改为 ${card.suit}${card.rank}【${card.name}】`;
@@ -622,7 +624,7 @@ export function projectMatch(
     const projectCard = (id: string) =>
       error || match.room.status === 'faulted'
         ? printedCardView(match, id)
-        : face(match, id, match.book.face(ctx, id));
+        : presentCard(match, id, face(ctx, id));
     const publicData = publicHistory(match, match.room.history, world, projectCard);
     return immutable({
       revision: world.snapshot.revision,
@@ -664,7 +666,7 @@ export function projectMatch(
           role: role ? roleNames[role]! : null,
           equipment: world.zone(`${player.id}:equipment`).cards.map(projectCard),
           judgment: delayedCards(world, player.id).map((entry) =>
-            face(match, entry.id, entry.source.card),
+            presentCard(match, entry.id, entry.source.card),
           ),
           skills: [
             ...new Set([

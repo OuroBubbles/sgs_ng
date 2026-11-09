@@ -27,7 +27,7 @@ function create(count = 1) {
       d: count >= 3 ? [card('n3', 'nullification')] : [],
     },
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   return game;
 }
 const intent = {
@@ -196,7 +196,7 @@ it('转换无懈走同一用牌管线，失去来源不吞掉已经宣告的反�
     hands: { a: [card('duel', 'duel')], b: [card('cost', 'peach')] },
     skills: [skill],
   });
-  installCounterspells(game.room, game.book);
+  installCounterspells(game.room);
   const source = { kind: 'general', id: 'b' } as const;
   await game.room.run('grant', (ctx) =>
     game.skills.grant(ctx, { owner: 'b', skill: skill.id, source }),
@@ -292,12 +292,12 @@ it('自定义反制牌可替代默认无懈名称，后续层保留同一规则�
           target: () => false,
           canUse: (_ctx, { request }) =>
             request.timing.kind === 'counter' ? null : 'Counter only',
-          execute: (ctx, { use, book }) => resolveCounter(ctx, use, book),
+          execute: (ctx, { use }) => resolveCounter(ctx, use),
         },
       },
     ],
   });
-  installCounterspells(game.room, game.book, ['probe:counter-card']);
+  installCounterspells(game.room, ['probe:counter-card']);
   const running = use(game, intent);
   const request = await nextRequest(game.room);
   expect(request.data).toMatchObject({ names: ['probe:counter-card'] });

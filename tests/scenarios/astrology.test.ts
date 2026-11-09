@@ -14,6 +14,8 @@ import {
   Target,
   Cards,
   Phase,
+  isTargetProhibited,
+  physicalCard,
 } from '../../src/sdk';
 import type { ArrangementGroup } from '../../src/core/decisions/arrangement';
 import type { ChoiceItem } from '../../src/sdk';
@@ -81,8 +83,8 @@ async function grant(
 ) {
   await game.room.run('grant', (ctx) => game.skills.grant(ctx, { owner, skill, source }));
 }
-const prepare = (game: Pick<Game, 'room' | 'book'>, actor = 'a') =>
-  game.room.run('prepare', (ctx) => runPhase(ctx, game.book, actor, 'prepare'));
+const prepare = (game: Pick<Game, 'room'>, actor = 'a') =>
+  game.room.run('prepare', (ctx) => runPhase(ctx, actor, 'prepare'));
 
 it('排序模型按组 ID 验证，组内先后保留，输入/输出均不共享可变数组', () => {
   class Item {
@@ -515,9 +517,7 @@ it('空城只禁止空手角色成为杀/决斗目标，装备、私有池和响
     ).toMatchObject({ value: { kind: 'unavailable' } });
   await game.room.run('private', (ctx) =>
     withPrivateTopCards(ctx, { player: 'b', count: 1, reason: 'test' }, (at) => {
-      expect(game.book.isTargetProhibited(at, 'a', 'b', game.book.physicalCard(at, 's'))).toBe(
-        true,
-      );
+      expect(isTargetProhibited(at, 'a', 'b', physicalCard(at, 's'))).toBe(true);
       return undefined;
     }),
   );
@@ -535,9 +535,7 @@ it('空城只禁止空手角色成为杀/决斗目标，装备、私有池和响
     game.skills.revoke(ctx, 'b', 'standard:kongcheng', source),
   );
   await game.room.run('check', (ctx) => {
-    expect(game.book.isTargetProhibited(ctx, 'a', 'b', game.book.physicalCard(ctx, 's'))).toBe(
-      false,
-    );
+    expect(isTargetProhibited(ctx, 'a', 'b', physicalCard(ctx, 's'))).toBe(false);
   });
   settled(game);
 });

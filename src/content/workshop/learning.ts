@@ -1,5 +1,5 @@
-import { draw, invoke, isGameOver, on, pay, rulesOf, Damage, Skill } from '../../sdk';
 import type { SkillDefinition } from '../../sdk';
+import { draw, invoke, isGameOver, on, pay, rulesOf, Damage, Skill } from '../../sdk';
 
 export const echo = {
   id: 'workshop:echo',
@@ -38,7 +38,7 @@ export const insight = {
         });
         if (paid.kind !== 'paid' || !ctx.world.player(self.owner).alive || isGameOver(ctx.world))
           return;
-        await rulesOf(ctx).skills.grant(ctx, {
+        await rulesOf(ctx).grant(ctx, {
           owner: self.owner,
           skill: echo.id,
           source: { kind: 'effect', id: self.skill },

@@ -1,3 +1,4 @@
+import type { Card, CardDefinition, PackDefinition, SkillDefinition } from '../../sdk';
 import {
   chooseOne,
   draw,
@@ -9,11 +10,10 @@ import {
   damage,
   isChained,
   setChained,
-  rulesOf,
   Use,
   Cards,
+  cardDef,
 } from '../../sdk';
-import type { Card, CardDefinition, PackDefinition, SkillDefinition } from '../../sdk';
 import { relay, ward } from './defense';
 import { vermilion, createFaceDeck } from './faces';
 import { insight, echo } from './learning';
@@ -91,7 +91,7 @@ export const hearing = {
   triggers: [
     on(Use.declared, {
       when: (ctx, use, self) =>
-        use.actor === self.owner && rulesOf(ctx).definition(use.card.name).type === 'trick',
+        use.actor === self.owner && cardDef(ctx, use.card.name).type === 'trick',
       async effect(ctx, _event, self) {
         const accepted = await invoke(ctx, self, '闻策：是否摸一张牌？');
         if (accepted) await draw(ctx, { player: self.owner, count: 1, reason: self.skill });

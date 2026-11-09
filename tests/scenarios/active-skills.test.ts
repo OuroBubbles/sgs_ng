@@ -105,17 +105,17 @@ it('执行取得本次重查的选择模型，跨 await 后支付仍按当前候
   expect(game.skills.definition(skill.id).active![0]!.label).toBe('发动');
   const instance = await grant(game, skill.id);
   await game.room.run('play', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
       const choice = { instance: instance, action: 'act', cards: [], targets: ['b'] };
-      expect(activeAvailable(at, game.book, phase)).toBe(true);
+      expect(activeAvailable(at, phase)).toBe(true);
       expect(projections).toBe(0);
-      const feedback = inspectActive(at, game.book, phase, choice);
+      const feedback = inspectActive(at, phase, choice);
       expect(feedback).toMatchObject({ complete: true, selection: { targets: ['b'] } });
       expect(feedback).not.toHaveProperty('preview');
       expect(projections).toBe(1);
       preview = latest;
-      await activate(at, game.book, phase, choice);
-      expect(activeAvailable(at, game.book, phase)).toBe(false);
+      await activate(at, phase, choice);
+      expect(activeAvailable(at, phase)).toBe(false);
     }),
   );
   expect(game.room.history.facts(Cost.paid)).toEqual([]);
@@ -154,8 +154,8 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
     definitions: [definition],
   });
   await game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      const offer = activeOffers(at, game.book, phase)[0]!;
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      const offer = activeOffers(at, phase)[0]!;
       expect(offer.description).toBe('装备的主动说明');
       expect(offer.label).toBe('装备技能');
       const input = {
@@ -163,8 +163,8 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
         cards: ['material'],
         targets: [],
       };
-      expect(validateActive(at, game.book, phase, input)).toEqual({ ok: true, value: input });
-      expect(inspectActive(at, game.book, phase, { ...input, cards: [] })).toMatchObject({
+      expect(validateActive(at, phase, input)).toEqual({ ok: true, value: input });
+      expect(inspectActive(at, phase, { ...input, cards: [] })).toMatchObject({
         valid: true,
         complete: false,
       });
@@ -173,24 +173,24 @@ it('装备派生的主动技能保留说明，来源离场后旧动作不能执�
         [{ cards: ['material'], from: 'a:hand', to: 'discard', place: 'bottom' }],
         'test',
       );
-      expect(activeOffers(at, game.book, phase)).toEqual([]);
-      expect(inspectActive(at, game.book, phase, input)).toBeNull();
-      expect(validateActive(at, game.book, phase, input).ok).toBe(false);
-      await activate(at, game.book, phase, input);
+      expect(activeOffers(at, phase)).toEqual([]);
+      expect(inspectActive(at, phase, input)).toBeNull();
+      expect(validateActive(at, phase, input).ok).toBe(false);
+      await activate(at, phase, input);
       await moveCards(
         at,
         [{ cards: ['material'], from: 'discard', to: 'a:hand', place: 'bottom' }],
         'test',
       );
-      expect(activeOffers(at, game.book, phase)).toHaveLength(1);
-      expect(validateActive(at, game.book, phase, input).ok).toBe(true);
+      expect(activeOffers(at, phase)).toHaveLength(1);
+      expect(validateActive(at, phase, input).ok).toBe(true);
       await moveCards(
         at,
         [{ cards: ['equipment'], from: 'a:equipment', to: 'discard', place: 'bottom' }],
         'test',
       );
-      expect(validateActive(at, game.book, phase, input).ok).toBe(false);
-      await activate(at, game.book, phase, input);
+      expect(validateActive(at, phase, input).ok).toBe(false);
+      await activate(at, phase, input);
     }),
   );
   expect(game.room.history.facts(testTiming('must-not-run'))).toEqual([]);
@@ -205,9 +205,9 @@ async function grant(game: Game, skill: string) {
 }
 const startPlay = (game: Game, observer?: (phase: PhaseView) => void) =>
   game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
       observer?.(phase);
-      await playPhase(at, phase, game.book);
+      await playPhase(at, phase);
     }),
   );
 async function playRequest(game: Game) {
@@ -302,13 +302,13 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
     owner: null,
     eligible: () => true,
     run(ctx, phase) {
-      expect(activeOffers(ctx, game.book, phase)).toEqual([]);
+      expect(activeOffers(ctx, phase)).toEqual([]);
     },
   });
   await game.room.run('phase', (ctx) =>
-    runPhase(ctx, game.book, 'b', 'play', (at, phase) => {
+    runPhase(ctx, 'b', 'play', (at, phase) => {
       expect(
-        validateActive(at, game.book, phase, {
+        validateActive(at, phase, {
           instance: instance,
           action: 'lose-hp-draw',
           cards: [],
@@ -320,14 +320,14 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
   );
   await game.room.run('outside', async (ctx) => {
     expect(
-      validateActive(ctx, game.book, saved, {
+      validateActive(ctx, saved, {
         instance: instance,
         action: 'lose-hp-draw',
         cards: [],
         targets: [],
       }).ok,
     ).toBe(false);
-    await activate(ctx, game.book, saved, {
+    await activate(ctx, saved, {
       instance: instance,
       action: 'lose-hp-draw',
       cards: [],
@@ -335,16 +335,16 @@ it('不能发动他人技能、失效技能、非当前阶段或已关闭阶段�
     });
   });
   await game.room.run('own-phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
-      expect(activeOffers(at, game.book, phase)).toHaveLength(1);
+    runPhase(ctx, 'a', 'play', async (at, phase) => {
+      expect(activeOffers(at, phase)).toHaveLength(1);
       await withLifetime(at, 'silence', (child, lifetime) => {
         blockSkill(child, instance, lifetime);
-        expect(activeOffers(child, game.book, phase)).toHaveLength(0);
+        expect(activeOffers(child, phase)).toHaveLength(0);
       });
-      await runPhase(at, game.book, 'b', 'play', (child) => {
-        expect(activeOffers(child, game.book, phase)).toHaveLength(0);
+      await runPhase(at, 'b', 'play', (child) => {
+        expect(activeOffers(child, phase)).toHaveLength(0);
       });
-      expect(activeOffers(at, game.book, phase)).toHaveLength(1);
+      expect(activeOffers(at, phase)).toHaveLength(1);
     }),
   );
   expect(game.room.world.player('a').hp).toBe(4);
@@ -358,7 +358,7 @@ it('苦肉一血进入濒死，救援成功后才摸两张；死亡后不摸', a
       skills: [kurou],
       draw: [card('d1', 'jink'), card('d2', 'jink')],
     });
-    installRescue(game.room, game.book);
+    installRescue(game.room);
     const instance = await grant(game, kurou.id);
     await game.room.run('wound', (ctx) =>
       ctx.commit(testTiming('wound'), [{ kind: 'vitality', player: 'a', hp: 1 }], null),

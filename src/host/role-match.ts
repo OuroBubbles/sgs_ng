@@ -2,10 +2,8 @@ import type { Card, WorldSeed } from '../core/model/state';
 import { immutable } from '../core/model/value';
 import { Room } from '../core/runtime/room';
 import type { Context, FlowResult } from '../core/runtime/room';
-import type { CardBook } from '../rules/cards/book';
 import { draw } from '../rules/cards/draw';
 import { moveCards } from '../rules/cards/move';
-import type { CardPolicy } from '../rules/cards/types';
 import { installRescue } from '../rules/combat/rescue';
 import { installCounterspells } from '../rules/cards/counter';
 import { installDelayedCards } from '../rules/cards/delayed';
@@ -50,7 +48,6 @@ export interface RoleMatchOptions {
   readonly content: ContentDefinition | ContentCatalog;
   /** 测试/预设局可固定身份，否则按基础配置用局内随机源洗牌。 */
   readonly roles?: readonly Role[];
-  readonly policy?: Partial<CardPolicy>;
   readonly phaseBody?: PhaseBody;
 }
 export interface MatchProgress {
@@ -94,7 +91,6 @@ export class RoleMatch {
   readonly content: ContentCatalog;
   readonly deckName: string;
   readonly room: Room;
-  readonly book: CardBook;
   readonly skills: SkillBook;
   readonly generals: GeneralBook;
   readonly initial: WorldSeed;
@@ -116,9 +112,8 @@ export class RoleMatch {
         ? this.content.decks.find((entry) => entry.id === requestedDeck)?.label
         : undefined) ??
       '自定义牌组';
-    const books = this.content.createBooks(options.policy);
+    const books = this.content.createBooks();
     this.skills = books.skills;
-    this.book = books.book;
     this.generals = books.generals;
     this.#players = immutable(
       options.players.map((player) => {
@@ -148,7 +143,9 @@ export class RoleMatch {
     )
       throw new Error('Invalid preset roles.');
     this.#body = options.phaseBody ?? defaultPhaseBody;
-    for (const card of deck) this.book.definition(card.name);
+    for (const card of deck)
+      if (!this.skills.cards.has(card.name))
+        throw new Error(`Unknown card definition: ${card.name}`);
     for (const player of this.#players)
       for (const skill of player.skills ?? []) this.skills.definition(skill);
     this.initial = immutable({
@@ -202,8 +199,8 @@ export class RoleMatch {
       actionAnchor: options.actionAnchor ?? turnActionAnchor,
     });
     this.skills.attach(this.room);
-    installRescue(this.room, this.book);
-    installCounterspells(this.room, this.book);
+    installRescue(this.room);
+    installCounterspells(this.room);
     installDelayedCards(this.room);
     installRoleMode(this.room);
   }
@@ -322,7 +319,7 @@ export class RoleMatch {
           ],
           { owner, turn: progress.turns + 1, extra },
         );
-        await runTurn(ctx, this.book, owner, {
+        await runTurn(ctx, owner, {
           body: this.#body,
           ...(extra
             ? {

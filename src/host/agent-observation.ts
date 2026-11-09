@@ -1,3 +1,5 @@
+import { face } from '../rules/cards/face';
+import { cardDef } from '../rules/skills/skills';
 import type { Card, Player } from '../core/model/state';
 import { immutable } from '../core/model/value';
 import type { Role } from '../rules/game/roles';
@@ -40,8 +42,8 @@ export function observeAgent(match: RoleMatch, actor: string): AgentObservation 
   return match.room.inspect((ctx) => {
     const world = ctx.world;
     const card = (id: string): AgentCard => {
-      const value = match.book.face(ctx, id);
-      const equipment = match.book.definition(value.name).equipment;
+      const value = face(ctx, id);
+      const equipment = cardDef(ctx, value.name).equipment;
       return { ...value, slot: equipment?.slot ?? null, range: equipment?.range ?? 0 };
     };
     const observation = immutable({
@@ -62,7 +64,7 @@ export function observeAgent(match: RoleMatch, actor: string): AgentObservation 
     // 不可枚举：观察的可比较内容仍只有局面数据。
     return Object.freeze(
       Object.defineProperty({ ...observation }, 'skills', {
-        value: (id: string) => match.book.skills.hint(id),
+        value: (id: string) => match.skills.hint(id),
       }),
     );
   });

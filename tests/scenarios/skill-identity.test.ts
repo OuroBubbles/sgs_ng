@@ -109,16 +109,14 @@ for (const rule of cases) {
 
       let firstPhase: PhaseView;
       const first = game.room.run('first-phase', (ctx) =>
-        runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+        runPhase(ctx, 'a', 'play', async (at, phase) => {
           firstPhase = phase;
-          await activate(at, game.book, phase, { instance: firstInstance, action: rule.action });
+          await activate(at, phase, { instance: firstInstance, action: rule.action });
           const current = currentInstance(game, skill);
           expect(current === firstInstance).toBe(change !== 'recreate');
-          expect(activeOffers(at, game.book, phase).some((offer) => offer.skill === skill)).toBe(
-            false,
-          );
+          expect(activeOffers(at, phase).some((offer) => offer.skill === skill)).toBe(false);
           expect(
-            validateActive(at, game.book, phase, {
+            validateActive(at, phase, {
               instance: current,
               action: rule.action,
               cards: ownedCards(at.world, 'a', ['hand', 'equipment']).slice(0, rule.cards),
@@ -127,7 +125,7 @@ for (const rule of cases) {
           ).toBe(false);
           // 绕过菜单直接提交新实例也不能支付第二次；材料与目标仍足够。
           expect(ownedCards(at.world, 'a').length).toBeGreaterThanOrEqual(rule.cards);
-          await activate(at, game.book, phase, { instance: current, action: rule.action });
+          await activate(at, phase, { instance: current, action: rule.action });
         }),
       );
       await resolveAction(game, rule);
@@ -141,12 +139,10 @@ for (const rule of cases) {
       expect(game.room.decisions.pending).toEqual([]);
 
       const second = game.room.run('second-phase', (ctx) =>
-        runPhase(ctx, game.book, 'a', 'play', async (at, phase) => {
+        runPhase(ctx, 'a', 'play', async (at, phase) => {
           expect(phase.id).not.toBe(firstPhase.id);
-          expect(activeOffers(at, game.book, phase).some((offer) => offer.skill === skill)).toBe(
-            true,
-          );
-          await activate(at, game.book, phase, {
+          expect(activeOffers(at, phase).some((offer) => offer.skill === skill)).toBe(true);
+          await activate(at, phase, {
             instance: currentInstance(game, skill),
             action: rule.action,
           });
@@ -184,18 +180,16 @@ it.each(cases)('$name嵌套同角色出牌阶段有独立次数，返回后外�
   await prepare(game, skill);
   const instance = currentInstance(game, skill);
   const running = game.room.run('nested-phases', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', async (at, outer) => {
-      await activate(at, game.book, outer, { instance: instance, action: rule.action });
-      expect(activeOffers(at, game.book, outer).some((offer) => offer.skill === skill)).toBe(false);
-      await runPhase(at, game.book, 'a', 'play', async (inside, inner) => {
+    runPhase(ctx, 'a', 'play', async (at, outer) => {
+      await activate(at, outer, { instance: instance, action: rule.action });
+      expect(activeOffers(at, outer).some((offer) => offer.skill === skill)).toBe(false);
+      await runPhase(at, 'a', 'play', async (inside, inner) => {
         expect(inner.id).not.toBe(outer.id);
-        expect(activeOffers(inside, game.book, inner).some((offer) => offer.skill === skill)).toBe(
-          true,
-        );
-        await activate(inside, game.book, inner, { instance: instance, action: rule.action });
+        expect(activeOffers(inside, inner).some((offer) => offer.skill === skill)).toBe(true);
+        await activate(inside, inner, { instance: instance, action: rule.action });
       });
-      expect(activeOffers(at, game.book, outer).some((offer) => offer.skill === skill)).toBe(false);
-      await activate(at, game.book, outer, { instance: instance, action: rule.action });
+      expect(activeOffers(at, outer).some((offer) => offer.skill === skill)).toBe(false);
+      await activate(at, outer, { instance: instance, action: rule.action });
     }),
   );
   await resolveAction(game, rule);
@@ -203,9 +197,9 @@ it.each(cases)('$name嵌套同角色出牌阶段有独立次数，返回后外�
   expect(await running).toMatchObject({ kind: 'resolved' });
   expect(game.room.history.facts(Skill.invoked)).toHaveLength(2);
   await game.room.run('fresh-phase', (ctx) =>
-    runPhase(ctx, game.book, 'a', 'play', (at, phase) => {
+    runPhase(ctx, 'a', 'play', (at, phase) => {
       // 即使离间已杀死 b，c/d 仍是合法男性组合；不是缺目标导致旧额度不可用。
-      expect(activeOffers(at, game.book, phase).some((offer) => offer.skill === skill)).toBe(true);
+      expect(activeOffers(at, phase).some((offer) => offer.skill === skill)).toBe(true);
     }),
   );
   expect(game.room.world.snapshot.states.some((state) => state.key === 'core:use-count')).toBe(
@@ -235,7 +229,7 @@ it.each([false, true])(
       await game.skills.revoke(ctx, 'c', 'standard:kurou', original);
     };
     await game.room.run('change', async (ctx) => {
-      if (inTurn) await runTurn(ctx, game.book, 'b', { phases: ['play'], body: (at) => body(at) });
+      if (inTurn) await runTurn(ctx, 'b', { phases: ['play'], body: (at) => body(at) });
       else await body(ctx);
     });
     const order = inTurn ? ['b', 'c', 'd', 'a'] : ['c', 'd', 'a', 'b'];

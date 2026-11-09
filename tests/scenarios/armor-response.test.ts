@@ -11,6 +11,9 @@ import {
   Judgment,
   Response,
   Cost,
+  cardQueries,
+  modify,
+  useCard,
 } from '../../src/sdk';
 import type { CardChoice, CardEffect, ResponseOpportunity, UseIntent } from '../../src/sdk';
 import { eightDiagram } from '../../src/content/standard/armor';
@@ -80,7 +83,9 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
   const before = cardGame({
     equipment: armor,
     draw: red,
-    policy: { prohibitUse: (_ctx, _actor, card) => card.name === 'standard:jink' },
+    rules: [
+      modify(cardQueries.prohibitUse, (_ctx, { input: { card } }) => card.name === 'standard:jink'),
+    ],
   });
   await use(before, slash());
   expect(before.room.world.player('b').hp).toBe(3);
@@ -90,7 +95,12 @@ it('禁止响应闪时不诱导八卦发动；判定后新禁令也不能绕过�
   const after = cardGame({
     equipment: armor,
     draw: red,
-    policy: { prohibitUse: (_ctx, _actor, card) => card.name === 'standard:jink' && prohibited },
+    rules: [
+      modify(
+        cardQueries.prohibitUse,
+        (_ctx, { input: { card } }) => card.name === 'standard:jink' && prohibited,
+      ),
+    ],
   });
   after.room.on(Judgment.finished, {
     id: 'prohibit',
@@ -132,14 +142,18 @@ it('八卦已经发动，判定期间失去防具不撤销本次技能；以后�
 });
 
 it('装备失效生存期关闭后恢复；多闪需求分别打开机会，不把一次判定算作两闪', async () => {
-  const game = cardGame({ equipment: armor, draw: red, policy: { responseTimes: () => 2 } });
+  const game = cardGame({
+    equipment: armor,
+    draw: red,
+    rules: [modify(cardQueries.responseCount, () => 2)],
+  });
   await game.room.run('block', async (ctx) => {
     const self = game.skills
       .bindings(ctx.world)
       .find(({ self }) => self.origin?.id === 'armor')!.self;
     await withLifetime(ctx, 'block', async (at, lifetime) => {
       blockSkill(at, self, lifetime);
-      await game.book.use(at, slash());
+      await useCard(at, slash());
     });
   });
   expect(game.room.world.player('b').hp).toBe(3);
@@ -211,7 +225,7 @@ it('青釭剑不污染同一目标上的嵌套杀；效果快照关闭后不能�
     owner: null,
     eligible: (_ctx, { effect }) => effect.actor === 'a',
     async run(ctx) {
-      await game.book.use(ctx, slash('inner', 'c'));
+      await useCard(ctx, slash('inner', 'c'));
     },
   });
   let liveEffect: CardEffect;
@@ -242,7 +256,7 @@ it('青釭剑声明只属于已指定身份，失去武器后追加和重复目�
     owner: null,
     eligible: (_ctx, { effect }) => effect.target === 'b',
     async run(ctx) {
-      await equip(ctx, game.book, { card: 'new', from: 'b:hand', owner: 'b' });
+      await equip(ctx, { card: 'new', from: 'b:hand', owner: 'b' });
     },
   });
   game.room.on(Resolve.finished, {

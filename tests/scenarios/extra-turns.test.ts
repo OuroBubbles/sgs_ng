@@ -139,7 +139,7 @@ it('普通回合和额外回合共用执行器，自定义阶段可重复，skip
     },
   });
   const result = await game.room.run('turn', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: plan,
       origin: { kind: 'extra', id: 'explicit-extra', reason: 'probe' },
       body(at, phase) {
@@ -166,14 +166,14 @@ it('嵌套回合恢复外层活动阶段与回合，内层生存期不清掉外�
   const mark = defineState('probe:mark', 0, (v): v is number => typeof v === 'number');
   let outer: TurnView | null = null;
   await game.room.run('nested', (ctx) =>
-    runTurn(ctx, game.book, 'a', {
+    runTurn(ctx, 'a', {
       phases: ['play'],
       async body(at, phase) {
         outer = phase.turn!;
         const target = { owner: 'a', source: 'probe', lifetime: outer.lifetime };
         setState(at, mark, target, 1);
         const before = readState(at.world, activePhase, activeTarget);
-        const extra = await runTurn(at, game.book, 'b', {
+        const extra = await runTurn(at, 'b', {
           origin: { kind: 'extra', id: 'nested', reason: 'ordinary-code' },
           phases: ['finish'],
           body(inner, current) {
@@ -205,7 +205,7 @@ it('嵌套回合恢复外层活动阶段与回合，内层生存期不清掉外�
 it('重复的真实出牌阶段各自计算杀次数，第一阶段已用杀不限制第二阶段', async () => {
   const game = cardGame();
   const running = game.room.run('two-play-phases', (ctx) =>
-    runTurn(ctx, game.book, 'a', { phases: ['play', 'play'] }),
+    runTurn(ctx, 'a', { phases: ['play', 'play'] }),
   );
   const first = await nextRequest(game.room);
   expect(
@@ -262,7 +262,7 @@ it('阶段计划在进入等待前复制，空回合仍有开始/结束与独立
     expect(result.kind).toBe('chosen');
   };
   const running = game.room.run('snapshot', (ctx) =>
-    runTurn(ctx, game.book, 'a', { phases: plan, origin, body }),
+    runTurn(ctx, 'a', { phases: plan, origin, body }),
   );
   const request = await nextRequest(game.room);
   plan.push('draw');
@@ -272,14 +272,12 @@ it('阶段计划在进入等待前复制，空回合仍有开始/结束与独立
     value: { origin: { reason: 'original' }, phases: [{ phase: { kind: 'prepare' } }] },
   });
   await game.room.run('empty', async (ctx) => {
-    const result = await runTurn(ctx, game.book, 'a', { phases: [] });
+    const result = await runTurn(ctx, 'a', { phases: [] });
     expect(result).toMatchObject({ phases: [], origin: { kind: 'normal' } });
-    expect(() => runTurn(ctx, game.book, 'a', { phases: ['invalid' as PhaseKind] })).toThrow(
+    expect(() => runTurn(ctx, 'a', { phases: ['invalid' as PhaseKind] })).toThrow('Invalid');
+    expect(() => runTurn(ctx, 'a', { origin: { kind: 'extra', id: '', reason: 'bad' } })).toThrow(
       'Invalid',
     );
-    expect(() =>
-      runTurn(ctx, game.book, 'a', { origin: { kind: 'extra', id: '', reason: 'bad' } }),
-    ).toThrow('Invalid');
   });
   expect(game.room.history.facts(Turn.started)).toHaveLength(2);
   expect(game.room.history.facts(Turn.finished)).toHaveLength(2);

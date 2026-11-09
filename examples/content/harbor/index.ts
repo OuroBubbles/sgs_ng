@@ -58,7 +58,7 @@ const tide = skill(
     effect: (ctx, _use, self) =>
       draw(ctx, {
         player: self.owner,
-        count: 1 + rulesOf(ctx).skills.query(ctx, tideDrawBonus, { actor: self.owner }, 0),
+        count: 1 + rulesOf(ctx).query(ctx, tideDrawBonus, { actor: self.owner }, 0),
         reason: self.skill,
       }),
   }),

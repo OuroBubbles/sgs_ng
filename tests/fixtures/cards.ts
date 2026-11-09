@@ -4,12 +4,22 @@ import type { Card, WorldSeed } from '../../src/core/model/state';
 import { expect } from 'vitest';
 import { rebuildWorld } from '../../src/core/history/rebuild';
 import { useDeclarations } from '../../src/rules/cards/plan';
-import { createContent, installDelayedCards, activate, activeOffers, kill } from '../../src/sdk';
+import {
+  createContent,
+  installDelayedCards,
+  activate,
+  activeOffers,
+  defineSkill,
+  kill,
+  rulesOf,
+  useCard,
+} from '../../src/sdk';
 import type {
   ActiveChoice,
   CardDefinition,
-  CardBook,
-  CardPolicy,
+  SkillBook,
+  SkillHandle,
+  SkillModifier,
   ContentDefinition,
   UseIntent,
   UseResult,
@@ -26,23 +36,22 @@ const baseCards = createContent({ cards: standardCards }).cards;
 /** 隔离规则场景：先取得作者选择，再调用执行入口；整合交互由 playPhase 场景覆盖。 */
 export async function chooseAndActivate(
   ctx: Context,
-  book: CardBook,
   phase: PhaseView,
   input: Pick<ActiveChoice, 'instance' | 'action'>,
 ) {
-  const offer = activeOffers(ctx, book, phase).find(
+  const offer = activeOffers(ctx, phase).find(
     (offer) => offer.choice.instance === input.instance && offer.choice.action === input.action,
   );
   if (!offer) return;
-  const binding = book.skills.binding(ctx.world, input.instance)!;
+  const binding = rulesOf(ctx).binding(ctx.world, input.instance)!;
   const model = ctx.query(() =>
     binding.definition
       .active!.find((action) => action.id === input.action)!
-      .selection?.(ctx, { self: binding.self, phase, book }),
+      .selection?.(ctx, { self: binding.self, phase }),
   );
-  if (!model) return activate(ctx, book, phase, { ...input, cards: [], targets: [] });
+  if (!model) return activate(ctx, phase, { ...input, cards: [], targets: [] });
   const answer = await ctx.ask(model.decision(phase.owner, offer.label, { optional: true }));
-  if (answer.kind === 'chosen') await activate(ctx, book, phase, { ...input, ...answer.value });
+  if (answer.kind === 'chosen') await activate(ctx, phase, { ...input, ...answer.value });
 }
 
 export function card(id: string, name: string, suit: Card['suit'] = 'spade', rank = 7): Card {
@@ -116,10 +125,11 @@ export function cardGame(
   options: CardSetup &
     Pick<ContentDefinition, 'skills' | 'effects'> & {
       readonly definitions?: readonly CardDefinition[];
-      readonly policy?: Partial<CardPolicy>;
+      /** 测试专用的全局规则修正（如禁止指定某目标），以始终生效的来源提供。 */
+      readonly rules?: readonly SkillModifier[];
       readonly actionAnchor?: ActionAnchor;
       /** 测试专用：在 attach 封存前装配快照读取器、能力提供者等。 */
-      readonly setup?: (book: CardBook) => void;
+      readonly setup?: (skills: SkillBook) => void;
     } = {},
 ) {
   const world = cardSeed(options);
@@ -130,20 +140,36 @@ export function cardGame(
     actionAnchor: options.actionAnchor ?? turnActionAnchor,
   });
   installDelayedCards(room);
-  const { book, skills } = createContent(
+  const { skills } = createContent(
     { cards: [...baseCards, ...(options.definitions ?? [])] },
     options,
-  ).createBooks(options.policy);
-  options.setup?.(book);
+  ).createBooks();
+  if (options.rules) {
+    const definition = defineSkill({
+      id: 'test:rules',
+      name: '测试规则',
+      modifiers: options.rules,
+    });
+    const self: SkillHandle = {
+      id: 'test:rules',
+      owner: 'a',
+      skill: definition.id,
+      name: definition.name,
+      origin: null,
+      active: () => true,
+    };
+    skills.addProvider({ collect: () => [{ self, definition }] });
+  }
+  options.setup?.(skills);
   skills.attach(room);
-  return { room, book, skills, initial: world };
+  return { room, skills, initial: world };
 }
 
 export async function use(
   game: ReturnType<typeof cardGame>,
   intent: UseIntent,
 ): Promise<FlowResult<UseResult>> {
-  return game.room.run('action', (ctx) => game.book.use(ctx, intent));
+  return game.room.run('action', (ctx) => useCard(ctx, intent));
 }
 
 /** 以测试武将来源授予技能，返回该技能实例。 */

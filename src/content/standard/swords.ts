@@ -1,3 +1,4 @@
+import type { CardDefinition } from '../../sdk';
 import {
   chooseOwnedCard,
   differentGender,
@@ -9,14 +10,13 @@ import {
   discardCards,
   on,
   ownedCards,
-  rulesOf,
   Target,
   Damage,
   select,
   selection,
   discardable,
+  canDiscard,
 } from '../../sdk';
-import type { CardDefinition } from '../../sdk';
 import { Weapon } from './weapons';
 
 const doubleSwords = equipment(
@@ -72,7 +72,7 @@ const iceSword = equipment(
       dealtWith(draft, self.owner, 'standard:slash') &&
       landing(ctx, draft) &&
       ownedCards(ctx.world, draft.input.to, ['hand', 'equipment']).some((card) =>
-        rulesOf(ctx).canDiscard(ctx, {
+        canDiscard(ctx, {
           actor: self.owner,
           owner: draft.input.to,
           card,
@@ -95,7 +95,7 @@ const iceSword = equipment(
       legal: (at) =>
         landing(at, draft) &&
         at.world.position(first.card) === first.from &&
-        rulesOf(at).canDiscard(at, {
+        canDiscard(at, {
           actor: self.owner,
           owner: draft.input.to,
           card: first.card,

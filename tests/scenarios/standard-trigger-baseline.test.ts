@@ -1,7 +1,7 @@
 import { generalGame } from '../fixtures/generals';
 import { setImmediate } from 'node:timers/promises';
 import { expect, it } from 'vitest';
-import { ownedCards, runPhase } from '../../src/sdk';
+import { ownedCards, runPhase, validateUse } from '../../src/sdk';
 import { card, cardGame, use, settled } from '../fixtures/cards';
 import { nextRequest } from '../fixtures/room';
 import { CardEvent } from '../../src/sdk';
@@ -97,16 +97,11 @@ it.each(['qianxun', 'kongcheng'] as const)(
           targets: ['b'],
           timing: { kind: 'effect', ignoreDistance: true },
         } as const;
-        expect(game.book.validateUse(ctx, intent).ok, `a→b ${name}`).toBe(
-          !forbidden.includes(name),
-        );
-        expect(game.book.validateUse(ctx, { ...intent, targets: ['c'] }).ok, `a→c ${name}`).toBe(
+        expect(validateUse(ctx, intent).ok, `a→b ${name}`).toBe(!forbidden.includes(name));
+        expect(validateUse(ctx, { ...intent, targets: ['c'] }).ok, `a→c ${name}`).toBe(true);
+        expect(validateUse(ctx, { ...intent, actor: 'b', targets: ['c'] }).ok, `b→c ${name}`).toBe(
           true,
         );
-        expect(
-          game.book.validateUse(ctx, { ...intent, actor: 'b', targets: ['c'] }).ok,
-          `b→c ${name}`,
-        ).toBe(true);
       }
       expect(ctx.world.snapshot).toEqual(before);
     });
@@ -175,8 +170,8 @@ it.each(['yingzi', 'biyue'] as const)(
     });
     await grant(game, skill);
     const running = game.room.run('phases', async (ctx) => {
-      await runPhase(ctx, game.book, 'b', skill === 'yingzi' ? 'draw' : 'finish');
-      await runPhase(ctx, game.book, 'a', skill === 'yingzi' ? 'finish' : 'draw');
+      await runPhase(ctx, 'b', skill === 'yingzi' ? 'draw' : 'finish');
+      await runPhase(ctx, 'a', skill === 'yingzi' ? 'finish' : 'draw');
     });
     expect(await acceptInvocations(game, running)).toBe(0);
     expect(ownedCards(game.room.world, 'a')).toHaveLength(skill === 'yingzi' ? 0 : 2);
