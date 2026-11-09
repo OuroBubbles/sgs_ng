@@ -2,7 +2,7 @@
 
 从零设计的三国杀项目：个人开发、AI 辅助迭代，用简洁、可组合的规则语义承载复杂技能。
 
-内容直接用普通 TypeScript 定义，以 `ContentDefinition` / `createContent(...)` 组合；不需要包清单、版本登记或专用编译器。现有标准＋EX（26 将、108 张牌）、身份模式、固定本人席位＋托管 AI、机制演武，以及浏览器 / Windows 桌面的局域网联机。
+内容直接用普通 TypeScript 定义，以 `ContentDefinition` / `createContent(...)` 组合；不需要包清单、版本登记或专用编译器，也不写任何 AI——托管 AI 靠推演规则自己判断新武将、新技能怎么用。现有标准＋EX（26 将、108 张牌）、身份模式、固定本人席位＋托管 AI、机制演武，以及浏览器 / Windows 桌面的局域网联机。
 
 技术栈：TypeScript + PixiJS 8（含官方 Spine runtime）+ Svelte 5 + Tauri 2；主持端为 Bun 直接运行 TypeScript 源码（不打包）；Vite、pnpm、Vitest、Playwright、ESLint、Prettier。
 
