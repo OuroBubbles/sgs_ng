@@ -79,7 +79,7 @@ FreeKill / noname 只作为本地参考分别查阅，不把不同项目、不�
 ## 项目采用的规则语义
 
 - 仁德以出牌阶段累计。FreeKill 使用 `_rende_cards-phase`，noname 说明使用“回合”措辞；本项目按 [仁德实现](../src/content/standard/generals/liubei.ts) 的明确阶段生存期与原子交牌累计处理，不从文本相似推断嵌套行为相同。
-- 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的独立效果处理。
+- 裸衣选择 FreeKill 的本人使用且本人造成直接伤害条件；noname 的 luoyi2 对杀/决斗非连环伤害判断更宽，且其临时技能到期点采用 phaseJieshuBegin。本项目当前按整个回合的持续效果（回合标记）处理。
 - 方天选择“材料包含全部非空手牌”，和 FreeKill 当前代码一致；不能仅按 noname“最后手牌”短句推断多材料或零材料分支。
 - 天妒的公共判定结束机会先于洛神的本次判定后续；最终牌若已被取得，后者不抢回。判定最终快照与当前牌面分开。
 - 抵消杀时使用闪，万箭齐发要求打出闪；用途、禁令、完成时点、转换和委托材料交接见 [response-purpose 场景](../tests/scenarios/response-purpose.test.ts)。参考为 FreeKill 的 `SlashOffsetFunc`、`archery_attack.lua` 与 noname 的 `chooseToUse`；用途区别不只是事实名称。

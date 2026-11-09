@@ -34,7 +34,7 @@ flowchart LR
   W -. ws /game · GET /catalog .-> N
 ```
 
-`sdk` 精选导出 core 与 rules 的实际类型和操作，不复制实现。内置内容是普通 `ContentDefinition`，由 [createContent](../src/content/catalog.ts) 直接组合。主持端启动时由 [load-content](../src/host/load-content.ts) 扫描 `src/content/<包>/package.ts` 与包内 `generals/*.ts`、`skills/*.ts`（Bun 直接 import 源码；桌面 Node 产物由 [prelink-content](../scripts/prelink-content.mjs) 预链接同一棵树），校验后按确定顺序组合；没有登记表、安装、依赖清单或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`；主持端把扫描到的内容源码哈希 `contentHash` 随 hello 与 `/catalog` 发出。
+`sdk` 是内容作者的唯一入口：按定义、时点、查询、动词与选择模型分组，再导出 core 与 rules 的实际对象（约 110 个值、130 个名字），不复制实现；测试与主持端直接引用规则模块。主持端启动时由 [load-content](../src/host/load-content.ts) 扫描 `src/content/<包>/package.ts` 与包内 `generals/*.ts`、`cards/*.ts`、`skills/*.ts`（一将、一牌、一技各一个文件；`package.ts` 只描述牌组与顺序）（Bun 直接 import 源码；桌面 Node 产物由 [prelink-content](../scripts/prelink-content.mjs) 预链接同一棵树），校验后按确定顺序组合；没有登记表、安装、依赖清单或编译器。对局不读取分发版本，也不将它们写入 World。[protocol](../src/protocol/index.ts) 是展示数据与线协议的唯一定义（纯数据，不依赖 core）。握手比较 `protocolHash`；主持端把扫描到的内容源码哈希 `contentHash` 随 hello 与 `/catalog` 发出。
 
 网页端边界有三道检查：eslint 禁止网页端导入 core / rules / content / sdk / host / server / `assets.json`；[导入图测试](../tests/scenarios/web-boundary.test.ts) 从 `src/main.ts` 沿运行时导入走查；`pnpm build` 之后 [check-web-bundle](../scripts/check-web-bundle.mjs) 扫描 `dist` 脚本中的主持端标记（如规则报错文本）。大厅需要的武将、牌组与技能说明由主持端 `GET /catalog`（[catalog](../src/host/catalog.ts)）提供。
 
@@ -48,7 +48,6 @@ src/
     runtime/         # Flow、时点（defineEvent / timing）、作用域、调度和随机源
     decisions/       # 选择会话、候选与回复验证
     history/         # 顺序事实、作用域查询、轨迹
-    view/            # 兼容再导出 → protocol
   rules/
     turn/            # 回合序列（轮与额外回合）、阶段、跳过与插入
     cards/           # 使用、响应、目标、判定、牌移动
@@ -56,14 +55,13 @@ src/
     characters/      # 武将、性别和势力
     costs/           # 支付、次数与同步宣告
     skills/          # 实例、触发、主动能力与具名查询
-    effects/         # 独立效果及其绑定
-    state/           # 类型化局内标记
+    state/           # 类型化局内标记（带技能的标记即持续效果）
     scopes/          # 领域生存期和到期善后
     game/            # 身份、胜负与模式装配
-  sdk/               # 内容作者使用的公共导出
+  sdk/               # 内容作者的唯一入口
   content/
-    standard/        # 武将、卡牌、技能、文本与资源声明
-    workshop/        # 演武内容，用于机制边界
+    standard/        # generals/、skills/、cards/ 各一文件一定义，另有牌组
+    workshop/        # 演武内容（同样的目录约定），用于机制边界
   protocol/          # 线协议与展示视图（纯数据；网页端只依赖这里）
   client/
     table/           # Pixi 战场、卡牌、角色和指示
@@ -317,7 +315,7 @@ UI 高亮调用同一选择会话的纯查询。不能穷举所有组合，也�
 
 ## 作用域、状态和清理
 
-运行资源绑定 Flow 的 Scope；局内临时状态与授予使用显式 Lifetime 管理到期，普通子 Flow 不自动成为阶段或回合生存期。阶段、回合、轮、处理区等领域生存期各有稳定身份；回合序列 `playRounds` 归规则层，模式只给座次、首席与交接钩子；额外回合和插入阶段重新创建身份；不使用字符串后缀或全局 turn 计数近似有效期。独立效果按自己的结束条件管理，见 [AUTHORING](AUTHORING.md#状态只读值与生存期)。
+运行资源绑定 Flow 的 Scope；局内临时状态与授予使用显式 Lifetime 管理到期，普通子 Flow 不自动成为阶段或回合生存期。阶段、回合、轮、处理区等领域生存期各有稳定身份；回合序列 `playRounds` 归规则层，模式只给座次、首席与交接钩子；额外回合和插入阶段重新创建身份；不使用字符串后缀或全局 turn 计数近似有效期。持续效果是带技能的标记，随标记的作用域到期，见 [AUTHORING](AUTHORING.md#持续效果带技能的标记)。
 
 清理分两类：
 

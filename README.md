@@ -38,7 +38,7 @@ pnpm build && pnpm test:ui   # 浏览器场景（首次需 pnpm exec playwright 
 | 文档                                 | 内容                                                |
 | ------------------------------------ | --------------------------------------------------- |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | 模块、依赖、所有权、数据流、联机与结算契约          |
-| [AUTHORING](docs/AUTHORING.md)       | 写武将、技能、牌与独立效果；[SDK](src/sdk/index.ts) |
+| [AUTHORING](docs/AUTHORING.md)       | 写武将、技能、牌与持续效果；[SDK](src/sdk/index.ts) |
 | [RULINGS](docs/RULINGS.md)           | 标准内容的规则裁定与对应场景测试                    |
 | [STATUS](docs/STATUS.md)             | 当前完成情况、验证结果与下一步                      |
 
