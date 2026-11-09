@@ -5,8 +5,6 @@ import {
   runTurn,
   runPhase,
   activeTurn,
-  activeTarget,
-  stateChange,
   kill,
   judge,
   installRescue,
@@ -395,7 +393,7 @@ it('孤立阶段不冒充回合，重建事实里的旧回合 ID 也不冒充当
     ctx.commit(
       testTiming('stale-turn'),
       [
-        stateChange(ctx, activeTurn, activeTarget, {
+        activeTurn.change(ctx, null, {
           id: 'old:not-an-ancestor',
           owner: 'd',
           origin: { kind: 'normal' },

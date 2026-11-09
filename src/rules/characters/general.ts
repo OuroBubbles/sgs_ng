@@ -1,7 +1,7 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import type { SkillBook } from '../skills/skills';
 import type { Gender } from './gender';
 
@@ -47,15 +47,9 @@ export class GeneralBook {
     return general;
   }
 }
-const general = defineState<string | null>(
-  'character:general',
-  null,
-  (value): value is string | null =>
-    value === null || (typeof value === 'string' && value.length > 0),
-);
-const target = (owner: string) => ({ owner, source: 'general', lifetime: null });
+const general = defineMark<string | null>('character:general', null);
 export const generalOf = (world: WorldReader, owner: string): string | null =>
-  readState(world, general, target(owner));
+  general.of(world, owner);
 export function generalChange(ctx: Context, owner: string, id: string) {
-  return stateChange(ctx, general, target(owner), id);
+  return general.change(ctx, owner, id);
 }

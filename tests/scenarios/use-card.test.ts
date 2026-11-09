@@ -152,8 +152,8 @@ it('出牌阶段杀次数只在宣告时记录，每次额外阶段有独立次�
         expect(
           await useCard(play, { ...slash, choice: { kind: 'physical', card: id }, timing }),
         ).toMatchObject({ kind: 'used' });
-        const limit = { key: 'slash', source: 'card-use', lifetime: phase, max: 1 };
-        expect(used(play.world, 'a', limit)).toBe(1);
+        const limit = { key: 'standard:slash', per: 'phase', times: 1 } as const;
+        expect(used(play, 'a', limit)).toBe(1);
         expect(
           await useCard(play, {
             ...slash,
@@ -427,9 +427,7 @@ it('决斗轮流响应杀，不消耗出牌阶段杀次数', async () => {
     withLifetime(ctx, 'play', async (play, phase) => {
       const timing = { kind: 'play', owner: 'a', phase } as const;
       await useCard(play, { ...slash, choice: { kind: 'physical', card: 'duel' }, timing });
-      expect(
-        used(play.world, 'a', { key: 'slash', source: 'card-use', lifetime: phase, max: 1 }),
-      ).toBe(0);
+      expect(used(play, 'a', { key: 'standard:slash', per: 'phase', times: 1 })).toBe(0);
       await useCard(play, { ...slash, choice: { kind: 'physical', card: 'slash2' }, timing });
     }),
   );

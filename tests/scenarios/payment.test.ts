@@ -235,8 +235,8 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
   const game = room();
   const observed: unknown[] = [];
   await game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'activation', source: 'test:skill', lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'activation', per: 'phase', times: 1 };
       phase.defer(
         game.on(Cards.moved, {
           id: 'observe-payment',
@@ -246,7 +246,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
             observed.push({
               hand: child.world.zone('a:hand').cards,
               discard: child.world.zone('discard').cards,
-              uses: used(child.world, 'a', limit),
+              uses: used(child, 'a', limit),
               declaration: child.history.facts(Cost.paid)[0]?.data.detail,
             });
           },
@@ -261,7 +261,7 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
         declaration: { target: 'b' },
       });
       expect(result).toMatchObject({ kind: 'paid' });
-      expect(used(phase.world, 'a', limit)).toBe(1);
+      expect(used(phase, 'a', limit)).toBe(1);
       const again = await pay(phase, {
         actor: 'a',
         cards: ['a2'],
@@ -295,8 +295,8 @@ it('费用、次数与宣告整批生效后才开放后效，没有半支付状�
 it('取消选择不支付、不增加次数；选择接纳后目标条件改变，支付入口仍重新检查', async () => {
   const game = room();
   const running = game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'activation', source: 'test:skill', lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'activation', per: 'phase', times: 1 };
       const model = new JointSelection({
         cards: () => phase.world.zone('a:hand').cards.map((id) => ({ id, label: id })),
         targets: () => [],
@@ -324,7 +324,7 @@ it('取消选择不支付、不增加次数；选择接纳后目标条件改变�
             reason: 'Final cost conditions changed.',
           });
         }
-        expect(used(phase.world, 'a', limit)).toBe(0);
+        expect(used(phase, 'a', limit)).toBe(0);
         expect(game.history.facts(Cost.paid)).toEqual([]);
         expect(game.world.zone('a:hand').cards).toEqual(['a1', 'a2']);
       }
@@ -348,8 +348,8 @@ it.each([
 ])('非法材料 $cards 不产生部分支付或次数', async ({ cards }) => {
   const game = room();
   await game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'activation', source: null, lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'activation', per: 'phase', times: 1 };
       const result = await pay(phase, {
         actor: 'a',
         cards,
@@ -358,7 +358,7 @@ it.each([
         limit,
       });
       expect(result).toMatchObject({ kind: 'unavailable' });
-      expect(used(phase.world, 'a', limit)).toBe(0);
+      expect(used(phase, 'a', limit)).toBe(0);
     }),
   );
   expect(game.world.zone('discard').cards).toEqual([]);
@@ -382,8 +382,8 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
     },
   });
   await game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'activation', source: null, lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'activation', per: 'phase', times: 1 };
       const result = await pay(phase, {
         actor: 'a',
         cards: ['a1'],
@@ -393,7 +393,7 @@ it('支付后效令发动者死亡，已付材料与次数不会回滚', async (
       });
       expect(result).toMatchObject({ kind: 'paid' });
       expect(phase.world.player('a').alive).toBe(false);
-      expect(used(phase.world, 'a', limit)).toBe(1);
+      expect(used(phase, 'a', limit)).toBe(1);
     }),
   );
   expect(game.world.zone('discard').cards).toEqual(['a1']);
@@ -412,8 +412,8 @@ it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚�
     },
   });
   await game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'zero', source: null, lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'zero', per: 'phase', times: 1 };
       phase.commit(
         testTiming('remove-unused-discard'),
         [{ kind: 'removeZone', zone: 'discard' }],
@@ -421,7 +421,7 @@ it('零材料宣告无需目的区，仍有一次支付事实与次数，不虚�
       );
       const result = await pay(phase, { actor: 'a', reason: 'zero', limit });
       expect(result).toMatchObject({ kind: 'paid', receipt: { actor: 'a', cards: [] } });
-      expect(used(phase.world, 'a', limit)).toBe(1);
+      expect(used(phase, 'a', limit)).toBe(1);
       expect(await pay(phase, { actor: 'a', reason: 'zero', limit })).toMatchObject({
         kind: 'unavailable',
         reason: 'Usage limit reached.',
@@ -445,8 +445,8 @@ it('失去再获得技能不能绕过以技能定义为来源的本阶段次数'
   book.attach(game);
   const source = { kind: 'general', id: 'general:a' } as const;
   await game.run('turn', (ctx) =>
-    withLifetime(ctx, 'phase', async (phase, lifetime) => {
-      const limit: UsageLimit = { key: 'active', source: 'test:limited', lifetime, max: 1 };
+    withLifetime(ctx, 'phase', async (phase) => {
+      const limit: UsageLimit = { key: 'active', per: 'phase', times: 1 };
       await book.grant(phase, { owner: 'a', skill: 'test:limited', source });
       const old = phase.world.snapshot.skills[0]?.id;
       await pay(phase, { actor: 'a', cards: ['a1'], to: 'discard', reason: 'activate', limit });

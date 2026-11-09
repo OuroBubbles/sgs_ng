@@ -5,8 +5,7 @@ import { immutable } from '../../core/model/value';
 import type { SkillHandle } from './skills';
 import { isGameOver } from '../game/end';
 import type { PhaseView } from '../turn/turn';
-import { activePhase, activeTarget } from '../turn/turn';
-import { readState } from '../state/state';
+import { activePhase } from '../turn/turn';
 import { JointSelection, type JointChoice } from '../../core/decisions/selection';
 
 /** 技能的具名输入；Context 仍显式传递，来源、阶段和本局目录不注入全局对象。 */
@@ -59,7 +58,7 @@ function availableSelection(ctx: Context, input: ActiveInput, action: ActiveSkil
 }
 
 function open(ctx: Context, phase: PhaseView): boolean {
-  const current = readState(ctx.world, activePhase, activeTarget);
+  const current = activePhase.of(ctx.world);
   return (
     current?.id === phase.id &&
     current.stage === 'acting' &&

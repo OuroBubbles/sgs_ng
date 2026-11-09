@@ -1,9 +1,9 @@
 import type { Change, WorldReader } from '../../core/model/state';
-import { immutable, isStringArray } from '../../core/model/value';
+import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import type {
   CardEffect,
   EffectSnapshot,
@@ -35,27 +35,11 @@ export interface UseDeclaration {
   readonly edits: UseSnapshot['edits'];
   readonly ignoredEquipment: EffectSnapshot['ignoredEquipment'];
 }
-const declarationKey = defineState<UseDeclaration | null>(
-  'card:use-declaration',
-  null,
-  (value): value is UseDeclaration | null =>
-    value === null ||
-    (typeof value === 'object' &&
-      'id' in value &&
-      typeof value.id === 'string' &&
-      'actionOrder' in value &&
-      isStringArray(value.actionOrder) &&
-      'effects' in value &&
-      Array.isArray(value.effects)),
-);
+const declarationKey = defineMark<UseDeclaration | null>('card:use-declaration', null);
 export function useDeclarations(world: WorldReader): readonly UseDeclaration[] {
   return world.snapshot.states
-    .filter((entry) => entry.key === declarationKey.id)
-    .map((entry) => {
-      if (!declarationKey.accepts(entry.value) || !entry.value)
-        throw new Error('Invalid use declaration.');
-      return entry.value;
-    });
+    .filter((entry) => entry.key === declarationKey.id && entry.value)
+    .map((entry) => entry.value as UseDeclaration);
 }
 class TargetEffect implements CardEffect {
   #state: EffectSnapshot['state'] = 'pending';
@@ -301,15 +285,15 @@ export class UsePlan {
       this.#open = false;
     });
   }
-  #stateTarget() {
-    return { owner: this.actor, source: this.id, lifetime: this.lifetime };
+  #slot() {
+    return { source: this.id, lifetime: this.lifetime };
   }
   #declaration(): UseDeclaration {
-    return readState(this.ctx.world, declarationKey, this.#stateTarget()) ?? this.#retained;
+    return declarationKey.of(this.ctx.world, this.actor, this.#slot()) ?? this.#retained;
   }
   initializeChange(ctx: Context): Change {
     this.assertMutable(ctx);
-    return stateChange(ctx, declarationKey, this.#stateTarget(), this.#retained);
+    return declarationKey.change(ctx, this.actor, this.#retained, this.#slot());
   }
   declaredEffect(id: string): DeclaredEffect {
     const entry = this.#declaration().effects.find((effect) => effect.effectId === id);
@@ -359,7 +343,7 @@ export class UsePlan {
     this.assertMutable(ctx);
     ctx.commit(
       CardEvent.planChanged,
-      [stateChange(ctx, declarationKey, this.#stateTarget(), value)],
+      [declarationKey.change(ctx, this.actor, value, this.#slot())],
       { useId: this.id },
     );
   }
@@ -483,25 +467,30 @@ export class UsePlan {
       throw new Error('Invalid replacement target.');
     const state = this.#declaration();
     const effect = this.#newEffect(state, this.#complete(target, this.declaredEffect(id)));
-    return stateChange(ctx, declarationKey, this.#stateTarget(), {
-      ...state,
-      effects: [
-        ...state.effects.map((entry) =>
-          entry.effectId === id ? { ...entry, cancelled: reason } : entry,
-        ),
-        effect,
-      ],
-      edits: [
-        ...state.edits,
-        {
-          kind: 'replace',
-          effectId: effect.effectId,
-          target: effect.target,
-          reason,
-          fromEffectId: id,
-        },
-      ],
-    });
+    return declarationKey.change(
+      ctx,
+      this.actor,
+      {
+        ...state,
+        effects: [
+          ...state.effects.map((entry) =>
+            entry.effectId === id ? { ...entry, cancelled: reason } : entry,
+          ),
+          effect,
+        ],
+        edits: [
+          ...state.edits,
+          {
+            kind: 'replace',
+            effectId: effect.effectId,
+            target: effect.target,
+            reason,
+            fromEffectId: id,
+          },
+        ],
+      },
+      this.#slot(),
+    );
   }
   replaceTarget(
     ctx: Context,

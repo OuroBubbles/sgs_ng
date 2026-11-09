@@ -23,14 +23,14 @@ import {
 import type { ActiveChoice } from '../skills/active';
 import { withLifetime, assertLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
-import { defineState, readState, stateChange } from '../state/state';
-import { activeTurn, activeTarget, validTurnOrigin } from './state';
+import { defineMark } from '../state/mark';
+import { activeTurn } from './state';
 import type { TurnOrigin } from './state';
 import { defineEvent, timing } from '../../core/runtime/event';
 import { Cards } from '../cards/move';
 import { Discard } from '../cards/discard';
 
-export { activeTurn, activeTarget } from './state';
+export { activeTurn } from './state';
 export type { TurnOrigin } from './state';
 
 export const phaseKinds = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'] as const;
@@ -121,6 +121,8 @@ export const Turn = defineEvent('turn', {
   ending: timing<TurnView>(),
   finished: timing<unknown>(),
   endDeclared: timing<unknown>(),
+  /** 回合序列选定下一个回合（含轮数与是否额外）。 */
+  advanced: timing<unknown>(),
   extraScheduled: timing<unknown>(),
   extraCancelled: timing<unknown>(),
   extraTaken: timing<unknown>(),
@@ -135,41 +137,13 @@ interface ActivePhase {
 }
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
-export const activePhase = defineState<ActivePhase | null>(
-  'core:active-phase',
-  null,
-  (value): value is ActivePhase | null =>
-    value === null ||
-    (isRecord(value) &&
-      typeof value.id === 'string' &&
-      typeof value.owner === 'string' &&
-      phaseKinds.some((kind) => value.kind === kind) &&
-      (value.stage === 'before' || value.stage === 'acting')),
-);
-const phaseSkip = defineState<string | null>(
-  'core:phase-skip',
-  null,
-  (value): value is string | null =>
-    value === null || (typeof value === 'string' && value.length > 0),
-);
-const phaseReplacement = defineState<string | null>(
-  'core:phase-replacement',
-  null,
-  (value): value is string | null =>
-    value === null || (typeof value === 'string' && value.length > 0),
-);
-const turnEnd = defineState<string | null>(
-  'core:turn-end',
-  null,
-  (value): value is string | null =>
-    value === null || (typeof value === 'string' && value.length > 0),
-);
-const plannedSkip = defineState<string | null>(
-  'core:planned-phase-skip',
-  null,
-  (value): value is string | null =>
-    value === null || (typeof value === 'string' && value.length > 0),
-);
+/** 正在进行的阶段（全局标记）；嵌套阶段结束时恢复外层。 */
+export const activePhase = defineMark<ActivePhase | null>('core:active-phase', null);
+/** 阶段/回合上的原因标记：跳过、替代、结束回合、预定跳过；null 即未发生。 */
+const phaseSkip = defineMark<string | null>('core:phase-skip', null);
+const phaseReplacement = defineMark<string | null>('core:phase-replacement', null);
+const turnEnd = defineMark<string | null>('core:turn-end', null);
+const plannedSkip = defineMark<string | null>('core:planned-phase-skip', null);
 
 class PhaseControl implements PhaseView {
   #closed: PhaseSnapshot | null = null;
@@ -186,11 +160,12 @@ class PhaseControl implements PhaseView {
     return this.lifetime.id;
   }
   get skipped(): boolean {
-    return this.#closed?.skipped ?? readState(this.ctx.world, phaseSkip, this.#target()) !== null;
+    return this.#closed?.skipped ?? phaseSkip.of(this.ctx.world, this.owner, this.#slot()) !== null;
   }
   get replaced(): boolean {
     return (
-      this.#closed?.replaced ?? readState(this.ctx.world, phaseReplacement, this.#target()) !== null
+      this.#closed?.replaced ??
+      phaseReplacement.of(this.ctx.world, this.owner, this.#slot()) !== null
     );
   }
   replace(ctx: Context, reason: string): void {
@@ -205,7 +180,7 @@ class PhaseControl implements PhaseView {
   replaceChange(ctx: Context, reason: string): Change {
     this.#assertReplacement(ctx, reason);
     if (this.replaced) throw new Error('Phase body is already replaced.');
-    return stateChange(ctx, phaseReplacement, this.#target(), reason);
+    return phaseReplacement.change(ctx, this.owner, reason, this.#slot());
   }
   #assertReplacement(ctx: Context, reason: string): void {
     assertLifetime(ctx, this.lifetime);
@@ -224,10 +199,10 @@ class PhaseControl implements PhaseView {
   skipChange(ctx: Context, reason: string): Change {
     this.#assertBefore(ctx, reason);
     if (this.skipped) throw new Error('Phase is already skipped.');
-    return stateChange(ctx, phaseSkip, this.#target(), reason);
+    return phaseSkip.change(ctx, this.owner, reason, this.#slot());
   }
-  #target() {
-    return { owner: this.owner, source: null, lifetime: this.lifetime };
+  #slot() {
+    return { lifetime: this.lifetime };
   }
   #assertBefore(ctx: Context, reason: string): void {
     assertLifetime(ctx, this.lifetime);
@@ -261,8 +236,8 @@ class PhaseControl implements PhaseView {
       skipped: this.skipped,
       replaced: this.replaced,
       reason:
-        readState(this.ctx.world, phaseSkip, this.#target()) ??
-        readState(this.ctx.world, phaseReplacement, this.#target()),
+        phaseSkip.of(this.ctx.world, this.owner, this.#slot()) ??
+        phaseReplacement.of(this.ctx.world, this.owner, this.#slot()),
     });
   }
   close(): void {
@@ -398,7 +373,7 @@ export function runPhase(
   turn: TurnView | null = null,
 ): Promise<PhaseResult> {
   return ctx.flow('phase', async (host) => {
-    const previous = readState(host.world, activePhase, activeTarget);
+    const previous = activePhase.of(host.world);
     let control: PhaseControl | null = null;
     const result = await host.attempt('phase.body', (at) =>
       withLifetime(at, kind, async (child, lifetime): Promise<PhaseResult> => {
@@ -413,23 +388,16 @@ export function runPhase(
         control = phase;
         child.commit(
           Phase.before,
-          [
-            stateChange(child, activePhase, activeTarget, {
-              id: phase.id,
-              owner,
-              kind,
-              stage: 'before',
-            }),
-          ],
+          [activePhase.change(child, null, { id: phase.id, owner, kind, stage: 'before' })],
           phase.snapshot(),
         );
         if (turn && turn.owner === owner) {
-          const target = { owner, source: kind, lifetime: turn.lifetime };
-          const reason = readState(child.world, plannedSkip, target);
+          const slot = { source: kind, lifetime: turn.lifetime };
+          const reason = plannedSkip.of(child.world, owner, slot);
           if (reason)
             child.commit(
               Phase.skipPlanned,
-              [phase.skipChange(child, reason), stateChange(child, plannedSkip, target, null)],
+              [phase.skipChange(child, reason), plannedSkip.change(child, owner, null, slot)],
               { id: phase.id, owner, kind, reason },
             );
         }
@@ -453,14 +421,7 @@ export function runPhase(
         }
         child.commit(
           Phase.started,
-          [
-            stateChange(child, activePhase, activeTarget, {
-              id: phase.id,
-              owner,
-              kind,
-              stage: 'acting',
-            }),
-          ],
+          [activePhase.change(child, null, { id: phase.id, owner, kind, stage: 'acting' })],
           phase.snapshot(),
         );
         await child.window(Phase.started, phase, { subject: owner });
@@ -484,7 +445,7 @@ export function runPhase(
     if (!phase) throw new Error('Phase did not initialize.');
     const summary: PhaseResult =
       result.kind === 'resolved' ? result.value : { phase, exit: 'aborted', reason: result.reason };
-    host.commit(Phase.finished, [stateChange(host, activePhase, activeTarget, previous)], summary);
+    host.commit(Phase.finished, [activePhase.change(host, null, previous)], summary);
     return immutable(summary);
   });
 }
@@ -495,18 +456,21 @@ export function runTurn(
   options: TurnOptions = {},
 ): Promise<TurnResult> {
   const phases = immutable(options.phases ?? phaseKinds);
-  const origin = immutable(options.origin ?? { kind: 'normal' });
+  const origin: TurnOrigin = immutable(options.origin ?? { kind: 'normal' });
   const body = options.body ?? defaultPhaseBody;
-  if (!phases.every((kind) => phaseKinds.includes(kind)) || !validTurnOrigin(origin))
+  if (
+    !phases.every((kind) => phaseKinds.includes(kind)) ||
+    (origin.kind !== 'normal' && !(origin.kind === 'extra' && origin.id && origin.reason))
+  )
     throw new Error('Invalid turn plan.');
   return ctx.flow('turn', async (host) => {
-    const previous = readState(host.world, activeTurn, activeTarget);
+    const previous = activeTurn.of(host.world);
     const result = await host.attempt('turn.body', (at) =>
       withLifetime(at, 'turn', async (child, lifetime) => {
-        const target = { owner, source: null, lifetime };
+        const slot = { lifetime };
         let finalReason: string | null = null;
         child.defer(() => {
-          finalReason = readState(child.world, turnEnd, target);
+          finalReason = turnEnd.of(child.world, owner, slot);
         });
         const turn: TurnView = Object.freeze({
           id: lifetime.id,
@@ -518,13 +482,13 @@ export function runTurn(
             return this.reason !== null;
           },
           get reason() {
-            return lifetime.active ? readState(child.world, turnEnd, target) : finalReason;
+            return lifetime.active ? turnEnd.of(child.world, owner, slot) : finalReason;
           },
           end: (at: Context, reason: string) => {
             assertLifetime(at, lifetime);
             if (!reason) throw new Error('Ending a turn requires a reason.');
-            if (readState(at.world, turnEnd, target) !== null) return;
-            at.commit(Turn.endDeclared, [stateChange(at, turnEnd, target, reason)], {
+            if (turnEnd.of(at.world, owner, slot) !== null) return;
+            at.commit(Turn.endDeclared, [turnEnd.change(at, owner, reason, slot)], {
               id: lifetime.id,
               owner,
               reason,
@@ -536,14 +500,14 @@ export function runTurn(
               throw new Error('Invalid planned phase skip.');
             at.commit(
               Phase.skipScheduled,
-              [stateChange(at, plannedSkip, { owner, source: kind, lifetime }, reason)],
+              [plannedSkip.change(at, owner, reason, { source: kind, lifetime })],
               { turn: lifetime.id, owner, kind, reason },
             );
           },
         });
         child.commit(
           Turn.started,
-          [stateChange(child, activeTurn, activeTarget, { id: turn.id, owner, origin })],
+          [activeTurn.change(child, null, { id: turn.id, owner, origin })],
           { id: turn.id, owner, origin, phases },
         );
         await child.window(Turn.started, turn, { subject: owner });
@@ -565,7 +529,7 @@ export function runTurn(
         });
       }),
     );
-    host.commit(Turn.finished, [stateChange(host, activeTurn, activeTarget, previous)], {
+    host.commit(Turn.finished, [activeTurn.change(host, null, previous)], {
       owner,
       exit: result.kind,
       result: result.kind === 'resolved' ? result.value : result.reason,

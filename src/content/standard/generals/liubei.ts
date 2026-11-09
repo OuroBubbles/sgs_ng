@@ -1,18 +1,15 @@
 import {
   action,
   currentPhase,
-  defineState,
+  defineMark,
   general,
   isGameOver,
   others,
   alive,
   kingdomOf,
   peers,
-  readState,
   recover,
-  setState,
   skill,
-  stateChange,
   on,
   declare,
   withCardSupply,
@@ -23,20 +20,15 @@ import {
 import type {
   CardChoice,
   Context,
-  PhaseView,
   SemanticCard,
   SkillHandle,
   UseIntent,
   ViewAsInput,
 } from '../../../sdk';
 
-const given = defineState('standard:rende-given', 0);
-const failed = defineState('standard:jijiang-failed', false);
-const perPhase = (self: SkillHandle, phase: PhaseView) => ({
-  owner: self.owner,
-  source: self.skill,
-  lifetime: phase.lifetime,
-});
+/** 本阶段以仁德给出的手牌数；激将本阶段是否已请求失败。阶段结束自动清除。 */
+const given = defineMark('standard:rende-given', 0, { scope: 'phase' });
+const failed = defineMark('standard:jijiang-failed', false, { scope: 'phase' });
 
 export const rende = skill(
   'standard:rende',
@@ -48,19 +40,12 @@ export const rende = skill(
     targets: { count: 1, filter: (_ctx, id, { self }) => id !== self.owner },
     pay: 'give',
     // 累计与交牌同次提交；后效中的失去/重新获得技能不能重置本阶段累计。
-    declare: (ctx, { self, phase, cards }) => ({
+    declare: (ctx, { self, cards }) => ({
       data: { count: cards.length },
-      changes: [
-        stateChange(
-          ctx,
-          given,
-          perPhase(self, phase),
-          readState(ctx.world, given, perPhase(self, phase)) + cards.length,
-        ),
-      ],
+      changes: [given.change(ctx, self.owner, given.of(ctx, self.owner) + cards.length)],
     }),
-    async effect(ctx, { self, phase, cards }) {
-      const after = readState(ctx.world, given, perPhase(self, phase));
+    async effect(ctx, { self, cards }) {
+      const after = given.of(ctx, self.owner);
       if (after - cards.length < 2 && after >= 2)
         await recover(ctx, { from: self.owner, to: self.owner, amount: 1 });
     },
@@ -78,8 +63,7 @@ export const rende = skill(
 );
 
 function markFailed(ctx: Context, self: SkillHandle) {
-  const phase = currentPhase(ctx);
-  if (phase && !isGameOver(ctx.world)) setState(ctx, failed, perPhase(self, phase), true);
+  if (currentPhase(ctx) && !isGameOver(ctx.world)) failed.set(ctx, self.owner, true);
 }
 const providedChoice = (card: SemanticCard, actor: string, reason: string): CardChoice => ({
   kind: 'generated',
@@ -126,14 +110,8 @@ export const jijiang = skill(
   }),
   {
     id: 'ask-slash',
-    available(ctx: Context, { self, purpose }: ViewAsInput) {
-      const phase = currentPhase(ctx);
-      return (
-        purpose === 'use' &&
-        peers(ctx, self.owner, '蜀').length > 0 &&
-        !(phase && readState(ctx.world, failed, perPhase(self, phase)))
-      );
-    },
+    available: (ctx: Context, { self, purpose }: ViewAsInput) =>
+      purpose === 'use' && peers(ctx, self.owner, '蜀').length > 0 && !failed.of(ctx, self.owner),
     make: { name: 'standard:slash' },
     use: (ctx, { self, intent }) =>
       ctx.flow('jijiang.use', async (at) => {

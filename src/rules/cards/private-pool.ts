@@ -1,7 +1,7 @@
 import { immutable } from '../../core/model/value';
 import type { WorldReader } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
-import { defineState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { isGameOver } from '../game/end';
 import { withProcessing } from './processing';
 import type { Processing, ProcessingCleanup } from './processing';
@@ -9,7 +9,7 @@ import { moveCards } from './move';
 import { reshuffle } from './draw';
 import { Cards } from './move';
 
-const privatePool = defineState('core:private-pool', false);
+const privatePool = defineMark('core:private-pool', false);
 
 export interface PrivatePoolInput {
   readonly player: string;
@@ -67,12 +67,10 @@ export function withPrivateTopCards<T>(
             kind: Cards.peeked,
             data: { ...input, zone: pool.zone, cards },
             changes: [
-              stateChange(
-                at,
-                privatePool,
-                { owner: input.player, source: pool.zone, lifetime: pool.lifetime },
-                true,
-              ),
+              privatePool.change(at, input.player, true, {
+                source: pool.zone,
+                lifetime: pool.lifetime,
+              }),
             ],
           },
         );

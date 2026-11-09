@@ -16,8 +16,6 @@ import {
   draw,
   activePhase,
   activeTurn,
-  activeTarget,
-  readState,
   defineSkill,
   on,
   runTurn,
@@ -245,8 +243,8 @@ it('真实主动用牌驱动从准备到身份终局；回合/阶段状态和处
   expect(game.room.decisions.pending).toEqual([]);
   expect(game.room.world.position(slash)).toBe('discard');
   expect(game.room.world.snapshot.zones.filter((zone) => zone.kind === 'processing')).toEqual([]);
-  expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
-  expect(readState(game.room.world, activePhase, activeTarget)).toBeNull();
+  expect(activeTurn.of(game.room.world)).toBeNull();
+  expect(activePhase.of(game.room.world)).toBeNull();
   expect(game.room.history.facts(Game.finished)[0]!.seq).toBeLessThan(
     game.room.history.facts(CardEvent.finished)[0]!.seq,
   );

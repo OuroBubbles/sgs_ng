@@ -39,7 +39,7 @@ export const jieyin = skill(
   '出牌阶段限一次，弃置两张手牌，令一名受伤的其他男性角色和你各回复 1 点体力。你无需处于受伤状态。',
   action({
     id: 'discard-heal',
-    limit: 1,
+    limit: { per: 'phase', times: 1 },
     cards: { count: 2 },
     targets: {
       count: 1,

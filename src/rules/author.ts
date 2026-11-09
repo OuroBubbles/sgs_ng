@@ -19,6 +19,7 @@ import type { PhysicalCardFace } from './cards/face';
 import { face } from './cards/face';
 import { canDiscard } from './cards/discard';
 import { payDiscard, used } from './costs/pay';
+import type { Limit } from './costs/pay';
 import { cardDef } from './skills/skills';
 import type { SkillDefinition, SkillHandle, SkillTrigger } from './skills/skills';
 import type { SkillModifier } from './skills/query';
@@ -33,9 +34,7 @@ import { genderOf } from './characters/gender';
 import type { Gender } from './characters/gender';
 import { kingdomOf } from './characters/kingdom';
 import type { JudgmentResult } from './cards/judge';
-import { readState } from './state/state';
-import { activeTarget, activeTurn } from './turn/state';
-import type { PhaseView } from './turn/turn';
+import { activeTurn } from './turn/state';
 import { Judgment } from './cards/judge';
 import { isDirectDamage } from './combat/damage';
 import type { DamageDraft } from './combat/damage';
@@ -69,8 +68,7 @@ export const isMale = (ctx: Context, player: string): boolean =>
 export const peers = (ctx: Context, owner: string, kingdom: string): readonly string[] =>
   others(ctx, owner).filter((id) => alive(ctx, id) && kingdomOf(ctx.world, id) === kingdom);
 /** 当前回合角色；不在回合内时为 null。 */
-export const turnOwner = (ctx: Context): string | null =>
-  readState(ctx.world, activeTurn, activeTarget)?.owner ?? null;
+export const turnOwner = (ctx: Context): string | null => activeTurn.of(ctx.world)?.owner ?? null;
 /** 多次触发时的进度后缀，如「（第 1/2 次）」。 */
 export const nth = (at: TriggerOccurrence): string =>
   at.total > 1 ? `（第 ${at.index}/${at.total} 次）` : '';
@@ -247,8 +245,8 @@ const count = (spec: CountSpec) =>
 export interface ActionSpec {
   readonly id: string;
   readonly label?: string;
-  /** 每个出牌阶段的发动次数上限。 */
-  readonly limit?: number;
+  /** 发动次数限制，如出牌阶段限一次 { per: 'phase', times: 1 }；按技能计数。 */
+  readonly limit?: Limit;
   readonly when?: (ctx: Context, input: ActiveInput) => boolean;
   readonly cards?: {
     readonly count: CountSpec;
@@ -270,16 +268,9 @@ export interface ActionSpec {
   readonly effect: (ctx: Context, input: ActionContext) => unknown;
 }
 
-const phaseLimit = (self: SkillHandle, phase: PhaseView, id: string, max: number) => ({
-  key: id,
-  source: self.skill,
-  lifetime: phase.lifetime,
-  max,
-});
-
 export function action(spec: ActionSpec): ActiveSkill {
   const { id, label, limit, when, cards, targets, pay, effect } = spec;
-  const key = (self: SkillHandle) => self.skill.split(':').pop()!;
+  const counted = (self: SkillHandle, times: Limit) => ({ key: self.skill, ...times });
   const live = (ctx: Context, { self, phase }: ActiveInput) =>
     alive(ctx, self.owner) && !phase.turn?.ended && !isGameOver(ctx.world);
   const build = (ctx: Context, input: ActiveInput): JointSelection => {
@@ -322,12 +313,7 @@ export function action(spec: ActionSpec): ActiveSkill {
     ...(limit !== undefined || when
       ? {
           available: (ctx: Context, input: ActiveInput) =>
-            (limit === undefined ||
-              used(
-                ctx.world,
-                input.self.owner,
-                phaseLimit(input.self, input.phase, key(input.self), limit),
-              ) < limit) &&
+            (!limit || used(ctx, input.self.owner, counted(input.self, limit)) < limit.times) &&
             (when?.(ctx, input) ?? true),
         }
       : {}),
@@ -344,7 +330,7 @@ export function action(spec: ActionSpec): ActiveSkill {
       const declared = await declare(ctx, self, {
         ...more,
         data: { ...(choice.targets.length ? { targets: choice.targets } : {}), ...more.data },
-        ...(limit === undefined ? {} : { limit: phaseLimit(self, phase, key(self), limit) }),
+        ...(limit ? { limit: counted(self, limit) } : {}),
         ...(pay === 'discard' ? { discard: choice.cards, areas: cards?.areas ?? ['hand'] } : {}),
         ...(pay === 'give'
           ? {

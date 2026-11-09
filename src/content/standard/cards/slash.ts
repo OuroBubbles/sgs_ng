@@ -10,7 +10,7 @@ export default card({
   response: true,
   use: {
     count: { min: 1, max: 1 },
-    usage: { key: 'slash', max: 1 },
+    limit: { per: 'phase', times: 1 },
     target: (ctx, { request, target }) =>
       target !== request.actor &&
       withinDistance(ctx, request, target, attackRange(ctx, request.actor, request.card)),

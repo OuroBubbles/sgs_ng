@@ -1,12 +1,11 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { isGameOver } from '../game/end';
 import { defineEvent, timing } from '../../core/runtime/event';
 
-const chained = defineState('combat:chained', false);
-const target = (player: string) => ({ owner: player, source: 'profile', lifetime: null });
+const chained = defineMark('combat:chained', false);
 
 export interface ChainChange {
   readonly player: string;
@@ -21,12 +20,12 @@ export const Chain = defineEvent('chain', {
 
 export function isChained(world: WorldReader, player: string): boolean {
   world.player(player);
-  return readState(world, chained, target(player));
+  return chained.of(world, player);
 }
 
 /** 可与伤害、费用等同次提交；低层 Change 本身不开变更后窗口。 */
 export function chainChange(ctx: Context, player: string, value: boolean) {
-  return stateChange(ctx, chained, target(player), value);
+  return chained.change(ctx, player, value);
 }
 
 /** 显式改变公开连环状态；无变化、不存活或终局不产生变更事实。 */

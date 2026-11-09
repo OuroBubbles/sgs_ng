@@ -48,7 +48,7 @@ export const fanjian = skill(
   '出牌阶段限一次，令一名其他角色猜一种花色，再正面朝上获得你的一张手牌。若花色不同，你对其造成一点伤害。手牌由目标暗选。',
   action({
     id: 'guess-suit',
-    limit: 1,
+    limit: { per: 'phase', times: 1 },
     targets: {
       count: 1,
       filter: (ctx, id, { self }) =>

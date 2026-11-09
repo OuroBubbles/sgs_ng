@@ -2,11 +2,15 @@ import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
-import { defineState, readState, stateChange } from '../state/state';
-import { phaseKinds } from './turn';
+import { defineMark } from '../state/mark';
+import { phaseKinds, Turn } from './turn';
 import type { PhaseKind } from './turn';
-import { Turn } from './turn';
 
+/**
+ * 额外回合（内核回合原语，对应 FreeKill 的 gainAnExtraTurn）：请求排入整局队列，
+ * 由回合序列（order.ts 的 playRounds）在当前回合结束后、正常轮转之前取出执行。
+ * 来源失去技能、死亡或当前回合到期都不撤销已授予的请求；立即插入一个回合直接调用 runTurn。
+ */
 export interface ExtraTurn {
   readonly id: string;
   readonly owner: string;
@@ -20,37 +24,12 @@ export interface ExtraTurnRequest {
   /** next 插在现有请求之前，last 排在之后；默认 next。 */
   readonly position?: 'next' | 'last';
 }
-interface ExtraTurns {
-  readonly serial: number;
-  readonly pending: readonly ExtraTurn[];
-}
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-const queue = defineState<ExtraTurns>(
-  'turn:extra-queue',
-  { serial: 0, pending: [] },
-  (value): value is ExtraTurns =>
-    isRecord(value) &&
-    Number.isSafeInteger(value.serial) &&
-    Number(value.serial) >= 0 &&
-    Array.isArray(value.pending) &&
-    value.pending.every(
-      (item: unknown) =>
-        isRecord(item) &&
-        typeof item.id === 'string' &&
-        item.id.length > 0 &&
-        typeof item.owner === 'string' &&
-        typeof item.reason === 'string' &&
-        item.reason.length > 0 &&
-        Array.isArray(item.phases) &&
-        item.phases.every((kind: unknown) => phaseKinds.some((phase) => phase === kind)),
-    ),
-);
-const target = Object.freeze({ owner: null, source: 'mode', lifetime: null });
+const queue = defineMark('turn:extra-queue', { serial: 0, pending: [] as readonly ExtraTurn[] });
+const save = (ctx: Context, serial: number, pending: readonly ExtraTurn[]) =>
+  queue.change(ctx, null, { serial, pending });
 
-/** 队列属于 World，来源技能失去、当前回合到期都不会撤销已授予的额外回合。 */
 export function pendingExtraTurns(world: WorldReader): readonly ExtraTurn[] {
-  return readState(world, queue, target).pending;
+  return queue.of(world).pending;
 }
 
 export function scheduleExtraTurn(ctx: Context, request: ExtraTurnRequest): ExtraTurn | null {
@@ -64,57 +43,42 @@ export function scheduleExtraTurn(ctx: Context, request: ExtraTurnRequest): Extr
   )
     throw new Error('Invalid extra turn request.');
   if (!ctx.world.player(request.owner).alive || isGameOver(ctx.world)) return null;
-  const current = readState(ctx.world, queue, target);
-  const serial = current.serial + 1;
+  const { serial, pending } = queue.of(ctx.world);
   const turn = immutable({
-    id: `${ctx.cause.flowId}:extra:${serial}`,
+    id: `${ctx.cause.flowId}:extra:${serial + 1}`,
     owner: request.owner,
     reason: request.reason,
     phases,
   });
-  const pending = position === 'next' ? [turn, ...current.pending] : [...current.pending, turn];
-  ctx.commit(Turn.extraScheduled, [stateChange(ctx, queue, target, { serial, pending })], turn);
+  const next = position === 'next' ? [turn, ...pending] : [...pending, turn];
+  ctx.commit(Turn.extraScheduled, [save(ctx, serial + 1, next)], turn);
   return turn;
 }
 
 export function cancelExtraTurn(ctx: Context, id: string, reason: string): boolean {
   ctx.assertActive();
   if (!reason) throw new Error('Cancelling an extra turn requires a reason.');
-  const current = readState(ctx.world, queue, target);
-  const turn = current.pending.find((item) => item.id === id);
+  const { serial, pending } = queue.of(ctx.world);
+  const turn = pending.find((item) => item.id === id);
   if (!turn) return false;
-  ctx.commit(
-    Turn.extraCancelled,
-    [
-      stateChange(ctx, queue, target, {
-        serial: current.serial,
-        pending: current.pending.filter((item) => item.id !== id),
-      }),
-    ],
-    { turn, reason },
-  );
+  const rest = pending.filter((item) => item.id !== id);
+  ctx.commit(Turn.extraCancelled, [save(ctx, serial, rest)], { turn, reason });
   return true;
 }
 
-/** 主持侧在回合边界取出请求；消费在执行前提交，死亡请求明确记录跳过。 */
+/** 回合序列在回合边界取出请求；消费在执行前提交，接收者已死亡的请求明确记录跳过。 */
 export function takeExtraTurn(ctx: Context): ExtraTurn | null {
   ctx.assertActive();
   if (isGameOver(ctx.world)) return null;
-  while (true) {
-    const current = readState(ctx.world, queue, target);
-    const turn = current.pending[0];
+  for (;;) {
+    const { serial, pending } = queue.of(ctx.world);
+    const [turn, ...rest] = pending;
     if (!turn) return null;
     const alive = ctx.world.player(turn.owner).alive;
-    ctx.commit(
-      alive ? Turn.extraTaken : Turn.extraSkipped,
-      [
-        stateChange(ctx, queue, target, {
-          serial: current.serial,
-          pending: current.pending.slice(1),
-        }),
-      ],
-      { turn, reason: alive ? null : 'owner-dead' },
-    );
+    ctx.commit(alive ? Turn.extraTaken : Turn.extraSkipped, [save(ctx, serial, rest)], {
+      turn,
+      reason: alive ? null : 'owner-dead',
+    });
     if (alive) return turn;
   }
 }

@@ -68,7 +68,7 @@ export const lijian = skill(
   '出牌阶段限一次，弃置一张手牌或装备，选择两名其他男性角色。后选角色视为对先选角色使用一张不能被无懈可击的决斗。',
   action({
     id: 'forced-duel',
-    limit: 1,
+    limit: { per: 'phase', times: 1 },
     selection: pairs,
     cards: { count: 1, areas: HE },
     pay: 'discard',

@@ -27,19 +27,35 @@ export function distance(
   return Math.max(1, value);
 }
 
-/** 目标是否在给定距离内；规则时机、目标选项或技能可整体豁免距离。 */
+/** 本次用牌的规则修正合计；时机或目标选项豁免距离即 range 为 Infinity。 */
+export function useRule(ctx: Context, request: UseRequest): Required<queries.UseRule> {
+  const free =
+    request.targetOptions?.ignoreDistance === true ||
+    (request.timing.kind === 'effect' && request.timing.ignoreDistance === true);
+  const rule = queryRule(ctx, queries.useRule, request, {
+    times: 0,
+    targets: 0,
+    range: free ? Infinity : 0,
+  }) as Required<queries.UseRule>;
+  if (
+    !(rule.times >= 0) ||
+    !(rule.range >= 0) ||
+    !Number.isSafeInteger(rule.targets) ||
+    rule.targets < 0
+  )
+    throw new Error('Invalid use rule.');
+  return rule;
+}
+
+/** 目标是否在给定距离内（加上 useRule 的额外距离）。 */
 export function withinDistance(
   ctx: Context,
   request: UseRequest,
   target: string,
   maximum: number,
 ): boolean {
-  return (
-    request.targetOptions?.ignoreDistance === true ||
-    (request.timing.kind === 'effect' && request.timing.ignoreDistance === true) ||
-    queryRule(ctx, queries.ignoreDistance, request, false) ||
-    distance(ctx, request.actor, target, request.card) <= maximum
-  );
+  const range = maximum + useRule(ctx, request).range;
+  return range === Infinity || distance(ctx, request.actor, target, request.card) <= range;
 }
 
 /** 攻击范围：基础 1，武器等取最大值。 */
@@ -97,25 +113,16 @@ export function targetCount(ctx: Context, request: UseRequest): ChoiceCount {
   return ctx.query(() => {
     const rules = cardDef(ctx, request.card.name).use;
     if (!rules) return { min: 0, max: 0 };
-    const extra = rules.fixedTargets ? 0 : queryRule(ctx, queries.extraTargets, request, 0);
-    if (!Number.isSafeInteger(extra) || extra < 0) throw new Error('Invalid extra target count.');
+    const extra = rules.fixedTargets ? 0 : useRule(ctx, request).targets;
     const max = rules.count.max === 'all' ? 'all' : rules.count.max + extra;
     if (max !== 'all' && !Number.isSafeInteger(max)) throw new Error('Invalid target limit.');
     return immutable({ min: rules.count.min, max });
   });
 }
 
-/** 出牌阶段的次数限制；其他时机或未声明 usage 的牌不限次。 */
+/** 牌面声明的次数限制只约束出牌阶段的主动使用；按牌名计数，修正给出额外次数。 */
 export function usageLimit(ctx: Context, request: UseRequest): UsageLimit | undefined {
-  const usage = cardDef(ctx, request.card.name).use?.usage;
-  if (request.timing.kind !== 'play' || !usage) return undefined;
-  const value = queryRule(ctx, queries.usageLimit, request, usage.max);
-  if (value !== null && (!Number.isSafeInteger(value) || value < 0))
-    throw new Error('Invalid card usage limit.');
-  return {
-    key: usage.key,
-    source: 'card-use',
-    lifetime: request.timing.phase,
-    max: value ?? Number.MAX_SAFE_INTEGER,
-  };
+  const limit = cardDef(ctx, request.card.name).use?.limit;
+  if (request.timing.kind !== 'play' || !limit) return undefined;
+  return { key: request.card.name, ...limit, times: limit.times + useRule(ctx, request).times };
 }

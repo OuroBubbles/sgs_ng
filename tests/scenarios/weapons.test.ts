@@ -382,7 +382,7 @@ it('额外目标查询按加法组合，不改变自动目标牌的手动选择�
     id: 'probe:targets',
     name: '追加目标',
     triggers: [],
-    modifiers: [modify(cardQueries.extraTargets, () => 1)],
+    modifiers: [modify(cardQueries.useRule, () => ({ targets: 1 }))],
   });
   const game = cardGame({
     hands: { a: [card('s0', 'slash'), card('aoe', 'archery_attack')] },

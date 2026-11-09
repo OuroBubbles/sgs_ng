@@ -24,8 +24,10 @@ export const qicai = skill(
   'standard:qicai',
   '奇才',
   '锁定技，你使用锦囊牌无距离限制；仍须满足其他目标条件。',
-  modify(cardQueries.ignoreDistance, (ctx, { input, self }) =>
-    input.actor === self.owner && cardDef(ctx, input.card.name).type === 'trick' ? true : undefined,
+  modify(cardQueries.useRule, (ctx, { input, self }) =>
+    input.actor === self.owner && cardDef(ctx, input.card.name).type === 'trick'
+      ? { range: Infinity }
+      : undefined,
   ),
 );
 

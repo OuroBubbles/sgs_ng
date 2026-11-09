@@ -3,7 +3,7 @@ import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
 import { isGameOver } from '../game/end';
 import { withLifetime } from '../scopes/lifetime';
-import { defineState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import type {
   BurialEvent,
   DeathDraft,
@@ -36,7 +36,7 @@ export type {
   HealthCause,
 } from './life-events';
 
-const dyingState = defineState('core:dying', false);
+const dyingState = defineMark('core:dying', false);
 export function isDying(world: WorldReader, player: string): boolean {
   return world.snapshot.states.some(
     (state) => state.key === dyingState.id && state.owner === player && state.value === true,
@@ -156,7 +156,7 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
       return { kind: 'unavailable', event };
     child.commit(
       Dying.started,
-      [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, true)],
+      [dyingState.change(child, event.player, true, { source: event.id, lifetime })],
       event,
     );
     await child.window(Dying.started, event, { subject: event.player });
@@ -189,7 +189,7 @@ export async function enterDying(ctx: Context, request: DyingInput): Promise<Dyi
     const result: DyingResult = immutable({ kind, event });
     child.commit(
       Dying.finished,
-      [stateChange(child, dyingState, { owner: event.player, source: event.id, lifetime }, false)],
+      [dyingState.change(child, event.player, false, { source: event.id, lifetime })],
       result,
     );
     await child.window(Dying.finished, result, { subject: event.player });

@@ -26,14 +26,20 @@ export const handLimitCorrection = defineQuery<{ readonly actor: string }, numbe
   (a, b) => a + b,
 );
 
-export const usageLimit = defineQuery<UseRequest, number | null>('card.usage-limit', (a, b) =>
-  a === null || b === null ? null : Math.max(a, b),
-);
-export const extraTargets = defineQuery<UseRequest, number>('card.extra-targets', (a, b) => a + b);
-export const ignoreDistance = defineQuery<UseRequest, boolean>(
-  'card.ignore-distance',
-  (a, b) => a || b,
-);
+/**
+ * 用牌规则的修正：各项都是在牌面声明之上的加法，Infinity 即不限。
+ * - times：额外次数（咆哮 Infinity）；targets：额外目标（方天画戟 2）；range：额外距离（奇才 Infinity）。
+ */
+export interface UseRule {
+  readonly times?: number;
+  readonly targets?: number;
+  readonly range?: number;
+}
+export const useRule = defineQuery<UseRequest, UseRule>('card.use-rule', (a, b) => ({
+  times: (a.times ?? 0) + (b.times ?? 0),
+  targets: (a.targets ?? 0) + (b.targets ?? 0),
+  range: (a.range ?? 0) + (b.range ?? 0),
+}));
 
 export const prohibitUse = defineQuery<
   { readonly actor: string; readonly card: SemanticCard },

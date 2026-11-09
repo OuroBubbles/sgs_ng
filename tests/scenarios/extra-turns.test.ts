@@ -4,18 +4,15 @@ import { SoloSession } from '../../src/host/solo';
 import { standardCards } from '../fixtures/standard';
 import {
   activePhase,
-  activeTarget,
   activeTurn,
   cancelExtraTurn,
-  defineState,
+  defineMark,
   finishGame,
   kill,
   pendingExtraTurns,
   phaseKinds,
-  readState,
   runTurn,
   scheduleExtraTurn,
-  setState,
   takeExtraTurn,
   Turn,
 } from '../../src/sdk';
@@ -145,7 +142,7 @@ it('普通回合和额外回合共用执行器，自定义阶段可重复，skip
       body(at, phase) {
         ran.push(phase.kind);
         ids.push(phase.id);
-        expect(readState(at.world, activeTurn, activeTarget)?.origin.kind).toBe('extra');
+        expect(activeTurn.of(at.world)?.origin.kind).toBe('extra');
       },
     }),
   );
@@ -157,13 +154,13 @@ it('普通回合和额外回合共用执行器，自定义阶段可重复，skip
       phases: [{ exit: 'skipped' }, { exit: 'completed' }, { exit: 'completed' }],
     },
   });
-  expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
+  expect(activeTurn.of(game.room.world)).toBeNull();
   settled(game);
 });
 
 it('嵌套回合恢复外层活动阶段与回合，内层生存期不清掉外层状态', async () => {
   const game = cardGame({ hands: { a: [] } });
-  const mark = defineState('probe:mark', 0, (v): v is number => typeof v === 'number');
+  const mark = defineMark('probe:mark', 0, { accepts: (v): v is number => typeof v === 'number' });
   let outer: TurnView | null = null;
   await game.room.run('nested', (ctx) =>
     runTurn(ctx, 'a', {
@@ -171,28 +168,23 @@ it('嵌套回合恢复外层活动阶段与回合，内层生存期不清掉外�
       async body(at, phase) {
         outer = phase.turn!;
         const target = { owner: 'a', source: 'probe', lifetime: outer.lifetime };
-        setState(at, mark, target, 1);
-        const before = readState(at.world, activePhase, activeTarget);
+        mark.set(at, target.owner, 1, target);
+        const before = activePhase.of(at.world);
         const extra = await runTurn(at, 'b', {
           origin: { kind: 'extra', id: 'nested', reason: 'ordinary-code' },
           phases: ['finish'],
           body(inner, current) {
-            setState(
-              inner,
-              mark,
-              { owner: 'b', source: 'probe', lifetime: current.turn!.lifetime },
-              2,
-            );
-            expect(readState(inner.world, activeTurn, activeTarget)?.owner).toBe('b');
+            mark.set(inner, 'b', 2, { source: 'probe', lifetime: current.turn!.lifetime });
+            expect(activeTurn.of(inner.world)?.owner).toBe('b');
           },
         });
         expect(extra.owner).toBe('b');
-        expect(readState(at.world, activeTurn, activeTarget)).toMatchObject({
+        expect(activeTurn.of(at.world)).toMatchObject({
           owner: 'a',
           origin: { kind: 'normal' },
         });
-        expect(readState(at.world, activePhase, activeTarget)).toEqual(before);
-        expect(readState(at.world, mark, target)).toBe(1);
+        expect(activePhase.of(at.world)).toEqual(before);
+        expect(mark.of(at.world, target.owner, target)).toBe(1);
         expect(at.world.snapshot.states.filter((state) => state.key === mark.id)).toHaveLength(1);
       },
     }),
@@ -360,11 +352,9 @@ it('开局技能可在主公前插入回合，之后仍从主公开始正常轮�
 });
 
 it('结束窗口排入额外回合，旧回合状态到期后才进入新回合', async () => {
-  const marker = defineState(
-    'probe:turn-marker',
-    false,
-    (v): v is boolean => typeof v === 'boolean',
-  );
+  const marker = defineMark('probe:turn-marker', false, {
+    accepts: (v): v is boolean => typeof v === 'boolean',
+  });
   let previous: TurnView | null = null;
   const game = match(async (ctx, phase) => {
     if (phase.kind !== 'prepare') return;
@@ -374,7 +364,7 @@ it('结束窗口排入额外回合，旧回合状态到期后才进入新回合'
       await stop(ctx);
     } else {
       previous = phase.turn!;
-      setState(ctx, marker, { owner: 'a', source: null, lifetime: previous.lifetime }, true);
+      marker.set(ctx, 'a', true, { source: null, lifetime: previous.lifetime });
     }
     phase.turn!.end(ctx, 'probe');
   });

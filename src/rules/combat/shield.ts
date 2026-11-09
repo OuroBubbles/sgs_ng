@@ -1,12 +1,11 @@
 import type { WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { isGameOver } from '../game/end';
 import { defineEvent, timing } from '../../core/runtime/event';
 
-const shield = defineState('combat:shield', 0);
-const target = (player: string) => ({ owner: player, source: 'profile', lifetime: null });
+const shield = defineMark('combat:shield', 0);
 
 export interface ShieldChange {
   readonly player: string;
@@ -33,12 +32,12 @@ export const Shield = defineEvent('shield', {
 
 export function shieldOf(world: WorldReader, player: string): number {
   world.player(player);
-  return readState(world, shield, target(player));
+  return shield.of(world, player);
 }
 
 /** 绝对值 Change，可与费用或伤害同次提交；本身不开放变更窗口。 */
 export function shieldChange(ctx: Context, player: string, value: number) {
-  return stateChange(ctx, shield, target(player), value);
+  return shield.change(ctx, player, value);
 }
 
 export function changeShield(ctx: Context, request: ShieldInput): Promise<ShieldResult> {

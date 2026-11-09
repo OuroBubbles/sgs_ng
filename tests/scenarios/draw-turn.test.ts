@@ -8,8 +8,6 @@ import {
   defaultPhaseBody,
   activePhase,
   activeTurn,
-  activeTarget,
-  readState,
   pay,
   used,
   runPhase as phase,
@@ -146,8 +144,8 @@ it('一次回合以真实决策走过摸牌、出牌、响应、弃牌和结束'
   });
   expect(game.room.world.zone('a:hand').cards).toHaveLength(4);
   expect(game.room.world.player('b').hp).toBe(4);
-  expect(readState(game.room.world, activePhase, activeTarget)).toBe(null);
-  expect(readState(game.room.world, activeTurn, activeTarget)).toBe(null);
+  expect(activePhase.of(game.room.world)).toBe(null);
+  expect(activeTurn.of(game.room.world)).toBe(null);
   expect(game.room.decisions.pending).toEqual([]);
   expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);
 });
@@ -279,8 +277,8 @@ it('支付后死亡会停止后续阶段，正常结束会恢复对局阶段状�
   await running;
   expect(game.room.world.player('b').hp).toBe(3);
   expect(game.room.history.facts(Phase.started)).toHaveLength(4);
-  expect(readState(game.room.world, activePhase, activeTarget)).toBe(null);
-  expect(readState(game.room.world, activeTurn, activeTarget)).toBe(null);
+  expect(activePhase.of(game.room.world)).toBe(null);
+  expect(activeTurn.of(game.room.world)).toBe(null);
 });
 
 it('独立额外出牌阶段拥有新身份，可重新使用杀', async () => {
@@ -342,7 +340,7 @@ it('阶段 body 中止仍清理并恢复阶段状态，记录明确原因', asyn
       runPhase(ctx, 'a', 'draw', (body) => body.abort('explicit phase abort')),
     ),
   ).toMatchObject({ value: { exit: 'aborted', reason: 'explicit phase abort' } });
-  expect(readState(game.room.world, activePhase, activeTarget)).toBe(null);
+  expect(activePhase.of(game.room.world)).toBe(null);
   expect(
     game.room.history.entries.some(
       (entry) =>
@@ -374,7 +372,7 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
     owner: 'a',
     eligible: (_ctx, current) => current.kind === 'draw',
     run: async (ctx, current) => {
-      const limit = { key: 'skip-draw', source: 'test:skip', lifetime: current.lifetime, max: 1 };
+      const limit = { key: 'skip-draw', per: 'phase', times: 1 } as const;
       ctx.defer(
         game.room.on(Cost.paid, {
           id: 'observe-skip',
@@ -383,7 +381,7 @@ it('弃牌费用、次数、跳过意图原子宣告，后效不会读到半完�
           run: (atPay) => {
             observations.push(
               current.skipped &&
-                used(atPay.world, 'a', limit) === 1 &&
+                used(atPay, 'a', limit) === 1 &&
                 atPay.world.zone('discard').cards.includes('slash1'),
             );
           },

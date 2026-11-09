@@ -240,7 +240,7 @@ export function validateUse(ctx: Context, intent: UseIntent): Validation<UseRequ
     if (request.targets.some((target) => !legalTarget(ctx, request, target)))
       return invalid('Illegal target.');
     const limit = usageLimit(ctx, request);
-    if (limit && used(ctx.world, intent.actor, limit) >= limit.max)
+    if (limit && used(ctx, intent.actor, limit) >= limit.times)
       return invalid('Usage limit reached.');
     const reason = rules.canUse?.(ctx, { request });
     return reason ? invalid(reason) : { ok: true, value: request };

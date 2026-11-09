@@ -5,7 +5,7 @@ import type { Change, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import type { PhaseView } from '../turn/turn';
-import { defineState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { isGameOver } from '../game/end';
 import type {
   CardDefinition,
@@ -56,16 +56,7 @@ export interface DelayedCard {
   readonly cards: readonly string[];
   readonly stateId: string;
 }
-const binding = defineState<CardUseRef | null>(
-  'core:delayed-card',
-  null,
-  (value): value is CardUseRef | null =>
-    value === null ||
-    (typeof value === 'object' &&
-      'useId' in value &&
-      typeof value.useId === 'string' &&
-      'card' in value),
-);
+const binding = defineMark<CardUseRef | null>('core:delayed-card', null);
 
 /** 每张延时牌拥有独立的持久区域与宣告快照；材料名不覆盖转化后的牌名。 */
 export function delayedCards(
@@ -114,7 +105,7 @@ export function placeDelayed(
     const zone = `judgment:${child.cause.flowId}`;
     const changes: Exclude<Change, { kind: 'move' }>[] = [
       { kind: 'createZone', zone: { id: zone, kind: 'judgment', owner, scopeId: null, cards: [] } },
-      stateChange(child, binding, { owner, source: zone, lifetime: null }, input),
+      binding.change(child, owner, input, { source: zone }),
     ];
     await moveCards(
       child,

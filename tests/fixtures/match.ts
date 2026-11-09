@@ -5,7 +5,7 @@ import { observeAgent } from '../../src/host/agent-observation';
 import { decideBasic } from '../../src/host/basic-agent';
 import type { DecisionRequest } from '../../src/core/decisions/hub';
 import { rebuildWorld } from '../../src/core/history/rebuild';
-import { activePhase, activeTarget, activeTurn, readState, useDeclarations } from '../../src/sdk';
+import { activePhase, activeTurn, useDeclarations } from '../../src/sdk';
 
 /** 驱动真实整局并验证终局不变量；阵容、预算和技能断言仍由场景负责。 */
 export async function playMatch(
@@ -45,8 +45,8 @@ export async function playMatch(
     // 在测试清理前验证自然收束，不能借 finally 的 abort 掩盖未关闭的规则资源。
     expect(match.room.status).toBe('ended');
     expect(match.room.decisions.pending).toEqual([]);
-    expect(readState(match.room.world, activeTurn, activeTarget)).toBeNull();
-    expect(readState(match.room.world, activePhase, activeTarget)).toBeNull();
+    expect(activeTurn.of(match.room.world)).toBeNull();
+    expect(activePhase.of(match.room.world)).toBeNull();
     expect(useDeclarations(match.room.world)).toEqual([]);
     const world = match.room.world.snapshot;
     expect(world.zones.some((zone) => zone.kind === 'processing')).toBe(false);

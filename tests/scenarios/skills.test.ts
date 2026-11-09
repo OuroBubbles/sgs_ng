@@ -7,9 +7,7 @@ import {
   skillEffective,
   blockSkill,
   withLifetime,
-  defineState,
-  readState,
-  setState,
+  defineMark,
   Lifetime,
 } from '../../src/sdk';
 import type { Context } from '../../src/sdk';
@@ -232,10 +230,12 @@ describe('显式生存期、状态与授予到期', () => {
         return ++reads === 1 ? 1 : -1;
       },
     };
-    const key = defineState('test:snapshot', input, (value): value is { amount: number } => {
-      if (!value || typeof value !== 'object' || !('amount' in value)) return false;
-      const amount = value.amount;
-      return Number.isSafeInteger(amount) && Number(amount) >= 0;
+    const key = defineMark('test:snapshot', input, {
+      accepts: (value): value is { amount: number } => {
+        if (!value || typeof value !== 'object' || !('amount' in value)) return false;
+        const amount = value.amount;
+        return Number.isSafeInteger(amount) && Number(amount) >= 0;
+      },
     });
     expect(key.initial.amount).toBe(1);
     expect(reads).toBe(1);
@@ -243,35 +243,37 @@ describe('显式生存期、状态与授予到期', () => {
     reads = 0;
     const target = { owner: 'a', source: null, lifetime: null };
     await game.run('state', (ctx) => {
-      setState(ctx, key, target, input);
+      key.set(ctx, target.owner, input, target);
       expect(reads).toBe(1);
-      expect(readState(ctx.world, key, target).amount).toBe(1);
+      expect(key.of(ctx.world, target.owner, target).amount).toBe(1);
     });
     expect(input.amount).toBe(-1);
-    expect(readState(game.world, key, target).amount).toBe(1);
+    expect(key.of(game.world, target.owner, target).amount).toBe(1);
     expect(game.status).toBe('ready');
     expect(rebuildWorld(worldSeed(), game.history.facts())).toEqual(game.world.snapshot);
   });
 
   it('复杂状态读取在类型和运行时都深只读，外部输入修改不影响已提交值', async () => {
     const game = room();
-    const key = defineState(
+    const key = defineMark(
       'test:cards',
       { cards: [] as string[] },
-      (value): value is { cards: string[] } =>
-        value !== null &&
-        typeof value === 'object' &&
-        'cards' in value &&
-        Array.isArray(value.cards) &&
-        value.cards.every((id) => typeof id === 'string'),
+      {
+        accepts: (value): value is { cards: string[] } =>
+          value !== null &&
+          typeof value === 'object' &&
+          'cards' in value &&
+          Array.isArray(value.cards) &&
+          value.cards.every((id) => typeof id === 'string'),
+      },
     );
     await game.run('state', (ctx) =>
       withLifetime(ctx, 'turn', (turn, lifetime) => {
         const target = { owner: 'a', source: 'state', lifetime };
         const input = { cards: ['a1'] };
-        setState(turn, key, target, input);
+        key.set(turn, target.owner, input, target);
         input.cards.push('a2');
-        const snapshot = readState(turn.world, key, target);
+        const snapshot = key.of(turn.world, target.owner, target);
         expect(snapshot.cards).toEqual(['a1']);
         // @ts-expect-error 内容不能把读取状态赋给可变数组。
         const mutable: string[] = snapshot.cards;
@@ -279,11 +281,9 @@ describe('显式生存期、状态与授予到期', () => {
       }),
     );
   });
-  const marker = defineState(
-    'test:marker',
-    0,
-    (value): value is number => typeof value === 'number' && Number.isSafeInteger(value),
-  );
+  const marker = defineMark('test:marker', 0, {
+    accepts: (value): value is number => typeof value === 'number' && Number.isSafeInteger(value),
+  });
 
   it('阶段中止仍原子清除临时状态和授予，永久来源保留', async () => {
     const game = room();
@@ -293,7 +293,7 @@ describe('显式生存期、状态与授予到期', () => {
       await book.grant(ctx, { owner: 'a', skill: 'test:skill', source: general });
       await withLifetime(ctx, 'phase', async (phase, lifetime) => {
         await book.grant(phase, { owner: 'a', skill: 'test:skill', source: equipment, lifetime });
-        setState(phase, marker, { owner: 'a', source: 'effect', lifetime }, 7);
+        marker.set(phase, 'a', 7, { source: 'effect', lifetime });
         phase.abort('phase skipped');
       });
       expect(ctx.world.snapshot.states).toEqual([]);
@@ -342,9 +342,9 @@ describe('显式生存期、状态与授予到期', () => {
         await book.grant(turn, { owner: 'a', skill: 'test:skill', source: general });
         const source = turn.world.snapshot.skills[0]?.id ?? '';
         const target = { owner: 'a', source, lifetime };
-        setState(turn, marker, target, 9);
+        marker.set(turn, target.owner, 9, target);
         await book.revoke(turn, 'a', 'test:skill', general);
-        expect(readState(turn.world, marker, target)).toBe(9);
+        expect(marker.of(turn.world, target.owner, target)).toBe(9);
       }),
     );
     expect(game.world.snapshot.states).toEqual([]);
@@ -357,11 +357,11 @@ describe('显式生存期、状态与授予到期', () => {
       for (let i = 0; i < 2; i++)
         await withLifetime(ctx, 'phase', (phase, lifetime) => {
           lifetimes.push(lifetime);
-          setState(phase, marker, { owner: 'a', source: null, lifetime }, i);
+          marker.set(phase, 'a', i, { source: null, lifetime });
         });
       const old = lifetimes[0];
       if (!old) throw new Error('Expected lifetime.');
-      expect(() => setState(ctx, marker, { owner: 'a', source: null, lifetime: old }, 1)).toThrow(
+      expect(() => marker.set(ctx, 'a', 1, { source: null, lifetime: old })).toThrow(
         'closed or outside',
       );
     });
@@ -379,9 +379,9 @@ describe('显式生存期、状态与授予到期', () => {
       run: (ctx) => {
         if (!lifetime) throw new Error('Expected lifetime.');
         const endedLifetime = lifetime;
-        expect(() =>
-          setState(ctx, marker, { owner: 'a', source: null, lifetime: endedLifetime }, 1),
-        ).toThrow('closed or outside');
+        expect(() => marker.set(ctx, 'a', 1, { source: null, lifetime: endedLifetime })).toThrow(
+          'closed or outside',
+        );
       },
     });
     await game.run('turn', (ctx) =>
@@ -403,7 +403,7 @@ describe('显式生存期、状态与授予到期', () => {
               id: 'bad',
               owner: 'a',
               eligible: (query) => {
-                setState(query, marker, { owner: 'a', source: null, lifetime }, 1);
+                marker.set(query, 'a', 1, { source: null, lifetime });
                 return true;
               },
               run: () => undefined,
@@ -424,12 +424,12 @@ describe('显式生存期、状态与授予到期', () => {
         await b.run('turn', (inner) =>
           withLifetime(inner, 'phase', (local, lifetime) => {
             expect(lifetime.id).toBe(foreign.id);
-            expect(() =>
-              setState(local, marker, { owner: 'a', source: null, lifetime: foreign }, 1),
-            ).toThrow('closed or outside');
-            expect(() =>
-              readState(local.world, marker, { owner: 'a', source: null, lifetime: foreign }),
-            ).toThrow('another World');
+            expect(() => marker.set(local, 'a', 1, { source: null, lifetime: foreign })).toThrow(
+              'closed or outside',
+            );
+            expect(() => marker.of(local.world, 'a', { source: null, lifetime: foreign })).toThrow(
+              'another World',
+            );
           }),
         );
       }),

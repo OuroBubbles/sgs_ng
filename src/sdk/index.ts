@@ -8,7 +8,8 @@ export type {
   ActionAnchor,
   TriggerSource,
 } from '../core/runtime/event';
-export { turnActionAnchor } from '../rules/turn/order';
+export { playRounds, rotationOf, turnActionAnchor } from '../rules/turn/order';
+export type { NextTurn, Rotation, RoundsOptions } from '../rules/turn/order';
 export type { Context, FlowBody, FlowResult } from '../core/runtime/room';
 export type { Decision, DecisionSpec, DecisionResult, Validation } from '../core/decisions/hub';
 export type {
@@ -139,13 +140,15 @@ export {
   Equipment,
 } from '../rules/cards/equipment';
 export type { EquipmentSlot, EquipmentDefinition, EquipResult } from '../rules/cards/equipment';
-export { defineState, readState, setState, stateChange } from '../rules/state/state';
-export type { StateKey, StateTarget } from '../rules/state/state';
+export { defineMark, MarkEvent } from '../rules/state/mark';
+export type { Mark, MarkSlot, MarkSpec } from '../rules/state/mark';
 export { withCardSupply } from '../rules/cards/supply';
 export type { CardSupplyInput, SuppliedCard, SupplyResult } from '../rules/cards/supply';
-export { withLifetime } from '../rules/scopes/lifetime';
+export { lifetimeOf, withLifetime } from '../rules/scopes/lifetime';
+export type { Scope } from '../rules/scopes/lifetime';
 export { pay, payDiscard, used } from '../rules/costs/pay';
 export type {
+  Limit,
   UsageLimit,
   PaymentResult,
   PaymentSpec,
@@ -304,7 +307,6 @@ export {
   phaseKinds,
   activeTurn,
   activePhase,
-  activeTarget,
 } from '../rules/turn/turn';
 export { enterDying, kill, isDying } from '../rules/combat/life';
 export type {

@@ -366,8 +366,8 @@ it('多目标决斗只中止当前 b 效果，后续 c 的真实未提供响应�
     name: '多目标',
     triggers: [],
     modifiers: [
-      modify(cardQueries.extraTargets, (_ctx, { input: use }) =>
-        use.card.name === 'standard:duel' ? 1 : undefined,
+      modify(cardQueries.useRule, (_ctx, { input: use }) =>
+        use.card.name === 'standard:duel' ? { targets: 1 } : undefined,
       ),
     ],
   });

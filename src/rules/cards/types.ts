@@ -4,6 +4,7 @@ import { normalizeChoiceCount } from '../../core/decisions/count';
 import type { ChoiceCount } from '../../core/decisions/count';
 import type { Context } from '../../core/runtime/room';
 import type { Lifetime } from '../scopes/lifetime';
+import type { Limit } from '../costs/pay';
 import type { SkillHandle } from '../skills/skills';
 import type { UseResult } from './use';
 import type { UsePlanView } from './plan';
@@ -289,7 +290,8 @@ export interface UseRules {
   readonly count: ChoiceCount;
   /** 省略时接受所有规则用途；提供时也约束候选菜单，不把仅可响应的牌列入出牌阶段。 */
   readonly timings?: readonly UseTiming['kind'][];
-  readonly usage?: { readonly key: string; readonly max: number };
+  /** 次数限制，如杀 { per: 'phase', times: 1 }；只约束出牌阶段的主动使用。 */
+  readonly limit?: Limit;
   readonly canUse?: (ctx: Context, input: CardUseInput) => string | null;
   /** 单个过滤器选单角色目标；过滤器数组按位置选目标元组，count 计元组个数。 */
   readonly target: TargetFilter | readonly [TargetFilter, ...TargetFilter[]];

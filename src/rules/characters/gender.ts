@@ -1,23 +1,20 @@
 import type { WorldReader } from '../../core/model/state';
 import type { Context } from '../../core/runtime/room';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { Character } from './kingdom';
 
 export type Gender = 'male' | 'female' | 'dual' | 'none';
-const gender = defineState<Gender>(
-  'character:gender',
-  'none',
-  (value): value is Gender =>
-    value === 'male' || value === 'female' || value === 'dual' || value === 'none',
-);
-const target = (player: string) => ({ owner: player, source: 'profile', lifetime: null });
+const genders: readonly unknown[] = ['male', 'female', 'dual', 'none'];
+const gender = defineMark<Gender>('character:gender', 'none', {
+  accepts: (value): value is Gender => genders.includes(value),
+});
 
 export function genderOf(world: WorldReader, player: string): Gender {
   world.player(player);
-  return readState(world, gender, target(player));
+  return gender.of(world, player);
 }
 export function genderChange(ctx: Context, player: string, value: Gender) {
-  return stateChange(ctx, gender, target(player), value);
+  return gender.change(ctx, player, value);
 }
 export function setGender(ctx: Context, player: string, value: Gender): void {
   const before = genderOf(ctx.world, player);

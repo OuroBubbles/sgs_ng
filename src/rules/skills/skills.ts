@@ -4,7 +4,7 @@ import type { Context, Room } from '../../core/runtime/room';
 import { defineEvent, timing } from '../../core/runtime/event';
 import type { Trigger, TriggerSource, Timing } from '../../core/runtime/event';
 import { assertLifetime, Lifetime } from '../scopes/lifetime';
-import { defineState, setState } from '../state/state';
+import { defineMark } from '../state/mark';
 import type { ViewAs } from '../cards/types';
 import { viewAs } from '../cards/types';
 import type { QueryType, SkillModifier } from './query';
@@ -119,7 +119,7 @@ export function defineSkill(definition: SkillDefinition): SkillDefinition {
   return definition;
 }
 
-export const skillBlocked = defineState('core:skill-blocked', false);
+export const skillBlocked = defineMark('core:skill-blocked', false);
 
 export function skillEffective(world: WorldReader, instance: string): boolean {
   const current = world.snapshot.skills.find((skill) => skill.id === instance);
@@ -162,7 +162,7 @@ export function blockSkill(ctx: Context, instance: string | SkillHandle, lifetim
       ? ctx.world.snapshot.skills.find((skill) => skill.id === instance)
       : instance;
   if (!current) throw new Error('Cannot block an unknown skill instance.');
-  setState(ctx, skillBlocked, { owner: current.owner, source: current.id, lifetime }, true);
+  skillBlocked.set(ctx, current.owner, true, { source: current.id, lifetime });
 }
 
 export interface SkillChange {

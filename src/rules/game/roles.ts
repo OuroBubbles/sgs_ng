@@ -3,7 +3,7 @@ import { immutable } from '../../core/model/value';
 import type { Context, Room } from '../../core/runtime/room';
 import { draw } from '../cards/draw';
 import { moveCards } from '../cards/move';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { finishGame, isGameOver, Game } from './end';
 import type { GameResult } from './end';
 import { Death } from '../combat/life-events';
@@ -20,22 +20,7 @@ export interface RoleSeat {
   readonly role: Role;
 }
 const roles: readonly Role[] = ['lord', 'loyalist', 'rebel', 'renegade'];
-const roleState = defineState<readonly RoleSeat[]>(
-  'role:seats',
-  [],
-  (value): value is readonly RoleSeat[] =>
-    Array.isArray(value) &&
-    value.every(
-      (item: unknown) =>
-        typeof item === 'object' &&
-        item !== null &&
-        'player' in item &&
-        typeof item.player === 'string' &&
-        'role' in item &&
-        roles.some((role) => role === item.role),
-    ),
-);
-const roleTarget = Object.freeze({ owner: null, source: 'role', lifetime: null });
+const roleState = defineMark<readonly RoleSeat[]>('role:seats', []);
 
 /** 采用基础身份模式的 2 至 8 人配置；版本变体另写模式，不塞进内核开关。 */
 export function roleRoster(count: number): readonly Role[] {
@@ -54,7 +39,7 @@ export function roleRoster(count: number): readonly Role[] {
 }
 
 export function roleSeats(world: WorldReader): readonly RoleSeat[] {
-  return readState(world, roleState, roleTarget);
+  return roleState.of(world);
 }
 export function roleOf(world: WorldReader, player: string): Role {
   const seat = roleSeats(world).find((seat) => seat.player === player);
@@ -74,7 +59,7 @@ export function assignRoles(ctx: Context, input: readonly RoleSeat[]): void {
   )
     throw new Error('Invalid or repeated role assignment.');
   for (const seat of seats) ctx.world.player(seat.player);
-  ctx.commit(RoleEvent.assigned, [stateChange(ctx, roleState, roleTarget, seats)], seats);
+  ctx.commit(RoleEvent.assigned, [roleState.change(ctx, null, seats)], seats);
 }
 
 /** 获胜成员包含已死亡的同阵营角色；内奸仅在成为唯一存活者时获胜。 */

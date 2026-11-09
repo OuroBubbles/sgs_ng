@@ -1,10 +1,8 @@
 import {
-  activeTarget,
   activeTurn,
   on,
   general,
   dealtWith,
-  readState,
   rulesOf,
   skill,
   Cards,
@@ -23,7 +21,7 @@ export const luoyiAftereffect = defineEffect({
       on(Damage.causing, {
         when: (ctx, hit) =>
           ctx.world.player(self.data.actor).alive &&
-          readState(ctx.world, activeTurn, activeTarget)?.id === self.data.turn &&
+          activeTurn.of(ctx.world)?.id === self.data.turn &&
           dealtWith(hit, self.data.actor, 'standard:slash', 'standard:duel'),
         effect: (_ctx, hit) => hit.adjust(1, 'standard:luoyi'),
       }),

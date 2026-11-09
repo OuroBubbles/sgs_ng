@@ -419,27 +419,17 @@ it('结姻取消不支付；拒绝装备、自己和女性目标，双性男性�
 it('结姻费用、次数和宣告同次提交；回复先目标后本人，一阶段不能再次发动', async () => {
   const game = supportGame(true);
   const instance = await setupSupport(game);
-  let current: PhaseView;
   game.room.on(Cards.moved, {
     id: 'cost-observer',
     owner: null,
     eligible: (_ctx, moved) => moved.moves.some((move) => move.cards.includes('one')),
     run(ctx) {
-      expect(
-        used(ctx.world, 'a', {
-          key: 'jieyin',
-          source: jieyin.id,
-          lifetime: current.lifetime,
-          max: 1,
-        }),
-      ).toBe(1);
+      expect(used(ctx, 'a', { key: jieyin.id, per: 'phase', times: 1 })).toBe(1);
       expect(ctx.world.zone('a:hand').cards).toEqual(['three', 'four']);
       expect(ctx.history.facts(Skill.invoked)).toHaveLength(1);
     },
   });
-  const running = startPlay(game, (phase) => {
-    current = phase;
-  });
+  const running = startPlay(game);
   await useSkill(game, instance, 'discard-heal', ['one', 'two'], ['b']);
   const next = await playRequest(game);
   expect(

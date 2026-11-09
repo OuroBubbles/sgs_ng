@@ -4,8 +4,8 @@
       "id": "4p-00",
       "seed": 42,
       "lineup": ["standard:guanyu", "standard:xuchu", "standard:liubei", "standard:lvbu"],
-      "entries": 21746,
-      "facts": 3156,
+      "entries": 21935,
+      "facts": 3177,
       "decisions": 238,
       "result": {
         "winners": ["丁席"],
@@ -36,17 +36,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "59facdf75297a2ac06f43af4a8112e31e5615a9485e970f5b3d89ce208bfe87a",
-        "facts": "c61d4f3f143ec3347a3f6c8d9b09209cdac1975df2ace31acc04b073b99b3f49",
-        "decisions": "267573e437502e1a9597d77e90cb525a7e19bb9a9df98011e8014c7605b2d29a"
+        "journal": "d7f1775fef9730c4fb646a82c441a57f9213bcba2c74d115067d1674579679a3",
+        "facts": "2e8d9fc9c4a967a31e20b384001653d7dd33f31471a63c5004a5bbc18da4328c",
+        "decisions": "a3dbb83dd00b11846c744686868f81bbca06ed8a37b3e62453d5f1696e27ea84"
       }
     },
     {
       "id": "4p-01",
       "seed": 59,
       "lineup": ["standard:huanggai", "standard:zhenji", "standard:huatuo", "standard:daqiao"],
-      "entries": 11121,
-      "facts": 1585,
+      "entries": 11175,
+      "facts": 1591,
       "decisions": 123,
       "result": {
         "winners": ["丁席"],
@@ -76,9 +76,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "7dd3da22c8c61b8139d114a20adfed32b70a6a35ce47afca3e859c117a03fbdf",
-        "facts": "e20d15bcfb7e0c406604a8c156d77b2d8b5aef9de6ec9064e285c0b6e63bf11d",
-        "decisions": "c146c785792b1039d55fc0b09b6e9e4bba59af71a33620691756a2344b131754"
+        "journal": "e2a3ae366d6bcd22a159f3653e8f064cb03d2a6d2e621b3f8516b89bd81833cd",
+        "facts": "5f79f59c14182bddbc67082c93eed495bc5d052a2350027e1f8028a62866b5a7",
+        "decisions": "eed51db79e3a7130ff7801c33ccb4f73ca85a3b41d948e1245faefb744df9f1e"
       }
     },
     {
@@ -90,8 +90,8 @@
         "standard:sunquan",
         "standard:machao"
       ],
-      "entries": 7504,
-      "facts": 1068,
+      "entries": 7558,
+      "facts": 1074,
       "decisions": 86,
       "result": {
         "winners": ["丁席"],
@@ -118,17 +118,17 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "43230553a07f9c3e234ce4e2a7b85c372d6cd206435d2b94d2edaa925b51ddfd",
-        "facts": "3505f7a319df26d6fe8d097292c78f81de57971d0567ed2470beb73a58aec34d",
-        "decisions": "cc17308ee0a9370e7a83de1d2d4955f8e25da9b6b3dfa94d1b901ace62c383d3"
+        "journal": "2bbc20f1fb0f74250244cea3d997c9fa092ef4c3d1e3e3152577967b780a14bb",
+        "facts": "9fb219603ed4a87bab2bfccf4e8e713b169c372f86a9aaeea435b2dfb1bb9020",
+        "decisions": "e65b58263f1d0f5d00b9a0ddd20dba30c3307d9e927a450c09966bb19911e8c1"
       }
     },
     {
       "id": "4p-03",
       "seed": 93,
       "lineup": ["standard:zhaoyun", "standard:guojia", "standard:lvmeng", "standard:zhouyu"],
-      "entries": 8148,
-      "facts": 1158,
+      "entries": 8193,
+      "facts": 1163,
       "decisions": 101,
       "result": {
         "winners": ["丁席"],
@@ -155,17 +155,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "ed19794d8fc859fa98f41ffa994120fcf9393119ce6169c77c1cb445e5a7370d",
-        "facts": "6a4a564e566dadd93fa97797a0fb070fbc8de96cdca6a58f15fd3f089fe7dde0",
-        "decisions": "bae548a29d9e35fdc82690cdc33c1630df39ec57466812185f6895e9e4d4b08f"
+        "journal": "6e51d1420bb8c09471342235f24deee0286530f71b0abd8763782f58615d73e2",
+        "facts": "0413d598423db141e8172ff23af4cb324515168491b10e0306220480bd91c94b",
+        "decisions": "a9064e1427a9e530605fd56ee2c8f6507a300b0f1b8aa43bdd1e1e8e23f9fe58"
       }
     },
     {
       "id": "4p-04",
       "seed": 110,
       "lineup": ["standard:zhangfei", "standard:caocao", "standard:luxun", "standard:diaochan"],
-      "entries": 7955,
-      "facts": 1117,
+      "entries": 8000,
+      "facts": 1122,
       "decisions": 86,
       "result": {
         "winners": ["乙席", "丙席"],
@@ -190,9 +190,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "96fc542afc87812be8eafbb54052e3aadd5f994539265f5cd649c04b9098d94e",
-        "facts": "79b0d4e02b561d7ca9a86f0b079fa550d3b6329f36c690d01134af5bc352a085",
-        "decisions": "fb8d7e8a9c9dfcba7d1387a9f824453c86adc5b01d778103de52a0e8f5d3146d"
+        "journal": "c88815dc7bba69545b1d589aebdb1092efd83e91b2f38166ff43d9f75c1976f6",
+        "facts": "bde8d770a2feaeb1a931f2c517a686bfc5d3550fe02aea5dfae5c98942a40337",
+        "decisions": "2cb52e0c09e2a5798068a8ce3c3f8c28c678cac7c5ee6d389873411703447b65"
       }
     },
     {
@@ -204,8 +204,8 @@
         "standard:huangyueying",
         "standard:zhugeliang"
       ],
-      "entries": 28922,
-      "facts": 4120,
+      "entries": 29165,
+      "facts": 4147,
       "decisions": 389,
       "result": {
         "winners": ["乙席", "丙席"],
@@ -243,17 +243,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "c6d5faee9577a202c038c19abba0b5ff5c4d9b0c133778add5eaeef958507fa0",
-        "facts": "b053a2d8fc04d1bbc860b977593d912064e7164732fc1f1e2a525637cdb1637a",
-        "decisions": "e34db7800dbf5e26f9d159dfea79ef046069b267fe19000c1ce516cbc6ca1c9e"
+        "journal": "14c712c929187c0624dcda87fb5faf711146e9999c04c1596e23cd9c0e312f82",
+        "facts": "b638c8497d645e88cb11c7a231d08b412434f7b487e953c2d31dd89b642b30e0",
+        "decisions": "07fedb3c078ff4f70457da2c3a31ab824c3cfb4aaa68e4e9c4901a73457d888a"
       }
     },
     {
       "id": "4p-06",
       "seed": 144,
       "lineup": ["standard:xiahoudun", "standard:liubei", "standard:lvbu", "standard:guanyu"],
-      "entries": 11245,
-      "facts": 1641,
+      "entries": 11335,
+      "facts": 1651,
       "decisions": 123,
       "result": {
         "winners": ["乙席", "丁席"],
@@ -284,17 +284,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "5b9ece2436d484ede8ce915e9e03c83832dbe6411925cb2fc48e04df8ee668d5",
-        "facts": "fa91b3cd11def666a212cb2f4762fa725c09a56955b1b6828efe836c80448674",
-        "decisions": "cdcdb4b95a0e1a7ab6ac3b326a348630fce686fb54c18bb60d6c568f9ebc6b02"
+        "journal": "1fb974c3c7a6063a98f9df2cd5539171d2fc8f4f2fe8eeab51b6b26124169218",
+        "facts": "36c43d0860463082750c3fcb4c90f9e9f65dd2ecd2d6e5bacd0821148a3dfe06",
+        "decisions": "2174f4cb5e1b2ba1588bf3bc7e31c5f10da71767308d1c0b65b5d1f85f2844d6"
       }
     },
     {
       "id": "4p-07",
       "seed": 161,
       "lineup": ["standard:xuchu", "standard:huatuo", "standard:daqiao", "standard:huanggai"],
-      "entries": 6585,
-      "facts": 935,
+      "entries": 6621,
+      "facts": 939,
       "decisions": 75,
       "result": {
         "winners": ["甲席", "丙席"],
@@ -321,9 +321,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "e5804ff6ca3c57daf03391cf18c130d69d1ea44e468a657d9d38b7c8b04e9bd2",
-        "facts": "e043e0e06cb09cf39920e2c1986b8a69d3cd7a0770fa1b66a3d714c796aee440",
-        "decisions": "39f1cfad94bc52edb2e63ff63fc3f59cb02ebd2b41fdd74ca16dfd84357f025d"
+        "journal": "20de10352cf8a7868c811f84482a280a8f9fc1ae8c97949b1edd3bac2f3a10b3",
+        "facts": "2b3e5f5028be4a4f2ba3194748320045aecf38462ec205599bd039f22e69045f",
+        "decisions": "88614e80648db22d5189e389c3ef8d11b330b6af01f7a6c829e12555ae09c53d"
       }
     },
     {
@@ -335,8 +335,8 @@
         "standard:machao",
         "standard:sunshangxiang"
       ],
-      "entries": 16164,
-      "facts": 2298,
+      "entries": 16254,
+      "facts": 2308,
       "decisions": 213,
       "result": {
         "winners": ["甲席"],
@@ -368,17 +368,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "da645bd45bb176e9d282bcf0e90b51782b064f6422b75957950ae3cce9106304",
-        "facts": "4937138f92e17c7d8b1e4623f54ff28b1262fe4ff4a35d97f17587f49d0a92ad",
-        "decisions": "09bfea25fefb56234d05279087d420ac5301d3100a2c00201d40da44504e2c9a"
+        "journal": "f75bf3ba23ecea647ffaf9c2e4c6835214a189139b0db5a64d10eb6f80526ffc",
+        "facts": "8a2afb0b3bd2f6adc13a47ba4deedad4c4bd66a6182a1eb2dce4292861f0ddc7",
+        "decisions": "cabd94e810de5cf1600f0c769c7eec1fc379bb05ba230c4f1a779231503dd50d"
       }
     },
     {
       "id": "4p-09",
       "seed": 195,
       "lineup": ["standard:simayi", "standard:lvmeng", "standard:zhouyu", "standard:zhaoyun"],
-      "entries": 7945,
-      "facts": 1120,
+      "entries": 7981,
+      "facts": 1124,
       "decisions": 92,
       "result": {
         "winners": ["甲席", "丙席"],
@@ -404,17 +404,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "0a8fe63fcaee68c7891b9f828964f5e7247306e08a51b69543925bbeedf6f23f",
-        "facts": "5fb58e71c423c55424e36e6709bca95473817b3e21f581a68792e6cc9cab4c2c",
-        "decisions": "8903dd3f99f379776919b9e03a5e0de7e6555174ebd573116fe9d572da43c3d3"
+        "journal": "8143283a4c7e5ff35a601529b062e367242e7da1f0da068213f1426a8eea2bac",
+        "facts": "f626374f498961f5051ce2374e24d19edbe27b581d1c29d79564c374be03304b",
+        "decisions": "17241e772dd85e3e2ffdb40b5cc66cf07d431eac2026b1fe4ee2a83e439d58a9"
       }
     },
     {
       "id": "4p-10",
       "seed": 212,
       "lineup": ["standard:guojia", "standard:luxun", "standard:diaochan", "standard:zhangfei"],
-      "entries": 6122,
-      "facts": 854,
+      "entries": 6158,
+      "facts": 858,
       "decisions": 72,
       "result": {
         "winners": ["丙席"],
@@ -436,9 +436,9 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "5904d1859f868299c39c1676ff381d270b87f76e43c835862ec8201420f42a4f",
-        "facts": "aee52ca204b8925652afca555d229ba2b8c591e9c32beb961c0f7f4708d4e682",
-        "decisions": "cfa8c2ada6453fb97d720957bf252d6d5ba8ba663dc8ff83f2519dd8d81ccdbd"
+        "journal": "f7af2c77aed1daf0dc603d12b1dd90c3a18fd7e98f1f476eb8b60db79227c0fb",
+        "facts": "9ff09ca57de318bbb806d37643be6e5f66970ec2b6aa8d6f9b3c1f0ae200ab0d",
+        "decisions": "919894a5128fef1ddaa6c85ca0a3a3f42796ac32cf1d30e914e44dea8cbc3c4c"
       }
     },
     {
@@ -450,8 +450,8 @@
         "standard:zhugeliang",
         "standard:ganning"
       ],
-      "entries": 12742,
-      "facts": 1832,
+      "entries": 12841,
+      "facts": 1843,
       "decisions": 159,
       "result": {
         "winners": ["丙席"],
@@ -482,17 +482,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "4e41a971478b94d92f0f06fb0a950f42eab719ebebd31dac9d90bc93f35a6aaa",
-        "facts": "eb9165013e9b672b7d8273db7134dbe21a9f3eee00271cd3ec869a3125edee15",
-        "decisions": "5164141a3c58c55aa8adcc3c579f4468f852c335aacdc8d4c75be71b955d3c77"
+        "journal": "6968b0593014caf6bba9d689f78f804d463065b8c8f53a8706601801ebe599ef",
+        "facts": "8754c62e19e47765f5f81898ca735372b4d1b5cf6cd0e4acd861e96039e82138",
+        "decisions": "9fd2b715a49ae22025ead6bddf470d247d46eb9981e292f861d6af9ca2a09475"
       }
     },
     {
       "id": "4p-12",
       "seed": 246,
       "lineup": ["standard:zhangliao", "standard:lvbu", "standard:guanyu", "standard:xiahoudun"],
-      "entries": 11081,
-      "facts": 1607,
+      "entries": 11180,
+      "facts": 1618,
       "decisions": 124,
       "result": {
         "winners": ["丙席"],
@@ -523,17 +523,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "0588ab23f6da67eca3fc5be52b7f62c02db5fea583249f179129653077545eea",
-        "facts": "9d2c6ab1c2e0402f4dbf198dbda63777a4a8c50a072cb7d768a6b1b3ea93df2a",
-        "decisions": "72747628524401fc966c286b7552e05edf1de6e14b40f2907ab4000a7a1eb2c7"
+        "journal": "b4e87edec9ca4dd449aece6eb2969401db39c46dcaa0e667e2d2517e9e4fda18",
+        "facts": "0d679e6e78ceffbf8e45c317ebf0a73a6191194e7c7eba227c344985f14d0500",
+        "decisions": "33f295260a9123c55ef5ba716282265998c6ecca25c746e0d47f1c262e9ba158"
       }
     },
     {
       "id": "4p-13",
       "seed": 263,
       "lineup": ["standard:liubei", "standard:daqiao", "standard:huanggai", "standard:xuchu"],
-      "entries": 8581,
-      "facts": 1233,
+      "entries": 8662,
+      "facts": 1242,
       "decisions": 97,
       "result": {
         "winners": ["甲席", "丙席"],
@@ -560,17 +560,17 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "9c06712aa0c1b6913bfb2a0717a1a1831a290208253deeead736f3ea36cc5764",
-        "facts": "90f16ffe0e55d63f5a2434288313c4ec1d6c067ee06be1e8d2bcc59d55183b5a",
-        "decisions": "0616841dc28ad198f7ab405cf8c8b439fd0a4ec77ed2dcc47eb71002561e589f"
+        "journal": "19b696c25f2b0e7bf73fae842aa3fe77b708e78ceaf664cc2d7fb9c52406d002",
+        "facts": "0b5f5ef881cdd789132b43bf02b8012c055bbb1704769d5eb6168e1d919de2fa",
+        "decisions": "192d7f22775ff235a36a235b4cfca0a2ae4f99c8cfcbb801825169cf9a86b1b4"
       }
     },
     {
       "id": "4p-14",
       "seed": 280,
       "lineup": ["standard:huatuo", "standard:machao", "standard:sunshangxiang", "standard:zhenji"],
-      "entries": 5798,
-      "facts": 808,
+      "entries": 5825,
+      "facts": 811,
       "decisions": 76,
       "result": {
         "winners": ["乙席", "丁席"],
@@ -595,17 +595,17 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "73d0f6e963af67f34432b318f892a8b2c3ce912381c27ae83d9691b1b589fc06",
-        "facts": "c4c4c454240262418ff03a664487c7a4fbbab932eab5faba046cc2f4e85523b8",
-        "decisions": "46d44df819e732caafba51a733c1329694bfe41eec67bb4f93a764266429589c"
+        "journal": "967ebbf89740aea2a50810318bbd92c3e666fac662cb59f3d6150a092e68015e",
+        "facts": "7525ae5a09ac993ad6503dd2c8387fb21943a95c4d39bdbfd80b19aa81b5cf64",
+        "decisions": "97f8a5f9bf2c3bd2d5225e739eef893d373bd4cfeb926aec64ad55f4e6864f0d"
       }
     },
     {
       "id": "4p-15",
       "seed": 297,
       "lineup": ["standard:sunquan", "standard:zhouyu", "standard:zhaoyun", "standard:simayi"],
-      "entries": 4111,
-      "facts": 569,
+      "entries": 4129,
+      "facts": 571,
       "decisions": 51,
       "result": {
         "winners": ["甲席", "乙席"],
@@ -628,17 +628,17 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "3d3f256b5bf88364c22c3f99b586e1cd7f9f0a4050e040b9d60c4e223fdbd01b",
-        "facts": "0e7de7700e2a1470c588b0187670a599c6cd58fb43beae75be0f024f5cbda242",
-        "decisions": "44cd314a56420f2b0c85fd7630213613eb2d1247745de95795b88750d62a1d9b"
+        "journal": "a53171d24dccb15332a26e1ca12b8386d4520e88713fbc12f8db9a1f3f7bfe5f",
+        "facts": "01db36f09565a5aafd39d27852ee89cbbfb14ff36bfa3b73c172162c7af7d887",
+        "decisions": "d82ec52ef4348ef83b47ae2a96b0b2c9d3e762644f76411282574cbc12376294"
       }
     },
     {
       "id": "4p-16",
       "seed": 314,
       "lineup": ["standard:lvmeng", "standard:diaochan", "standard:zhangfei", "standard:guojia"],
-      "entries": 15688,
-      "facts": 2276,
+      "entries": 15832,
+      "facts": 2292,
       "decisions": 191,
       "result": {
         "winners": ["乙席", "丁席"],
@@ -672,17 +672,17 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "f4c38dd52ef18229f75c910710bda358b672cf53815a5e7a44f526aa1f7d1a39",
-        "facts": "038dbca85bc081dfefb85c11b952c56314438acc10c401e3ea36d8ba3db22d9c",
-        "decisions": "f52015183d1674e6b33eeba6cfe444c0b530f8e6a9cacc0e37ead6efcbaedf7d"
+        "journal": "3b2cdff7a8011ff47c6fb3c6e73a61961a87c50bd353fd22091ef0da5106693e",
+        "facts": "05780515278d0db0451a17f5941372840abff0ee1841009af74f139bf0a555ca",
+        "decisions": "b0d458fb489c3ce0149420b953f8c40a7b901820807962ba167f4a0daa6ca07c"
       }
     },
     {
       "id": "4p-17",
       "seed": 331,
       "lineup": ["standard:luxun", "standard:zhugeliang", "standard:ganning", "standard:caocao"],
-      "entries": 9143,
-      "facts": 1289,
+      "entries": 9188,
+      "facts": 1294,
       "decisions": 103,
       "result": {
         "winners": ["丁席"],
@@ -706,9 +706,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "d5e8df3861515ccb7f974d7755ba93c9b855aaf4fdc24a5705862eb4029b0a57",
-        "facts": "49f4929e6d6b725bb230cdab044d6af7792d3646ab3d712cb024d4d88f0578c1",
-        "decisions": "faf340c6840342976b5476125866b0012accc9da6d3cab2912b2a1c5dfebf8b9"
+        "journal": "4a8ece79a5b26027c8a1e6d748aeecf4f4e8a20da85c6ecc36c79cc93fbdfa20",
+        "facts": "c3dd8f5db785e0dd825428d1298fc82a3bafe315992561f4b85c85018acdef33",
+        "decisions": "bae3a9940ce7e80e2cfaebb754628cc5fe3ca9bdc953f90d205fc2ef36e1d738"
       }
     },
     {
@@ -720,8 +720,8 @@
         "standard:xiahoudun",
         "standard:zhangliao"
       ],
-      "entries": 9490,
-      "facts": 1364,
+      "entries": 9553,
+      "facts": 1371,
       "decisions": 116,
       "result": {
         "winners": ["丙席"],
@@ -750,17 +750,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "8fda769f3161c0064a573b4ce4ede1923d508bd2020b428a30dfdb01bb5187b7",
-        "facts": "43f5260cd9f49e03029e17253e926c8842998b64024e7a4512392a8938703334",
-        "decisions": "7c18b409080b90798b921936f11736d5f822710a8fc8e02879ff24cd517efdbb"
+        "journal": "90bb2390b36e8cce72d17a0ba5868377c2618a6aa544309f0ce3fc77b6a0d341",
+        "facts": "b9e7323ce68848a214a70a861dc72089bda14d9ca912115b08355fd10dd3de1a",
+        "decisions": "e3cf2d02b56190fbcd8c9aeb6672420bec029f7d524db755b9e3e9a29968fa26"
       }
     },
     {
       "id": "4p-19",
       "seed": 365,
       "lineup": ["standard:lvbu", "standard:huanggai", "standard:xuchu", "standard:liubei"],
-      "entries": 7268,
-      "facts": 1029,
+      "entries": 7322,
+      "facts": 1035,
       "decisions": 81,
       "result": {
         "winners": ["甲席", "乙席"],
@@ -783,17 +783,17 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "73a223bcbf15a74408cf291c8a43e6bd0c2db474d5374983e10c6e8de9793e6d",
-        "facts": "60eb04339786739c0ea94841a6d68bf79f7e8906cf2d93c814a467bd121baf43",
-        "decisions": "96fc13cdb28bd5c05211769daec89d3863c093443598f5de181deb66c4c82c79"
+        "journal": "06e485d0418b2161b8be1fb629777aef44e54e6beb49c4c0a82336367da1c616",
+        "facts": "d39dd78229b99f60fe8345160910d996bb7bf639904000207b2802010b938d7d",
+        "decisions": "5f5d2f61d02870b01ef74b2a156c20f60c7072d870a5d33ff8795113256044d1"
       }
     },
     {
       "id": "4p-20",
       "seed": 382,
       "lineup": ["standard:daqiao", "standard:sunshangxiang", "standard:zhenji", "standard:huatuo"],
-      "entries": 30172,
-      "facts": 4354,
+      "entries": 30442,
+      "facts": 4384,
       "decisions": 348,
       "result": {
         "winners": ["丙席"],
@@ -824,17 +824,17 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "6e4f77b0d0f1ee3e3ffbd6f848b7a63b8e0657010bea676e0f2399873125addd",
-        "facts": "9b3e8d7f14880ded50e67b7b7648fcc25879846a5a940e25395b2ae23eb79277",
-        "decisions": "e0f2fd4ee9352d8294fc4523992b40c07cf46c6c2a264cc07adab2497272202b"
+        "journal": "174c03ded708ccc07b04a17bce7454eb1857025522e07189997fb95309577fce",
+        "facts": "365f8da39bf1aa558a827bc220630a8524b1428828c1a8a16a89c49f67f1b952",
+        "decisions": "a82157853910df5910eaef45aa6cc83117472822079fecf0e412bf9d2f7cb24a"
       }
     },
     {
       "id": "4p-21",
       "seed": 399,
       "lineup": ["standard:machao", "standard:zhaoyun", "standard:simayi", "standard:sunquan"],
-      "entries": 6241,
-      "facts": 880,
+      "entries": 6268,
+      "facts": 883,
       "decisions": 64,
       "result": {
         "winners": ["甲席", "乙席"],
@@ -861,17 +861,17 @@
         "standard:spear"
       ],
       "digest": {
-        "journal": "01f1edb87902732d9586d51405084b848f70f75e012f1a1320e35657f3b083ba",
-        "facts": "e2d3463356a85622b640f467ffdcc124267056d3ab0b45fe2948b434fa13f022",
-        "decisions": "1b3026333ad8189ecab3c111ad12e67a2327e7b14e6af80635a05ba21b15e780"
+        "journal": "7d533d46316d02cb6918b6b5184285a57de98615027f4597a4d280db415480f3",
+        "facts": "b6b95c750b83865cf86fd8a033802116b4cda4a3b4d022c4a593b16c86072c35",
+        "decisions": "43feda58e47fae88c2c8d8c90f3353e1762dc0cc06ba8c9ad52cca497cc4c6b3"
       }
     },
     {
       "id": "4p-22",
       "seed": 416,
       "lineup": ["standard:zhouyu", "standard:zhangfei", "standard:guojia", "standard:lvmeng"],
-      "entries": 7439,
-      "facts": 1062,
+      "entries": 7493,
+      "facts": 1068,
       "decisions": 90,
       "result": {
         "winners": ["乙席", "丁席"],
@@ -898,17 +898,17 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "4f0ae45778b0b4aea3f526c9691b36b504195b14bc374c26addacb6a98fa03a8",
-        "facts": "a39ca8e4f9fe04e8ee7137a1fea67fab03740c2dc5d7b5d370a932ef69e4263b",
-        "decisions": "5692c2fdbe223bde7be7ece1335a3b6e812ec215c3d70572be23867a7837124f"
+        "journal": "d983768094dd236b48840d2406557480f0031596283e6643232c27f6dd315f30",
+        "facts": "a2087471def83e865e7d4423e85f0a7067bee8a635d6c474aee37f3fe1bd37a2",
+        "decisions": "fcf9709564a2bf9d2b7ce8c9b5408f0f8c12203c5fab41617f7e309c03132b62"
       }
     },
     {
       "id": "4p-23",
       "seed": 433,
       "lineup": ["standard:diaochan", "standard:ganning", "standard:caocao", "standard:luxun"],
-      "entries": 4214,
-      "facts": 569,
+      "entries": 4232,
+      "facts": 571,
       "decisions": 43,
       "result": {
         "winners": ["丙席", "丁席"],
@@ -928,9 +928,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "4dea74d2d627cd1f17ae9addb520bd102904fdd90379e31b456775e51c67d94f",
-        "facts": "76cba627700d9b0d18a98037a45bbd8b779f45194892b58841d1c200a950d7b9",
-        "decisions": "7a7b5720c0184834236392c3f0452655ce0908b779bab0fa8592d9925b4d1d83"
+        "journal": "8d8cf53b5f3224fce4faf3816752f0fdda2f00d46ee4fe79fd3e155f6eae22ac",
+        "facts": "f5c28ea1f6638c93532917081d012a714e5edde568abaf738698053f6e7298e6",
+        "decisions": "177773c90df0aa2c3f91ee381feaa406e67d3b55e1b53e39e7ac3bbffcc4de98"
       }
     },
     {
@@ -942,8 +942,8 @@
         "standard:zhangliao",
         "standard:huangyueying"
       ],
-      "entries": 9723,
-      "facts": 1380,
+      "entries": 9786,
+      "facts": 1387,
       "decisions": 118,
       "result": {
         "winners": ["乙席"],
@@ -968,9 +968,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "f451dd1b83983831ebaa4ae601af05bf1fb03e877fe47dc6ea8d65cf88f8d30c",
-        "facts": "43c7c81217562a43ce1fcbd6f7deec2e84129215c464b53da78e1b747893cd2a",
-        "decisions": "24d7b47e6020ddba4ccadbb342373b3f5d3b6abe850dad8b2ecdbb95e2b4f04b"
+        "journal": "147c7765ac70ec68f1137f5208c5d37e43df89f0cf6c53eb0278a76c0bc17ba4",
+        "facts": "2b7247dc1ae5518e5cbf2da2fdd118ee41252eec177ce3d0022dde03ccbe186e",
+        "decisions": "7e3b2f8dc311603c179f7738c42f243ff673eb593d5759b10aedde71226babec"
       }
     },
     {
@@ -986,8 +986,8 @@
         "standard:huangyueying",
         "standard:machao"
       ],
-      "entries": 10326,
-      "facts": 1412,
+      "entries": 10344,
+      "facts": 1414,
       "decisions": 118,
       "result": {
         "winners": ["乙席", "丁席", "己席", "辛席"],
@@ -1011,9 +1011,9 @@
         "standard:snatch"
       ],
       "digest": {
-        "journal": "12805fb9fdf9494e57d0c799e6f4f7f920be391ac5600200a530c55c23d8bfbc",
-        "facts": "195ff6bcfa154cb09284347fdc30bb94069734c56b742f0ce1eb0d2050bed13f",
-        "decisions": "e3d8431ed90ee1f280ff6a744b004088c92e19edc21be489624a9f59ecde1fac"
+        "journal": "59498e936a842a74f98cc2919f684849b7efa3fe4c46c7ba88702c34970eea4e",
+        "facts": "1e68838f7c895c400d0e5cef85f2e2fa8f398f7101dcb98367a99bb5e6ca7f99",
+        "decisions": "5764997d92ea3df052e9a2eb3c31ee32fe2ef1664a80f281da856e39db9924a0"
       }
     },
     {
@@ -1029,8 +1029,8 @@
         "standard:zhouyu",
         "standard:guanyu"
       ],
-      "entries": 17999,
-      "facts": 2429,
+      "entries": 18053,
+      "facts": 2435,
       "decisions": 227,
       "result": {
         "winners": ["甲席", "丁席", "己席", "辛席"],
@@ -1065,9 +1065,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "cecef9912835aed0c837e390d5b2e02131cdd6a0200d298abc21a47583a23d62",
-        "facts": "ef64d552051308a8bdcbf5048ce4ef701dd0ec9850c4943d7b9b680dcd62ac33",
-        "decisions": "ad7d934819dfd927853d7116dd3f86262c7af186d6c795b30de0dc0a52881bdc"
+        "journal": "33bf40127d9bddabfc73a9af26e5b0f46972f16d21514c42783e288308854c04",
+        "facts": "7c4c3247d9614ef6af149745a02176b7ec3201d095cad0efe3493979ebc7e10e",
+        "decisions": "1f3222d363ec5e1f21dbe26a2621e22ebee9f3232c128f94d4178004ce2bbdfd"
       }
     },
     {
@@ -1083,8 +1083,8 @@
         "standard:huanggai",
         "standard:zhangfei"
       ],
-      "entries": 10628,
-      "facts": 1405,
+      "entries": 10646,
+      "facts": 1407,
       "decisions": 106,
       "result": {
         "winners": ["乙席", "己席", "庚席"],
@@ -1112,9 +1112,9 @@
         "standard:zhuahuangfeidian"
       ],
       "digest": {
-        "journal": "747a19b5c849a1a35b514fdc8e5a280eb0c023737283767dd17ed2de0671aca2",
-        "facts": "d09867a11f260e725d1e048a8ca4bc331212599a415ec9dd1d6d2c7a0eeb0301",
-        "decisions": "598332ce19e3794f46b5408c5952599e62e7a8c3d827bd204bec9fba61d2c4e5"
+        "journal": "ceb42b60dbc65dbc5f507a6fbc095e8b1872c73062789569cb42ebf6100bee28",
+        "facts": "b32f23498414acc93a5a3a542da389df98c2e1f2b08c81ccbc12e2be1d6e4956",
+        "decisions": "2fde0859eb458589118e8aec4664c54504d931eb8e3f697a6ef3a4dbb706a5e5"
       }
     },
     {
@@ -1130,8 +1130,8 @@
         "standard:ganning",
         "standard:zhenji"
       ],
-      "entries": 26895,
-      "facts": 3710,
+      "entries": 26976,
+      "facts": 3719,
       "decisions": 287,
       "result": {
         "winners": ["甲席", "丁席", "辛席"],
@@ -1166,9 +1166,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "c78c2b7b739affb8fb559597c0a8307f89b7861f3ace7e873856a11eec145d3e",
-        "facts": "84c0eb222634b8647e2b84a4959642d8129af2aca3d53331259faa1186773fd8",
-        "decisions": "0eef2249ba7f8280b23e14f3d80df6e65bbf896ee99a6502a23ae00facc06507"
+        "journal": "a6ba6dca5f11ce33139da6a683d985d20571ce23adb3074443a7edbbedb16a4b",
+        "facts": "1d79a9497ce4fb383a2e7b2889553e3e3bf8c1e69e9f2e01eb957564c9750ff0",
+        "decisions": "32316e4e6f2599249318714b99224815aa10033efaa6f58872e8f61929fea710"
       }
     },
     {
@@ -1184,8 +1184,8 @@
         "standard:simayi",
         "standard:zhangliao"
       ],
-      "entries": 20948,
-      "facts": 2925,
+      "entries": 21020,
+      "facts": 2933,
       "decisions": 244,
       "result": {
         "winners": ["乙席", "丙席", "己席", "庚席"],
@@ -1220,9 +1220,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "a12738c449ca160d3030a136453b631a7cdb82ec7e8f2dac68559ba0c2cc94c3",
-        "facts": "c4d1f5f21267a763a8830f2e60183cf66722e3dd2747dcc859b11ef9fea777b3",
-        "decisions": "42441dd334a87f40b6209eba3e28a6e667d6a699e4ff9ea7db58693840994e0e"
+        "journal": "a3c83df88d8b7a6d9153712105caa85cb2f5022a515296fd7af34ce545626405",
+        "facts": "74c7371073d03f67f181056b6d5603336db119883579279f746a391f5a56c8a7",
+        "decisions": "d75367c827eba414a827aab9d27f86cd7000744c1692f2b4535b7d850a40efa1"
       }
     },
     {
@@ -1238,8 +1238,8 @@
         "standard:liubei",
         "standard:lvmeng"
       ],
-      "entries": 22132,
-      "facts": 3035,
+      "entries": 22213,
+      "facts": 3044,
       "decisions": 239,
       "result": {
         "winners": ["戊席"],
@@ -1275,9 +1275,9 @@
         "standard:zixing"
       ],
       "digest": {
-        "journal": "996f1bce0f86844db77bde45637fc687221fd04fff9e543e444af66dea6e9707",
-        "facts": "c47ca3cf517b1d621d14ea230a7be04da1035f978c913544801e3b4d9bc8a77c",
-        "decisions": "4d936b7679525b26abe4bbac6d35f8e659a7e47d45162243478d7adcac0b32b6"
+        "journal": "351ebe9b668b6ca0ef5bbaab53d488c6f3d670fa757220022f570fcd370685aa",
+        "facts": "60731be83a57f7aba14c65bab3bc87998d9ba69f880403871dae1f796a97397b",
+        "decisions": "52daa092df6265e7dde95650c495532633cd306f5b866a71b6079b4d10bcf314"
       }
     }
   ]

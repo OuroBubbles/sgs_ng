@@ -1,34 +1,36 @@
 import { canDiscard } from '../cards/discard';
-import type { CardMove, Change, WorldReader, Zone } from '../../core/model/state';
+import type { CardMove, Change, Zone } from '../../core/model/state';
 import { immutable, isStringArray } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { assertLifetime } from '../scopes/lifetime';
-import type { Lifetime } from '../scopes/lifetime';
+import { lifetimeOf } from '../scopes/lifetime';
+import type { Scope } from '../scopes/lifetime';
 import type { SkillHandle } from '../skills/skills';
-import { readState, stateChange, useCount } from '../state/state';
+import { defineMark } from '../state/mark';
 import { isGameOver } from '../game/end';
 import { Cards } from '../cards/move';
 import { defineEvent, timing } from '../../core/runtime/event';
 import type { Timing } from '../../core/runtime/event';
 
-export interface UsageLimit {
+/** 次数限制：每阶段 / 每回合 / 每轮 / 每局至多 times 次。牌与主动技共用这一种写法。 */
+export interface Limit {
+  readonly per: Scope;
+  readonly times: number;
+}
+/** 规则层的限制：key 是计数命名空间（牌名或技能名），跨重新授予共享。 */
+export interface UsageLimit extends Limit {
   readonly key: string;
-  /** 规则选择计数命名空间：技能名可跨重新授予共享，实例 ID 则区分每次技能实例。 */
-  readonly source: string | null;
-  readonly lifetime: Lifetime;
-  readonly max: number;
 }
 
-function usageTarget(actor: string, limit: UsageLimit) {
-  return {
-    owner: actor,
-    source: JSON.stringify([limit.source, limit.key]),
-    lifetime: limit.lifetime,
-  };
-}
+const useCount = defineMark('core:use-count', 0);
+const counted = (ctx: Context, limit: UsageLimit) => ({
+  source: limit.key,
+  lifetime: lifetimeOf(ctx, limit.per),
+});
 
-export function used(world: WorldReader, actor: string, limit: UsageLimit): number {
-  return readState(world, useCount, usageTarget(actor, limit));
+/** 本作用域内已计次数；不在该作用域内（如阶段外）为 0。 */
+export function used(ctx: Context, actor: string, limit: UsageLimit): number {
+  const slot = counted(ctx, limit);
+  return limit.per !== 'game' && !slot.lifetime ? 0 : useCount.of(ctx, actor, slot);
 }
 
 export interface PaymentOptions {
@@ -120,18 +122,20 @@ function performPayment(
       if ((specifiedActor === undefined) === (skill === undefined))
         throw new Error('Payment requires exactly one actor or skill source.');
       const limit = spec.limit;
-      if (limit) {
-        assertLifetime(child, limit.lifetime);
-        if (!limit.key || !Number.isSafeInteger(limit.max) || limit.max < 0)
-          throw new Error('Invalid usage limit.');
-      }
+      if (
+        limit &&
+        (!limit.key ||
+          !(limit.times >= 0) ||
+          (limit.per !== 'game' && !lifetimeOf(child, limit.per)))
+      )
+        throw new Error('Invalid usage limit.');
       const materials = spec.cards;
       if ((materials === undefined) !== (to === undefined))
         throw new Error('Payment materials and destination must be provided together.');
       if (to !== undefined) child.world.zone(to);
       if (skill ? !child.query(() => skill.active(child)) : !child.world.player(actor).alive)
         return { kind: 'unavailable', reason: 'Actor or skill is no longer available.' };
-      if (limit && used(child.world, actor, limit) >= limit.max)
+      if (limit && used(child, actor, limit) >= limit.times)
         return { kind: 'unavailable', reason: 'Usage limit reached.' };
       // 权限检查与实际移动使用同一份材料，查询回调不能替换本次费用。
       const ids = child.query(() => immutable(materials ?? []));
@@ -172,12 +176,7 @@ function performPayment(
       const changes: Change[] = materialMoves.map((move) => ({ kind: 'move', ...move }));
       if (limit)
         changes.push(
-          stateChange(
-            child,
-            useCount,
-            usageTarget(actor, limit),
-            used(child.world, actor, limit) + 1,
-          ),
+          useCount.change(child, actor, used(child, actor, limit) + 1, counted(child, limit)),
         );
       changes.push(...(spec.changes ?? []));
       const moves = immutable(

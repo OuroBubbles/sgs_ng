@@ -322,9 +322,9 @@ it('转移、重复与追加持械者保留同一受害者，各自完整用杀'
     name: '多目标',
     triggers: [],
     modifiers: [
-      modify(cardQueries.extraTargets, (_ctx, { input: use }) =>
+      modify(cardQueries.useRule, (_ctx, { input: use }) =>
         use.card.name === 'standard:collateral' && use.targets.some((t) => primaryOf(t) === 'b')
-          ? 1
+          ? { targets: 1 }
           : undefined,
       ),
     ],

@@ -17,8 +17,8 @@ import type {
 } from '../protocol';
 import type { CardView, CardChoiceView } from '../protocol';
 import { immutable, isStringArray } from '../core/model/value';
-import { activePhase, activeTurn, activeTarget } from '../rules/turn/turn';
-import { readState } from '../rules/state/state';
+import { activePhase, activeTurn } from '../rules/turn/turn';
+
 import { knownRole } from './knowledge';
 import { roleOf } from '../rules/game/roles';
 import { genderOf } from '../rules/characters/gender';
@@ -610,8 +610,8 @@ export function projectMatch(
   return match.room.inspect((ctx) => {
     const world = ctx.world;
     const assigned = match.progress !== null;
-    const active = readState(world, activeTurn, activeTarget);
-    const phase = readState(world, activePhase, activeTarget);
+    const active = activeTurn.of(world);
+    const phase = activePhase.of(world);
     const handoff =
       request && (request.kind === 'seat-ready' || request.player !== viewer)
         ? {

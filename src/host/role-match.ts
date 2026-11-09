@@ -7,17 +7,16 @@ import { moveCards } from '../rules/cards/move';
 import { installRescue } from '../rules/combat/rescue';
 import { installCounterspells } from '../rules/cards/counter';
 import { installDelayedCards } from '../rules/cards/delayed';
-import { resultOf } from '../rules/game/end';
+import { isGameOver, resultOf } from '../rules/game/end';
 import type { GameResult } from '../rules/game/end';
 import { assignRoles, installRoleMode, roleRoster, roleSeats } from '../rules/game/roles';
 import type { Role } from '../rules/game/roles';
 import type { SkillBook } from '../rules/skills/skills';
-import { defineState, readState, stateChange } from '../rules/state/state';
-import { runTurn, defaultPhaseBody } from '../rules/turn/turn';
+import { defineMark } from '../rules/state/mark';
+import { defaultPhaseBody } from '../rules/turn/turn';
 import type { PhaseBody } from '../rules/turn/turn';
-import { turnActionAnchor } from '../rules/turn/order';
+import { playRounds, rotationOf, turnActionAnchor } from '../rules/turn/order';
 import type { ActionAnchor } from '../core/runtime/event';
-import { takeExtraTurn } from '../rules/turn/extra';
 import { genderChange } from '../rules/characters/gender';
 import type { Gender } from '../rules/characters/gender';
 import { kingdomChange } from '../rules/characters/kingdom';
@@ -55,25 +54,14 @@ export interface MatchProgress {
   readonly turns: number;
   readonly next: string;
 }
-const matchState = defineState<MatchProgress | null>(
-  'role:match',
-  null,
-  (value): value is MatchProgress | null =>
-    value === null ||
-    (typeof value === 'object' &&
-      value !== null &&
-      'stage' in value &&
-      (value.stage === 'preparing' || value.stage === 'ready' || value.stage === 'playing') &&
-      'turns' in value &&
-      Number.isSafeInteger(value.turns) &&
-      'next' in value &&
-      typeof value.next === 'string'),
-);
-const matchTarget = Object.freeze({ owner: null, source: 'match', lifetime: null });
+/** 本局阶段与首席；回合游标（turns / next）属于规则层的回合序列。 */
+const matchState = defineMark<{
+  readonly stage: 'preparing' | 'ready';
+  readonly first: string;
+} | null>('role:match', null);
 export const Match = defineEvent('match', {
   prepared: timing<{ readonly first: string }>(),
   preparing: timing<unknown>(),
-  turn: timing<unknown>(),
 });
 
 /** Fisher–Yates 只消耗 Context 随机源；最终身份/牌序都通过事实提交。 */
@@ -206,7 +194,12 @@ export class RoleMatch {
   }
 
   get progress(): MatchProgress | null {
-    return readState(this.room.world, matchState, matchTarget);
+    const match = matchState.of(this.room.world);
+    const rotation = rotationOf(this.room.world);
+    if (!match) return null;
+    return rotation
+      ? { stage: 'playing', turns: rotation.turns, next: rotation.next }
+      : { stage: match.stage, turns: 0, next: match.first };
   }
   get result(): GameResult | null {
     return resultOf(this.room.world);
@@ -225,7 +218,7 @@ export class RoleMatch {
       ctx.commit(
         Match.preparing,
         [
-          stateChange(ctx, matchState, matchTarget, { stage: 'preparing', turns: 0, next: lord }),
+          matchState.change(ctx, null, { stage: 'preparing', first: lord }),
           ...this.#players.map((player) => genderChange(ctx, player.id, player.gender ?? 'none')),
           ...this.#players.map((player) => kingdomChange(ctx, player.id, player.kingdom ?? null)),
           ...this.#players.flatMap((player) =>
@@ -268,11 +261,9 @@ export class RoleMatch {
         if (this.result) break;
         await draw(ctx, { player: id, count: 4, reason: 'match:initial-hand' });
       }
-      ctx.commit(
-        Match.prepared,
-        [stateChange(ctx, matchState, matchTarget, { stage: 'ready', turns: 0, next: lord })],
-        { first: lord },
-      );
+      ctx.commit(Match.prepared, [matchState.change(ctx, null, { stage: 'ready', first: lord })], {
+        first: lord,
+      });
       if (!this.result) await ctx.window(Match.prepared, { first: lord }, { subject: lord });
     });
   }
@@ -280,56 +271,30 @@ export class RoleMatch {
   play(): Promise<FlowResult<GameResult>> {
     if (this.result) return Promise.resolve({ kind: 'resolved', value: this.result });
     if (this.progress?.stage !== 'ready') throw new Error('Prepare the match before play.');
+    const first = this.progress.next;
     return this.room.run('match.play', async (ctx) => {
-      const seats = this.#players.map((player) => player.id);
-      while (!this.result) {
-        const progress = this.progress!;
-        const extra = takeExtraTurn(ctx);
-        const start = seats.indexOf(progress.next);
-        const owner =
-          extra?.owner ??
-          [...seats.slice(start), ...seats.slice(0, start)].find(
-            (id) => ctx.world.player(id).alive,
-          );
-        if (!owner) throw new Error('No living seat and no game result.');
+      await playRounds(ctx, {
+        seats: this.#players.map((player) => player.id),
+        first,
+        body: this.#body,
         // 热座交接也是无可用动作时的暂停点；不靠计时器或无限空转推进回合。
-        const ready = await ctx.ask<true>({
-          player: owner,
-          kind: 'seat-ready',
-          prompt: `请交给 ${owner}，确认开始回合`,
-          data: { turn: progress.turns + 1, extra: extra !== null },
-          optional: false,
-          validate: (input) =>
-            input === true
-              ? { ok: true, value: true }
-              : { ok: false, reason: 'Confirm the active seat.' },
-        });
-        if (this.result) break;
-        if (ready.kind !== 'chosen') return ctx.abort('Seat handoff interrupted.');
-        // 额外回合只插入执行，不移动正常轮转游标。
-        const next = extra ? progress.next : seats[(seats.indexOf(owner) + 1) % seats.length]!;
-        ctx.commit(
-          Match.turn,
-          [
-            stateChange(ctx, matchState, matchTarget, {
-              stage: 'playing',
-              turns: progress.turns + 1,
-              next,
-            }),
-          ],
-          { owner, turn: progress.turns + 1, extra },
-        );
-        await runTurn(ctx, owner, {
-          body: this.#body,
-          ...(extra
-            ? {
-                origin: { kind: 'extra', id: extra.id, reason: extra.reason },
-                phases: extra.phases,
-              }
-            : {}),
-        });
-      }
-      return this.result;
+        async ready(at, next) {
+          const ready = await at.ask<true>({
+            player: next.owner,
+            kind: 'seat-ready',
+            prompt: `请交给 ${next.owner}，确认开始回合`,
+            data: { turn: next.turn, extra: next.extra !== null },
+            optional: false,
+            validate: (input) =>
+              input === true
+                ? { ok: true, value: true }
+                : { ok: false, reason: 'Confirm the active seat.' },
+          });
+          if (ready.kind !== 'chosen' && !isGameOver(at.world))
+            return at.abort('Seat handoff interrupted.');
+        },
+      });
+      return this.result!;
     });
   }
 

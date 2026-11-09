@@ -4,11 +4,9 @@ import { keji } from '../../src/content/standard/generals/lvmeng';
 import { guicai } from '../../src/content/standard/generals/simayi';
 import {
   activePhase,
-  activeTarget,
   activeTurn,
   cardActivities,
   judge,
-  readState,
   runPhase,
   runTurn,
   Lifetime,
@@ -107,8 +105,8 @@ async function complete(
       Number(invokes === 0),
     );
     expect(game.room.decisions.pending).toEqual([]);
-    expect(readState(game.room.world, activeTurn, activeTarget)).toBeNull();
-    expect(readState(game.room.world, activePhase, activeTarget)).toBeNull();
+    expect(activeTurn.of(game.room.world)).toBeNull();
+    expect(activePhase.of(game.room.world)).toBeNull();
     expect(game.room.world.snapshot.states.filter((state) => state.scopeId !== null)).toEqual([]);
     expect(game.room.world.position('hit')).toBe('discard');
     expect(rebuildWorld(game.initial, game.room.history.facts())).toEqual(game.room.world.snapshot);

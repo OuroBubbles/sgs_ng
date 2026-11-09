@@ -2,7 +2,7 @@ import { face } from './face';
 import type { Card, WorldReader } from '../../core/model/state';
 import { immutable } from '../../core/model/value';
 import type { Context } from '../../core/runtime/room';
-import { defineState, readState, stateChange } from '../state/state';
+import { defineMark } from '../state/mark';
 import { assertLifetime, withLifetime } from '../scopes/lifetime';
 import type { Lifetime } from '../scopes/lifetime';
 import { isGameOver } from '../game/end';
@@ -87,17 +87,7 @@ export const Judgment = defineEvent('judgment', {
     readonly card: string;
   }>(),
 });
-const currentCard = defineState<JudgmentCard | null>(
-  'core:judgment-card',
-  null,
-  (value): value is JudgmentCard | null =>
-    value === null ||
-    (typeof value === 'object' &&
-      'id' in value &&
-      typeof value.id === 'string' &&
-      'color' in value &&
-      ['red', 'black', 'none'].includes(String(value.color))),
-);
+const currentCard = defineMark<JudgmentCard | null>('core:judgment-card', null);
 
 /** 判定牌面和材料位置分离：牌被获得不抹掉结果，改判则原子替换牌面与持有材料。 */
 export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentResult> {
@@ -107,7 +97,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
   if (!input.reason) throw new Error('Judgment requires a reason.');
   return withLifetime(ctx, 'judgment', async (host, lifetime) => {
     const result = await withProcessing<JudgmentResult>(host, [], async (at, processing) => {
-      const target = { owner: input.player, source: lifetime.id, lifetime };
+      const slot = { source: lifetime.id, lifetime };
       let open = true;
       let sealed: JudgmentResult | null = null;
       at.defer(() => {
@@ -120,14 +110,14 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
         processing: processing.zone,
         get card() {
           if (sealed) return sealed.card;
-          const current = readState(at.world, currentCard, target);
+          const current = currentCard.of(at.world, input.player, slot);
           return current ? face(at, current.id, input.player) : null;
         },
         replace: (child: Context, replacement: RetrialInput) =>
           replaceJudgment(child, control, replacement, {
             lifetime,
             world: at.world,
-            target,
+            slot,
             open: () => open,
           }),
       });
@@ -145,7 +135,7 @@ export function judge(ctx: Context, request: JudgmentInput): Promise<JudgmentRes
             {
               kind: Judgment.revealed,
               data: { id: control.id, ...input, processing: processing.zone, card },
-              changes: [stateChange(at, currentCard, target, card)],
+              changes: [currentCard.change(at, input.player, card, slot)],
             },
           );
 
@@ -187,11 +177,7 @@ async function replaceJudgment(
   control: {
     readonly lifetime: Lifetime;
     readonly world: WorldReader;
-    readonly target: {
-      readonly owner: string;
-      readonly source: string;
-      readonly lifetime: Lifetime;
-    };
+    readonly slot: { readonly source: string; readonly lifetime: Lifetime };
     readonly open: () => boolean;
   },
 ): Promise<'replaced' | 'unavailable'> {
@@ -265,7 +251,7 @@ async function replaceJudgment(
           ...(invocation ? { invocation } : {}),
           ...(response ? { response } : {}),
         },
-        changes: [stateChange(child, currentCard, control.target, card)],
+        changes: [currentCard.change(child, judgment.player, card, control.slot)],
       },
     );
 

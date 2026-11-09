@@ -123,12 +123,12 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
     }
   }
   await game.room.run('cost', (ctx) =>
-    withLifetime(ctx, 'phase', async (at, lifetime) => {
-      const limit = { key: 'once', source: 'prototype', max: 1, lifetime };
+    withLifetime(ctx, 'phase', async (at) => {
+      const limit = { key: 'once', per: 'phase', times: 1 } as const;
       const spec = new TestCost(limit);
       expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(at.world.position('fee')).toBe('a:hand');
-      expect(used(at.world, 'a', limit)).toBe(0);
+      expect(used(at, 'a', limit)).toBe(0);
       expect(game.room.history.facts(spec.factKind)).toEqual([]);
 
       const order: string[] = [];
@@ -139,7 +139,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
           eligible: () => true,
           run(child) {
             expect(child.world.position('fee')).toBe('discard');
-            expect(used(child.world, 'a', limit)).toBe(1);
+            expect(used(child, 'a', limit)).toBe(1);
             order.push('moved');
           },
         }),
@@ -166,7 +166,7 @@ it('弃牌费用保留原型字段与私有方法，实时资格、次数和宣�
       });
       expect(order).toEqual(['moved', 'paid']);
       expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
-      expect(used(at.world, 'a', limit)).toBe(1);
+      expect(used(at, 'a', limit)).toBe(1);
       expect(game.room.history.facts(spec.factKind)).toHaveLength(1);
     }),
   );
@@ -182,8 +182,8 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
   });
   await grant(game, 'a');
   await game.room.run('cost', (ctx) =>
-    withLifetime(ctx, 'phase', async (at, lifetime) => {
-      const limit = { key: 'once', source: 'skill', max: 1, lifetime };
+    withLifetime(ctx, 'phase', async (at) => {
+      const limit = { key: 'once', per: 'phase', times: 1 } as const;
       let materialReads = 0;
       const spec = {
         actor: 'a',
@@ -197,7 +197,7 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
       expect(await payDiscard(at, spec)).toMatchObject({ kind: 'unavailable' });
       expect(materialReads).toBe(1);
       expect(at.world.zone('a:hand').cards).toEqual(['guarded', 'free']);
-      expect(used(at.world, 'a', limit)).toBe(0);
+      expect(used(at, 'a', limit)).toBe(0);
       await game.skills.revoke(at, 'a', skill.id, source);
       at.defer(
         game.room.on(Cards.moved, {
@@ -206,7 +206,7 @@ it('费用整批重查，受保护材料不能部分支付，也不能被自定�
           eligible: () => true,
           run(child) {
             expect(child.world.zone('a:hand').cards).toEqual([]);
-            expect(used(child.world, 'a', limit)).toBe(1);
+            expect(used(child, 'a', limit)).toBe(1);
           },
         }),
       );
